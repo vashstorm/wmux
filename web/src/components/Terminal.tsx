@@ -81,16 +81,20 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const fitAddonRef = useRef<FitAddon | null>(null);
 	const wsRef = useRef<TerminalWebSocket | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
+	const resizeFrameRef = useRef<number | null>(null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 	const fitAndReadSize = useCallback((): TerminalSize | null => {
 		const terminal = terminalRef.current;
 		const fitAddon = fitAddonRef.current;
-		if (!terminal || !fitAddon) return null;
+		const container = containerRef.current;
+		if (!terminal || !fitAddon || !container) return null;
 
 		const proposed = fitAddon.proposeDimensions();
-		fitAddon.fit();
+		if (proposed) {
+			fitAddon.fit();
+		}
 
 		return normalizeTerminalSize(
 			proposed?.cols ?? terminal.cols,
@@ -184,7 +188,13 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		});
 
 		const resizeObserver = new ResizeObserver(() => {
-			fitAddon.fit();
+			if (resizeFrameRef.current !== null) {
+				window.cancelAnimationFrame(resizeFrameRef.current);
+			}
+			resizeFrameRef.current = window.requestAnimationFrame(() => {
+				resizeFrameRef.current = null;
+				fitAndReadSize();
+			});
 		});
 
 		if (containerRef.current) {
@@ -214,6 +224,10 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		return () => {
 			themeObserver.disconnect();
 			resizeObserver.disconnect();
+			if (resizeFrameRef.current !== null) {
+				window.cancelAnimationFrame(resizeFrameRef.current);
+				resizeFrameRef.current = null;
+			}
 			resizeObserverRef.current = null;
 			terminal.dispose();
 			terminalRef.current = null;
