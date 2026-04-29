@@ -79,7 +79,6 @@ describe("PaneCanvas", () => {
 
 		const activeBox = screen.getByTestId("pane-box-active");
 		expect(activeBox).toHaveClass("is-active");
-		expect(activeBox).toHaveTextContent("bash");
 	});
 
 	test("clicking a pane fires onSelectPane with pane ID", () => {

@@ -73,8 +73,8 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
-							<div className="pane-box-label">{pane.title}</div>
-							{isActive && selectedPane && (
+						{!isActive && <div className="pane-box-label">{pane.title}</div>}
+						{isActive && selectedPane && (
 								<div className="pane-box-terminal">
 									<Terminal selectedPane={selectedPane} />
 								</div>
