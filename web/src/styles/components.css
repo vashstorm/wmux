@@ -1534,6 +1534,14 @@
 	min-height: 0;
 }
 
+.pane-canvas-terminal {
+	position: absolute;
+	inset: 0;
+	min-width: 0;
+	min-height: 0;
+	z-index: 0;
+}
+
 .pane-box {
 	background-color: var(--color-panel);
 	border: 1px solid var(--color-border);
@@ -1547,14 +1555,33 @@
 	min-height: 0;
 }
 
+.pane-canvas.has-terminal .pane-box {
+	background-color: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	pointer-events: none;
+	z-index: 1;
+}
+
 .pane-box:hover {
 	border-color: var(--color-accent-subtle);
+}
+
+.pane-canvas.has-terminal .pane-box:hover {
+	border-color: transparent;
 }
 
 .pane-box.is-active {
 	border: 2px solid var(--color-accent);
 	box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
 	z-index: 1;
+}
+
+.pane-canvas.has-terminal .pane-box.is-active {
+	background-color: transparent;
+	border-color: var(--color-accent);
+	box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+	z-index: 2;
 }
 
 .pane-box-label {
@@ -1565,6 +1592,12 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	flex-shrink: 0;
+	align-self: flex-start;
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	cursor: pointer;
+	pointer-events: auto;
 }
 
 .pane-box.is-active .pane-box-label {

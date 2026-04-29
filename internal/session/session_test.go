@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,6 +94,47 @@ func TestBridgeForwardsResize(t *testing.T) {
 		sizes := terminal.sizesSnapshot()
 		return len(sizes) == 1 && sizes[0] == (WindowSize{Rows: 55, Cols: 120})
 	}, "resize forwarding")
+
+	manager.Detach("conn-1")
+	assertNoSessionError(t, errCh)
+}
+
+func TestBridgePreservesUTF8AcrossOutputReads(t *testing.T) {
+	manager := NewManager()
+	terminal := newFakeTerminal()
+	conn, errCh := openTerminalSession(t, &manager, "session-one", terminal)
+
+	payload := []byte("prefix: \xe4\xb8\xad\xe6\x96\x87 icon: \xf0\x9f\x9a\x80\n")
+	splitAt := bytes.Index(payload, []byte{0xe4, 0xb8, 0xad}) + 2
+	if splitAt < 2 {
+		t.Fatalf("failed to find split point in payload")
+	}
+
+	if _, err := terminal.outputWriter.Write(payload[:splitAt]); err != nil {
+		t.Fatalf("failed to write first output chunk: %v", err)
+	}
+	if _, err := terminal.outputWriter.Write(payload[splitAt:]); err != nil {
+		t.Fatalf("failed to write second output chunk: %v", err)
+	}
+
+	var got string
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("failed to set read deadline: %v", err)
+	}
+	for len([]byte(got)) < len(payload) {
+		var message protocol.ServerMessage
+		if err := conn.ReadJSON(&message); err != nil {
+			t.Fatalf("failed to read output message: %v", err)
+		}
+		if message.Type != protocol.ServerMessageTypeOutput {
+			t.Fatalf("unexpected server message: %#v", message)
+		}
+		got += message.Data
+	}
+
+	if got != string(payload) {
+		t.Fatalf("unexpected terminal output:\nwant: %q\n got: %q", string(payload), got)
+	}
 
 	manager.Detach("conn-1")
 	assertNoSessionError(t, errCh)

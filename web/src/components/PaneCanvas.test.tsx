@@ -113,7 +113,7 @@ describe("PaneCanvas", () => {
 		expect(screen.getByText("No panes loaded")).toBeInTheDocument();
 	});
 
-	test("renders Terminal only in active pane", () => {
+	test("renders one Terminal for the selected pane", () => {
 		render(
 			<PaneCanvas
 				panes={mockPanes}

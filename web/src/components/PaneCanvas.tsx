@@ -49,8 +49,16 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 	}
 
 	return (
-		<div className="pane-canvas" data-testid="pane-canvas">
+		<div
+			className={`pane-canvas${selectedPane ? " has-terminal" : ""}`}
+			data-testid="pane-canvas"
+		>
 			<div className="pane-canvas-stage">
+				{selectedPane && (
+					<div className="pane-canvas-terminal" data-testid="pane-canvas-terminal">
+						<Terminal selectedPane={selectedPane} />
+					</div>
+				)}
 				{panes.map((pane) => {
 					const isActive = pane.id === selectedPaneId;
 					const isAttentionExplicit = pane.attentionState === "explicit";
@@ -75,16 +83,22 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
-						{(isAttention || isAttentionExplicit) && (
-							<div className="pane-box-attention-indicator">
-								<span className="attention-badge" />
-							</div>
-						)}
-						{!isActive && <div className="pane-box-label">{pane.title}</div>}
-						{isActive && selectedPane && (
-								<div className="pane-box-terminal">
-									<Terminal selectedPane={selectedPane} />
+							{(isAttention || isAttentionExplicit) && (
+								<div className="pane-box-attention-indicator">
+									<span className="attention-badge" />
 								</div>
+							)}
+							{!isActive && (
+								<button
+									type="button"
+									className="pane-box-label"
+									onClick={(event) => {
+										event.stopPropagation();
+										onSelectPane(pane.id);
+									}}
+								>
+									{pane.title}
+								</button>
 							)}
 						</div>
 					);

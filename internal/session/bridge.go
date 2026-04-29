@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"context"
 
@@ -151,17 +152,25 @@ func (b terminalBridge) readPump(ctx context.Context, cancel context.CancelFunc,
 func (b terminalBridge) outputPump(ctx context.Context, cancel context.CancelFunc, outbound chan<- protocol.ServerMessage) {
 	reader := b.terminal.Output()
 	buffer := make([]byte, terminalBufferSize)
+	pending := make([]byte, 0, utf8.UTFMax)
 	for {
 		n, err := reader.Read(buffer)
 		if n > 0 {
-			if !sendServerMessage(ctx, outbound, protocol.ServerMessage{
-				Type: protocol.ServerMessageTypeOutput,
-				Data: string(buffer[:n]),
-			}) {
-				return
+			chunk := append(pending, buffer[:n]...)
+			var complete []byte
+			complete, pending = splitCompleteUTF8(chunk)
+			if len(complete) > 0 {
+				if !sendTerminalOutput(ctx, outbound, string(complete)) {
+					return
+				}
 			}
 		}
 		if err != nil {
+			if len(pending) > 0 {
+				if !sendTerminalOutput(ctx, outbound, string(pending)) {
+					return
+				}
+			}
 			if errors.Is(err, io.EOF) || ctx.Err() != nil {
 				cancel()
 				return
@@ -170,6 +179,53 @@ func (b terminalBridge) outputPump(ctx context.Context, cancel context.CancelFun
 			cancel()
 			return
 		}
+	}
+}
+
+func splitCompleteUTF8(data []byte) ([]byte, []byte) {
+	if len(data) == 0 {
+		return data, nil
+	}
+
+	maxCheck := min(utf8.UTFMax, len(data))
+	for i := len(data) - 1; i >= len(data)-maxCheck; i-- {
+		b := data[i]
+		if b < utf8.RuneSelf {
+			return data, nil
+		}
+		if !utf8.RuneStart(b) {
+			continue
+		}
+
+		size := expectedUTF8Size(b)
+		if size == 0 {
+			return data, nil
+		}
+		if len(data)-i >= size {
+			return data, nil
+		}
+		for j := i + 1; j < len(data); j++ {
+			if data[j]&0xc0 != 0x80 {
+				return data, nil
+			}
+		}
+
+		return data[:i], append([]byte(nil), data[i:]...)
+	}
+
+	return data, nil
+}
+
+func expectedUTF8Size(b byte) int {
+	switch {
+	case b >= 0xc2 && b <= 0xdf:
+		return 2
+	case b >= 0xe0 && b <= 0xef:
+		return 3
+	case b >= 0xf0 && b <= 0xf4:
+		return 4
+	default:
+		return 0
 	}
 }
 
@@ -210,6 +266,13 @@ func (b terminalBridge) writeJSON(message protocol.ServerMessage) error {
 
 func (b terminalBridge) writePing() error {
 	return b.wsConn.WriteControl(websocket.PingMessage, nil, time.Now().Add(terminalWriteWait))
+}
+
+func sendTerminalOutput(ctx context.Context, outbound chan<- protocol.ServerMessage, data string) bool {
+	return sendServerMessage(ctx, outbound, protocol.ServerMessage{
+		Type: protocol.ServerMessageTypeOutput,
+		Data: data,
+	})
 }
 
 func sendServerMessage(ctx context.Context, outbound chan<- protocol.ServerMessage, message protocol.ServerMessage) bool {

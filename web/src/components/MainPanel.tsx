@@ -104,12 +104,36 @@ export function MainPanel() {
 
 				const nextWindows = windowsResponse.data ?? [];
 				const activeWindow = nextWindows.find((window) => window.Active);
-				if (!activeWindow || activeWindow.ID === selectedPane.window) return;
-
 				setWindows(selectedPane.connectionId, selectedPane.session, nextWindows);
-				await handleSelectWindow(activeWindow.ID, activeWindow.ActivePaneID, {
-					forcePanes: true,
-				});
+
+				if (!activeWindow) return;
+
+				if (activeWindow.ID !== selectedPane.window) {
+					await handleSelectWindow(activeWindow.ID, activeWindow.ActivePaneID, {
+						forcePanes: true,
+					});
+					return;
+				}
+
+				const panesResponse = await listPanes(
+					selectedPane.connectionId,
+					selectedPane.session,
+					activeWindow.ID,
+				);
+				if (cancelled) return;
+
+				const nextPanes = panesResponse.data ?? [];
+				setPanes(selectedPane.connectionId, selectedPane.session, activeWindow.ID, nextPanes);
+
+				const activePane = nextPanes.find((pane) => pane.Active);
+				if (activePane && activePane.ID !== selectedPane.pane) {
+					setSelectedPane({
+						connectionId: selectedPane.connectionId,
+						session: selectedPane.session,
+						window: activeWindow.ID,
+						pane: activePane.ID,
+					});
+				}
 			} catch {
 				// 保持终端输入顺滑；显式 API 操作仍会显示错误。
 			} finally {
@@ -125,7 +149,33 @@ export function MainPanel() {
 			cancelled = true;
 			window.clearInterval(intervalId);
 		};
-	}, [handleSelectWindow, selectedPane, setWindows]);
+	}, [handleSelectWindow, selectedPane, setPanes, setSelectedPane, setWindows]);
+
+	useEffect(() => {
+		if (!selectedPane || !selectedPane.window) return;
+
+		let cancelled = false;
+		const loadInitialPanes = async () => {
+			try {
+				const panesResponse = await listPanes(
+					selectedPane.connectionId,
+					selectedPane.session,
+					selectedPane.window ?? "",
+				);
+				if (cancelled) return;
+				const panes = panesResponse.data ?? [];
+				setPanes(selectedPane.connectionId, selectedPane.session, selectedPane.window ?? "", panes);
+			} catch {
+				// 周期同步会继续尝试刷新。
+			}
+		};
+
+		void loadInitialPanes();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedPane?.connectionId, selectedPane?.session, selectedPane?.window, setPanes]);
 
 	const handleSelectPane = (paneId: string) => {
 		if (!selectedPane) return;

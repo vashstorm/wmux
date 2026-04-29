@@ -15,6 +15,8 @@ import {
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
 
+const SESSION_SYNC_INTERVAL_MS = 2000;
+
 function isApiError(err: unknown): err is Error & { code: string; message: string } {
   return err instanceof Error && "code" in err && "message" in err;
 }
@@ -120,10 +122,43 @@ export function Sidebar() {
     loadSessionsForConnection(selectedConnectionId);
   }, [selectedConnectionId, loadSessionsForConnection]);
 
+  useEffect(() => {
+    if (!selectedConnectionId) return;
+
+    let cancelled = false;
+    let inFlight = false;
+    const syncSessions = async () => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        await loadSessionsForConnection(selectedConnectionId);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void syncSessions();
+    }, SESSION_SYNC_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [selectedConnectionId, loadSessionsForConnection]);
+
   const connectionSessions = useMemo(() => {
     if (!selectedConnectionId) return [];
     return sessions[selectedConnectionId] ?? [];
   }, [sessions, selectedConnectionId]);
+
+  useEffect(() => {
+    if (!selectedConnectionId || selectedPane?.connectionId !== selectedConnectionId) return;
+    if (!sessions[selectedConnectionId]) return;
+    if (connectionSessions.some((session) => session.name === selectedPane.session)) return;
+
+    setSelectedPane(null);
+  }, [connectionSessions, selectedConnectionId, selectedPane, sessions, setSelectedPane]);
 
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return connectionSessions;

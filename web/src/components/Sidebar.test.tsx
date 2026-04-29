@@ -27,6 +27,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 
 describe("Sidebar session loading", () => {
 	beforeEach(() => {
+		vi.useRealTimers();
 		vi.clearAllMocks();
 		mockListConnections.mockResolvedValue([
 			{ id: "conn1", type: "local" },
@@ -35,6 +36,37 @@ describe("Sidebar session loading", () => {
 	});
 
 	describe("handleOpenSession happy path", () => {
+		test("periodically refreshes sessions for external tmux changes", async () => {
+			mockListSessions
+				.mockResolvedValueOnce({
+					connectionId: "conn1",
+					mode: "local",
+					data: [{ name: "session1", attached: false }],
+				})
+				.mockResolvedValueOnce({
+					connectionId: "conn1",
+					mode: "local",
+					data: [
+						{ name: "session1", attached: false },
+						{ name: "session2", attached: false },
+					],
+				});
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session2")).toBeInTheDocument();
+			}, { timeout: 3000 });
+		}, 4000);
+
 		test("loads windows and panes, sets selectedPane with active IDs", async () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",

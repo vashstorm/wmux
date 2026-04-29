@@ -13,6 +13,7 @@ const mockXTermLoadAddon = vi.fn();
 const mockXTermDispose = vi.fn();
 const mockXTermOnData = vi.fn();
 const mockXTermOnResize = vi.fn();
+const mockXTermFocus = vi.fn();
 const mockFit = vi.fn();
 const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
 
@@ -30,6 +31,7 @@ vi.mock("@xterm/xterm", () => ({
 		dispose: mockXTermDispose,
 		onData: mockXTermOnData,
 		onResize: mockXTermOnResize,
+		focus: mockXTermFocus,
 	})),
 }));
 
@@ -87,6 +89,7 @@ describe("Terminal", () => {
 		mockClose.mockClear();
 		mockXTermWrite.mockClear();
 		mockXTermWriteln.mockClear();
+		mockXTermFocus.mockClear();
 		mockFit.mockClear();
 		mockProposeDimensions.mockClear();
 		capturedOnMessage = null;
