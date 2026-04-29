@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/protocol"
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/protocol"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 func TestNewManager(t *testing.T) {
@@ -127,7 +127,7 @@ func TestAttachLocalCloseKeepsTmuxSession(t *testing.T) {
 	}
 
 	adapter := tmux.NewAdapter("tmux")
-	sessionName := fmt.Sprintf("webmux-test-%d", time.Now().UnixNano())
+	sessionName := fmt.Sprintf("wmux-test-%d", time.Now().UnixNano())
 	if _, err := adapter.NewSession(sessionName); err != nil {
 		t.Fatalf("failed to create tmux session: %v", err)
 	}

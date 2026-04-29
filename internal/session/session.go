@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/sshclient"
+	"github.com/panh/wmux/internal/sshclient"
 )
 
 const (

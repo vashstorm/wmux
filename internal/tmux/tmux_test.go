@@ -178,8 +178,8 @@ func TestLocalTmuxIntegration(t *testing.T) {
 	}
 
 	adapter := NewAdapter(path)
-	sessionName := fmt.Sprintf("webmux-test-%d", time.Now().UnixNano())
-	windowName := "webmux-window"
+	sessionName := fmt.Sprintf("wmux-test-%d", time.Now().UnixNano())
+	windowName := "wmux-window"
 
 	t.Cleanup(func() {
 		_ = adapter.KillSession(sessionName)

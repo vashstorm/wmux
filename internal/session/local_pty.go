@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/creack/pty"
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 type localPTY struct {

@@ -13,9 +13,9 @@ import (
 	"testing/fstest"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/config"
-	"github.com/panh/webmux/internal/protocol"
-	"github.com/panh/webmux/internal/server"
+	"github.com/panh/wmux/internal/config"
+	"github.com/panh/wmux/internal/protocol"
+	"github.com/panh/wmux/internal/server"
 )
 
 type configResponse struct {
@@ -68,7 +68,7 @@ func TestStaticFallbackServesIndex(t *testing.T) {
 		t.Fatalf("unexpected status code: %d", rec.Code)
 	}
 
-	if string(body) != "<html>Webmux</html>" {
+	if string(body) != "<html>Wmux</html>" {
 		t.Fatalf("unexpected fallback body: %q", string(body))
 	}
 }
@@ -172,14 +172,14 @@ func TestUpdateConfigReturnsConflictAfterExternalModification(t *testing.T) {
 		t.Fatalf("failed to seed test config store: %v", err)
 	}
 
-	srv := server.New(server.Options{
-		Store: store,
-		Assets: http.FS(fstest.MapFS{
-			"index.html": &fstest.MapFile{Data: []byte("<html>Webmux</html>")},
-		}),
-	})
+		srv := server.New(server.Options{
+			Store: store,
+			Assets: http.FS(fstest.MapFS{
+				"index.html": &fstest.MapFile{Data: []byte("<html>Wmux</html>")},
+			}),
+		})
 
-	external := config.DefaultConfig()
+		external := config.DefaultConfig()
 	external.Server.Bind = "127.0.0.1:7444"
 	external.Auth.Token = "external-token"
 	externalData, err := json.Marshal(external)
@@ -298,7 +298,7 @@ func newTestServer(t *testing.T, cfg config.Config) *server.Server {
 	return server.New(server.Options{
 		Store: store,
 		Assets: http.FS(fstest.MapFS{
-			"index.html": &fstest.MapFile{Data: []byte("<html>Webmux</html>")},
+			"index.html": &fstest.MapFile{Data: []byte("<html>Wmux</html>")},
 		}),
 	})
 }

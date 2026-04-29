@@ -12,7 +12,7 @@ import (
 	"context"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/protocol"
+	"github.com/panh/wmux/internal/protocol"
 )
 
 const (

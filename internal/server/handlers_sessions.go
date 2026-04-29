@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/panh/webmux/internal/sshclient"
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/sshclient"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 type sessionsListResponse struct {

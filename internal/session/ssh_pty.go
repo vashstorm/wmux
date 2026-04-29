@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/panh/webmux/internal/sshclient"
+	"github.com/panh/wmux/internal/sshclient"
 )
 
 const (

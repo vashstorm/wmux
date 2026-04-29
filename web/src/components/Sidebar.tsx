@@ -69,7 +69,7 @@ export function Sidebar() {
 		<aside className="sidebar" data-testid="sidebar">
 			<div className="sidebar-header">
 				<div className="sidebar-header-row">
-					<div className="sidebar-brand">Webmux</div>
+					<div className="sidebar-brand">Wmux</div>
 					<button
 						type="button"
 						className="sidebar-settings-button"

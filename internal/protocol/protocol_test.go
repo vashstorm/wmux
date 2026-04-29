@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/panh/webmux/internal/protocol"
+	"github.com/panh/wmux/internal/protocol"
 )
 
 func TestClientMessageJSON(t *testing.T) {

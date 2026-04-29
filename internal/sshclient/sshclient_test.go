@@ -17,7 +17,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 func TestNewClient(t *testing.T) {

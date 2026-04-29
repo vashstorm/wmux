@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 const (

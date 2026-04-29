@@ -3,7 +3,7 @@ import { ApiError, type ApiErrorResponse } from "./errors.js";
 const BASE_URL = "";
 
 function getAuthToken(): string | null {
-	return sessionStorage.getItem("webmux-auth-token");
+	return sessionStorage.getItem("wmux-auth-token");
 }
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {

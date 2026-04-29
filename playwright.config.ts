@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const tempDir = mkdtempSync(join(tmpdir(), "webmux-playwright-"));
+const tempDir = mkdtempSync(join(tmpdir(), "wmux-playwright-"));
 const configPath = join(tempDir, "config.jsonc");
 
 writeFileSync(
@@ -44,7 +44,7 @@ export default defineConfig({
 		screenshot: "only-on-failure",
 	},
 	webServer: {
-		command: `./bin/webmux -c "${configPath}"`,
+		command: `./bin/wmux -c "${configPath}"`,
 		url: "http://127.0.0.1:7331/api/health",
 		reuseExistingServer: !process.env.CI,
 		timeout: 30_000,

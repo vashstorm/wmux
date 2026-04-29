@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/config"
-	"github.com/panh/webmux/internal/protocol"
-	"github.com/panh/webmux/internal/session"
+	"github.com/panh/wmux/internal/config"
+	"github.com/panh/wmux/internal/protocol"
+	"github.com/panh/wmux/internal/session"
 )
 
 type Options struct {

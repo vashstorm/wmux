@@ -9,10 +9,10 @@ build:
 	bun install --cwd web
 	bun run --cwd web build
 	mkdir -p bin
-	go build -ldflags "-X main.version=$(VERSION)" -o bin/webmux ./cmd/webmux
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/wmux ./cmd/wmux
 
 run: build
-	./bin/webmux
+	./bin/wmux
 
 clean:
 	rm -rf bin web/dist

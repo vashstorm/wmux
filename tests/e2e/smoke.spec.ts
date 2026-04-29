@@ -1,10 +1,10 @@
 // @ts-nocheck
 import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
 
-test.describe("webmux smoke", () => {
+test.describe("wmux smoke", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.addInitScript(() => {
-			window.sessionStorage.setItem("webmux-auth-token", "playwright-token");
+			window.sessionStorage.setItem("wmux-auth-token", "playwright-token");
 		});
 	});
 

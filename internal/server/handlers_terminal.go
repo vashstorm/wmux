@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/panh/webmux/internal/protocol"
-	"github.com/panh/webmux/internal/session"
-	"github.com/panh/webmux/internal/sshclient"
-	"github.com/panh/webmux/internal/tmux"
+	"github.com/panh/wmux/internal/protocol"
+	"github.com/panh/wmux/internal/session"
+	"github.com/panh/wmux/internal/sshclient"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 func (s *Server) handleTerminalWebSocket(w http.ResponseWriter, r *http.Request) {

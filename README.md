@@ -1,4 +1,4 @@
-# Webmux
+# Wmux
 
 Web-based tmux management service.
 
@@ -16,21 +16,21 @@ make
 make build
 ```
 
-This builds the frontend into `web/dist` and produces the server binary at `bin/webmux`.
+This builds the frontend into `web/dist` and produces the server binary at `bin/wmux`.
 
 ## Run
 
 ```bash
 make run
 # or
-./bin/webmux -c config.jsonc
+./bin/wmux -c config.jsonc
 ```
 
 Useful runtime flags:
 
 ```bash
-./bin/webmux --version
-./bin/webmux --print-config-and-exit -c config.jsonc
+./bin/wmux --version
+./bin/wmux --print-config-and-exit -c config.jsonc
 ```
 
 Startup logs print the binary version, config path, and bind address.
@@ -51,12 +51,12 @@ make e2e
 
 ## Configuration
 
-Webmux reads `config.jsonc` by default. Use `-c <path>` to point at a different file.
+Wmux reads `config.jsonc` by default. Use `-c <path>` to point at a different file.
 
 Example:
 
 ```bash
-./bin/webmux -c /tmp/webmux.jsonc
+./bin/wmux -c /tmp/wmux.jsonc
 ```
 
 Config rules:
@@ -97,13 +97,13 @@ Minimal example:
 
 ```bash
 # Start with the default config path
-./bin/webmux
+./bin/wmux
 
 # Start with a custom config file
-./bin/webmux -c /tmp/webmux.jsonc
+./bin/wmux -c /tmp/wmux.jsonc
 
 # Print the validated runtime config and exit
-./bin/webmux --print-config-and-exit -c /tmp/webmux.jsonc
+./bin/wmux --print-config-and-exit -c /tmp/wmux.jsonc
 ```
 
 ## Error Codes

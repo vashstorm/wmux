@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/panh/webmux/internal/config"
+	"github.com/panh/wmux/internal/config"
 )
 
 type configResponse struct {

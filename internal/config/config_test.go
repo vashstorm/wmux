@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/panh/webmux/internal/config"
+	"github.com/panh/wmux/internal/config"
 )
 
 func TestDefaultConfig(t *testing.T) {
