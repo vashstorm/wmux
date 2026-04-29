@@ -164,6 +164,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		const terminal = new XTerm({
 			cursorBlink: true,
+			customGlyphs: false,
 			fontFamily:
 				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 			fontSize: 14,
