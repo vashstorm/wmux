@@ -96,6 +96,7 @@ describe("useAppState", () => {
 				</span>
 				<span data-testid="health-status">{state.connectionHealth["1"]?.status ?? "null"}</span>
 				<span data-testid="editing">{state.editingConnection?.type ?? "null"}</span>
+				<span data-testid="sessions-count">{(state.sessions["1"] ?? []).length}</span>
 				<button
 					data-testid="set-editing"
 					onClick={() => state.setEditingConnection({ id: "1", type: "local" })}
@@ -188,8 +189,9 @@ describe("useAppState", () => {
 
 	test("setSessions stores keyed sessions", () => {
 		renderWithProvider();
+		expect(screen.getByTestId("sessions-count").textContent).toBe("0");
 		fireEvent.click(screen.getByTestId("set-sessions"));
-		expect(screen.getByTestId("connections-count").textContent).toBe("0");
+		expect(screen.getByTestId("sessions-count").textContent).toBe("1");
 	});
 
 	test("setSelectedPane updates pane", () => {
@@ -265,5 +267,88 @@ describe("useSelectedConnection", () => {
 	test("returns null when no selection", () => {
 		renderWithProvider();
 		expect(screen.getByTestId("selected-name").textContent).toBe("null");
+	});
+});
+
+describe("attention field mapping", () => {
+	function TestAttentionComponent() {
+		const state = useAppState();
+		return (
+			<div>
+				<button
+					data-testid="set-windows-attention"
+					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash", AttentionState: "attention", AttentionCount: 2 }])}
+				>
+					Set Windows Attention
+				</button>
+				<button
+					data-testid="set-windows-explicit"
+					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash", AttentionState: "explicit", AttentionCount: 1 }])}
+				>
+					Set Windows Explicit
+				</button>
+				<button
+					data-testid="set-panes-attention"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "vim", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0, AttentionState: "attention" }])}
+				>
+					Set Panes Attention
+				</button>
+				<button
+					data-testid="set-panes-explicit"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "bash", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0, AttentionState: "explicit" }])}
+				>
+					Set Panes Explicit
+				</button>
+				<span data-testid="window-attention-state">
+					{state.windows["1:session1"]?.windows[0]?.attentionState ?? "null"}
+				</span>
+				<span data-testid="window-attention-count">
+					{state.windows["1:session1"]?.windows[0]?.attentionCount ?? "null"}
+				</span>
+				<span data-testid="pane-attention-state">
+					{state.windows["1:session1"]?.loadedPanes["@1"]?.[0]?.attentionState ?? "null"}
+				</span>
+			</div>
+		);
+	}
+
+	function renderWithProvider() {
+		return render(
+			<AppProvider>
+				<TestAttentionComponent />
+			</AppProvider>,
+		);
+	}
+
+	test("setWindows maps AttentionState attention to window summary", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-attention"));
+		expect(screen.getByTestId("window-attention-state").textContent).toBe("attention");
+	});
+
+	test("setWindows maps AttentionCount to window summary", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-attention"));
+		expect(screen.getByTestId("window-attention-count").textContent).toBe("2");
+	});
+
+	test("setWindows maps AttentionState explicit to window summary", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-explicit"));
+		expect(screen.getByTestId("window-attention-state").textContent).toBe("explicit");
+	});
+
+	test("setPanes maps AttentionState attention to pane data", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-attention"));
+		fireEvent.click(screen.getByTestId("set-panes-attention"));
+		expect(screen.getByTestId("pane-attention-state").textContent).toBe("attention");
+	});
+
+	test("setPanes maps AttentionState explicit to pane data", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-attention"));
+		fireEvent.click(screen.getByTestId("set-panes-explicit"));
+		expect(screen.getByTestId("pane-attention-state").textContent).toBe("explicit");
 	});
 });

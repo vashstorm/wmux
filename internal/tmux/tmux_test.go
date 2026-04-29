@@ -81,25 +81,26 @@ func TestParseWindowRowFormattedFieldsAllowsColonTitle(t *testing.T) {
 }
 
 func TestParsePaneRow(t *testing.T) {
-	pane, err := parsePaneRow("%3:nvim:logs:1:1:120:40:0:0")
+	row := strings.Join([]string{"%3", "nvim:logs", "1", "1", "120", "40", "0", "0", "0", "0", "0", "0", "vim"}, fieldSeparator)
+	pane, err := parsePaneRow(row)
 	if err != nil {
 		t.Fatalf("parsePaneRow() error = %v", err)
 	}
 
-	want := Pane{ID: "%3", Title: "nvim:logs", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0}
+	want := Pane{ID: "%3", Title: "nvim:logs", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, CurrentCommand: "vim", AttentionState: AttentionStateNone}
 	if !reflect.DeepEqual(pane, want) {
 		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
 	}
 }
 
 func TestParsePaneRowFormattedFieldsAllowsColonTitle(t *testing.T) {
-	row := strings.Join([]string{"%3", "nvim:/workspace", "1", "1", "120", "40", "0", "0"}, fieldSeparator)
+	row := strings.Join([]string{"%3", "nvim:/workspace", "1", "1", "120", "40", "0", "0", "0", "0", "0", "0", "tmux"}, fieldSeparator)
 	pane, err := parsePaneRow(row)
 	if err != nil {
 		t.Fatalf("parsePaneRow() error = %v", err)
 	}
 
-	want := Pane{ID: "%3", Title: "nvim:/workspace", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0}
+	want := Pane{ID: "%3", Title: "nvim:/workspace", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, CurrentCommand: "tmux", AttentionState: AttentionStateNone}
 	if !reflect.DeepEqual(pane, want) {
 		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
 	}
@@ -122,16 +123,18 @@ func TestParseWindowsOutputWithNewFields(t *testing.T) {
 }
 
 func TestParsePanesOutputWithGeometry(t *testing.T) {
-	output := "%1:main:0:1:120:40:0:0\n%2:logs:1:0:80:24:0:40\n%3:side:2:0:40:40:120:0"
+	output := strings.Join([]string{"%1", "main", "0", "1", "120", "40", "0", "0", "0", "0", "0", "0", ""}, fieldSeparator) + "\n" +
+		strings.Join([]string{"%2", "logs", "1", "0", "80", "24", "0", "40", "0", "0", "0", "0", ""}, fieldSeparator) + "\n" +
+		strings.Join([]string{"%3", "side", "2", "0", "40", "40", "120", "0", "0", "0", "0", "0", ""}, fieldSeparator)
 	panes, err := parsePanesOutput(output)
 	if err != nil {
 		t.Fatalf("parsePanesOutput() error = %v", err)
 	}
 
 	want := []Pane{
-		{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0},
-		{ID: "%2", Title: "logs", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 40},
-		{ID: "%3", Title: "side", Index: 2, Active: false, Width: 40, Height: 40, Left: 120, Top: 0},
+		{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, AttentionState: AttentionStateNone},
+		{ID: "%2", Title: "logs", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 40, AttentionState: AttentionStateNone},
+		{ID: "%3", Title: "side", Index: 2, Active: false, Width: 40, Height: 40, Left: 120, Top: 0, AttentionState: AttentionStateNone},
 	}
 	if !reflect.DeepEqual(panes, want) {
 		t.Fatalf("parsePanesOutput() = %#v, want %#v", panes, want)
@@ -151,12 +154,25 @@ func TestParseWindowRowSinglePane(t *testing.T) {
 }
 
 func TestParsePaneRowWithPosition(t *testing.T) {
+	row := strings.Join([]string{"%5", "vim", "3", "1", "80", "24", "10", "5", "0", "0", "0", "0", ""}, fieldSeparator)
+	pane, err := parsePaneRow(row)
+	if err != nil {
+		t.Fatalf("parsePaneRow() error = %v", err)
+	}
+
+	want := Pane{ID: "%5", Title: "vim", Index: 3, Active: true, Width: 80, Height: 24, Left: 10, Top: 5, AttentionState: AttentionStateNone}
+	if !reflect.DeepEqual(pane, want) {
+		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
+	}
+}
+
+func TestParsePaneRowFallbackColonSeparated(t *testing.T) {
 	pane, err := parsePaneRow("%5:vim:3:1:80:24:10:5")
 	if err != nil {
 		t.Fatalf("parsePaneRow() error = %v", err)
 	}
 
-	want := Pane{ID: "%5", Title: "vim", Index: 3, Active: true, Width: 80, Height: 24, Left: 10, Top: 5}
+	want := Pane{ID: "%5", Title: "vim", Index: 3, Active: true, Width: 80, Height: 24, Left: 10, Top: 5, AttentionState: AttentionStateNone}
 	if !reflect.DeepEqual(pane, want) {
 		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
 	}
@@ -245,6 +261,112 @@ func TestRunCommandFailureIncludesStderr(t *testing.T) {
 	if !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("expected stderr in error, got %q", err.Error())
 	}
+}
+
+func TestParsePaneRowWithAttentionFields(t *testing.T) {
+	tests := []struct {
+		name string
+		row  string
+		want Pane
+	}{
+		{
+			name: "dead pane explicit",
+			row: strings.Join([]string{"%1", "main", "0", "1", "120", "40", "0", "0", "1", "0", "0", "0", "bash"}, fieldSeparator),
+			want: Pane{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, Dead: true, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: AttentionStateExplicit},
+		},
+		{
+			name: "input off explicit",
+			row: strings.Join([]string{"%2", "logs", "1", "0", "80", "24", "0", "40", "0", "1", "0", "0", "bash"}, fieldSeparator),
+			want: Pane{ID: "%2", Title: "logs", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 40, Dead: false, InputOff: true, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: AttentionStateExplicit},
+		},
+		{
+			name: "in mode attention",
+			row: strings.Join([]string{"%3", "vim", "2", "0", "80", "24", "0", "0", "0", "0", "1", "0", "bash"}, fieldSeparator),
+			want: Pane{ID: "%3", Title: "vim", Index: 2, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: true, AlternateOn: false, CurrentCommand: "bash", AttentionState: AttentionStateAttention},
+		},
+		{
+			name: "alternate on with TUI attention",
+			row: strings.Join([]string{"%4", "editor", "3", "0", "100", "30", "10", "0", "0", "0", "0", "1", "vim"}, fieldSeparator),
+			want: Pane{ID: "%4", Title: "editor", Index: 3, Active: false, Width: 100, Height: 30, Left: 10, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "vim", AttentionState: AttentionStateAttention},
+		},
+		{
+			name: "alternate on with shell none",
+			row: strings.Join([]string{"%5", "shell", "4", "0", "80", "24", "0", "0", "0", "0", "0", "1", "bash"}, fieldSeparator),
+			want: Pane{ID: "%5", Title: "shell", Index: 4, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "bash", AttentionState: AttentionStateNone},
+		},
+		{
+			name: "alternate on with login shell none",
+			row: strings.Join([]string{"%6", "login", "5", "0", "80", "24", "0", "0", "0", "0", "0", "1", "-bash"}, fieldSeparator),
+			want: Pane{ID: "%6", Title: "login", Index: 5, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "-bash", AttentionState: AttentionStateNone},
+		},
+		{
+			name: "empty command none",
+			row: strings.Join([]string{"%7", "empty", "6", "0", "80", "24", "0", "0", "0", "0", "0", "0", ""}, fieldSeparator),
+			want: Pane{ID: "%7", Title: "empty", Index: 6, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "", AttentionState: AttentionStateNone},
+		},
+		{
+			name: "all false none",
+			row: strings.Join([]string{"%8", "idle", "7", "1", "120", "40", "0", "0", "0", "0", "0", "0", "zsh"}, fieldSeparator),
+			want: Pane{ID: "%8", Title: "idle", Index: 7, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "zsh", AttentionState: AttentionStateNone},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePaneRow(tt.row)
+			if err != nil {
+				t.Fatalf("parsePaneRow() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("parsePaneRow() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParsePanesOutputWithAttentionFields(t *testing.T) {
+	output := strings.Join([]string{"%1", "main", "0", "1", "120", "40", "0", "0", "0", "0", "0", "0", "bash"}, fieldSeparator) + "\n" +
+		strings.Join([]string{"%2", "vim", "1", "0", "80", "24", "0", "0", "0", "0", "0", "1", "vim"}, fieldSeparator) + "\n" +
+		strings.Join([]string{"%3", "dead", "2", "0", "80", "24", "0", "0", "1", "0", "0", "0", "bash"}, fieldSeparator)
+
+	panes, err := parsePanesOutput(output)
+	if err != nil {
+		t.Fatalf("parsePanesOutput() error = %v", err)
+	}
+
+	want := []Pane{
+		{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: AttentionStateNone},
+		{ID: "%2", Title: "vim", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "vim", AttentionState: AttentionStateAttention},
+		{ID: "%3", Title: "dead", Index: 2, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: true, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: AttentionStateExplicit},
+	}
+	if !reflect.DeepEqual(panes, want) {
+		t.Fatalf("parsePanesOutput() = %#v, want %#v", panes, want)
+	}
+}
+
+func TestParsePaneRowFallbackColonSeparatedDoesNotPanic(t *testing.T) {
+	pane, err := parsePaneRow("%5:vim:3:1:80:24:10:5")
+	if err != nil {
+		t.Fatalf("parsePaneRow() error = %v", err)
+	}
+
+	want := Pane{ID: "%5", Title: "vim", Index: 3, Active: true, Width: 80, Height: 24, Left: 10, Top: 5, Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "", AttentionState: AttentionStateNone}
+	if !reflect.DeepEqual(pane, want) {
+		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
+	}
+}
+
+func TestListPanesReturnsErrorOnCommandFailure(t *testing.T) {
+	adapter := newFakeAdapter(t, fakeExecConfig{
+		stderr:   "bad target\n",
+		exitCode: 1,
+	})
+
+	_, err := adapter.ListPanes("session-1", "window-1")
+	if err == nil {
+		t.Fatal("expected error for failed list-panes")
+	}
+	assertErrorCode(t, err, ErrorCodeCommandFailed)
 }
 
 func TestLocalTmuxIntegration(t *testing.T) {

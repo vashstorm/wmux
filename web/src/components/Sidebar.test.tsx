@@ -244,3 +244,75 @@ describe("Sidebar session loading", () => {
 		});
 	});
 });
+
+describe("session card attention rendering", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockListConnections.mockResolvedValue([{ id: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+	});
+
+	test("session card with attention state gets is-attention class", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false, attentionState: "attention", attentionCount: 1 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		expect(screen.getByTestId("session-card-session1")).toHaveClass("is-attention");
+		expect(screen.getByTestId("session-card-session1")).not.toHaveClass("is-attention-explicit");
+	});
+
+	test("session card with explicit attention state gets is-attention-explicit class", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false, attentionState: "explicit", attentionCount: 1 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		expect(screen.getByTestId("session-card-session1")).toHaveClass("is-attention-explicit");
+		expect(screen.getByTestId("session-card-session1")).not.toHaveClass("is-attention");
+	});
+
+	test("session card with attention shows badge count", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false, attentionState: "attention", attentionCount: 2 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const badge = document.querySelector(".attention-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge?.textContent).toBe("2");
+	});
+});

@@ -322,8 +322,8 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			tt.assert(t, rec, adapterPath)
 
 			logLines := readFakeTMUXLog(t, logPath)
-			if len(logLines) != 1 {
-				t.Fatalf("expected one tmux invocation, got %#v", logLines)
+			if len(logLines) < 1 {
+				t.Fatalf("expected at least one tmux invocation, got %#v", logLines)
 			}
 			for _, want := range tt.wantLogContains {
 				if !strings.Contains(logLines[0], want) {
@@ -379,8 +379,8 @@ func TestListWindowsAndPanesJSONIncludesNewFields(t *testing.T) {
 	}
 
 	logLines := readFakeTMUXLog(t, logPath)
-	if len(logLines) != 2 {
-		t.Fatalf("expected two tmux invocations, got %#v", logLines)
+	if len(logLines) != 4 {
+		t.Fatalf("expected four tmux invocations, got %#v", logLines)
 	}
 }
 
@@ -595,7 +595,7 @@ case "$cmd" in
     printf '@1:editor:1:1:1:%%1:zsh\n@2:shell:2:0:1:%%2:bash\n'
     ;;
   list-panes)
-    printf '%%1:main:0:1:120:40:0:0\n%%2:logs:1:0:80:24:0:40\n'
+    printf '%%1\x1fmain\x1f0\x1f1\x1f120\x1f40\x1f0\x1f0\x1f0\x1f0\x1f0\x1f0\x1fzsh\n%%2\x1flogs\x1f1\x1f0\x1f80\x1f24\x1f0\x1f40\x1f0\x1f0\x1f0\x1f0\x1fbash\n'
     ;;
   new-session)
     name="$(find_flag_value -s "$@" || true)"

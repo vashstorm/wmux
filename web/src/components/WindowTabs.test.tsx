@@ -124,3 +124,107 @@ describe("WindowTabs", () => {
 		expect(screen.getByText("very-long-title-that-might-overflow")).toBeInTheDocument();
 	});
 });
+
+describe("attention rendering", () => {
+	test("window with attention state gets is-attention class", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			attentionState: "attention",
+			attentionCount: 1,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		const tab = screen.getByTestId("window-tab-active");
+		expect(tab).toHaveClass("is-attention");
+		expect(tab).not.toHaveClass("is-attention-explicit");
+	});
+
+	test("window with attention state and count shows attention badge", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			attentionState: "attention",
+			attentionCount: 1,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		const badge = document.querySelector(".attention-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge?.textContent).toBe("1");
+	});
+
+	test("window with explicit state gets is-attention-explicit class", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			attentionState: "explicit",
+			attentionCount: 2,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		const tab = screen.getByTestId("window-tab-active");
+		expect(tab).toHaveClass("is-attention-explicit");
+		const badge = document.querySelector(".attention-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge?.textContent).toBe("2");
+	});
+
+	test("window with no attention state shows no attention badge", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(document.querySelector(".attention-badge")).toBeNull();
+	});
+});

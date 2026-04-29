@@ -221,3 +221,114 @@ describe("PaneCanvas", () => {
 		expect(boxes[1]!.style.top).toBe("50%");
 	});
 });
+
+describe("attention rendering", () => {
+	test("pane with attention state gets is-attention class", () => {
+		const attentionPane: PaneData = {
+			id: "%3",
+			title: "vim",
+			index: 0,
+			active: false,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			attentionState: "attention",
+		};
+
+		render(
+			<PaneCanvas
+				panes={[attentionPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const box = screen.getByTestId("pane-box");
+		expect(box).toHaveClass("is-attention");
+		expect(box).not.toHaveClass("is-attention-explicit");
+	});
+
+	test("pane with explicit state gets is-attention-explicit class", () => {
+		const explicitPane: PaneData = {
+			id: "%3",
+			title: "dead",
+			index: 0,
+			active: false,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			attentionState: "explicit",
+		};
+
+		render(
+			<PaneCanvas
+				panes={[explicitPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const box = screen.getByTestId("pane-box");
+		expect(box).toHaveClass("is-attention-explicit");
+		expect(box).not.toHaveClass("is-attention");
+	});
+
+	test("attention pane renders attention indicator badge", () => {
+		const attentionPane: PaneData = {
+			id: "%3",
+			title: "vim",
+			index: 0,
+			active: false,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			attentionState: "attention",
+		};
+
+		render(
+			<PaneCanvas
+				panes={[attentionPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const indicator = document.querySelector(".pane-box-attention-indicator");
+		expect(indicator).toBeInTheDocument();
+		const badge = document.querySelector(".attention-badge");
+		expect(badge).toBeInTheDocument();
+	});
+
+	test("active pane with attention still has is-active class", () => {
+		const activeAttentionPane: PaneData = {
+			id: "%1",
+			title: "bash",
+			index: 0,
+			active: true,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			attentionState: "attention",
+		};
+
+		render(
+			<PaneCanvas
+				panes={[activeAttentionPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const box = screen.getByTestId("pane-box-active");
+		expect(box).toHaveClass("is-active");
+		expect(box).toHaveClass("is-attention");
+	});
+});
