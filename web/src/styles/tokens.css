@@ -27,10 +27,10 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* Monospace-first font stack — Berkeley Mono preferred, free fallbacks */
-  --font-stack: 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code',
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+	/* Monospace-first font stack — CaskaydiaCove Nerd Font preferred */
+	--font-stack: 'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono',
+		'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo,
+		Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
   /* Spacing scale (8px base grid) */
   --spacing-xs: 4px;

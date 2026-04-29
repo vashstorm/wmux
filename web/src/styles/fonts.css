@@ -1,0 +1,44 @@
+/* ==========================================================================
+   Font-Face Declarations — CaskaydiaCove Nerd Font
+   Bundled locally, served via Vite public/ directory.
+   ========================================================================== */
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
+		local("CaskaydiaCove Nerd Font"),
+		url("/fonts/CaskaydiaCoveNerdFont-Regular.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
+		local("CaskaydiaCove Nerd Font Bold"),
+		url("/fonts/CaskaydiaCoveNerdFont-Bold.ttf") format("truetype");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
+		local("CaskaydiaCove Nerd Font Italic"),
+		url("/fonts/CaskaydiaCoveNerdFont-Italic.ttf") format("truetype");
+	font-weight: 400;
+	font-style: italic;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
+		local("CaskaydiaCove Nerd Font Bold Italic"),
+		url("/fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf") format("truetype");
+	font-weight: 700;
+	font-style: italic;
+	font-display: swap;
+}

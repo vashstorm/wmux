@@ -1,6 +1,7 @@
 import "./styles/global.css";
 import "./styles/layout.css";
 import "./styles/components.css";
+import "./styles/fonts.css";
 
 import { useEffect } from "react";
 import { AppProvider } from "./state/store.js";

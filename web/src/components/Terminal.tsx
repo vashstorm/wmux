@@ -133,7 +133,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		const terminal = new XTerm({
 			cursorBlink: true,
 			fontFamily:
-				"'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 			fontSize: 14,
 			theme: getXtermTheme(),
 		});
