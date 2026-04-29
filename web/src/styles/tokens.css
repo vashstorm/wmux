@@ -1,66 +1,194 @@
+/* ==========================================================================
+   Design Tokens — OpenCode-inspired terminal-native system
+   Dark and light themes via semantic CSS custom properties.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Shared Tokens (non-themed)
+   -------------------------------------------------------------------------- */
+
 :root {
-	/* Color palette - GitHub Dark / VS Code inspired */
-	--color-background: #0d1117;
-	--color-panel: #161b22;
-	--color-surface: #21262d;
-	--color-surface-hover: #30363d;
-	--color-border: #30363d;
-	--color-border-subtle: #21262d;
-	--color-text: #e6edf3;
-	--color-text-muted: #7d8590;
-	--color-text-disabled: #484f58;
-	--color-accent: #58a6ff;
-	--color-accent-hover: #79c0ff;
-	--color-accent-subtle: rgba(88, 166, 255, 0.15);
-	--color-success: #3fb950;
-	--color-warning: #d29922;
-	--color-error: #f85149;
+  /* Typography scale */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-base: 16px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 38px;
 
-	/* Spacing scale */
-	--spacing-xs: 4px;
-	--spacing-sm: 8px;
-	--spacing-md: 16px;
-	--spacing-lg: 24px;
-	--spacing-xl: 32px;
-	--spacing-2xl: 48px;
+  --line-height-tight: 1.00;
+  --line-height-normal: 1.50;
+  --line-height-relaxed: 2.00;
 
-	/* Border radius */
-	--radius-sm: 6px;
-	--radius-md: 8px;
-	--radius-lg: 12px;
-	--radius-full: 9999px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
-	/* Typography */
-	--font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-	--font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
-	--font-size-xs: 11px;
-	--font-size-sm: 12px;
-	--font-size-md: 13px;
-	--font-size-base: 14px;
-	--font-size-lg: 16px;
-	--font-size-xl: 20px;
-	--font-size-2xl: 24px;
-	--line-height-tight: 1.25;
-	--line-height-normal: 1.5;
-	--font-weight-normal: 400;
-	--font-weight-medium: 500;
-	--font-weight-semibold: 600;
-	--font-weight-bold: 700;
+  /* Monospace-first font stack — Berkeley Mono preferred, free fallbacks */
+  --font-stack: 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code',
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 
-	/* Shadows */
-	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-	--shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Spacing scale (8px base grid) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+  --spacing-4xl: 80px;
+  --spacing-5xl: 96px;
 
-	/* Transitions */
-	--transition-fast: 150ms ease;
-	--transition-base: 200ms ease;
+  /* Border radius — 4px default, 6px inputs only */
+  --radius-sm: 4px;
+  --radius-input: 6px;
 
-	/* Z-index scale */
-	--z-base: 0;
-	--z-dropdown: 100;
-	--z-sticky: 200;
-	--z-modal: 300;
-	--z-toast: 400;
-	--z-confirm: 500;
+  /* Transitions — minimal, terminal-inspired */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+  --z-confirm: 500;
+}
+
+/* --------------------------------------------------------------------------
+   Dark Theme (default)
+   -------------------------------------------------------------------------- */
+
+:root,
+[data-theme="dark"] {
+  /* Page */
+  --color-background: #201d1d;
+  --color-text: #fdfcfc;
+  --color-text-secondary: #9a9898;
+  --color-text-muted: #6e6e73;
+  --color-text-disabled: #5a5858;
+
+  /* Surfaces */
+  --color-panel: #201d1d;
+  --color-surface: #302c2c;
+  --color-surface-hover: #3d3838;
+  --color-surface-elevated: #302c2c;
+
+  /* Borders */
+  --color-border: rgba(15, 0, 0, 0.12);
+  --color-border-strong: #646262;
+  --color-border-subtle: rgba(15, 0, 0, 0.08);
+  --color-tab-indicator: #9a9898;
+
+  /* Accent — Apple HIG blue */
+  --color-accent: #007aff;
+  --color-accent-hover: #0056b3;
+  --color-accent-active: #004085;
+  --color-accent-subtle: rgba(0, 122, 255, 0.12);
+
+  /* Semantic — Danger */
+  --color-danger: #ff3b30;
+  --color-danger-hover: #d70015;
+  --color-danger-active: #a50011;
+  --color-danger-subtle: rgba(255, 59, 48, 0.12);
+
+  /* Semantic — Warning */
+  --color-warning: #ff9f0a;
+  --color-warning-hover: #cc7f08;
+  --color-warning-active: #995f06;
+  --color-warning-subtle: rgba(255, 159, 10, 0.12);
+
+  /* Semantic — Success */
+  --color-success: #30d158;
+  --color-success-subtle: rgba(48, 209, 88, 0.12);
+
+  /* Inputs */
+  --color-input-bg: #f8f7f7;
+  --color-input-text: #201d1d;
+  --color-input-border: rgba(15, 0, 0, 0.12);
+
+  /* Overlay scrim */
+  --color-overlay-scrim: rgba(32, 29, 29, 0.65);
+
+  /* Banner backgrounds */
+  --color-banner-bg: #302c2c;
+  --color-banner-warning-bg: rgba(255, 159, 10, 0.10);
+  --color-banner-warning-border: rgba(255, 159, 10, 0.40);
+  --color-banner-error-bg: rgba(255, 59, 48, 0.10);
+  --color-banner-error-border: rgba(255, 59, 48, 0.35);
+
+  /* Link defaults */
+  --color-link: #fdfcfc;
+  --color-link-muted: #9a9898;
+}
+
+/* --------------------------------------------------------------------------
+   Light Theme
+   -------------------------------------------------------------------------- */
+
+[data-theme="light"] {
+  /* Page */
+  --color-background: #f1eeee;
+  --color-text: #201d1d;
+  --color-text-secondary: #424245;
+  --color-text-muted: #6e6e73;
+  --color-text-disabled: #9a9898;
+
+  /* Surfaces */
+  --color-panel: #f8f7f7;
+  --color-surface: #f8f7f7;
+  --color-surface-hover: #edecec;
+  --color-surface-elevated: #ffffff;
+
+  /* Borders */
+  --color-border: rgba(15, 0, 0, 0.08);
+  --color-border-strong: #9a9898;
+  --color-border-subtle: rgba(15, 0, 0, 0.05);
+  --color-tab-indicator: #646262;
+
+  /* Accent — Apple HIG blue (same) */
+  --color-accent: #007aff;
+  --color-accent-hover: #0056b3;
+  --color-accent-active: #004085;
+  --color-accent-subtle: rgba(0, 122, 255, 0.10);
+
+  /* Semantic — Danger */
+  --color-danger: #ff3b30;
+  --color-danger-hover: #d70015;
+  --color-danger-active: #a50011;
+  --color-danger-subtle: rgba(255, 59, 48, 0.10);
+
+  /* Semantic — Warning */
+  --color-warning: #ff9f0a;
+  --color-warning-hover: #cc7f08;
+  --color-warning-active: #995f06;
+  --color-warning-subtle: rgba(255, 159, 10, 0.10);
+
+  /* Semantic — Success */
+  --color-success: #248a3d;
+  --color-success-subtle: rgba(36, 138, 61, 0.10);
+
+  /* Inputs */
+  --color-input-bg: #ffffff;
+  --color-input-text: #201d1d;
+  --color-input-border: rgba(15, 0, 0, 0.10);
+
+  /* Overlay scrim */
+  --color-overlay-scrim: rgba(32, 29, 29, 0.50);
+
+  /* Banner backgrounds */
+  --color-banner-bg: #ffffff;
+  --color-banner-warning-bg: rgba(255, 159, 10, 0.08);
+  --color-banner-warning-border: rgba(255, 159, 10, 0.35);
+  --color-banner-error-bg: rgba(255, 59, 48, 0.08);
+  --color-banner-error-border: rgba(255, 59, 48, 0.30);
+
+  /* Link defaults */
+  --color-link: #201d1d;
+  --color-link-muted: #6e6e73;
 }

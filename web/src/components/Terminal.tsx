@@ -1,11 +1,62 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Terminal as XTerm } from "@xterm/xterm";
+import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { getErrorMessage } from "../api/errors.js";
 import { TerminalWebSocket } from "../api/websocket.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
+
+const darkTheme: ITheme = {
+	background: "#201d1d",
+	foreground: "#fdfcfc",
+	cursor: "#007aff",
+	selectionBackground: "#3d3838",
+	black: "#201d1d",
+	red: "#ff3b30",
+	green: "#30d158",
+	yellow: "#ff9f0a",
+	blue: "#007aff",
+	magenta: "#af52de",
+	cyan: "#5ac8fa",
+	white: "#fdfcfc",
+	brightBlack: "#5a5858",
+	brightRed: "#ff6961",
+	brightGreen: "#30d158",
+	brightYellow: "#ffb340",
+	brightBlue: "#409cff",
+	brightMagenta: "#bf5af2",
+	brightCyan: "#64d2ff",
+	brightWhite: "#ffffff",
+};
+
+const lightTheme: ITheme = {
+	background: "#f1eeee",
+	foreground: "#201d1d",
+	cursor: "#007aff",
+	selectionBackground: "#e0dddd",
+	black: "#f1eeee",
+	red: "#d70015",
+	green: "#248a3d",
+	yellow: "#cc7f08",
+	blue: "#007aff",
+	magenta: "#8944ab",
+	cyan: "#0071a4",
+	white: "#201d1d",
+	brightBlack: "#9a9898",
+	brightRed: "#ff3b30",
+	brightGreen: "#30d158",
+	brightYellow: "#ff9f0a",
+	brightBlue: "#409cff",
+	brightMagenta: "#af52de",
+	brightCyan: "#5ac8fa",
+	brightWhite: "#424245",
+};
+
+function getXtermTheme(): ITheme {
+	const theme = document.documentElement.dataset.theme;
+	return theme === "light" ? lightTheme : darkTheme;
+}
 
 interface TerminalProps {
 	selectedPane: SelectedPane;
@@ -80,30 +131,10 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		const terminal = new XTerm({
 			cursorBlink: true,
-			fontFamily: "var(--font-mono)",
+			fontFamily:
+				"'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 			fontSize: 14,
-			theme: {
-				background: "#0d1117",
-				foreground: "#e6edf3",
-				cursor: "#58a6ff",
-				selectionBackground: "#264f78",
-				black: "#010409",
-				red: "#ff7b72",
-				green: "#3fb950",
-				yellow: "#d29922",
-				blue: "#58a6ff",
-				magenta: "#bc8cff",
-				cyan: "#76e3ea",
-				white: "#b1bac4",
-				brightBlack: "#484f58",
-				brightRed: "#ffa198",
-				brightGreen: "#56d364",
-				brightYellow: "#e3b341",
-				brightBlue: "#79c0ff",
-				brightMagenta: "#d2a8ff",
-				brightCyan: "#b3f0ff",
-				brightWhite: "#ffffff",
-			},
+			theme: getXtermTheme(),
 		});
 
 		const fitAddon = new FitAddon();
@@ -136,7 +167,24 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		connectWebSocket();
 
+		const themeObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (
+					mutation.type === "attributes" &&
+					mutation.attributeName === "data-theme"
+				) {
+					terminal.options.theme = getXtermTheme();
+				}
+			}
+		});
+
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["data-theme"],
+		});
+
 		return () => {
+			themeObserver.disconnect();
 			resizeObserver.disconnect();
 			resizeObserverRef.current = null;
 			terminal.dispose();

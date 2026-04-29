@@ -126,7 +126,6 @@ export function SettingsPanel() {
 			},
 			auth: {
 				token: formState.tokenInput,
-				tokenConfigured: formState.tokenConfigured,
 			},
 			tmux: {
 				...config.tmux,
@@ -162,7 +161,7 @@ export function SettingsPanel() {
 						const retryPayload: AppConfig = {
 							...latest,
 							server: { ...latest.server, bind: payload.server.bind },
-							auth: { ...latest.auth, token: payload.auth.token },
+							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
 							ui: { ...latest.ui, theme: payload.ui.theme },
 							connections: latest.connections.map((connection) => {
