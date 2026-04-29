@@ -1,0 +1,246 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { Sidebar } from "./Sidebar.js";
+import { AppProvider, useAppState } from "../state/store.js";
+import * as client from "../api/client.js";
+
+vi.mock("../api/client.js", () => ({
+	listConnections: vi.fn(),
+	listConnectionHealth: vi.fn(),
+	listSessions: vi.fn(),
+	listWindows: vi.fn(),
+	listPanes: vi.fn(),
+	createSession: vi.fn(),
+	killSession: vi.fn(),
+	renameSession: vi.fn(),
+}));
+
+const mockListConnections = vi.mocked(client.listConnections);
+const mockListConnectionHealth = vi.mocked(client.listConnectionHealth);
+const mockListSessions = vi.mocked(client.listSessions);
+const mockListWindows = vi.mocked(client.listWindows);
+const mockListPanes = vi.mocked(client.listPanes);
+
+function TestWrapper({ children }: { children: React.ReactNode }) {
+	return <AppProvider>{children}</AppProvider>;
+}
+
+describe("Sidebar session loading", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockListConnections.mockResolvedValue([
+			{ id: "conn1", type: "local" },
+		]);
+		mockListConnectionHealth.mockResolvedValue([]);
+	});
+
+	describe("handleOpenSession happy path", () => {
+		test("loads windows and panes, sets selectedPane with active IDs", async () => {
+			mockListSessions.mockResolvedValue({
+				connectionId: "conn1",
+				mode: "local",
+				data: [{ name: "session1", attached: false }],
+			});
+
+			mockListWindows.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				mode: "local",
+				data: [
+					{ ID: "@1", Name: "editor", Index: 0, Active: false, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" },
+					{ ID: "@2", Name: "terminal", Index: 1, Active: true, PaneCount: 2, ActivePaneID: "%3", ActivePaneTitle: "vim" },
+				],
+			});
+
+			mockListPanes.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				window: "@2",
+				mode: "local",
+				data: [
+					{ ID: "%3", Title: "vim", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 },
+					{ ID: "%4", Title: "bash", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 25 },
+				],
+			});
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByTestId("session-open-session1"));
+
+			await waitFor(() => {
+				expect(mockListWindows).toHaveBeenCalledWith("conn1", "session1");
+			});
+
+			await waitFor(() => {
+				expect(mockListPanes).toHaveBeenCalledWith("conn1", "session1", "@2");
+			});
+		});
+
+		test("falls back to first window when no active window", async () => {
+			mockListSessions.mockResolvedValue({
+				connectionId: "conn1",
+				mode: "local",
+				data: [{ name: "session1", attached: false }],
+			});
+
+			mockListWindows.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				mode: "local",
+				data: [
+					{ ID: "@1", Name: "editor", Index: 0, Active: false, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" },
+				],
+			});
+
+			mockListPanes.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				window: "@1",
+				mode: "local",
+				data: [
+					{ ID: "%1", Title: "bash", Index: 0, Active: false, Width: 80, Height: 24, Left: 0, Top: 0 },
+				],
+			});
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByTestId("session-open-session1"));
+
+			await waitFor(() => {
+				expect(mockListPanes).toHaveBeenCalledWith("conn1", "session1", "@1");
+			});
+		});
+
+		test("sets session only when no windows exist", async () => {
+			mockListSessions.mockResolvedValue({
+				connectionId: "conn1",
+				mode: "local",
+				data: [{ name: "session1", attached: false }],
+			});
+
+			mockListWindows.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				mode: "local",
+				data: [],
+			});
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByTestId("session-open-session1"));
+
+			await waitFor(() => {
+				expect(mockListWindows).toHaveBeenCalledWith("conn1", "session1");
+			});
+
+			expect(mockListPanes).not.toHaveBeenCalled();
+		});
+	});
+
+	describe("handleOpenSession error path", () => {
+		test("listWindows failure sets error in store", async () => {
+			mockListSessions.mockResolvedValue({
+				connectionId: "conn1",
+				mode: "local",
+				data: [{ name: "session1", attached: false }],
+			});
+
+			const apiError = new Error("connection failed") as Error & { code: string };
+			apiError.code = "connection_failed";
+			mockListWindows.mockRejectedValue(apiError);
+
+			function ErrorChecker() {
+				const { error } = useAppState();
+				return <span data-testid="error-state">{error ? `${error.code}` : "no-error"}</span>;
+			}
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+					<ErrorChecker />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByTestId("session-open-session1"));
+
+			await waitFor(() => {
+				expect(mockListWindows).toHaveBeenCalledWith("conn1", "session1");
+			});
+
+			await waitFor(() => {
+				expect(screen.getByTestId("error-state").textContent).toBe("connection_failed");
+			});
+		});
+
+		test("listPanes failure sets error in store", async () => {
+			mockListSessions.mockResolvedValue({
+				connectionId: "conn1",
+				mode: "local",
+				data: [{ name: "session1", attached: false }],
+			});
+
+			mockListWindows.mockResolvedValue({
+				connectionId: "conn1",
+				session: "session1",
+				mode: "local",
+				data: [
+					{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" },
+				],
+			});
+
+			const apiError = new Error("pane error") as Error & { code: string };
+			apiError.code = "internal_error";
+			mockListPanes.mockRejectedValue(apiError);
+
+			function ErrorChecker() {
+				const { error } = useAppState();
+				return <span data-testid="error-state">{error ? `${error.code}` : "no-error"}</span>;
+			}
+
+			render(
+				<TestWrapper>
+					<Sidebar />
+					<ErrorChecker />
+				</TestWrapper>,
+			);
+
+			await waitFor(() => {
+				expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+			});
+
+			fireEvent.click(screen.getByTestId("session-open-session1"));
+
+			await waitFor(() => {
+				expect(screen.getByTestId("error-state").textContent).toBe("internal_error");
+			});
+		});
+	});
+});

@@ -3,10 +3,14 @@ import {
   listConnections,
   listConnectionHealth,
   listSessions,
+  listWindows,
+  listPanes,
   createSession,
   killSession,
   renameSession,
   type SessionInfoData,
+  type WindowInfo,
+  type PaneInfo,
 } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
@@ -26,6 +30,8 @@ export function Sidebar() {
     setSessions,
     setSelectedPane,
     selectedPane,
+    setWindows,
+    setPanes,
   } = useAppState();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,6 +112,7 @@ export function Sidebar() {
     if (prevId && prevId !== selectedConnectionId) {
       setShowNewSessionForm(false);
       setSearchQuery("");
+      setSelectedPane(null);
     }
 
     loadSessionsForConnection(selectedConnectionId);
@@ -122,13 +129,71 @@ export function Sidebar() {
     return connectionSessions.filter((s) => s.name?.toLowerCase().includes(query) ?? false);
   }, [connectionSessions, searchQuery]);
 
-  const handleOpenSession = (sessionName: string) => {
+  const handleOpenSession = async (sessionName: string) => {
     if (!selectedConnectionId) return;
-    const pane: SelectedPane = {
-      connectionId: selectedConnectionId,
-      session: sessionName,
-    };
-    setSelectedPane(pane);
+    const connId = selectedConnectionId;
+
+    try {
+      const windowsResponse = await listWindows(connId, sessionName);
+      const windows = windowsResponse.data ?? [];
+
+      if (windows.length === 0) {
+        setSelectedPane({ connectionId: connId, session: sessionName });
+        return;
+      }
+
+      const activeWindow = windows.find((w) => w.Active) ?? windows[0];
+      if (!activeWindow) {
+        setSelectedPane({ connectionId: connId, session: sessionName });
+        return;
+      }
+      const activeWindowID = activeWindow.ID;
+
+      const panesResponse = await listPanes(connId, sessionName, activeWindowID);
+      const panes = panesResponse.data ?? [];
+
+      setWindows(connId, sessionName, windows);
+      setPanes(connId, sessionName, activeWindowID, panes);
+
+      const activePane = panes.find((p) => p.Active) ?? panes[0];
+
+      setSelectedPane({
+        connectionId: connId,
+        session: sessionName,
+        window: activeWindowID,
+        pane: activePane?.ID,
+      });
+    } catch (err) {
+      if (err instanceof Error && "code" in err) {
+        const apiErr = err as { code: string; message: string };
+        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      } else {
+        setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to open session" });
+      }
+    }
+  };
+
+  /**
+   * Lazy-load panes for a non-active window when a tab is first opened.
+   * Exported for use by MainPanel when switching window tabs.
+   */
+  const loadWindowPanes = async (
+    connectionId: string,
+    sessionName: string,
+    windowId: string,
+  ): Promise<PaneInfo[] | null> => {
+    try {
+      const panesResponse = await listPanes(connectionId, sessionName, windowId);
+      const panes = panesResponse.data ?? [];
+      setPanes(connectionId, sessionName, windowId, panes);
+      return panes;
+    } catch (err) {
+      if (err instanceof Error && "code" in err) {
+        const apiErr = err as { code: string; message: string };
+        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      }
+      return null;
+    }
   };
 
   const handleCreateSession = async (e: React.FormEvent) => {

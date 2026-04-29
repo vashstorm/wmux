@@ -1,48 +1,95 @@
 import { useAppState } from "../state/store.js";
-import { Terminal } from "./Terminal.js";
+import { WindowTabs } from "./WindowTabs.js";
+import { PaneCanvas } from "./PaneCanvas.js";
 
 export function MainPanel() {
-  const {
-    selectedPane,
-  } = useAppState();
-  const hasSelectedPane = selectedPane !== null;
+	const {
+		selectedPane,
+		windows,
+		setSelectedPane,
+	} = useAppState();
 
-  return (
-    <div className="main-panel">
-      <header className="main-header">
-        <h1 className="main-header-title" data-testid="main-title">
-          {hasSelectedPane
-            ? `${selectedPane.session} / ${selectedPane.window} / ${selectedPane.pane}`
-            : "Wmux"}
-        </h1>
-      </header>
+	const hasSelectedPane = selectedPane !== null;
 
-      <main className="main-content">
-        {hasSelectedPane ? (
-          <Terminal selectedPane={selectedPane} />
-        ) : (
-          <div className="empty-state" data-testid="empty-state">
-            <div className="empty-state-icon" aria-hidden="true">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect x="2" y="3" width="20" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M6 8H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M6 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M6 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <p className="empty-state-title">Select a session</p>
-            <p className="empty-state-description">
-              Click a session card in the sidebar to open the terminal
-            </p>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+	const sessionKey = selectedPane
+		? `${selectedPane.connectionId}:${selectedPane.session}`
+		: null;
+	const sessionWindowState = sessionKey ? windows[sessionKey] : null;
+	const windowSummaries = sessionWindowState?.windows ?? [];
+
+	const currentWindowId = selectedPane?.window ?? null;
+	const currentPanes = currentWindowId
+		? (sessionWindowState?.loadedPanes[currentWindowId] ?? [])
+		: [];
+
+	const handleSelectWindow = (windowId: string, activePaneId: string) => {
+		if (!selectedPane) return;
+		setSelectedPane({
+			connectionId: selectedPane.connectionId,
+			session: selectedPane.session,
+			window: windowId,
+			pane: activePaneId,
+		});
+	};
+
+	const handleSelectPane = (paneId: string) => {
+		if (!selectedPane) return;
+		setSelectedPane({
+			connectionId: selectedPane.connectionId,
+			session: selectedPane.session,
+			window: selectedPane.window,
+			pane: paneId,
+		});
+	};
+
+	return (
+		<div className="main-panel">
+			<header className="main-header">
+				<h1 className="main-header-title" data-testid="main-title">
+					{hasSelectedPane
+						? `${selectedPane.session} / ${selectedPane.window ?? "-"} / ${selectedPane.pane ?? "-"}`
+						: "Wmux"}
+				</h1>
+			</header>
+
+			<main className="main-content">
+				{hasSelectedPane ? (
+					<div className="main-workspace">
+						<WindowTabs
+							windows={windowSummaries}
+							selectedWindowId={currentWindowId}
+							onSelectWindow={handleSelectWindow}
+						/>
+						<PaneCanvas
+							panes={currentPanes}
+							selectedPaneId={selectedPane.pane ?? null}
+							onSelectPane={handleSelectPane}
+							selectedPane={selectedPane}
+						/>
+					</div>
+				) : (
+					<div className="empty-state" data-testid="empty-state">
+						<div className="empty-state-icon" aria-hidden="true">
+							<svg
+								width="24"
+								height="24"
+								viewBox="0 0 24 24"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<rect x="2" y="3" width="20" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
+								<path d="M6 8H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+								<path d="M6 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+								<path d="M6 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+							</svg>
+						</div>
+						<p className="empty-state-title">Select a session</p>
+						<p className="empty-state-description">
+							Click a session card in the sidebar to open the terminal
+						</p>
+					</div>
+				)}
+			</main>
+		</div>
+	);
 }
