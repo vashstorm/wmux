@@ -258,7 +258,77 @@ func TestClassify(t *testing.T) {
 			want:   semantic.EventNone,
 		},
 
-		// ===== Edge cases =====
+		{
+			name:   "dead loop repeated identical lines",
+			output: "running step 1\nrunning step 1\nrunning step 1\nrunning step 1\nrunning step 1\n",
+			want:   semantic.EventDeadLoop,
+		},
+		{
+			name:   "dead loop retry storm",
+			output: "retrying...\nretrying...\nretrying...\nretrying...\nretrying...\n",
+			want:   semantic.EventDeadLoop,
+		},
+		{
+			name:   "dead loop attempting again storm",
+			output: "attempting again\nattempting again\nattempting again\nattempting again\n",
+			want:   semantic.EventDeadLoop,
+		},
+		{
+			name:   "dead loop cursor reset sequences",
+			output: "\033[1A\033[1A\033[1A\033[1A\033[1A\033[1A\033[1A\033[1A\033[1A\033[1A",
+			want:   semantic.EventDeadLoop,
+		},
+		{
+			name:   "negative dead loop normal progress counter",
+			output: "step 1/10\nstep 2/10\nstep 3/10\nstep 4/10\nstep 5/10\n",
+			want:   semantic.EventNone,
+		},
+		{
+			name:   "negative dead loop build output repeated keywords",
+			output: "[build] compiling foo.go\n[build] compiling bar.go\n[build] compiling baz.go\n[build] linking\n",
+			want:   semantic.EventNone,
+		},
+		{
+			name:   "user response cannot proceed without approval",
+			output: "I cannot proceed without your approval.\nPlease confirm before I continue.",
+			want:   semantic.EventUserResponseRequired,
+		},
+		{
+			name:   "user response need you to provide credentials",
+			output: "I need you to provide the database credentials before I can continue.",
+			want:   semantic.EventUserResponseRequired,
+		},
+		{
+			name:   "user response before i continue please",
+			output: "Before I continue, please tell me which environment to deploy to.",
+			want:   semantic.EventUserResponseRequired,
+		},
+		{
+			name:   "user response need your approval to proceed",
+			output: "I need your approval to proceed with deleting the database.",
+			want:   semantic.EventUserResponseRequired,
+		},
+		{
+			name:   "user response blocked until you",
+			output: "The pipeline is blocked until you authorize the release.",
+			want:   semantic.EventUserResponseRequired,
+		},
+		{
+			name:   "negative user response would you like",
+			output: "Would you like me to proceed with this approach?",
+			want:   semantic.EventNone,
+		},
+		{
+			name:   "negative user response what do you think",
+			output: "What do you think about this solution?",
+			want:   semantic.EventNone,
+		},
+		{
+			name:   "negative user response completed analysis",
+			output: "I've completed the analysis. Here are my recommendations...",
+			want:   semantic.EventNone,
+		},
+
 		{
 			name:   "edge exit status 0 is not blocked",
 			output: "exit status 0",

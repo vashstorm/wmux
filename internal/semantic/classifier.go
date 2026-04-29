@@ -113,8 +113,28 @@ func isBlockedError(output string) bool {
 }
 
 func isUserResponseRequired(output string) bool {
-	lines := strings.Split(output, "\n")
 	lowerOutput := strings.ToLower(output)
+
+	if cannotProceedPattern.MatchString(output) {
+		return true
+	}
+
+	if needYouToPattern.MatchString(output) {
+		return true
+	}
+
+	if strings.Contains(lowerOutput, "waiting for your input") ||
+		strings.Contains(lowerOutput, "blocked until you") {
+		return true
+	}
+
+	if beforeIContinuePattern.MatchString(output) {
+		return true
+	}
+
+	if needYourApprovalPattern.MatchString(output) {
+		return true
+	}
 
 	if pleaseProvidePattern.MatchString(output) {
 		return true
@@ -126,11 +146,11 @@ func isUserResponseRequired(output string) bool {
 		return true
 	}
 
-	if strings.Contains(lowerOutput, "cannot continue without") ||
-		strings.Contains(lowerOutput, "requires your input to proceed") {
+	if strings.Contains(lowerOutput, "requires your input to proceed") {
 		return true
 	}
 
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		lowerLine := strings.ToLower(line)
@@ -144,8 +164,89 @@ func isUserResponseRequired(output string) bool {
 	return false
 }
 
-func isDeadLoop(_ string) bool {
+func isDeadLoop(output string) bool {
+	if isDeadLoopPattern(output) {
+		return true
+	}
 	return false
+}
+
+func isDeadLoopPattern(output string) bool {
+	lines := strings.Split(output, "\n")
+	lowerOutput := strings.ToLower(output)
+
+	if hasRepeatedIdenticalLines(lines, 5) {
+		return true
+	}
+
+	retryPatterns := []string{"attempting again", "retrying", "retry"}
+	for _, p := range retryPatterns {
+		if countOccurrences(lowerOutput, p) >= 4 {
+			return true
+		}
+	}
+
+	loopPatterns := []string{"loop iteration", "cycle"}
+	for _, p := range loopPatterns {
+		if countOccurrences(lowerOutput, p) >= 4 {
+			return true
+		}
+	}
+
+	cursorResetCount := strings.Count(output, "\033[1A") + strings.Count(output, "\r")
+	if cursorResetCount >= 10 {
+		return true
+	}
+
+	return false
+}
+
+func hasRepeatedIdenticalLines(lines []string, threshold int) bool {
+	if threshold < 2 {
+		threshold = 2
+	}
+	var nonEmpty []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmpty = append(nonEmpty, strings.TrimSpace(line))
+		}
+	}
+	if len(nonEmpty) < threshold {
+		return false
+	}
+	windowStart := 0
+	if len(nonEmpty) > 10 {
+		windowStart = len(nonEmpty) - 10
+	}
+	window := nonEmpty[windowStart:]
+	if len(window) < threshold {
+		return false
+	}
+
+	freq := make(map[string]int, len(window))
+	for _, line := range window {
+		freq[line]++
+		if freq[line] >= threshold {
+			return true
+		}
+	}
+	return false
+}
+
+func countOccurrences(s, substr string) int {
+	if substr == "" {
+		return 0
+	}
+	count := 0
+	for {
+		idx := strings.Index(s, substr)
+		if idx == -1 {
+			break
+		}
+		count++
+		s = s[idx+len(substr):]
+	}
+	return count
 }
 
 func hasOptionIndicators(line string) bool {
@@ -202,4 +303,12 @@ var (
 
 	// Matches "Please provide/Enter your/Type your" with context
 	pleaseProvidePattern = regexp.MustCompile(`(?i)(please provide|enter your|type your)\s+\w+`)
+
+	cannotProceedPattern = regexp.MustCompile(`(?i)(i cannot proceed|cannot continue without|blocked until you)`)
+
+	needYouToPattern = regexp.MustCompile(`(?i)(i need you to|i need your)`)
+
+	beforeIContinuePattern = regexp.MustCompile(`(?i)(before i continue, please)`)
+
+	needYourApprovalPattern = regexp.MustCompile(`(?i)(need your approval to proceed|need your approval)`)
 )
