@@ -9,6 +9,8 @@ export interface WindowSummary {
 	paneCount: number;
 	activePaneID: string;
 	activePaneTitle: string;
+	attentionState?: "none" | "attention" | "explicit";
+	attentionCount?: number;
 }
 
 export interface PaneData {
@@ -20,6 +22,7 @@ export interface PaneData {
 	height: number;
 	left: number;
 	top: number;
+	attentionState?: "none" | "attention" | "explicit";
 }
 
 export interface SessionWindowState {
@@ -48,6 +51,8 @@ function windowInfoToSummary(w: WindowInfo): WindowSummary {
 		paneCount: w.PaneCount,
 		activePaneID: w.ActivePaneID,
 		activePaneTitle: w.ActivePaneTitle,
+		attentionState: w.AttentionState,
+		attentionCount: w.AttentionCount,
 	};
 }
 
@@ -61,6 +66,7 @@ function paneInfoToData(p: PaneInfo): PaneData {
 		height: p.Height,
 		left: p.Left,
 		top: p.Top,
+		attentionState: p.AttentionState,
 	};
 }
 

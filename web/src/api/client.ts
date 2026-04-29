@@ -77,6 +77,8 @@ export interface SessionInfoData {
 	name?: string;
 	attached?: boolean;
 	windowCount?: number;
+	attentionState?: "none" | "attention" | "explicit";
+	attentionCount?: number;
 }
 
 export interface SessionsListResponse {
@@ -160,6 +162,8 @@ export interface WindowInfo {
 	PaneCount: number;
 	ActivePaneID: string;
 	ActivePaneTitle: string;
+	AttentionState?: "none" | "attention" | "explicit";
+	AttentionCount?: number;
 }
 
 export interface WindowsListResponse {
@@ -179,6 +183,7 @@ export interface PaneInfo {
 	Height: number;
 	Left: number;
 	Top: number;
+	AttentionState?: "none" | "attention" | "explicit";
 }
 
 export interface PanesListResponse {
@@ -198,17 +203,19 @@ export async function listPanes(connectionId: string, sessionName: string, windo
 	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as PanesListResponse;
 }
 
+type NormalizedSession = { id: string; name: string; attached: boolean; windowCount: number; attentionState?: "none" | "attention" | "explicit"; attentionCount?: number };
+
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
 	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as {
 		connectionId: string;
 		mode: string;
 		adapterPath?: string;
-		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number }>;
+		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number; AttentionState?: "none" | "attention" | "explicit"; attentionState?: "none" | "attention" | "explicit"; AttentionCount?: number; attentionCount?: number }>;
 	};
 	return {
 		...response,
 		data: (response.data ?? [])
-			.map((s) => {
+			.map((s): NormalizedSession => {
 				if (typeof s === "string") {
 					return { id: "", name: s, attached: false, windowCount: 0 };
 				}
@@ -217,9 +224,11 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 					name: s.name ?? s.Name ?? "",
 					attached: s.attached ?? s.Attached ?? false,
 					windowCount: s.windowCount ?? s.WindowCount ?? 0,
+					attentionState: s.attentionState ?? s.AttentionState,
+					attentionCount: s.attentionCount ?? s.AttentionCount,
 				};
 			})
-			.filter((s): s is { id: string; name: string; attached: boolean; windowCount: number } => s.name.length > 0),
+			.filter((s) => s.name.length > 0),
 	};
 }
 

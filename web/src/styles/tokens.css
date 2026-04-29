@@ -115,6 +115,10 @@
   --color-success-subtle: rgba(0, 255, 65, 0.12);
   --color-success-glow: 0 0 12px rgba(0, 255, 65, 0.3);
 
+  /* Semantic — Attention */
+  --color-attention: #00b4d8;
+  --color-attention-explicit: #f77f00;
+
   /* Inputs */
   --color-input-bg: rgba(0, 0, 0, 0.3);
   --color-input-text: #e0e0e6;
@@ -180,6 +184,10 @@
   /* Semantic — Success */
   --color-success: #248a3d;
   --color-success-subtle: rgba(36, 138, 61, 0.10);
+
+  /* Semantic — Attention */
+  --color-attention: #0096c7;
+  --color-attention-explicit: #e85d04;
 
   /* Inputs */
   --color-input-bg: #ffffff;

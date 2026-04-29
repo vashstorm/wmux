@@ -15,11 +15,13 @@ export function WindowTabs({ windows, selectedWindowId, onSelectWindow }: Window
 		<div className="window-tabs" data-testid="window-tabs">
 			{windows.map((window) => {
 				const isActive = window.id === selectedWindowId;
+				const isAttentionExplicit = window.attentionState === "explicit";
+				const isAttention = window.attentionState === "attention";
 				return (
 					<button
 						key={window.id}
 						type="button"
-						className={`window-tab${isActive ? " is-active" : ""}`}
+						className={`window-tab${isActive ? " is-active" : ""}${isAttentionExplicit ? " is-attention-explicit" : ""}${isAttention && !isAttentionExplicit ? " is-attention" : ""}`}
 						data-testid={isActive ? "window-tab-active" : "window-tab"}
 						onClick={() => onSelectWindow(window.id, window.activePaneID)}
 						title={window.name}
@@ -27,6 +29,11 @@ export function WindowTabs({ windows, selectedWindowId, onSelectWindow }: Window
 						<span className="window-tab-index">{window.index}</span>
 						<span className="window-tab-name">{window.name}</span>
 						<span className="window-tab-badge">{window.paneCount}</span>
+						{(isAttention || isAttentionExplicit) && typeof window.attentionCount === "number" && window.attentionCount > 0 && (
+							<span className={`attention-badge${isAttention && !isAttentionExplicit ? " is-soft" : ""}`}>
+								{window.attentionCount}
+							</span>
+						)}
 						{window.activePaneTitle && (
 							<span className="window-tab-pane-title">{window.activePaneTitle}</span>
 						)}

@@ -373,7 +373,7 @@ export function Sidebar() {
                     return (
                       <div
                         key={sname}
-                        className={`session-card${isActive ? " is-active" : ""}`}
+                        className={`session-card${isActive ? " is-active" : ""}${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}`}
                         data-testid={`session-card-${sname}`}
                       >
                         {isRenaming ? (
@@ -414,6 +414,11 @@ export function Sidebar() {
                                 {typeof session.windowCount === "number" && session.windowCount > 0 && (
                                   <span className="session-card-meta-count">
                                     {session.windowCount} window{session.windowCount === 1 ? "" : "s"}
+                                  </span>
+                                )}
+                                {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
+                                  <span className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}>
+                                    {session.attentionCount}
                                   </span>
                                 )}
                               </div>

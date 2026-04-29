@@ -53,6 +53,8 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 			<div className="pane-canvas-stage">
 				{panes.map((pane) => {
 					const isActive = pane.id === selectedPaneId;
+					const isAttentionExplicit = pane.attentionState === "explicit";
+					const isAttention = pane.attentionState === "attention";
 					const left = scaleToPercent(pane.left - bounds.minLeft, bounds.width);
 					const top = scaleToPercent(pane.top - bounds.minTop, bounds.height);
 					const width = scaleToPercent(pane.width, bounds.width);
@@ -61,7 +63,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 					return (
 						<div
 							key={pane.id}
-							className={`pane-box${isActive ? " is-active" : ""}`}
+							className={`pane-box${isActive ? " is-active" : ""}${isAttentionExplicit ? " is-attention-explicit" : ""}${isAttention && !isAttentionExplicit ? " is-attention" : ""}`}
 							data-testid={isActive ? "pane-box-active" : "pane-box"}
 							style={{
 								position: "absolute",
@@ -73,6 +75,11 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
+						{(isAttention || isAttentionExplicit) && (
+							<div className="pane-box-attention-indicator">
+								<span className="attention-badge" />
+							</div>
+						)}
 						{!isActive && <div className="pane-box-label">{pane.title}</div>}
 						{isActive && selectedPane && (
 								<div className="pane-box-terminal">
