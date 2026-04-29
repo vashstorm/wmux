@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { useState, useCallback } from "react";
-import { AppProvider, useAppState, useSelectedConnection } from "./store.js";
+import { AppProvider, useAppState, useSelectedConnection, type SessionWindowState } from "./store.js";
 
 describe("AppProvider", () => {
 	test("renders children", () => {
@@ -57,9 +57,15 @@ describe("useAppState", () => {
 				</button>
 				<button
 					data-testid="set-windows"
-					onClick={() => state.setWindows("1", "session1", [{ id: "w1", name: "editor", panes: [{ id: "p1", index: 0 }] }])}
+					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 2, ActivePaneID: "%1", ActivePaneTitle: "bash" }])}
 				>
 					Set Windows
+				</button>
+				<button
+					data-testid="set-panes"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "bash", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 }, { ID: "%2", Title: "node", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 25 }])}
+				>
+					Set Panes
 				</button>
 				<button data-testid="set-pane" onClick={() => state.setSelectedPane({ connectionId: "1", session: "s1", window: "w1", pane: "p1" })}>
 					Set Pane
@@ -96,6 +102,32 @@ describe("useAppState", () => {
 				>
 					Set Editing
 				</button>
+				<span data-testid="windows-count">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						return sessionState ? String(sessionState.windows.length) : "null";
+					})()}
+				</span>
+				<span data-testid="windows-pane-count">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						const first = sessionState?.windows[0];
+						return first ? String(first.paneCount) : "null";
+					})()}
+				</span>
+				<span data-testid="panes-loaded-count">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						return sessionState?.panesLoaded ? String(Object.keys(sessionState.loadedPanes).length) : "null";
+					})()}
+				</span>
+				<span data-testid="pane-geometry">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						const first = sessionState?.loadedPanes["@1"]?.[0];
+						return first ? `${first.left},${first.top}` : "null";
+					})()}
+				</span>
 			</div>
 		);
 	}
@@ -182,6 +214,37 @@ describe("useAppState", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-editing"));
 		expect(screen.getByTestId("editing").textContent).toBe("local");
+	});
+
+	test("setWindows stores session windows with metadata", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows"));
+		expect(screen.getByTestId("windows-count").textContent).toBe("1");
+		expect(screen.getByTestId("windows-pane-count").textContent).toBe("2");
+	});
+
+	test("setPanes stores pane geometry with stable IDs", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows"));
+		fireEvent.click(screen.getByTestId("set-panes"));
+		expect(screen.getByTestId("panes-loaded-count").textContent).toBe("1");
+		expect(screen.getByTestId("pane-geometry").textContent).toBe("0,0");
+	});
+
+	test("setWindows preserves pane geometry when called again", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows"));
+		fireEvent.click(screen.getByTestId("set-panes"));
+		expect(screen.getByTestId("panes-loaded-count").textContent).toBe("1");
+		fireEvent.click(screen.getByTestId("set-windows"));
+		expect(screen.getByTestId("panes-loaded-count").textContent).toBe("1");
+		expect(screen.getByTestId("windows-count").textContent).toBe("1");
+	});
+
+	test("selectedPane holds stable window and pane IDs", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-pane"));
+		expect(screen.getByTestId("selected-pane").textContent).toBe("1:p1");
 	});
 });
 

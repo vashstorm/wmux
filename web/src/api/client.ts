@@ -156,6 +156,9 @@ export interface WindowInfo {
 	Name: string;
 	Index: number;
 	Active: boolean;
+	PaneCount: number;
+	ActivePaneID: string;
+	ActivePaneTitle: string;
 }
 
 export interface WindowsListResponse {
@@ -173,6 +176,8 @@ export interface PaneInfo {
 	Active: boolean;
 	Width: number;
 	Height: number;
+	Left: number;
+	Top: number;
 }
 
 export interface PanesListResponse {

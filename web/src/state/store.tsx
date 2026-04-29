@@ -1,6 +1,37 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo } from "../api/client.js";
 
+export interface WindowSummary {
+	id: string;
+	name: string;
+	index: number;
+	active: boolean;
+	paneCount: number;
+	activePaneID: string;
+	activePaneTitle: string;
+}
+
+export interface PaneData {
+	id: string;
+	title: string;
+	index: number;
+	active: boolean;
+	width: number;
+	height: number;
+	left: number;
+	top: number;
+}
+
+export interface SessionWindowState {
+	windows: WindowSummary[];
+	loadedPanes: Record<string, PaneData[]>;
+	panesLoaded: boolean;
+}
+
+/**
+ * Stable ID selectors: window holds a `@window_id`, pane holds a `%pane_id`.
+ * These are populated once a session is opened and remain stable across refreshes.
+ */
 export interface SelectedPane {
 	connectionId: string;
 	session: string;
@@ -8,11 +39,36 @@ export interface SelectedPane {
 	pane?: string;
 }
 
+function windowInfoToSummary(w: WindowInfo): WindowSummary {
+	return {
+		id: w.ID,
+		name: w.Name,
+		index: w.Index,
+		active: w.Active,
+		paneCount: w.PaneCount,
+		activePaneID: w.ActivePaneID,
+		activePaneTitle: w.ActivePaneTitle,
+	};
+}
+
+function paneInfoToData(p: PaneInfo): PaneData {
+	return {
+		id: p.ID,
+		title: p.Title,
+		index: p.Index,
+		active: p.Active,
+		width: p.Width,
+		height: p.Height,
+		left: p.Left,
+		top: p.Top,
+	};
+}
+
 export interface AppState {
 	connections: ConnectionConfig[];
 	selectedConnectionId: string | null;
 	sessions: Record<string, SessionInfoData[]>;
-	windows: Record<string, { id: string; name: string; panes: { id: string; index: number }[] }[]>;
+	windows: Record<string, SessionWindowState>;
 	loading: {
 		connections: boolean;
 		sessions: boolean;
@@ -47,7 +103,8 @@ interface AppContextValue extends AppState {
 	setConnections: (connections: ConnectionConfig[]) => void;
 	setSelectedConnectionId: (id: string | null) => void;
 	setSessions: (connectionId: string, sessions: SessionInfoData[]) => void;
-	setWindows: (connectionId: string, session: string, windows: { id: string; name: string; panes: { id: string; index: number }[] }[]) => void;
+	setWindows: (connectionId: string, session: string, windows: WindowInfo[]) => void;
+	setPanes: (connectionId: string, session: string, windowId: string, panes: PaneInfo[]) => void;
 	setLoading: (key: keyof AppState["loading"], value: boolean) => void;
 	setError: (error: { code: string; message: string } | null) => void;
 	setShowNewConnectionForm: (show: boolean) => void;
@@ -90,11 +147,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setSessionsState((prev) => ({ ...prev, [connectionId]: newSessions }));
 	}, []);
 
-	const setWindows = useCallback((connectionId: string, session: string, newWindows: { id: string; name: string; panes: { id: string; index: number }[] }[]) => {
-		setWindowsState((prev) => ({
-			...prev,
-			[`${connectionId}:${session}`]: newWindows,
-		}));
+	const setWindows = useCallback((connectionId: string, session: string, newWindows: WindowInfo[]) => {
+		const key = `${connectionId}:${session}`;
+		setWindowsState((prev) => {
+			const existing = prev[key];
+			return {
+				...prev,
+				[key]: {
+					windows: newWindows.map(windowInfoToSummary),
+					loadedPanes: existing?.loadedPanes ?? {},
+					panesLoaded: existing?.panesLoaded ?? false,
+				},
+			};
+		});
+	}, []);
+
+	const setPanes = useCallback((connectionId: string, session: string, windowId: string, newPanes: PaneInfo[]) => {
+		const key = `${connectionId}:${session}`;
+		setWindowsState((prev) => {
+			const existing = prev[key];
+			return {
+				...prev,
+				[key]: {
+					windows: existing?.windows ?? [],
+					loadedPanes: {
+						...(existing?.loadedPanes ?? {}),
+						[windowId]: newPanes.map(paneInfoToData),
+					},
+					panesLoaded: true,
+				},
+			};
+		});
 	}, []);
 
 	const setLoading = useCallback((key: keyof AppState["loading"], value: boolean) => {
@@ -133,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setSelectedConnectionId,
 		setSessions,
 		setWindows,
+		setPanes,
 		setLoading,
 		setError,
 		setShowNewConnectionForm,
