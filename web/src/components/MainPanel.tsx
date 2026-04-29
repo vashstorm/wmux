@@ -1,12 +1,14 @@
 import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
+import { listPanes } from "../api/client.js";
 
 export function MainPanel() {
 	const {
 		selectedPane,
 		windows,
 		setSelectedPane,
+		setPanes,
 	} = useAppState();
 
 	const hasSelectedPane = selectedPane !== null;
@@ -22,14 +24,45 @@ export function MainPanel() {
 		? (sessionWindowState?.loadedPanes[currentWindowId] ?? [])
 		: [];
 
-	const handleSelectWindow = (windowId: string, activePaneId: string) => {
+	const handleSelectWindow = async (windowId: string, activePaneId: string) => {
 		if (!selectedPane) return;
-		setSelectedPane({
-			connectionId: selectedPane.connectionId,
-			session: selectedPane.session,
-			window: windowId,
-			pane: activePaneId,
-		});
+
+		const loadedPanesForWindow = sessionWindowState?.loadedPanes[windowId];
+
+		if (!loadedPanesForWindow || loadedPanesForWindow.length === 0) {
+			try {
+				const panesResponse = await listPanes(
+					selectedPane.connectionId,
+					selectedPane.session,
+					windowId
+				);
+				const panes = panesResponse.data ?? [];
+				setPanes(selectedPane.connectionId, selectedPane.session, windowId, panes);
+
+				const activePane = panes.find((p) => p.Active) ?? panes[0];
+				setSelectedPane({
+					connectionId: selectedPane.connectionId,
+					session: selectedPane.session,
+					window: windowId,
+					pane: activePane?.ID ?? activePaneId,
+				});
+			} catch {
+				// On error, still update the window selection with the provided pane ID
+				setSelectedPane({
+					connectionId: selectedPane.connectionId,
+					session: selectedPane.session,
+					window: windowId,
+					pane: activePaneId,
+				});
+			}
+		} else {
+			setSelectedPane({
+				connectionId: selectedPane.connectionId,
+				session: selectedPane.session,
+				window: windowId,
+				pane: activePaneId,
+			});
+		}
 	};
 
 	const handleSelectPane = (paneId: string) => {
@@ -42,13 +75,23 @@ export function MainPanel() {
 		});
 	};
 
+	const buildTitle = () => {
+		if (!hasSelectedPane || !selectedPane) return "Wmux";
+
+		const sessionName = selectedPane.session;
+		const windowSummary = windowSummaries.find((w) => w.id === selectedPane.window);
+		const windowName = windowSummary?.name ?? selectedPane.window ?? "-";
+		const paneData = currentPanes.find((p) => p.id === selectedPane.pane);
+		const paneTitle = paneData?.title ?? selectedPane.pane ?? "-";
+
+		return `${sessionName} / ${windowName} / ${paneTitle}`;
+	};
+
 	return (
 		<div className="main-panel">
 			<header className="main-header">
 				<h1 className="main-header-title" data-testid="main-title">
-					{hasSelectedPane
-						? `${selectedPane.session} / ${selectedPane.window ?? "-"} / ${selectedPane.pane ?? "-"}`
-						: "Wmux"}
+					{buildTitle()}
 				</h1>
 			</header>
 
