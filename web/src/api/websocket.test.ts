@@ -59,6 +59,16 @@ describe("TerminalWebSocket", () => {
 		expect(url).toContain("token=secret");
 	});
 
+	test("constructs WebSocket URL with empty token", () => {
+		const socket = createSocket({ token: "" });
+		socket.connect();
+
+		const Call = vi.mocked(WebSocket).mock.calls[0];
+		const url = Call[0] as string;
+		expect(url).toContain("token=");
+		expect(url).not.toContain("token=secret");
+	});
+
 	test("calls onOpen when connection opens", () => {
 		const onOpen = vi.fn();
 		const socket = createSocket({ onOpen });

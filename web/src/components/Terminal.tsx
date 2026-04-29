@@ -22,11 +22,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 	const connectWebSocket = useCallback(() => {
-		const token = sessionStorage.getItem("wmux-auth-token");
-		if (!token) {
-			setErrorMessage("Authentication token not found");
-			return;
-		}
+		const token = sessionStorage.getItem("wmux-auth-token") ?? "";
 
 		setDisconnected(false);
 		setErrorMessage(null);

@@ -219,6 +219,52 @@ func TestTerminalWebSocketUnsupportedConnectionType(t *testing.T) {
 	}
 }
 
+func TestTerminalWebSocketEmptyTokenAllowed(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Auth.Token = ""
+	srv := newTestServer(t, cfg)
+	httpServer := httptest.NewServer(srv.Handler())
+	defer httpServer.Close()
+
+	wsURL := websocketURL(httpServer.URL + "/api/terminal")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to dial websocket without token: %v", err)
+	}
+	defer conn.Close()
+
+	var connected protocol.ServerMessage
+	if err := conn.ReadJSON(&connected); err != nil {
+		t.Fatalf("failed to read connected message: %v", err)
+	}
+	if connected.Type != protocol.ServerMessageTypeStatus || connected.Status != "connected" {
+		t.Fatalf("unexpected connected message: %#v", connected)
+	}
+}
+
+func TestTerminalWebSocketEmptyTokenWithQueryParam(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Auth.Token = ""
+	srv := newTestServer(t, cfg)
+	httpServer := httptest.NewServer(srv.Handler())
+	defer httpServer.Close()
+
+	wsURL := websocketURL(httpServer.URL + "/api/terminal?token=")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to dial websocket with empty token param: %v", err)
+	}
+	defer conn.Close()
+
+	var connected protocol.ServerMessage
+	if err := conn.ReadJSON(&connected); err != nil {
+		t.Fatalf("failed to read connected message: %v", err)
+	}
+	if connected.Type != protocol.ServerMessageTypeStatus || connected.Status != "connected" {
+		t.Fatalf("unexpected connected message: %#v", connected)
+	}
+}
+
 func TestTerminalWebSocketUpgradeFailure(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Auth.Token = "secret-token"
