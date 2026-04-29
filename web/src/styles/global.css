@@ -1,0 +1,104 @@
+@import './tokens.css';
+
+/* Reset and base styles */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html {
+	font-size: var(--font-size-base);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+body {
+	font-family: var(--font-stack);
+	font-size: var(--font-size-base);
+	line-height: var(--line-height-normal);
+	color: var(--color-text);
+	background-color: var(--color-background);
+	min-height: 100vh;
+	overflow: hidden;
+}
+
+#root {
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+}
+
+/* Typography utilities */
+h1, h2, h3, h4, h5, h6 {
+	font-weight: var(--font-weight-semibold);
+	line-height: var(--line-height-tight);
+}
+
+/* Focus styles */
+:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: -1px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--color-surface-hover);
+	border-radius: var(--radius-full);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-border);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+/* Selection */
+::selection {
+	background-color: var(--color-accent-subtle);
+	color: var(--color-text);
+}
+
+/* Button reset */
+button {
+	font-family: inherit;
+	font-size: inherit;
+	cursor: pointer;
+	border: none;
+	background: none;
+	color: inherit;
+}
+
+/* Input reset */
+input {
+	font-family: inherit;
+	font-size: inherit;
+	color: inherit;
+	background: none;
+	border: none;
+	outline: none;
+}
+
+/* Anchor reset */
+a {
+	color: var(--color-accent);
+	text-decoration: none;
+}
+
+a:hover {
+	color: var(--color-accent-hover);
+	text-decoration: underline;
+}

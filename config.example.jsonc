@@ -1,0 +1,40 @@
+{
+  // Increment when the config schema changes.
+  "schemaVersion": 1,
+
+  "server": {
+    // Localhost binds can omit auth.token. Non-localhost binds must set it.
+    "bind": "127.0.0.1:7331"
+  },
+
+  "auth": {
+    // Leave empty only for localhost development.
+    "token": "replace-with-a-random-token"
+  },
+
+  "tmux": {
+    "path": "tmux"
+  },
+
+  "connections": [
+    {
+      "id": "local-dev",
+      "name": "Local",
+      "type": "local"
+    },
+    {
+      "id": "remote-prod",
+      "name": "Remote SSH",
+      "type": "ssh",
+      "host": "example.com",
+      "port": 22,
+      "user": "deploy",
+      "privateKeyPath": "~/.ssh/id_ed25519",
+      "knownHostsPath": "~/.ssh/known_hosts"
+    }
+  ],
+
+  "ui": {
+    "theme": "dark"
+  }
+}
