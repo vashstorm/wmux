@@ -1,9 +1,9 @@
-// @ts-nocheck
 import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import type { APIRequestContext } from "../../web/node_modules/@playwright/test/index.js";
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
-async function createLocalConnection(request: any, name: string) {
+async function createLocalConnection(request: APIRequestContext, name: string) {
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -25,19 +25,18 @@ test.describe("session window pane navigation", () => {
 		});
 	});
 
+	function getSessionCardLocator(page: import("../../web/node_modules/@playwright/test/index.js").Page, sessionName: string) {
+		return page.locator(`[data-testid="session-card-${sessionName}"]`);
+	}
+
 	test("clicking session loads window tabs in main panel", async ({ page, request }) => {
 		const connectionName = "Session Load Test";
 		await createLocalConnection(request, connectionName);
 		await page.goto("/");
 
-		const sessionItem = page
-			.locator(".sidebar-session-item")
-			.filter({ has: page.getByText(connectionName) })
-			.filter({ has: page.getByTestId(`session-label-${terminalSessionName}`) })
-			.first();
-
-		await expect(sessionItem.getByTestId(`session-label-${terminalSessionName}`)).toBeVisible();
-		await sessionItem.getByTestId(`session-open-${terminalSessionName}`).click();
+		const sessionCard = getSessionCardLocator(page, terminalSessionName);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".window-tabs")).toBeVisible();
 		await expect(page.locator(".window-tab")).toHaveCount(1, { timeout: 5000 });
@@ -48,15 +47,11 @@ test.describe("session window pane navigation", () => {
 		await createLocalConnection(request, connectionName);
 		await page.goto("/");
 
-		const sessionItem = page
-			.locator(".sidebar-session-item")
-			.filter({ has: page.getByText(connectionName) })
-			.filter({ has: page.getByTestId(`session-label-${terminalSessionName}`) })
-			.first();
+		const sessionCard = getSessionCardLocator(page, terminalSessionName);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
-		await sessionItem.getByTestId(`session-open-${terminalSessionName}`).click();
-
-		const activeTab = page.locator(".window-tab.active");
+		const activeTab = page.locator(".window-tab.is-active");
 		await expect(activeTab).toBeVisible({ timeout: 5000 });
 	});
 
@@ -65,13 +60,9 @@ test.describe("session window pane navigation", () => {
 		await createLocalConnection(request, connectionName);
 		await page.goto("/");
 
-		const sessionItem = page
-			.locator(".sidebar-session-item")
-			.filter({ has: page.getByText(connectionName) })
-			.filter({ has: page.getByTestId(`session-label-${terminalSessionName}`) })
-			.first();
-
-		await sessionItem.getByTestId(`session-open-${terminalSessionName}`).click();
+		const sessionCard = getSessionCardLocator(page, terminalSessionName);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 
@@ -86,13 +77,9 @@ test.describe("session window pane navigation", () => {
 		await createLocalConnection(request, connectionName);
 		await page.goto("/");
 
-		const sessionItem = page
-			.locator(".sidebar-session-item")
-			.filter({ has: page.getByText(connectionName) })
-			.filter({ has: page.getByTestId(`session-label-${terminalSessionName}`) })
-			.first();
-
-		await sessionItem.getByTestId(`session-open-${terminalSessionName}`).click();
+		const sessionCard = getSessionCardLocator(page, terminalSessionName);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
 		await expect(page.getByTestId("main-title")).toContainText("/", { timeout: 5000 });

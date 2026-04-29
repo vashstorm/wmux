@@ -15,6 +15,10 @@ import {
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
 
+function isApiError(err: unknown): err is Error & { code: string; message: string } {
+  return err instanceof Error && "code" in err && "message" in err;
+}
+
 export function Sidebar() {
   const {
     connections,
@@ -72,9 +76,8 @@ export function Sidebar() {
       const data = await listConnections();
       setConnections(data);
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       } else {
         setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Unknown error" });
       }
@@ -89,10 +92,9 @@ export function Sidebar() {
       const response = await listSessions(connectionId);
       setSessions(connectionId, response.data ?? []);
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        if (apiErr.code !== "connection_failed" && apiErr.code !== "unknown_error") {
-          setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        if (err.code !== "connection_failed" && err.code !== "unknown_error") {
+          setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
         }
       }
     }
@@ -119,7 +121,7 @@ export function Sidebar() {
   }, [selectedConnectionId, loadSessionsForConnection]);
 
   const connectionSessions = useMemo(() => {
-    if (!selectedConnectionId) return [] as SessionInfoData[];
+    if (!selectedConnectionId) return [];
     return sessions[selectedConnectionId] ?? [];
   }, [sessions, selectedConnectionId]);
 
@@ -164,9 +166,9 @@ export function Sidebar() {
         pane: activePane?.ID,
       });
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      setSelectedPane(null);
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       } else {
         setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to open session" });
       }
@@ -175,7 +177,7 @@ export function Sidebar() {
 
   /**
    * Lazy-load panes for a non-active window when a tab is first opened.
-   * Exported for use by MainPanel when switching window tabs.
+   * Used internally; MainPanel imports listPanes directly from client.ts.
    */
   const loadWindowPanes = async (
     connectionId: string,
@@ -188,9 +190,8 @@ export function Sidebar() {
       setPanes(connectionId, sessionName, windowId, panes);
       return panes;
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       }
       return null;
     }
@@ -207,9 +208,8 @@ export function Sidebar() {
       const response = await listSessions(connId);
       setSessions(connId, response.data ?? []);
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       }
     }
   };
@@ -221,9 +221,8 @@ export function Sidebar() {
       const response = await listSessions(connId);
       setSessions(connId, response.data ?? []);
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       }
     }
   }, [selectedConnectionId, setSessions, setError]);
@@ -241,9 +240,8 @@ export function Sidebar() {
           await killSession(connId, sessionName);
           await reloadSessions();
         } catch (err) {
-          if (err instanceof Error && "code" in err) {
-            const apiErr = err as { code: string; message: string };
-            setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+          if (isApiError(err)) {
+            setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
           }
         }
       },
@@ -268,9 +266,8 @@ export function Sidebar() {
       await renameSession(connId, sessionName, newName);
       await reloadSessions();
     } catch (err) {
-      if (err instanceof Error && "code" in err) {
-        const apiErr = err as { code: string; message: string };
-        setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+      if (isApiError(err)) {
+        setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       }
     } finally {
       setRenamingSession(null);

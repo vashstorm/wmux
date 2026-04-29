@@ -2,6 +2,7 @@ import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
 import { listPanes } from "../api/client.js";
+import { getErrorMessage } from "../api/errors.js";
 
 export function MainPanel() {
 	const {
@@ -9,6 +10,7 @@ export function MainPanel() {
 		windows,
 		setSelectedPane,
 		setPanes,
+		setError,
 	} = useAppState();
 
 	const hasSelectedPane = selectedPane !== null;
@@ -46,8 +48,14 @@ export function MainPanel() {
 					window: windowId,
 					pane: activePane?.ID ?? activePaneId,
 				});
-			} catch {
-				// On error, still update the window selection with the provided pane ID
+			} catch (err) {
+				if (err instanceof Error && "code" in err) {
+					const apiErr = err as { code: string; message: string };
+					setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+				} else {
+					setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to load panes" });
+				}
+				// Still update the window selection with the provided pane ID as fallback
 				setSelectedPane({
 					connectionId: selectedPane.connectionId,
 					session: selectedPane.session,
