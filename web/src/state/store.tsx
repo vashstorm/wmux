@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth } from "../api/client.js";
 
 export interface SelectedPane {
 	connectionId: string;
@@ -17,6 +17,7 @@ export interface AppState {
 		connections: boolean;
 		sessions: boolean;
 		creatingConnection: boolean;
+		connectionHealth: boolean;
 	};
 	error: { code: string; message: string } | null;
 	showNewConnectionForm: boolean;
@@ -24,6 +25,8 @@ export interface AppState {
 	configConflict: ConfigConflictState | null;
 	confirmDialog: ConfirmDialogState | null;
 	selectedPane: SelectedPane | null;
+	connectionHealth: Record<string, ConnectionHealth>;
+	editingConnection: ConnectionConfig | null;
 }
 
 export interface ConfigConflictState {
@@ -53,6 +56,8 @@ interface AppContextValue extends AppState {
 	setConfirmDialog: (dialog: ConfirmDialogState | null) => void;
 	showConfirm: (options: Omit<ConfirmDialogState, "onConfirm"> & { onConfirm: () => void }) => void;
 	setSelectedPane: (pane: SelectedPane | null) => void;
+	setConnectionHealth: (health: Record<string, ConnectionHealth>) => void;
+	setEditingConnection: (connection: ConnectionConfig | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -66,6 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		connections: false,
 		sessions: false,
 		creatingConnection: false,
+		connectionHealth: false,
 	});
 	const [error, setErrorState] = useState<AppState["error"]>(null);
 	const [showNewConnectionForm, setShowNewConnectionForm] = useState(false);
@@ -73,6 +79,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [configConflict, setConfigConflict] = useState<ConfigConflictState | null>(null);
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 	const [selectedPane, setSelectedPane] = useState<SelectedPane | null>(null);
+	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
+	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {
 		setConnectionsState(newConnections);
@@ -119,6 +127,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		configConflict,
 		confirmDialog,
 		selectedPane,
+		connectionHealth,
+		editingConnection,
 		setConnections,
 		setSelectedConnectionId,
 		setSessions,
@@ -131,6 +141,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setConfirmDialog,
 		showConfirm,
 		setSelectedPane,
+		setConnectionHealth,
+		setEditingConnection,
 	};
 
 	return (

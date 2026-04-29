@@ -1,18 +1,56 @@
-import { useState } from "react";
-import { createConnection } from "../api/client.js";
+import { useState, useEffect } from "react";
+import { createConnection, updateConnection, listConnectionHealth } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 
 export function NewConnectionForm() {
-	const { showNewConnectionForm, setShowNewConnectionForm, setConnections, connections, setLoading, setError } = useAppState();
+	const {
+		showNewConnectionForm,
+		setShowNewConnectionForm,
+		editingConnection,
+		setEditingConnection,
+		setConnections,
+		connections,
+		setLoading,
+		setError,
+		setConnectionHealth,
+	} = useAppState();
 	const [name, setName] = useState("");
 	const [type, setType] = useState<"local" | "ssh">("local");
 	const [host, setHost] = useState("");
 	const [port, setPort] = useState("");
 	const [user, setUser] = useState("");
 	const [privateKeyPath, setPrivateKeyPath] = useState("");
+	const [knownHostsPath, setKnownHostsPath] = useState("");
 
-	if (!showNewConnectionForm) return null;
+	const isEditMode = editingConnection !== null;
+
+	useEffect(() => {
+		if (editingConnection) {
+			setName(editingConnection.name);
+			setType(editingConnection.type as "local" | "ssh");
+			setHost(editingConnection.host ?? "");
+			setPort(editingConnection.port ? String(editingConnection.port) : "");
+			setUser(editingConnection.user ?? "");
+			setPrivateKeyPath(editingConnection.privateKeyPath ?? "");
+			setKnownHostsPath(editingConnection.knownHostsPath ?? "");
+		} else {
+			setName("");
+			setType("local");
+			setHost("");
+			setPort("");
+			setUser("");
+			setPrivateKeyPath("");
+			setKnownHostsPath("");
+		}
+	}, [editingConnection]);
+
+	if (!showNewConnectionForm && !editingConnection) return null;
+
+	const handleClose = () => {
+		setShowNewConnectionForm(false);
+		setEditingConnection(null);
+	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -20,7 +58,15 @@ export function NewConnectionForm() {
 		setError(null);
 
 		try {
-			const payload: { name: string; type: string; host?: string; port?: number; user?: string; privateKeyPath?: string } = {
+			const payload: {
+				name: string;
+				type: string;
+				host?: string;
+				port?: number;
+				user?: string;
+				privateKeyPath?: string;
+				knownHostsPath?: string;
+			} = {
 				name: name.trim(),
 				type,
 			};
@@ -30,17 +76,33 @@ export function NewConnectionForm() {
 				if (port.trim()) payload.port = Number.parseInt(port.trim(), 10);
 				if (user.trim()) payload.user = user.trim();
 				if (privateKeyPath.trim()) payload.privateKeyPath = privateKeyPath.trim();
+				if (knownHostsPath.trim()) payload.knownHostsPath = knownHostsPath.trim();
 			}
 
-			const newConnection = await createConnection(payload);
-			setConnections([...connections, newConnection]);
-			setShowNewConnectionForm(false);
-			setName("");
-			setType("local");
-			setHost("");
-			setPort("");
-			setUser("");
-			setPrivateKeyPath("");
+			if (isEditMode) {
+				const updated = await updateConnection(editingConnection.id, {
+					...editingConnection,
+					...payload,
+					id: editingConnection.id,
+				});
+				setConnections(connections.map((c) => (c.id === editingConnection.id ? updated : c)));
+			} else {
+				const newConnection = await createConnection(payload);
+				setConnections([...connections, newConnection]);
+			}
+
+			handleClose();
+
+			try {
+				const healthData = await listConnectionHealth();
+				const healthMap: Record<string, { connectionId: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
+				for (const h of healthData) {
+					healthMap[h.connectionId] = h;
+				}
+				setConnectionHealth(healthMap);
+			} catch {
+				// non-critical
+			}
 		} catch (err) {
 			if (err instanceof Error && "code" in err) {
 				const apiErr = err as { code: string; message: string };
@@ -54,9 +116,9 @@ export function NewConnectionForm() {
 	};
 
 	return (
-		<div className="new-connection-form-overlay">
-			<form className="new-connection-form" onSubmit={handleSubmit} data-testid="new-connection-form">
-				<h3 className="form-title">New Connection</h3>
+		<div className="new-connection-form-overlay" onClick={handleClose}>
+			<form className="new-connection-form" onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} data-testid="new-connection-form">
+				<h3 className="form-title">{isEditMode ? "Edit Connection" : "New Connection"}</h3>
 
 				<div className="form-field">
 					<label htmlFor="conn-name">Name *</label>
@@ -135,6 +197,18 @@ export function NewConnectionForm() {
 								data-testid="connection-key-input"
 							/>
 						</div>
+
+						<div className="form-field">
+							<label htmlFor="conn-known-hosts">Known Hosts Path</label>
+							<input
+								id="conn-known-hosts"
+								type="text"
+								value={knownHostsPath}
+								onChange={(e) => setKnownHostsPath(e.target.value)}
+								placeholder="~/.ssh/known_hosts"
+								data-testid="connection-known-hosts-input"
+							/>
+						</div>
 					</>
 				)}
 
@@ -142,7 +216,7 @@ export function NewConnectionForm() {
 					<button
 						type="button"
 						className="form-button form-button-secondary"
-						onClick={() => setShowNewConnectionForm(false)}
+						onClick={handleClose}
 						data-testid="cancel-connection"
 					>
 						Cancel
@@ -153,7 +227,7 @@ export function NewConnectionForm() {
 						data-testid="save-connection"
 						disabled={!name.trim()}
 					>
-						Save
+						{isEditMode ? "Update" : "Save"}
 					</button>
 				</div>
 			</form>

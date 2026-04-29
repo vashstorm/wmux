@@ -130,6 +130,47 @@ export async function deleteConnection(id: string): Promise<void> {
 	});
 }
 
+export interface WindowInfo {
+	ID: string;
+	Name: string;
+	Index: number;
+	Active: boolean;
+}
+
+export interface WindowsListResponse {
+	connectionId: string;
+	session: string;
+	mode: string;
+	adapterPath?: string;
+	data: WindowInfo[];
+}
+
+export interface PaneInfo {
+	ID: string;
+	Title: string;
+	Index: number;
+	Active: boolean;
+	Width: number;
+	Height: number;
+}
+
+export interface PanesListResponse {
+	connectionId: string;
+	session: string;
+	window: string;
+	mode: string;
+	adapterPath?: string;
+	data: PaneInfo[];
+}
+
+export async function listWindows(connectionId: string, sessionName: string): Promise<WindowsListResponse> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as WindowsListResponse;
+}
+
+export async function listPanes(connectionId: string, sessionName: string, windowId: string): Promise<PanesListResponse> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as PanesListResponse;
+}
+
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
 	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as SessionsListResponse;
 	return {
@@ -193,6 +234,27 @@ export async function killPane(
 	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}`, {
 		method: "DELETE",
 	})) as OperationResponse;
+}
+
+export interface ConnectionHealth {
+	connectionId: string;
+	status: "online" | "offline";
+	checkedAt: string;
+	errorCode?: string;
+	message?: string;
+}
+
+export interface ConnectionHealthListResponse {
+	data: ConnectionHealth[];
+}
+
+export async function listConnectionHealth(): Promise<ConnectionHealth[]> {
+	const response = (await apiFetch("/api/connections/health")) as ConnectionHealthListResponse;
+	return response.data ?? [];
+}
+
+export async function getConnectionHealth(id: string): Promise<ConnectionHealth> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(id)}/health`)) as ConnectionHealth;
 }
 
 export async function getConfig(): Promise<AppConfig> {

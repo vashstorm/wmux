@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getConfig, type AppConfig, updateConfig } from "../api/client.js";
+import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 
@@ -33,6 +33,11 @@ export function SettingsPanel() {
 		setConnections,
 		setConfigConflict,
 		configConflict,
+		setShowNewConnectionForm,
+		setEditingConnection,
+		showConfirm,
+		connectionHealth,
+		setConnectionHealth,
 	} = useAppState();
 	const [config, setConfig] = useState<AppConfig | null>(null);
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
@@ -58,11 +63,25 @@ export function SettingsPanel() {
 		}
 	};
 
+	const loadHealth = async () => {
+		try {
+			const healthData = await listConnectionHealth();
+			const healthMap: Record<string, { connectionId: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
+			for (const h of healthData) {
+				healthMap[h.connectionId] = h;
+			}
+			setConnectionHealth(healthMap);
+		} catch {
+			// ignored
+		}
+	};
+
 	useEffect(() => {
 		if (!showSettingsPanel) {
 			return;
 		}
 		void loadConfig();
+		void loadHealth();
 	}, [showSettingsPanel]);
 
 	useEffect(() => {
@@ -189,6 +208,35 @@ export function SettingsPanel() {
 		closePanel();
 	};
 
+	const handleDeleteConnection = (connection: { id: string; name: string }) => {
+		showConfirm({
+			title: "Delete Connection",
+			message: `Delete connection "${connection.name}"? This cannot be undone.`,
+			confirmText: "Delete Connection",
+			confirmVariant: "danger",
+			onConfirm: async () => {
+				try {
+					await deleteConnection(connection.id);
+					setConnections(connections.filter((c) => c.id !== connection.id));
+				} catch (err) {
+					if (err instanceof Error && "code" in err) {
+						const apiErr = err as { code: string; message: string };
+						setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+					}
+				}
+			},
+		});
+	};
+
+	const handleEditConnection = (connection: { id: string; name: string; type: string; host?: string }) => {
+		setEditingConnection(connection);
+	};
+
+	const handleNewConnection = () => {
+		setEditingConnection(null);
+		setShowNewConnectionForm(true);
+	};
+
 	return (
 		<div className="settings-panel-overlay">
 			<form className="settings-panel" onSubmit={handleSave} data-testid="settings-panel">
@@ -203,6 +251,91 @@ export function SettingsPanel() {
 					<div className="settings-panel-loading">Loading settings...</div>
 				) : (
 					<>
+						{/* Connections Section */}
+						<div className="settings-section">
+							<div className="settings-section-header">
+								<h4 className="settings-section-title">Connections</h4>
+							<button
+								type="button"
+								className="settings-new-connection-btn"
+								onClick={handleNewConnection}
+								data-testid="settings-new-connection-button"
+							>
+								<span aria-hidden="true">+</span>
+								<span>New</span>
+							</button>
+							</div>
+
+							{connections.length === 0 ? (
+								<p className="settings-connections-empty">No connections configured</p>
+							) : (
+								<ul className="settings-connections-list">
+									{connections.map((connection) => {
+										const connHealth = connectionHealth[connection.id];
+										const statusClass =
+											connHealth?.status === "online"
+												? "is-online"
+												: connHealth?.status === "offline"
+													? "is-offline"
+													: "is-unknown";
+										const typeLabel = connection.type === "ssh" ? "SSH" : "Local";
+										const subtitle = connection.type === "ssh" && connection.host
+											? `${connection.user ?? ""}@${connection.host}${connection.port ? `:${connection.port}` : ""}`
+											: null;
+
+										return (
+											<li key={connection.id} className="settings-connection-item">
+												<div className="settings-connection-info">
+													<span
+														className={`connection-status-dot ${statusClass}`}
+														title={
+															connHealth?.status === "online"
+																? "Online"
+																: connHealth?.status === "offline"
+																	? `Offline: ${connHealth.errorCode ?? connHealth.message ?? "unknown"}`
+																	: "Unknown"
+														}
+														aria-label={`Connection status: ${connHealth?.status ?? "unknown"}`}
+													/>
+													<div className="settings-connection-details">
+														<span className="settings-connection-name">{connection.name}</span>
+														<span className="settings-connection-meta">
+															{typeLabel}
+															{subtitle ? ` · ${subtitle}` : ""}
+														</span>
+													</div>
+												</div>
+												<div className="settings-connection-actions">
+													<button
+														type="button"
+														className="connection-edit-btn"
+														onClick={() => handleEditConnection(connection)}
+														title="Edit connection"
+														aria-label="Edit connection"
+														data-testid={`settings-edit-connection-${connection.id}`}
+													>
+														✎
+													</button>
+													<button
+														type="button"
+														className="connection-delete-btn"
+														onClick={() => handleDeleteConnection(connection)}
+														title="Delete connection"
+														aria-label="Delete connection"
+														data-testid={`settings-delete-connection-${connection.id}`}
+													>
+														×
+													</button>
+												</div>
+											</li>
+										);
+									})}
+								</ul>
+							)}
+						</div>
+
+						<div className="settings-divider" />
+
 						<div className="form-field">
 							<label htmlFor="settings-bind">Server Bind</label>
 							<input
