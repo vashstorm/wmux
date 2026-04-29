@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -59,9 +60,13 @@ func main() {
 		log.Fatalf("failed to load embedded assets: %v", err)
 	}
 
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	srv := server.New(server.Options{
 		Store:  store,
 		Assets: assetFS,
+		Logger: logger,
 	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -72,7 +77,11 @@ func main() {
 		serverErrCh <- srv.ListenAndServe()
 	}()
 
-	log.Printf("starting wmux version=%s config=%q bind=http://%s", version, *configPath, store.Config.Server.Bind)
+	logger.Info("starting wmux",
+		slog.String("version", version),
+		slog.String("config", *configPath),
+		slog.String("bind", store.Config.Server.Bind),
+	)
 
 	select {
 	case err := <-serverErrCh:
@@ -83,7 +92,7 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		log.Printf("shutting down wmux after signal: %v", ctx.Err())
+		logger.Info("shutting down wmux", slog.String("reason", ctx.Err().Error()))
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			log.Fatalf("failed to shut down server gracefully: %v", err)
 		}
@@ -92,6 +101,6 @@ func main() {
 			log.Fatalf("server stopped with error: %v", err)
 		}
 
-		log.Printf("wmux shutdown complete")
+		logger.Info("wmux shutdown complete")
 	}
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -186,6 +187,9 @@ func (s *Server) writeStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, errConnectionConflict), errors.Is(err, config.ErrConfigModified):
 		s.writeError(w, http.StatusConflict, "conflict", err.Error())
 	default:
+		s.logger.Error("store error",
+			slog.String("raw_error", err.Error()),
+		)
 		s.writeError(w, http.StatusInternalServerError, "internal_error", "failed to persist configuration")
 	}
 }

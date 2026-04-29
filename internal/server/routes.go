@@ -28,13 +28,13 @@ func (s *Server) registerRoutes() {
 	s.handleAPI("PUT /api/config", s.handleUpdateConfig)
 
 	s.handleTerminal("GET /api/terminal", s.handleTerminalWebSocket)
-	s.mux.HandleFunc("/", s.handleStatic)
+	s.mux.Handle("/", s.loggingMiddleware(http.HandlerFunc(s.handleStatic)))
 }
 
 func (s *Server) handleAPI(pattern string, handler http.HandlerFunc) {
-	s.mux.Handle(pattern, s.authMiddleware(handler, false))
+	s.mux.Handle(pattern, s.loggingMiddleware(s.authMiddleware(handler, false)))
 }
 
 func (s *Server) handleTerminal(pattern string, handler http.HandlerFunc) {
-	s.mux.Handle(pattern, s.authMiddleware(handler, true))
+	s.mux.Handle(pattern, s.loggingMiddleware(s.authMiddleware(handler, true)))
 }

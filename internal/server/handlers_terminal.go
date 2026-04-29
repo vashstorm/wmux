@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -123,6 +124,12 @@ func (s *Server) writeTerminalAttachError(conn *websocket.Conn, err error) {
 	if message == "" {
 		message = err.Error()
 	}
+
+	s.logger.Error("terminal attach error",
+		slog.String("code", code),
+		slog.String("message", message),
+		slog.String("raw_error", err.Error()),
+	)
 
 	s.writeTerminalError(conn, code, message)
 }

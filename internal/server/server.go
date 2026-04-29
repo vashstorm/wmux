@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"mime"
 	"net/http"
 	"path"
@@ -17,6 +18,7 @@ import (
 type Options struct {
 	Store  *config.Store
 	Assets http.FileSystem
+	Logger *slog.Logger
 }
 
 type Server struct {
@@ -26,6 +28,7 @@ type Server struct {
 	mux               *http.ServeMux
 	sessionManager    session.Manager
 	websocketUpgrader websocket.Upgrader
+	logger            *slog.Logger
 	checkConnectionHealth func(config.ConnectionConfig, string) connectionHealthResponse
 }
 
@@ -38,12 +41,18 @@ func New(options Options) *Server {
 		panic("server options store is required")
 	}
 
+	logger := options.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	mux := http.NewServeMux()
 	srv := &Server{
 		store:          options.Store,
 		assets:         options.Assets,
 		mux:            mux,
 		sessionManager: session.NewManager(),
+		logger:         logger,
 		checkConnectionHealth: checkConnectionHealth,
 		websocketUpgrader: websocket.Upgrader{
 			CheckOrigin: func(*http.Request) bool {
@@ -128,6 +137,11 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func (s *Server) writeError(w http.ResponseWriter, status int, code, message string) {
+	s.logger.Error("http error response",
+		slog.Int("status", status),
+		slog.String("code", code),
+		slog.String("message", message),
+	)
 	s.writeJSON(w, status, protocol.ErrorResponse{
 		Error: protocol.ErrorDetail{
 			Code:    code,

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -660,6 +661,14 @@ func (s *Server) writeSessionHTTPError(w http.ResponseWriter, err error) {
 
 	if message == "" {
 		message = err.Error()
+	}
+
+	if status >= http.StatusInternalServerError {
+		s.logger.Error("session http error",
+			slog.String("code", code),
+			slog.String("message", message),
+			slog.String("raw_error", err.Error()),
+		)
 	}
 
 	s.writeError(w, status, code, message)
