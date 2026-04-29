@@ -13,8 +13,8 @@ const (
 	defaultRemoteTmuxPath = "tmux"
 
 	remoteSessionFormat = "#{session_id}:#{session_name}:#{session_attached}"
-	remoteWindowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}"
-	remotePaneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}"
+	remoteWindowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"
+	remotePaneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"
 )
 
 type remoteCommandRunner func(binary string, args ...string) (string, error)
@@ -375,79 +375,125 @@ func parseRemoteSessionRow(row string) (tmux.Session, error) {
 
 func parseRemoteWindowRow(row string) (tmux.Window, error) {
 	first := strings.Index(row, ":")
+	if first <= 0 {
+		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
 	last := strings.LastIndex(row, ":")
-	if first <= 0 || last <= first {
+	if last <= first {
 		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
 	}
 	secondLast := strings.LastIndex(row[:last], ":")
 	if secondLast <= first {
 		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
 	}
+	thirdLast := strings.LastIndex(row[:secondLast], ":")
+	if thirdLast <= first {
+		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
+	fourthLast := strings.LastIndex(row[:thirdLast], ":")
+	if fourthLast <= first {
+		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
+	fifthLast := strings.LastIndex(row[:fourthLast], ":")
+	if fifthLast <= first {
+		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
 
-	index, err := strconv.Atoi(row[secondLast+1 : last])
+	index, err := strconv.Atoi(row[fifthLast+1 : fourthLast])
 	if err != nil {
 		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid index: %w", row, err)
 	}
 
-	active, err := parseRemoteBoolField(row[last+1:])
+	active, err := parseRemoteBoolField(row[fourthLast+1 : thirdLast])
 	if err != nil {
 		return tmux.Window{}, fmt.Errorf("parse window row %q: %w", row, err)
 	}
 
+	paneCount, err := strconv.Atoi(row[thirdLast+1 : secondLast])
+	if err != nil {
+		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid pane count: %w", row, err)
+	}
+
 	return tmux.Window{
-		ID:     row[:first],
-		Name:   row[first+1 : secondLast],
-		Index:  index,
-		Active: active,
+		ID:              row[:first],
+		Name:            row[first+1 : fifthLast],
+		Index:           index,
+		Active:          active,
+		PaneCount:       paneCount,
+		ActivePaneID:    row[secondLast+1 : last],
+		ActivePaneTitle: row[last+1:],
 	}, nil
 }
 
 func parseRemotePaneRow(row string) (tmux.Pane, error) {
 	first := strings.Index(row, ":")
+	if first <= 0 {
+		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
 	last := strings.LastIndex(row, ":")
-	if first <= 0 || last <= first {
+	if last <= first {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	third := strings.LastIndex(row[:last], ":")
-	if third <= first {
+	secondLast := strings.LastIndex(row[:last], ":")
+	if secondLast <= first {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	fourth := strings.LastIndex(row[:third], ":")
-	if fourth <= first {
+	thirdLast := strings.LastIndex(row[:secondLast], ":")
+	if thirdLast <= first {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	fifth := strings.LastIndex(row[:fourth], ":")
-	if fifth <= first {
+	fourthLast := strings.LastIndex(row[:thirdLast], ":")
+	if fourthLast <= first {
+		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
+	fifthLast := strings.LastIndex(row[:fourthLast], ":")
+	if fifthLast <= first {
+		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
+	sixthLast := strings.LastIndex(row[:fifthLast], ":")
+	if sixthLast <= first {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
 
-	index, err := strconv.Atoi(row[fifth+1 : fourth])
+	index, err := strconv.Atoi(row[sixthLast+1 : fifthLast])
 	if err != nil {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
 	}
 
-	active, err := parseRemoteBoolField(row[fourth+1 : third])
+	active, err := parseRemoteBoolField(row[fifthLast+1 : fourthLast])
 	if err != nil {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
 	}
 
-	width, err := strconv.Atoi(row[third+1 : last])
+	width, err := strconv.Atoi(row[fourthLast+1 : thirdLast])
 	if err != nil {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid width: %w", row, err)
 	}
 
-	height, err := strconv.Atoi(row[last+1:])
+	height, err := strconv.Atoi(row[thirdLast+1 : secondLast])
 	if err != nil {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid height: %w", row, err)
 	}
 
+	left, err := strconv.Atoi(row[secondLast+1 : last])
+	if err != nil {
+		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid left: %w", row, err)
+	}
+
+	top, err := strconv.Atoi(row[last+1:])
+	if err != nil {
+		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
+	}
+
 	return tmux.Pane{
 		ID:     row[:first],
-		Title:  row[first+1 : fifth],
+		Title:  row[first+1 : sixthLast],
 		Index:  index,
 		Active: active,
 		Width:  width,
 		Height: height,
+		Left:   left,
+		Top:    top,
 	}, nil
 }
 

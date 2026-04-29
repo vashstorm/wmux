@@ -56,24 +56,81 @@ func TestParseSessionRow(t *testing.T) {
 }
 
 func TestParseWindowRow(t *testing.T) {
-	window, err := parseWindowRow("@2:editor:main:3:0")
+	window, err := parseWindowRow("@2:editor:main:3:0:1:%5:zsh")
 	if err != nil {
 		t.Fatalf("parseWindowRow() error = %v", err)
 	}
 
-	want := Window{ID: "@2", Name: "editor:main", Index: 3, Active: false}
+	want := Window{ID: "@2", Name: "editor:main", Index: 3, Active: false, PaneCount: 1, ActivePaneID: "%5", ActivePaneTitle: "zsh"}
 	if !reflect.DeepEqual(window, want) {
 		t.Fatalf("parseWindowRow() = %#v, want %#v", window, want)
 	}
 }
 
 func TestParsePaneRow(t *testing.T) {
-	pane, err := parsePaneRow("%3:nvim:logs:1:1:120:40")
+	pane, err := parsePaneRow("%3:nvim:logs:1:1:120:40:0:0")
 	if err != nil {
 		t.Fatalf("parsePaneRow() error = %v", err)
 	}
 
-	want := Pane{ID: "%3", Title: "nvim:logs", Index: 1, Active: true, Width: 120, Height: 40}
+	want := Pane{ID: "%3", Title: "nvim:logs", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0}
+	if !reflect.DeepEqual(pane, want) {
+		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
+	}
+}
+
+func TestParseWindowsOutputWithNewFields(t *testing.T) {
+	output := "@1:editor:1:1:2:%1:zsh\n@2:shell:2:0:1:%2:bash"
+	windows, err := parseWindowsOutput(output)
+	if err != nil {
+		t.Fatalf("parseWindowsOutput() error = %v", err)
+	}
+
+	want := []Window{
+		{ID: "@1", Name: "editor", Index: 1, Active: true, PaneCount: 2, ActivePaneID: "%1", ActivePaneTitle: "zsh"},
+		{ID: "@2", Name: "shell", Index: 2, Active: false, PaneCount: 1, ActivePaneID: "%2", ActivePaneTitle: "bash"},
+	}
+	if !reflect.DeepEqual(windows, want) {
+		t.Fatalf("parseWindowsOutput() = %#v, want %#v", windows, want)
+	}
+}
+
+func TestParsePanesOutputWithGeometry(t *testing.T) {
+	output := "%1:main:0:1:120:40:0:0\n%2:logs:1:0:80:24:0:40\n%3:side:2:0:40:40:120:0"
+	panes, err := parsePanesOutput(output)
+	if err != nil {
+		t.Fatalf("parsePanesOutput() error = %v", err)
+	}
+
+	want := []Pane{
+		{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0},
+		{ID: "%2", Title: "logs", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 40},
+		{ID: "%3", Title: "side", Index: 2, Active: false, Width: 40, Height: 40, Left: 120, Top: 0},
+	}
+	if !reflect.DeepEqual(panes, want) {
+		t.Fatalf("parsePanesOutput() = %#v, want %#v", panes, want)
+	}
+}
+
+func TestParseWindowRowSinglePane(t *testing.T) {
+	window, err := parseWindowRow("@1:single:0:1:1:%1:")
+	if err != nil {
+		t.Fatalf("parseWindowRow() error = %v", err)
+	}
+
+	want := Window{ID: "@1", Name: "single", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: ""}
+	if !reflect.DeepEqual(window, want) {
+		t.Fatalf("parseWindowRow() = %#v, want %#v", window, want)
+	}
+}
+
+func TestParsePaneRowWithPosition(t *testing.T) {
+	pane, err := parsePaneRow("%5:vim:3:1:80:24:10:5")
+	if err != nil {
+		t.Fatalf("parsePaneRow() error = %v", err)
+	}
+
+	want := Pane{ID: "%5", Title: "vim", Index: 3, Active: true, Width: 80, Height: 24, Left: 10, Top: 5}
 	if !reflect.DeepEqual(pane, want) {
 		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
 	}

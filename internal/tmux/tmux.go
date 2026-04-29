@@ -13,8 +13,8 @@ const (
 	defaultBinaryPath = "tmux"
 
 	sessionFormat = "#{session_id}:#{session_name}:#{session_attached}"
-	windowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}"
-	paneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}"
+	windowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"
+	paneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"
 
 	ErrorCodeNotFound      = "tmux_not_found"
 	ErrorCodeNoSessions    = "tmux_no_sessions"
@@ -436,79 +436,125 @@ func parseSessionRow(row string) (Session, error) {
 
 func parseWindowRow(row string) (Window, error) {
 	first := strings.Index(row, ":")
+	if first <= 0 {
+		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
 	last := strings.LastIndex(row, ":")
-	if first <= 0 || last <= first {
+	if last <= first {
 		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
 	}
 	secondLast := strings.LastIndex(row[:last], ":")
 	if secondLast <= first {
 		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
 	}
+	thirdLast := strings.LastIndex(row[:secondLast], ":")
+	if thirdLast <= first {
+		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
+	fourthLast := strings.LastIndex(row[:thirdLast], ":")
+	if fourthLast <= first {
+		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
+	fifthLast := strings.LastIndex(row[:fourthLast], ":")
+	if fifthLast <= first {
+		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
+	}
 
-	index, err := strconv.Atoi(row[secondLast+1 : last])
+	index, err := strconv.Atoi(row[fifthLast+1 : fourthLast])
 	if err != nil {
 		return Window{}, fmt.Errorf("parse window row %q: invalid index: %w", row, err)
 	}
 
-	active, err := parseBoolField(row[last+1:])
+	active, err := parseBoolField(row[fourthLast+1 : thirdLast])
 	if err != nil {
 		return Window{}, fmt.Errorf("parse window row %q: %w", row, err)
 	}
 
+	paneCount, err := strconv.Atoi(row[thirdLast+1 : secondLast])
+	if err != nil {
+		return Window{}, fmt.Errorf("parse window row %q: invalid pane count: %w", row, err)
+	}
+
 	return Window{
-		ID:     row[:first],
-		Name:   row[first+1 : secondLast],
-		Index:  index,
-		Active: active,
+		ID:              row[:first],
+		Name:            row[first+1 : fifthLast],
+		Index:           index,
+		Active:          active,
+		PaneCount:       paneCount,
+		ActivePaneID:    row[secondLast+1 : last],
+		ActivePaneTitle: row[last+1:],
 	}, nil
 }
 
 func parsePaneRow(row string) (Pane, error) {
 	first := strings.Index(row, ":")
+	if first <= 0 {
+		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
 	last := strings.LastIndex(row, ":")
-	if first <= 0 || last <= first {
+	if last <= first {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	third := strings.LastIndex(row[:last], ":")
-	if third <= first {
+	secondLast := strings.LastIndex(row[:last], ":")
+	if secondLast <= first {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	fourth := strings.LastIndex(row[:third], ":")
-	if fourth <= first {
+	thirdLast := strings.LastIndex(row[:secondLast], ":")
+	if thirdLast <= first {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
-	fifth := strings.LastIndex(row[:fourth], ":")
-	if fifth <= first {
+	fourthLast := strings.LastIndex(row[:thirdLast], ":")
+	if fourthLast <= first {
+		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
+	fifthLast := strings.LastIndex(row[:fourthLast], ":")
+	if fifthLast <= first {
+		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
+	}
+	sixthLast := strings.LastIndex(row[:fifthLast], ":")
+	if sixthLast <= first {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
 	}
 
-	index, err := strconv.Atoi(row[fifth+1 : fourth])
+	index, err := strconv.Atoi(row[sixthLast+1 : fifthLast])
 	if err != nil {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
 	}
 
-	active, err := parseBoolField(row[fourth+1 : third])
+	active, err := parseBoolField(row[fifthLast+1 : fourthLast])
 	if err != nil {
 		return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
 	}
 
-	width, err := strconv.Atoi(row[third+1 : last])
+	width, err := strconv.Atoi(row[fourthLast+1 : thirdLast])
 	if err != nil {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid width: %w", row, err)
 	}
 
-	height, err := strconv.Atoi(row[last+1:])
+	height, err := strconv.Atoi(row[thirdLast+1 : secondLast])
 	if err != nil {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid height: %w", row, err)
 	}
 
+	left, err := strconv.Atoi(row[secondLast+1 : last])
+	if err != nil {
+		return Pane{}, fmt.Errorf("parse pane row %q: invalid left: %w", row, err)
+	}
+
+	top, err := strconv.Atoi(row[last+1:])
+	if err != nil {
+		return Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
+	}
+
 	return Pane{
 		ID:     row[:first],
-		Title:  row[first+1 : fifth],
+		Title:  row[first+1 : sixthLast],
 		Index:  index,
 		Active: active,
 		Width:  width,
 		Height: height,
+		Left:   left,
+		Top:    top,
 	}, nil
 }
 

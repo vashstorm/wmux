@@ -7,10 +7,13 @@ type Session struct {
 }
 
 type Window struct {
-	ID     string
-	Name   string
-	Index  int
-	Active bool
+	ID              string
+	Name            string
+	Index           int
+	Active          bool
+	PaneCount       int
+	ActivePaneID    string
+	ActivePaneTitle string
 }
 
 type Pane struct {
@@ -20,4 +23,6 @@ type Pane struct {
 	Active bool
 	Width  int
 	Height int
+	Left   int
+	Top    int
 }

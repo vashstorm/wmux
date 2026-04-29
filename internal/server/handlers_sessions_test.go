@@ -169,7 +169,7 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			method:          http.MethodGet,
 			path:            "/api/connections/local-1/sessions/work/windows",
 			wantStatus:      http.StatusOK,
-			wantLogContains: []string{"list-windows", "-t", "work", "#{window_id}:#{window_name}:#{window_index}:#{window_active}"},
+			wantLogContains: []string{"list-windows", "-t", "work", "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"},
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder, adapterPath string) {
 				payload := decodeBody[windowsListResponse](t, rec.Body.Bytes())
 				if payload.Session != "work" || payload.Mode != "local" || payload.AdapterPath != adapterPath {
@@ -185,7 +185,7 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			method:          http.MethodGet,
 			path:            "/api/connections/local-1/sessions/work/windows/editor/panes",
 			wantStatus:      http.StatusOK,
-			wantLogContains: []string{"list-panes", "-t", "work:editor", "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}"},
+			wantLogContains: []string{"list-panes", "-t", "work:editor", "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"},
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder, adapterPath string) {
 				payload := decodeBody[panesListResponse](t, rec.Body.Bytes())
 				if payload.Session != "work" || payload.Window != "editor" || payload.AdapterPath != adapterPath {
@@ -331,6 +331,56 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestListWindowsAndPanesJSONIncludesNewFields(t *testing.T) {
+	adapterPath, logPath := createFakeTMUXBinary(t)
+
+	cfg := config.DefaultConfig()
+	cfg.Tmux.Path = adapterPath
+	cfg.Connections = []config.ConnectionConfig{{
+		ID:   "local-1",
+		Type: "local",
+	}}
+
+	srv := newTestServer(t, cfg)
+
+	rec := performSessionRequest(t, srv, http.MethodGet, "/api/connections/local-1/sessions/work/windows", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rec.Code)
+	}
+
+	windowsPayload := decodeBody[windowsListResponse](t, rec.Body.Bytes())
+	if len(windowsPayload.Data) != 2 {
+		t.Fatalf("expected 2 windows, got %d", len(windowsPayload.Data))
+	}
+	w := windowsPayload.Data[0]
+	if w.PaneCount != 1 || w.ActivePaneID != "%1" || w.ActivePaneTitle != "zsh" {
+		t.Fatalf("window missing new fields: %#v", w)
+	}
+
+	rec = performSessionRequest(t, srv, http.MethodGet, "/api/connections/local-1/sessions/work/windows/editor/panes", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rec.Code)
+	}
+
+	panesPayload := decodeBody[panesListResponse](t, rec.Body.Bytes())
+	if len(panesPayload.Data) != 2 {
+		t.Fatalf("expected 2 panes, got %d", len(panesPayload.Data))
+	}
+	p := panesPayload.Data[0]
+	if p.Left != 0 || p.Top != 0 || p.Width != 120 || p.Height != 40 {
+		t.Fatalf("pane missing geometry fields: %#v", p)
+	}
+	p2 := panesPayload.Data[1]
+	if p2.Left != 0 || p2.Top != 40 || p2.Width != 80 || p2.Height != 24 {
+		t.Fatalf("pane 2 missing geometry fields: %#v", p2)
+	}
+
+	logLines := readFakeTMUXLog(t, logPath)
+	if len(logLines) != 2 {
+		t.Fatalf("expected two tmux invocations, got %#v", logLines)
 	}
 }
 
@@ -542,10 +592,10 @@ case "$cmd" in
     printf '$1:alpha:1\n$2:beta:0\n'
     ;;
   list-windows)
-    printf '@1:editor:1:1\n@2:shell:2:0\n'
+    printf '@1:editor:1:1:1:%%1:zsh\n@2:shell:2:0:1:%%2:bash\n'
     ;;
   list-panes)
-    printf '%%1:main:0:1:120:40\n%%2:logs:1:0:80:24\n'
+    printf '%%1:main:0:1:120:40:0:0\n%%2:logs:1:0:80:24:0:40\n'
     ;;
   new-session)
     name="$(find_flag_value -s "$@" || true)"
@@ -553,12 +603,12 @@ case "$cmd" in
     ;;
   new-window)
     name="$(find_flag_value -n "$@" || true)"
-    printf '@3:%s:3:1\n' "${name:-created}"
+    printf '@3:%s:3:1:1:%%3:zsh\n' "${name:-created}"
     ;;
   rename-session|kill-session|kill-window|kill-pane)
     ;;
   split-window)
-    printf '%%3:split:2:0:60:20\n'
+    printf '%%3:split:2:0:60:20:60:0\n'
     ;;
   *)
     echo "unsupported command: $cmd" >&2
