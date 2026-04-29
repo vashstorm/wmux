@@ -104,6 +104,25 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Data = sessions
+		for i := range response.Data {
+			windows, err := adapter.ListWindows(response.Data[i].Name)
+			if err != nil {
+				continue
+			}
+			allStates := make([]tmux.AttentionState, 0, len(windows))
+			totalCount := 0
+			for _, w := range windows {
+				panes, err := adapter.ListPanes(response.Data[i].Name, w.Name)
+				if err != nil {
+					continue
+				}
+				wState, wCount := aggregatePaneAttention(panes)
+				allStates = append(allStates, wState)
+				totalCount += wCount
+			}
+			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
+			response.Data[i].AttentionCount = totalCount
+		}
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
 			Host:           connection.Host,
@@ -121,6 +140,25 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Data = sessions
+		for i := range response.Data {
+			windows, err := remote.ListWindows(response.Data[i].Name)
+			if err != nil {
+				continue
+			}
+			allStates := make([]tmux.AttentionState, 0, len(windows))
+			totalCount := 0
+			for _, w := range windows {
+				panes, err := remote.ListPanes(buildWindowTarget(response.Data[i].Name, w.Name))
+				if err != nil {
+					continue
+				}
+				wState, wCount := aggregatePaneAttention(panes)
+				allStates = append(allStates, wState)
+				totalCount += wCount
+			}
+			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
+			response.Data[i].AttentionCount = totalCount
+		}
 	default:
 		s.writeError(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("unsupported connection type %q", connection.Type))
 		return
@@ -155,6 +193,13 @@ func (s *Server) handleListWindows(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Data = windows
+		for i := range response.Data {
+			panes, err := adapter.ListPanes(sessionName, response.Data[i].Name)
+			if err != nil {
+				continue
+			}
+			response.Data[i].AttentionState, response.Data[i].AttentionCount = aggregatePaneAttention(panes)
+		}
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
 			Host:           connection.Host,
@@ -172,6 +217,13 @@ func (s *Server) handleListWindows(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response.Data = windows
+		for i := range response.Data {
+			panes, err := remote.ListPanes(buildWindowTarget(sessionName, response.Data[i].Name))
+			if err != nil {
+				continue
+			}
+			response.Data[i].AttentionState, response.Data[i].AttentionCount = aggregatePaneAttention(panes)
+		}
 	default:
 		s.writeError(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("unsupported connection type %q", connection.Type))
 		return
@@ -649,4 +701,16 @@ func buildWindowTarget(session, window string) string {
 
 func buildPaneTarget(session, window, pane string) string {
 	return fmt.Sprintf("%s.%s", buildWindowTarget(session, window), pane)
+}
+
+func aggregatePaneAttention(panes []tmux.Pane) (tmux.AttentionState, int) {
+	states := make([]tmux.AttentionState, 0, len(panes))
+	count := 0
+	for _, p := range panes {
+		states = append(states, p.AttentionState)
+		if p.AttentionState != tmux.AttentionStateNone {
+			count++
+		}
+	}
+	return tmux.AggregateAttentionState(states), count
 }
