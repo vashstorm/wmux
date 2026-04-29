@@ -90,7 +90,7 @@ describe("Terminal", () => {
 
 		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
 		expect(mockConnect).toHaveBeenCalledTimes(1);
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0][0];
+		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.token).toBe("test-token");
 	});
 
@@ -99,7 +99,7 @@ describe("Terminal", () => {
 
 		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
 		expect(mockConnect).toHaveBeenCalledTimes(1);
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0][0];
+		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.token).toBe("");
 		expect(screen.queryByText("Authentication token not found")).not.toBeInTheDocument();
 	});
@@ -107,7 +107,7 @@ describe("Terminal", () => {
 	test("passes correct pane parameters to WebSocket", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0][0];
+		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.connectionId).toBe("conn-1");
 		expect(callArgs.session).toBe("dev");
 		expect(callArgs.window).toBe("@1");

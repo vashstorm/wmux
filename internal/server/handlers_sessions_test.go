@@ -153,7 +153,7 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			method:          http.MethodGet,
 			path:            "/api/connections/local-1/sessions",
 			wantStatus:      http.StatusOK,
-			wantLogContains: []string{"list-sessions", "-F", "#{session_id}:#{session_name}:#{session_attached}"},
+			wantLogContains: []string{"list-sessions", "-F", "#{session_id}", "#{session_name}", "#{session_attached}"},
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder, adapterPath string) {
 				payload := decodeBody[sessionsListResponse](t, rec.Body.Bytes())
 				if payload.ConnectionID != "local-1" || payload.Mode != "local" || payload.AdapterPath != adapterPath {
@@ -169,7 +169,7 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			method:          http.MethodGet,
 			path:            "/api/connections/local-1/sessions/work/windows",
 			wantStatus:      http.StatusOK,
-			wantLogContains: []string{"list-windows", "-t", "work", "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"},
+			wantLogContains: []string{"list-windows", "-t", "work", "#{window_id}", "#{window_name}", "#{window_index}", "#{window_active}", "#{window_panes}", "#{pane_id}", "#{pane_title}"},
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder, adapterPath string) {
 				payload := decodeBody[windowsListResponse](t, rec.Body.Bytes())
 				if payload.Session != "work" || payload.Mode != "local" || payload.AdapterPath != adapterPath {
@@ -185,7 +185,7 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			method:          http.MethodGet,
 			path:            "/api/connections/local-1/sessions/work/windows/editor/panes",
 			wantStatus:      http.StatusOK,
-			wantLogContains: []string{"list-panes", "-t", "work:editor", "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"},
+			wantLogContains: []string{"list-panes", "-t", "work:editor", "#{pane_id}", "#{pane_title}", "#{pane_index}", "#{pane_active}", "#{pane_width}", "#{pane_height}", "#{pane_left}", "#{pane_top}"},
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder, adapterPath string) {
 				payload := decodeBody[panesListResponse](t, rec.Body.Bytes())
 				if payload.Session != "work" || payload.Window != "editor" || payload.AdapterPath != adapterPath {

@@ -11,10 +11,11 @@ import (
 
 const (
 	defaultRemoteTmuxPath = "tmux"
+	remoteFieldSeparator  = "\x1f"
 
-	remoteSessionFormat = "#{session_id}:#{session_name}:#{session_attached}"
-	remoteWindowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"
-	remotePaneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"
+	remoteSessionFormat = "#{session_id}" + remoteFieldSeparator + "#{session_name}" + remoteFieldSeparator + "#{session_attached}"
+	remoteWindowFormat  = "#{window_id}" + remoteFieldSeparator + "#{window_name}" + remoteFieldSeparator + "#{window_index}" + remoteFieldSeparator + "#{window_active}" + remoteFieldSeparator + "#{window_panes}" + remoteFieldSeparator + "#{pane_id}" + remoteFieldSeparator + "#{pane_title}"
+	remotePaneFormat    = "#{pane_id}" + remoteFieldSeparator + "#{pane_title}" + remoteFieldSeparator + "#{pane_index}" + remoteFieldSeparator + "#{pane_active}" + remoteFieldSeparator + "#{pane_width}" + remoteFieldSeparator + "#{pane_height}" + remoteFieldSeparator + "#{pane_left}" + remoteFieldSeparator + "#{pane_top}"
 )
 
 type remoteCommandRunner func(binary string, args ...string) (string, error)
@@ -356,6 +357,15 @@ func parseRemotePanesOutput(output string) ([]tmux.Pane, error) {
 }
 
 func parseRemoteSessionRow(row string) (tmux.Session, error) {
+	if fields, ok := splitRemoteFormattedFields(row, 3); ok {
+		attached, err := parseRemoteBoolField(fields[2])
+		if err != nil {
+			return tmux.Session{}, fmt.Errorf("parse session row %q: %w", row, err)
+		}
+
+		return tmux.Session{ID: fields[0], Name: fields[1], Attached: attached}, nil
+	}
+
 	first, last, ok := splitRemoteFirstLast(row)
 	if !ok {
 		return tmux.Session{}, fmt.Errorf("parse session row %q: invalid format", row)
@@ -374,6 +384,25 @@ func parseRemoteSessionRow(row string) (tmux.Session, error) {
 }
 
 func parseRemoteWindowRow(row string) (tmux.Window, error) {
+	if fields, ok := splitRemoteFormattedFields(row, 7); ok {
+		index, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return tmux.Window{}, fmt.Errorf("parse window row %q: invalid index: %w", row, err)
+		}
+
+		active, err := parseRemoteBoolField(fields[3])
+		if err != nil {
+			return tmux.Window{}, fmt.Errorf("parse window row %q: %w", row, err)
+		}
+
+		paneCount, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return tmux.Window{}, fmt.Errorf("parse window row %q: invalid pane count: %w", row, err)
+		}
+
+		return tmux.Window{ID: fields[0], Name: fields[1], Index: index, Active: active, PaneCount: paneCount, ActivePaneID: fields[5], ActivePaneTitle: fields[6]}, nil
+	}
+
 	first := strings.Index(row, ":")
 	if first <= 0 {
 		return tmux.Window{}, fmt.Errorf("parse window row %q: invalid format", row)
@@ -426,6 +455,40 @@ func parseRemoteWindowRow(row string) (tmux.Window, error) {
 }
 
 func parseRemotePaneRow(row string) (tmux.Pane, error) {
+	if fields, ok := splitRemoteFormattedFields(row, 8); ok {
+		index, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
+		}
+
+		active, err := parseRemoteBoolField(fields[3])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		width, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid width: %w", row, err)
+		}
+
+		height, err := strconv.Atoi(fields[5])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid height: %w", row, err)
+		}
+
+		left, err := strconv.Atoi(fields[6])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid left: %w", row, err)
+		}
+
+		top, err := strconv.Atoi(fields[7])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
+		}
+
+		return tmux.Pane{ID: fields[0], Title: fields[1], Index: index, Active: active, Width: width, Height: height, Left: left, Top: top}, nil
+	}
+
 	first := strings.Index(row, ":")
 	if first <= 0 {
 		return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
@@ -515,6 +578,17 @@ func splitRemoteFirstLast(value string) (int, int, bool) {
 		return 0, 0, false
 	}
 	return first, last, true
+}
+
+func splitRemoteFormattedFields(row string, count int) ([]string, bool) {
+	if !strings.Contains(row, remoteFieldSeparator) {
+		return nil, false
+	}
+	fields := strings.Split(row, remoteFieldSeparator)
+	if len(fields) != count {
+		return nil, false
+	}
+	return fields, true
 }
 
 func requireRemoteValue(field, value string) error {

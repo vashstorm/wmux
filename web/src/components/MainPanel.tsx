@@ -75,6 +75,8 @@ export function MainPanel() {
 
 	const handleSelectPane = (paneId: string) => {
 		if (!selectedPane) return;
+		if (selectedPane.pane === paneId) return;
+
 		setSelectedPane({
 			connectionId: selectedPane.connectionId,
 			session: selectedPane.session,

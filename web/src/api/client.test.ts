@@ -50,7 +50,7 @@ describe("api client", () => {
 		mockJsonResponse(200, { data: [{ id: "1", type: "local" }] });
 		const result = await listConnections();
 		expect(result).toHaveLength(1);
-		expect(result[0].type).toBe("local");
+		expect(result[0]!.type).toBe("local");
 	});
 
 	test("createConnection POSTs payload", async () => {
@@ -58,7 +58,7 @@ describe("api client", () => {
 		const result = await createConnection({ type: "ssh" });
 		expect(result.type).toBe("ssh");
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[1]?.method).toBe("POST");
 		expect(JSON.parse(call[1]?.body as string)).toEqual({ type: "ssh" });
 	});
@@ -74,7 +74,7 @@ describe("api client", () => {
 		const result = await updateConnection("1", { id: "1", type: "local" });
 		expect(result.type).toBe("local");
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[1]?.method).toBe("PUT");
 	});
 
@@ -82,7 +82,7 @@ describe("api client", () => {
 		mockFetch(new Response(null, { status: 204 }));
 		await deleteConnection("1");
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[1]?.method).toBe("DELETE");
 	});
 
@@ -94,9 +94,9 @@ describe("api client", () => {
 		});
 		const result = await listSessions("1");
 		expect(result.data).toHaveLength(3);
-		expect(result.data[0].name).toBe("session1");
-		expect(result.data[1].name).toBe("session2");
-		expect(result.data[2].name).toBe("session3");
+		expect(result.data[0]!.name).toBe("session1");
+		expect(result.data[1]!.name).toBe("session2");
+		expect(result.data[2]!.name).toBe("session3");
 	});
 
 	test("listWindows returns windows", async () => {
@@ -107,7 +107,7 @@ describe("api client", () => {
 			data: [{ ID: "@1", Name: "editor", Index: 0, Active: true }],
 		});
 		const result = await listWindows("1", "dev");
-		expect(result.data[0].Name).toBe("editor");
+		expect(result.data[0]!.Name).toBe("editor");
 	});
 
 	test("listPanes returns panes", async () => {
@@ -119,14 +119,14 @@ describe("api client", () => {
 			data: [{ ID: "%1", Title: "shell", Index: 0, Active: true, Width: 80, Height: 24 }],
 		});
 		const result = await listPanes("1", "dev", "@1");
-		expect(result.data[0].Title).toBe("shell");
+		expect(result.data[0]!.Title).toBe("shell");
 	});
 
 	test("createSession POSTs name", async () => {
 		mockJsonResponse(200, { connectionId: "1", operation: "create_session", mode: "local", status: "ok" });
 		await createSession("1", "new-session");
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(JSON.parse(call[1]?.body as string)).toEqual({ name: "new-session" });
 	});
 
@@ -145,7 +145,7 @@ describe("api client", () => {
 	test("listConnectionHealth returns health data", async () => {
 		mockJsonResponse(200, { data: [{ connectionId: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" }] });
 		const result = await listConnectionHealth();
-		expect(result[0].status).toBe("online");
+		expect(result[0]!.status).toBe("online");
 	});
 
 	test("getConnectionHealth returns single health", async () => {
@@ -168,7 +168,7 @@ describe("api client", () => {
 		mockJsonResponse(200, { data: [] });
 		await listConnections();
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		const headers = call[1]?.headers as Headers;
 		expect(headers.get("Authorization")).toBe("Bearer test-token");
 	});
@@ -177,7 +177,7 @@ describe("api client", () => {
 		mockJsonResponse(200, { id: "conn#1", type: "local" });
 		await getConnection("conn#1");
 
-		const call = vi.mocked(fetch).mock.calls[0];
+		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[0]).toContain(encodeURIComponent("conn#1"));
 	});
 });

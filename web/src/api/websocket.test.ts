@@ -50,8 +50,8 @@ describe("TerminalWebSocket", () => {
 		const socket = createSocket();
 		socket.connect();
 
-		const Call = vi.mocked(WebSocket).mock.calls[0];
-		const url = Call[0] as string;
+		const call = vi.mocked(WebSocket).mock.calls[0]!;
+		const url = call[0] as string;
 		expect(url).toContain("connectionId=conn-1");
 		expect(url).toContain("session=dev");
 		expect(url).toContain("window=win-1");
@@ -63,8 +63,8 @@ describe("TerminalWebSocket", () => {
 		const socket = createSocket({ token: "" });
 		socket.connect();
 
-		const Call = vi.mocked(WebSocket).mock.calls[0];
-		const url = Call[0] as string;
+		const call = vi.mocked(WebSocket).mock.calls[0]!;
+		const url = call[0] as string;
 		expect(url).toContain("token=");
 		expect(url).not.toContain("token=secret");
 	});
@@ -143,10 +143,10 @@ describe("TerminalWebSocket", () => {
 		socket.send({ type: "input", data: "trigger" });
 
 		expect(mockWs.send).toHaveBeenCalledTimes(4);
-		expect(mockWs.send.mock.calls[0][0]).toBe(JSON.stringify({ type: "input", data: "trigger" }));
-		expect(mockWs.send.mock.calls[1][0]).toBe(JSON.stringify({ type: "input", data: "1" }));
-		expect(mockWs.send.mock.calls[2][0]).toBe(JSON.stringify({ type: "input", data: "2" }));
-		expect(mockWs.send.mock.calls[3][0]).toBe(JSON.stringify({ type: "input", data: "3" }));
+		expect(mockWs.send.mock.calls[0]![0]).toBe(JSON.stringify({ type: "input", data: "trigger" }));
+		expect(mockWs.send.mock.calls[1]![0]).toBe(JSON.stringify({ type: "input", data: "1" }));
+		expect(mockWs.send.mock.calls[2]![0]).toBe(JSON.stringify({ type: "input", data: "2" }));
+		expect(mockWs.send.mock.calls[3]![0]).toBe(JSON.stringify({ type: "input", data: "3" }));
 	});
 
 	test("attempts reconnect with exponential backoff", () => {
@@ -194,6 +194,38 @@ describe("TerminalWebSocket", () => {
 		socket.close();
 		mockWs.onclose?.();
 		vi.advanceTimersByTime(10000);
+		expect(WebSocket).toHaveBeenCalledTimes(1);
+	});
+
+	test("close does not call onClose for intentional shutdown", () => {
+		const onClose = vi.fn();
+		const socket = createSocket({ onClose });
+		socket.connect();
+
+		socket.close();
+		mockWs.onclose?.();
+
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	test("close cancels pending reconnect", () => {
+		const socket = createSocket();
+		socket.connect();
+
+		mockWs.onclose?.();
+		socket.close();
+
+		vi.advanceTimersByTime(10000);
+		expect(WebSocket).toHaveBeenCalledTimes(1);
+	});
+
+	test("connect is ignored after close", () => {
+		const socket = createSocket();
+		socket.connect();
+		socket.close();
+
+		socket.connect();
+
 		expect(WebSocket).toHaveBeenCalledTimes(1);
 	});
 

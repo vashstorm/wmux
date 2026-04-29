@@ -11,10 +11,11 @@ import (
 
 const (
 	defaultBinaryPath = "tmux"
+	fieldSeparator    = "\x1f"
 
-	sessionFormat = "#{session_id}:#{session_name}:#{session_attached}"
-	windowFormat  = "#{window_id}:#{window_name}:#{window_index}:#{window_active}:#{window_panes}:#{pane_id}:#{pane_title}"
-	paneFormat    = "#{pane_id}:#{pane_title}:#{pane_index}:#{pane_active}:#{pane_width}:#{pane_height}:#{pane_left}:#{pane_top}"
+	sessionFormat = "#{session_id}" + fieldSeparator + "#{session_name}" + fieldSeparator + "#{session_attached}"
+	windowFormat  = "#{window_id}" + fieldSeparator + "#{window_name}" + fieldSeparator + "#{window_index}" + fieldSeparator + "#{window_active}" + fieldSeparator + "#{window_panes}" + fieldSeparator + "#{pane_id}" + fieldSeparator + "#{pane_title}"
+	paneFormat    = "#{pane_id}" + fieldSeparator + "#{pane_title}" + fieldSeparator + "#{pane_index}" + fieldSeparator + "#{pane_active}" + fieldSeparator + "#{pane_width}" + fieldSeparator + "#{pane_height}" + fieldSeparator + "#{pane_left}" + fieldSeparator + "#{pane_top}"
 
 	ErrorCodeNotFound      = "tmux_not_found"
 	ErrorCodeNoSessions    = "tmux_no_sessions"
@@ -417,6 +418,15 @@ func parsePanesOutput(output string) ([]Pane, error) {
 }
 
 func parseSessionRow(row string) (Session, error) {
+	if fields, ok := splitFormattedFields(row, 3); ok {
+		attached, err := parseBoolField(fields[2])
+		if err != nil {
+			return Session{}, fmt.Errorf("parse session row %q: %w", row, err)
+		}
+
+		return Session{ID: fields[0], Name: fields[1], Attached: attached}, nil
+	}
+
 	first, last, ok := splitFirstLast(row)
 	if !ok {
 		return Session{}, fmt.Errorf("parse session row %q: invalid format", row)
@@ -435,6 +445,25 @@ func parseSessionRow(row string) (Session, error) {
 }
 
 func parseWindowRow(row string) (Window, error) {
+	if fields, ok := splitFormattedFields(row, 7); ok {
+		index, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return Window{}, fmt.Errorf("parse window row %q: invalid index: %w", row, err)
+		}
+
+		active, err := parseBoolField(fields[3])
+		if err != nil {
+			return Window{}, fmt.Errorf("parse window row %q: %w", row, err)
+		}
+
+		paneCount, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return Window{}, fmt.Errorf("parse window row %q: invalid pane count: %w", row, err)
+		}
+
+		return Window{ID: fields[0], Name: fields[1], Index: index, Active: active, PaneCount: paneCount, ActivePaneID: fields[5], ActivePaneTitle: fields[6]}, nil
+	}
+
 	first := strings.Index(row, ":")
 	if first <= 0 {
 		return Window{}, fmt.Errorf("parse window row %q: invalid format", row)
@@ -487,6 +516,40 @@ func parseWindowRow(row string) (Window, error) {
 }
 
 func parsePaneRow(row string) (Pane, error) {
+	if fields, ok := splitFormattedFields(row, 8); ok {
+		index, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
+		}
+
+		active, err := parseBoolField(fields[3])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		width, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: invalid width: %w", row, err)
+		}
+
+		height, err := strconv.Atoi(fields[5])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: invalid height: %w", row, err)
+		}
+
+		left, err := strconv.Atoi(fields[6])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: invalid left: %w", row, err)
+		}
+
+		top, err := strconv.Atoi(fields[7])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
+		}
+
+		return Pane{ID: fields[0], Title: fields[1], Index: index, Active: active, Width: width, Height: height, Left: left, Top: top}, nil
+	}
+
 	first := strings.Index(row, ":")
 	if first <= 0 {
 		return Pane{}, fmt.Errorf("parse pane row %q: invalid format", row)
@@ -690,4 +753,15 @@ func splitFirstLast(value string) (int, int, bool) {
 		return 0, 0, false
 	}
 	return first, last, true
+}
+
+func splitFormattedFields(row string, count int) ([]string, bool) {
+	if !strings.Contains(row, fieldSeparator) {
+		return nil, false
+	}
+	fields := strings.Split(row, fieldSeparator)
+	if len(fields) != count {
+		return nil, false
+	}
+	return fields, true
 }

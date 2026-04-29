@@ -67,6 +67,19 @@ func TestParseWindowRow(t *testing.T) {
 	}
 }
 
+func TestParseWindowRowFormattedFieldsAllowsColonTitle(t *testing.T) {
+	row := strings.Join([]string{"@2", "editor:main", "3", "0", "1", "%5", "user@host:/workspace"}, fieldSeparator)
+	window, err := parseWindowRow(row)
+	if err != nil {
+		t.Fatalf("parseWindowRow() error = %v", err)
+	}
+
+	want := Window{ID: "@2", Name: "editor:main", Index: 3, Active: false, PaneCount: 1, ActivePaneID: "%5", ActivePaneTitle: "user@host:/workspace"}
+	if !reflect.DeepEqual(window, want) {
+		t.Fatalf("parseWindowRow() = %#v, want %#v", window, want)
+	}
+}
+
 func TestParsePaneRow(t *testing.T) {
 	pane, err := parsePaneRow("%3:nvim:logs:1:1:120:40:0:0")
 	if err != nil {
@@ -74,6 +87,19 @@ func TestParsePaneRow(t *testing.T) {
 	}
 
 	want := Pane{ID: "%3", Title: "nvim:logs", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0}
+	if !reflect.DeepEqual(pane, want) {
+		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
+	}
+}
+
+func TestParsePaneRowFormattedFieldsAllowsColonTitle(t *testing.T) {
+	row := strings.Join([]string{"%3", "nvim:/workspace", "1", "1", "120", "40", "0", "0"}, fieldSeparator)
+	pane, err := parsePaneRow(row)
+	if err != nil {
+		t.Fatalf("parsePaneRow() error = %v", err)
+	}
+
+	want := Pane{ID: "%3", Title: "nvim:/workspace", Index: 1, Active: true, Width: 120, Height: 40, Left: 0, Top: 0}
 	if !reflect.DeepEqual(pane, want) {
 		t.Fatalf("parsePaneRow() = %#v, want %#v", pane, want)
 	}

@@ -30,26 +30,27 @@ export class TerminalWebSocket {
 	private maxReconnectAttempts = 3;
 	private reconnectDelay = 1000;
 	private closed = false;
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(options: TerminalWebSocketOptions) {
 		this.options = options;
 	}
 
 	connect(): void {
-		if (this.ws) {
+		if (this.closed || this.ws) {
 			return;
 		}
 
-const { connectionId, session, window: windowId, pane, token } = this.options;
-const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const host = window.location.host;
-const params = new URLSearchParams();
-params.set("connectionId", connectionId);
-params.set("session", session);
-if (windowId) params.set("window", windowId);
-if (pane) params.set("pane", pane);
-params.set("token", token);
-const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
+		const { connectionId, session, window: windowId, pane, token } = this.options;
+		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+		const host = window.location.host;
+		const params = new URLSearchParams();
+		params.set("connectionId", connectionId);
+		params.set("session", session);
+		if (windowId) params.set("window", windowId);
+		if (pane) params.set("pane", pane);
+		params.set("token", token);
+		const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
 
 		this.ws = new WebSocket(url);
 
@@ -68,12 +69,21 @@ const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
 		};
 
 		this.ws.onclose = () => {
+			const shouldReconnect = !this.closed;
 			this.ws = null;
+
+			if (!shouldReconnect) {
+				return;
+			}
+
 			this.options.onClose?.();
 
-			if (!this.closed && this.reconnectAttempts < this.maxReconnectAttempts) {
+			if (this.reconnectAttempts < this.maxReconnectAttempts) {
 				this.reconnectAttempts++;
-				setTimeout(() => this.connect(), this.reconnectDelay * this.reconnectAttempts);
+				this.reconnectTimer = setTimeout(() => {
+					this.reconnectTimer = null;
+					this.connect();
+				}, this.reconnectDelay * this.reconnectAttempts);
 			}
 		};
 
@@ -120,9 +130,18 @@ const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
 	close(): void {
 		this.closed = true;
 		this.writeQueue = [];
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
 		if (this.ws) {
-			this.ws.close();
+			const ws = this.ws;
 			this.ws = null;
+			ws.onopen = null;
+			ws.onmessage = null;
+			ws.onclose = null;
+			ws.onerror = null;
+			ws.close();
 		}
 	}
 
