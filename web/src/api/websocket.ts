@@ -12,8 +12,8 @@ export type ServerMessage =
 export interface TerminalWebSocketOptions {
 	connectionId: string;
 	session: string;
-	window: string;
-	pane: string;
+	window?: string;
+	pane?: string;
 	token: string;
 	onMessage: (message: ServerMessage) => void;
 	onOpen?: () => void;
@@ -40,10 +40,16 @@ export class TerminalWebSocket {
 			return;
 		}
 
-		const { connectionId, session, window: windowId, pane, token } = this.options;
-		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const host = window.location.host;
-		const url = `${protocol}//${host}/api/terminal?connectionId=${encodeURIComponent(connectionId)}&session=${encodeURIComponent(session)}&window=${encodeURIComponent(windowId)}&pane=${encodeURIComponent(pane)}&token=${encodeURIComponent(token)}`;
+const { connectionId, session, window: windowId, pane, token } = this.options;
+const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const host = window.location.host;
+const params = new URLSearchParams();
+params.set("connectionId", connectionId);
+params.set("session", session);
+if (windowId) params.set("window", windowId);
+if (pane) params.set("pane", pane);
+params.set("token", token);
+const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
 
 		this.ws = new WebSocket(url);
 

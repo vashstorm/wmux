@@ -37,7 +37,6 @@ func TestGetConnectionHealthReturnsOnlineForLocalConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 
@@ -88,7 +87,6 @@ func TestGetConnectionHealthReturnsOfflineForSSHError(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "ssh-1",
-		Name: "Remote",
 		Type: "ssh",
 		Host: "example.com",
 		User: "root",
@@ -132,8 +130,8 @@ func TestGetConnectionHealthReturnsOfflineForSSHError(t *testing.T) {
 func TestListConnectionHealthReturnsEntriesForAllConnections(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{
-		{ID: "local-1", Name: "Local", Type: "local"},
-		{ID: "ssh-1", Name: "Remote", Type: "ssh", Host: "example.com", User: "root"},
+		{ID: "local-1", Type: "local"},
+		{ID: "ssh-1", Type: "ssh", Host: "example.com", User: "root"},
 	}
 
 	srv := newTestServer(t, cfg)

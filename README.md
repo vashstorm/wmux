@@ -83,7 +83,6 @@ Minimal example:
   },
   "connections": [
     {
-      "name": "local",
       "type": "local"
     }
   ],

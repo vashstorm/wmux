@@ -181,28 +181,30 @@ export function SessionList() {
 			) : (
 				<ul className="session-tree">
 					{connectionSessions.map((session) => {
-						const tree = trees.find((t) => t.session === session);
+						const sessionName = typeof session === "string" ? session : session.name;
+						if (!sessionName) return null;
+						const tree = trees.find((t) => t.session === sessionName);
 						const expanded = tree?.expanded ?? false;
 
 						return (
-							<li key={session} className="session-tree-item">
+							<li key={sessionName} className="session-tree-item">
 								<div className="session-tree-row">
 									<button
 										type="button"
 										className="session-tree-toggle"
-										onClick={() => toggleSessionExpanded(session)}
+										onClick={() => toggleSessionExpanded(sessionName)}
 										aria-expanded={expanded}
 									>
 										{expanded ? "▼" : "▶"}
 									</button>
-									{renamingSession === session ? (
+									{renamingSession === sessionName ? (
 										<input
 											type="text"
 											value={renameValue}
 											onChange={(e) => setRenameValue(e.target.value)}
-											onBlur={() => submitRename(session)}
+											onBlur={() => submitRename(sessionName)}
 											onKeyDown={(e) => {
-												if (e.key === "Enter") submitRename(session);
+												if (e.key === "Enter") submitRename(sessionName);
 												if (e.key === "Escape") {
 													setRenamingSession(null);
 													setRenameValue("");
@@ -212,13 +214,13 @@ export function SessionList() {
 											className="session-rename-input"
 										/>
 									) : (
-										<span className="session-tree-label">{session}</span>
+										<span className="session-tree-label">{sessionName}</span>
 									)}
 									<div className="session-tree-actions">
 										<button
 											type="button"
 											className="session-action-btn"
-											onClick={() => handleRenameSession(session)}
+											onClick={() => handleRenameSession(sessionName)}
 											title="Rename"
 											aria-label="Rename session"
 										>
@@ -227,7 +229,7 @@ export function SessionList() {
 										<button
 											type="button"
 											className="session-action-btn session-action-danger"
-											onClick={() => handleKillSession(session)}
+											onClick={() => handleKillSession(sessionName)}
 											title="Kill session"
 											aria-label="Kill session"
 										>
@@ -238,7 +240,7 @@ export function SessionList() {
 
 								{expanded && (
 									<ul className="window-tree">
-										{(windows[`${connection.id}:${session}`] ?? []).map((win) => (
+										{(windows[`${connection.id}:${sessionName}`] ?? []).map((win) => (
 											<li key={win.id} className="window-tree-item">
 												<div className="window-tree-row">
 													<span className="window-tree-label">{win.name}</span>
@@ -253,7 +255,7 @@ export function SessionList() {
 																confirmVariant: "danger",
 																onConfirm: async () => {
 																	try {
-																		await killWindow(connection.id, session, win.id);
+																		await killWindow(connection.id, sessionName, win.id);
 																		await refreshSessions();
 																	} catch (err) {
 																		if (err instanceof Error && "code" in err) {
@@ -274,7 +276,7 @@ export function SessionList() {
 													{win.panes.map((pane) => {
 														const isSelected =
 															selectedPane?.connectionId === connection.id &&
-															selectedPane?.session === session &&
+															selectedPane?.session === sessionName &&
 															selectedPane?.window === win.id &&
 															selectedPane?.pane === pane.id;
 														return (
@@ -285,7 +287,7 @@ export function SessionList() {
 																	onClick={() =>
 																		setSelectedPane({
 																			connectionId: connection.id,
-																			session,
+																			session: sessionName,
 																			window: win.id,
 																			pane: pane.id,
 																		})
@@ -304,7 +306,7 @@ export function SessionList() {
 																			confirmVariant: "danger",
 																			onConfirm: async () => {
 																				try {
-																					await killPane(connection.id, session, win.id, pane.id);
+																					killPane(connection.id, sessionName, win.id, pane.id);
 																					await refreshSessions();
 																				} catch (err) {
 																					if (err instanceof Error && "code" in err) {

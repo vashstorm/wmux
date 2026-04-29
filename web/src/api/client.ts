@@ -44,13 +44,19 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<unknow
 
 export interface ConnectionConfig {
 	id: string;
-	name: string;
 	type: string;
 	host?: string;
 	port?: number;
 	user?: string;
 	privateKeyPath?: string;
 	knownHostsPath?: string;
+}
+
+export function connectionDisplayName(conn: ConnectionConfig): string {
+	if (conn.type === "local") {
+		return "local";
+	}
+	return conn.host ?? conn.id;
 }
 
 export interface ConnectionsListResponse {
@@ -66,18 +72,17 @@ export interface SessionInfo {
 	attached?: boolean;
 }
 
+export interface SessionInfoData {
+	id?: string;
+	name?: string;
+	attached?: boolean;
+}
+
 export interface SessionsListResponse {
 	connectionId: string;
 	mode: string;
 	adapterPath?: string;
-	data: string[];
-}
-
-interface RawSessionsListResponse {
-	connectionId: string;
-	mode: string;
-	adapterPath?: string;
-	data: SessionInfo[];
+	data: SessionInfoData[];
 }
 
 export interface OperationResponse {
@@ -188,12 +193,26 @@ export async function listPanes(connectionId: string, sessionName: string, windo
 }
 
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
-	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as RawSessionsListResponse;
+	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as {
+		connectionId: string;
+		mode: string;
+		adapterPath?: string;
+		data: Array<{ ID?: string; Name?: string; Attached?: boolean; id?: string; name?: string; attached?: boolean }>;
+	};
 	return {
 		...response,
 		data: (response.data ?? [])
-			.map((session) => (typeof session === "string" ? session : (session.name ?? session.Name ?? "")))
-			.filter((sessionName): sessionName is string => sessionName.length > 0),
+			.map((s) => {
+				if (typeof s === "string") {
+					return { id: "", name: s, attached: false };
+				}
+				return {
+					id: s.id ?? s.ID ?? "",
+					name: s.name ?? s.Name ?? "",
+					attached: s.attached ?? s.Attached ?? false,
+				};
+			})
+			.filter((s): s is { id: string; name: string; attached: boolean } => s.name.length > 0),
 	};
 }
 

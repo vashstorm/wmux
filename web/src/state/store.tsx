@@ -1,17 +1,17 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData } from "../api/client.js";
 
 export interface SelectedPane {
 	connectionId: string;
 	session: string;
-	window: string;
-	pane: string;
+	window?: string;
+	pane?: string;
 }
 
 export interface AppState {
 	connections: ConnectionConfig[];
 	selectedConnectionId: string | null;
-	sessions: Record<string, string[]>;
+	sessions: Record<string, SessionInfoData[]>;
 	windows: Record<string, { id: string; name: string; panes: { id: string; index: number }[] }[]>;
 	loading: {
 		connections: boolean;
@@ -46,7 +46,7 @@ export interface ConfirmDialogState {
 interface AppContextValue extends AppState {
 	setConnections: (connections: ConnectionConfig[]) => void;
 	setSelectedConnectionId: (id: string | null) => void;
-	setSessions: (connectionId: string, sessions: string[]) => void;
+	setSessions: (connectionId: string, sessions: SessionInfoData[]) => void;
 	setWindows: (connectionId: string, session: string, windows: { id: string; name: string; panes: { id: string; index: number }[] }[]) => void;
 	setLoading: (key: keyof AppState["loading"], value: boolean) => void;
 	setError: (error: { code: string; message: string } | null) => void;
@@ -65,7 +65,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
 	const [connections, setConnectionsState] = useState<ConnectionConfig[]>([]);
 	const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-	const [sessions, setSessionsState] = useState<Record<string, string[]>>({});
+	const [sessions, setSessionsState] = useState<Record<string, SessionInfoData[]>>({});
 	const [windows, setWindowsState] = useState<AppState["windows"]>({});
 	const [loading, setLoadingState] = useState<AppState["loading"]>({
 		connections: false,
@@ -86,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setConnectionsState(newConnections);
 	}, []);
 
-	const setSessions = useCallback((connectionId: string, newSessions: string[]) => {
+	const setSessions = useCallback((connectionId: string, newSessions: SessionInfoData[]) => {
 		setSessionsState((prev) => ({ ...prev, [connectionId]: newSessions }));
 	}, []);
 

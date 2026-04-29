@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth } from "../api/client.js";
+import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 
@@ -109,7 +109,7 @@ export function SettingsPanel() {
 			return null;
 		}
 
-		const nextConnections = config.connections.map((connection) =>
+		const nextConnections = connections.map((connection) =>
 			connection.type === "ssh"
 				? {
 					...connection,
@@ -208,16 +208,18 @@ export function SettingsPanel() {
 		closePanel();
 	};
 
-	const handleDeleteConnection = (connection: { id: string; name: string }) => {
+	const handleDeleteConnection = (connection: { id: string; type: string; host?: string }) => {
 		showConfirm({
 			title: "Delete Connection",
-			message: `Delete connection "${connection.name}"? This cannot be undone.`,
+			message: `Delete connection "${connectionDisplayName(connection)}"? This cannot be undone.`,
 			confirmText: "Delete Connection",
 			confirmVariant: "danger",
 			onConfirm: async () => {
 				try {
 					await deleteConnection(connection.id);
-					setConnections(connections.filter((c) => c.id !== connection.id));
+					const updated = connections.filter((c) => c.id !== connection.id);
+					setConnections(updated);
+					setConfig((prev) => prev ? { ...prev, connections: updated } : prev);
 				} catch (err) {
 					if (err instanceof Error && "code" in err) {
 						const apiErr = err as { code: string; message: string };
@@ -228,7 +230,7 @@ export function SettingsPanel() {
 		});
 	};
 
-	const handleEditConnection = (connection: { id: string; name: string; type: string; host?: string }) => {
+	const handleEditConnection = (connection: { id: string; type: string; host?: string }) => {
 		setEditingConnection(connection);
 	};
 
@@ -239,7 +241,7 @@ export function SettingsPanel() {
 
 	return (
 		<div className="settings-panel-overlay">
-			<form className="settings-panel" onSubmit={handleSave} data-testid="settings-panel">
+			<div className="settings-panel" data-testid="settings-panel">
 				<div className="settings-panel-header">
 					<h3 className="form-title">Settings</h3>
 					<button type="button" className="error-banner-dismiss" onClick={closePanel} aria-label="Close settings">
@@ -250,22 +252,20 @@ export function SettingsPanel() {
 				{isLoading || !formState ? (
 					<div className="settings-panel-loading">Loading settings...</div>
 				) : (
-					<>
-						{/* Connections Section */}
-						<div className="settings-section">
-							<div className="settings-section-header">
-								<h4 className="settings-section-title">Connections</h4>
-							<button
-								type="button"
-								className="settings-new-connection-btn"
-								onClick={handleNewConnection}
-								data-testid="settings-new-connection-button"
-							>
-								<span aria-hidden="true">+</span>
-								<span>New</span>
-							</button>
+					<div className="settings-panel-body">
+						{/* Left: Connections */}
+						<div className="settings-connections-pane">
+							<div className="settings-connections-pane-header">
+								<span className="sidebar-section-label">Connections</span>
+								<button
+									type="button"
+									className="sidebar-section-action"
+									onClick={handleNewConnection}
+									title="New Connection"
+								>
+									+
+								</button>
 							</div>
-
 							{connections.length === 0 ? (
 								<p className="settings-connections-empty">No connections configured</p>
 							) : (
@@ -298,7 +298,7 @@ export function SettingsPanel() {
 														aria-label={`Connection status: ${connHealth?.status ?? "unknown"}`}
 													/>
 													<div className="settings-connection-details">
-														<span className="settings-connection-name">{connection.name}</span>
+														<span className="settings-connection-name">{connectionDisplayName(connection)}</span>
 														<span className="settings-connection-meta">
 															{typeLabel}
 															{subtitle ? ` · ${subtitle}` : ""}
@@ -334,85 +334,90 @@ export function SettingsPanel() {
 							)}
 						</div>
 
-						<div className="settings-divider" />
+						{/* Right: Settings form */}
+						<form className="settings-form-pane" onSubmit={handleSave}>
+							<div className="settings-divider-vertical" />
 
-						<div className="form-field">
-							<label htmlFor="settings-bind">Server Bind</label>
-							<input
-								id="settings-bind"
-								type="text"
-								value={formState.bind}
-								onChange={(event) => updateField("bind", event.target.value)}
-								data-testid="settings-bind-input"
-							/>
-						</div>
+							<div className="settings-form-fields">
+								<div className="form-field">
+									<label htmlFor="settings-bind">Server Bind</label>
+									<input
+										id="settings-bind"
+										type="text"
+										value={formState.bind}
+										onChange={(event) => updateField("bind", event.target.value)}
+										data-testid="settings-bind-input"
+									/>
+								</div>
 
-						<div className="form-field">
-							<label htmlFor="settings-token">Auth Token</label>
-							<input
-								id="settings-token"
-								type="password"
-								value={formState.tokenInput}
-								onChange={(event) => updateField("tokenInput", event.target.value)}
-								placeholder={formState.tokenConfigured ? "Token already configured" : "Optional on localhost"}
-								data-testid="settings-token-input"
-								autoComplete="new-password"
-							/>
-							<p className="form-help-text" data-testid="settings-token-status">
-								{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
-							</p>
-						</div>
+								<div className="form-field">
+									<label htmlFor="settings-token">Auth Token</label>
+									<input
+										id="settings-token"
+										type="password"
+										value={formState.tokenInput}
+										onChange={(event) => updateField("tokenInput", event.target.value)}
+										placeholder={formState.tokenConfigured ? "Token already configured" : "Optional on localhost"}
+										data-testid="settings-token-input"
+										autoComplete="new-password"
+									/>
+									<p className="form-help-text" data-testid="settings-token-status">
+										{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
+									</p>
+								</div>
 
-						<div className="form-field">
-							<label htmlFor="settings-tmux-path">tmux Path</label>
-							<input
-								id="settings-tmux-path"
-								type="text"
-								value={formState.tmuxPath}
-								onChange={(event) => updateField("tmuxPath", event.target.value)}
-								data-testid="settings-tmux-path-input"
-							/>
-						</div>
+								<div className="form-field">
+									<label htmlFor="settings-tmux-path">tmux Path</label>
+									<input
+										id="settings-tmux-path"
+										type="text"
+										value={formState.tmuxPath}
+										onChange={(event) => updateField("tmuxPath", event.target.value)}
+										data-testid="settings-tmux-path-input"
+									/>
+								</div>
 
-						<div className="form-field">
-							<label htmlFor="settings-known-hosts">known_hosts Path</label>
-							<input
-								id="settings-known-hosts"
-								type="text"
-								value={formState.knownHostsPath}
-								onChange={(event) => updateField("knownHostsPath", event.target.value)}
-								data-testid="settings-known-hosts-input"
-							/>
-						</div>
+								<div className="form-field">
+									<label htmlFor="settings-known-hosts">known_hosts Path</label>
+									<input
+										id="settings-known-hosts"
+										type="text"
+										value={formState.knownHostsPath}
+										onChange={(event) => updateField("knownHostsPath", event.target.value)}
+										data-testid="settings-known-hosts-input"
+									/>
+								</div>
 
-						<div className="form-field">
-							<label htmlFor="settings-theme">Theme</label>
-							<select
-								id="settings-theme"
-								value={formState.theme}
-								onChange={(event) => updateField("theme", event.target.value)}
-								data-testid="settings-theme-toggle"
-							>
-								<option value="dark">Dark</option>
-								<option value="light">Light</option>
-							</select>
-						</div>
+								<div className="form-field">
+									<label htmlFor="settings-theme">Theme</label>
+									<select
+										id="settings-theme"
+										value={formState.theme}
+										onChange={(event) => updateField("theme", event.target.value)}
+										data-testid="settings-theme-toggle"
+									>
+										<option value="dark">Dark</option>
+										<option value="light">Light</option>
+									</select>
+								</div>
 
-						{connections.some((connection) => connection.type === "ssh") ? (
-							<p className="form-help-text">Known hosts path applies to saved SSH connections.</p>
-						) : null}
+								{connections.some((connection) => connection.type === "ssh") ? (
+									<p className="form-help-text">Known hosts path applies to saved SSH connections.</p>
+								) : null}
 
-						<div className="form-actions">
-							<button type="button" className="form-button form-button-secondary" onClick={handleCancel}>
-								Cancel
-							</button>
-							<button type="submit" className="form-button form-button-primary" disabled={isSaving || isLoading}>
-								{isSaving ? "Saving..." : "Save"}
-							</button>
-						</div>
-					</>
+								<div className="form-actions">
+									<button type="button" className="form-button form-button-secondary" onClick={handleCancel}>
+										Cancel
+									</button>
+									<button type="submit" className="form-button form-button-primary" disabled={isSaving || isLoading}>
+										{isSaving ? "Saving..." : "Save"}
+									</button>
+								</div>
+							</div>
+						</form>
+					</div>
 				)}
-			</form>
+			</div>
 		</div>
 	);
 }

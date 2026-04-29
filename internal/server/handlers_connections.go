@@ -162,10 +162,6 @@ var (
 )
 
 func validateConnectionPayload(connection config.ConnectionConfig) error {
-	if strings.TrimSpace(connection.Name) == "" {
-		return fmt.Errorf("connection name is required")
-	}
-
 	connectionType := strings.ToLower(strings.TrimSpace(connection.Type))
 	if connectionType != "local" && connectionType != "ssh" {
 		return fmt.Errorf("connection type must be local or ssh")

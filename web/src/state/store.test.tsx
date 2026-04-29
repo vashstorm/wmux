@@ -27,7 +27,7 @@ describe("useAppState", () => {
 				<span data-testid="show-settings">{state.showSettingsPanel ? "true" : "false"}</span>
 				<button
 					data-testid="set-connections"
-					onClick={() => state.setConnections([{ id: "1", name: "Local", type: "local" }])}
+					onClick={() => state.setConnections([{ id: "1", type: "local" }])}
 				>
 					Set Connections
 				</button>
@@ -51,7 +51,7 @@ describe("useAppState", () => {
 				</button>
 				<button
 					data-testid="set-sessions"
-					onClick={() => state.setSessions("1", ["session1"])}
+					onClick={() => state.setSessions("1", [{ name: "session1" }])}
 				>
 					Set Sessions
 				</button>
@@ -89,10 +89,10 @@ describe("useAppState", () => {
 					{state.selectedPane ? `${state.selectedPane.connectionId}:${state.selectedPane.pane}` : "null"}
 				</span>
 				<span data-testid="health-status">{state.connectionHealth["1"]?.status ?? "null"}</span>
-				<span data-testid="editing">{state.editingConnection?.name ?? "null"}</span>
+				<span data-testid="editing">{state.editingConnection?.type ?? "null"}</span>
 				<button
 					data-testid="set-editing"
-					onClick={() => state.setEditingConnection({ id: "1", name: "Edit", type: "local" })}
+					onClick={() => state.setEditingConnection({ id: "1", type: "local" })}
 				>
 					Set Editing
 				</button>
@@ -181,14 +181,14 @@ describe("useAppState", () => {
 	test("setEditingConnection updates editing", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-editing"));
-		expect(screen.getByTestId("editing").textContent).toBe("Edit");
+		expect(screen.getByTestId("editing").textContent).toBe("local");
 	});
 });
 
 describe("useSelectedConnection", () => {
 	function TestComponent() {
 		const selected = useSelectedConnection();
-		return <span data-testid="selected-name">{selected?.name ?? "null"}</span>;
+		return <span data-testid="selected-name">{selected?.type ?? "null"}</span>;
 	}
 
 	function renderWithProvider() {

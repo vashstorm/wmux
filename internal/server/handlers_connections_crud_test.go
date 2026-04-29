@@ -18,8 +18,8 @@ type connectionsListPayload struct {
 func TestListConnectionsReturnsAllConnectionsFromConfig(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{
-		{ID: "local-1", Name: "Local", Type: "local"},
-		{ID: "ssh-1", Name: "Remote", Type: "ssh", Host: "example.com", User: "root", KnownHostsPath: "/tmp/known_hosts"},
+		{ID: "local-1", Type: "local"},
+		{ID: "ssh-1", Type: "ssh", Host: "example.com", User: "root", KnownHostsPath: "/tmp/known_hosts"},
 	}
 
 	srv := newTestServer(t, cfg)
@@ -40,7 +40,7 @@ func TestListConnectionsReturnsAllConnectionsFromConfig(t *testing.T) {
 		t.Fatalf("unexpected connection count: %d", len(payload.Data))
 	}
 
-	if payload.Data[0].ID != "local-1" || payload.Data[0].Name != "Local" || payload.Data[0].Type != "local" {
+		if payload.Data[0].ID != "local-1" || payload.Data[0].Type != "local" {
 		t.Fatalf("unexpected first connection: %#v", payload.Data[0])
 	}
 
@@ -58,12 +58,11 @@ func TestCreateConnectionReturnsCreatedConnection(t *testing.T) {
 		{
 			name: "local connection",
 			payload: config.ConnectionConfig{
-				Name: "Local",
 				Type: "local",
 			},
 			assert: func(t *testing.T, connection config.ConnectionConfig) {
 				t.Helper()
-				if connection.Name != "Local" || connection.Type != "local" {
+				if connection.Type != "local" {
 					t.Fatalf("unexpected connection payload: %#v", connection)
 				}
 				if connection.Host != "" || connection.User != "" {
@@ -74,14 +73,13 @@ func TestCreateConnectionReturnsCreatedConnection(t *testing.T) {
 		{
 			name: "ssh connection",
 			payload: config.ConnectionConfig{
-				Name: "Remote",
 				Type: "ssh",
 				Host: "example.com",
 				User: "root",
 			},
 			assert: func(t *testing.T, connection config.ConnectionConfig) {
 				t.Helper()
-				if connection.Name != "Remote" || connection.Type != "ssh" {
+				if connection.Type != "ssh" {
 					t.Fatalf("unexpected connection payload: %#v", connection)
 				}
 				if connection.Host != "example.com" || connection.User != "root" {
@@ -151,16 +149,8 @@ func TestCreateConnectionRejectsInvalidPayload(t *testing.T) {
 		wantMessage string
 	}{
 		{
-			name: "empty name",
-			payload: config.ConnectionConfig{
-				Type: "local",
-			},
-			wantMessage: "connection name is required",
-		},
-		{
 			name: "invalid type",
 			payload: config.ConnectionConfig{
-				Name: "Broken",
 				Type: "docker",
 			},
 			wantMessage: "connection type must be local or ssh",
@@ -168,7 +158,6 @@ func TestCreateConnectionRejectsInvalidPayload(t *testing.T) {
 		{
 			name: "ssh without host",
 			payload: config.ConnectionConfig{
-				Name: "Remote",
 				Type: "ssh",
 				User: "root",
 			},
@@ -177,7 +166,6 @@ func TestCreateConnectionRejectsInvalidPayload(t *testing.T) {
 		{
 			name: "ssh without user",
 			payload: config.ConnectionConfig{
-				Name: "Remote",
 				Type: "ssh",
 				Host: "example.com",
 			},
@@ -221,14 +209,12 @@ func TestCreateConnectionReturnsConflictForDuplicateID(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "duplicate-id",
-		Name: "Existing",
 		Type: "local",
 	}}
 
 	srv := newTestServer(t, cfg)
 	body, err := json.Marshal(config.ConnectionConfig{
 		ID:   "duplicate-id",
-		Name: "Another",
 		Type: "local",
 	})
 	if err != nil {
@@ -260,7 +246,6 @@ func TestGetConnectionReturnsExistingConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 
@@ -278,7 +263,7 @@ func TestGetConnectionReturnsExistingConnection(t *testing.T) {
 		t.Fatalf("failed to decode connection payload: %v", err)
 	}
 
-	if payload.ID != "local-1" || payload.Name != "Local" || payload.Type != "local" {
+	if payload.ID != "local-1" || payload.Type != "local" {
 		t.Fatalf("unexpected connection payload: %#v", payload)
 	}
 }
@@ -310,14 +295,12 @@ func TestUpdateConnectionUpdatesExistingConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 
 	srv := newTestServer(t, cfg)
 	body, err := json.Marshal(config.ConnectionConfig{
 		ID:   "ignored-id",
-		Name: "Remote",
 		Type: "ssh",
 		Host: "example.com",
 		User: "root",
@@ -339,7 +322,7 @@ func TestUpdateConnectionUpdatesExistingConnection(t *testing.T) {
 		t.Fatalf("failed to decode update payload: %v", err)
 	}
 
-	if payload.ID != "local-1" || payload.Name != "Remote" || payload.Type != "ssh" {
+	if payload.ID != "local-1" || payload.Type != "ssh" {
 		t.Fatalf("unexpected updated payload: %#v", payload)
 	}
 	if payload.Host != "example.com" || payload.User != "root" {
@@ -367,7 +350,6 @@ func TestUpdateConnectionUpdatesExistingConnection(t *testing.T) {
 func TestUpdateConnectionReturnsNotFoundForMissingConnection(t *testing.T) {
 	srv := newTestServer(t, config.DefaultConfig())
 	body, err := json.Marshal(config.ConnectionConfig{
-		Name: "Remote",
 		Type: "ssh",
 		Host: "example.com",
 		User: "root",
@@ -401,7 +383,6 @@ func TestDeleteConnectionDeletesExistingConnection(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 

@@ -38,7 +38,7 @@ export function MainPanel() {
             </div>
             <p className="empty-state-title">Select a session</p>
             <p className="empty-state-description">
-              Expand a session in the sidebar and click a pane to open the terminal
+              Click a session card in the sidebar to open the terminal
             </p>
           </div>
         )}

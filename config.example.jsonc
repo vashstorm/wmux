@@ -19,12 +19,10 @@
   "connections": [
     {
       "id": "local-dev",
-      "name": "Local",
       "type": "local"
     },
     {
       "id": "remote-prod",
-      "name": "Remote SSH",
       "type": "ssh",
       "host": "example.com",
       "port": 22,

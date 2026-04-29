@@ -80,7 +80,6 @@ func TestTerminalWebSocketInvalidTarget(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-test",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)
@@ -117,7 +116,6 @@ func TestTerminalWebSocketInvalidRows(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-test",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)
@@ -154,7 +152,6 @@ func TestTerminalWebSocketInvalidCols(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-test",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)
@@ -191,7 +188,6 @@ func TestTerminalWebSocketUnsupportedConnectionType(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "unknown-type",
-		Name: "Unknown",
 		Type: "docker",
 	}}
 	srv := newTestServer(t, cfg)

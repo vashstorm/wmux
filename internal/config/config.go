@@ -50,7 +50,6 @@ type TmuxConfig struct {
 
 type ConnectionConfig struct {
 	ID             string `json:"id"`
-	Name           string `json:"name"`
 	Type           string `json:"type"`
 	Host           string `json:"host,omitempty"`
 	Port           int    `json:"port,omitempty"`
@@ -278,13 +277,13 @@ func (c Config) Expanded() (Config, error) {
 	for i := range expanded.Connections {
 		privateKeyPath, err := expandUserPath(expanded.Connections[i].PrivateKeyPath)
 		if err != nil {
-			return Config{}, fmt.Errorf("expand privateKeyPath for connection %q: %w", expanded.Connections[i].Name, err)
+			return Config{}, fmt.Errorf("expand privateKeyPath for connection %q: %w", expanded.Connections[i].ID, err)
 		}
 		expanded.Connections[i].PrivateKeyPath = privateKeyPath
 
 		knownHostsPath, err := expandUserPath(expanded.Connections[i].KnownHostsPath)
 		if err != nil {
-			return Config{}, fmt.Errorf("expand knownHostsPath for connection %q: %w", expanded.Connections[i].Name, err)
+			return Config{}, fmt.Errorf("expand knownHostsPath for connection %q: %w", expanded.Connections[i].ID, err)
 		}
 		expanded.Connections[i].KnownHostsPath = knownHostsPath
 	}

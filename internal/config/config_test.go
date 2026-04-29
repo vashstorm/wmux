@@ -127,12 +127,12 @@ func TestSaveWritesValidJSON(t *testing.T) {
 
 	store.Config.Auth.Token = "local-token"
 	store.Config.Connections = []config.ConnectionConfig{{
-		Name:           "Remote",
 		Type:           "ssh",
 		Host:           "example.com",
 		Port:           22,
 		User:           "alice",
 		PrivateKeyPath: "~/.ssh/id_ed25519",
+		KnownHostsPath: "~/.ssh/known_hosts",
 	}}
 
 	if err := store.Save(); err != nil {
@@ -227,7 +227,6 @@ func TestConfigNeverSerializesSensitiveFields(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:             "remote-1",
-		Name:           "Remote",
 		Type:           "ssh",
 		Host:           "example.com",
 		Port:           22,
@@ -258,7 +257,6 @@ func TestExpandedExpandsSSHPaths(t *testing.T) {
 
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
-		Name:           "Remote",
 		Type:           "ssh",
 		PrivateKeyPath: "~/.ssh/id_ed25519",
 		KnownHostsPath: "~/.ssh/known_hosts",

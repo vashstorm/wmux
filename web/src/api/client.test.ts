@@ -47,32 +47,32 @@ describe("api client", () => {
 	});
 
 	test("listConnections returns data array", async () => {
-		mockJsonResponse(200, { data: [{ id: "1", name: "Local", type: "local" }] });
+		mockJsonResponse(200, { data: [{ id: "1", type: "local" }] });
 		const result = await listConnections();
 		expect(result).toHaveLength(1);
-		expect(result[0].name).toBe("Local");
+		expect(result[0].type).toBe("local");
 	});
 
 	test("createConnection POSTs payload", async () => {
-		mockJsonResponse(201, { id: "2", name: "Remote", type: "ssh" });
-		const result = await createConnection({ name: "Remote", type: "ssh" });
-		expect(result.name).toBe("Remote");
+		mockJsonResponse(201, { id: "2", type: "ssh" });
+		const result = await createConnection({ type: "ssh" });
+		expect(result.type).toBe("ssh");
 
 		const call = vi.mocked(fetch).mock.calls[0];
 		expect(call[1]?.method).toBe("POST");
-		expect(JSON.parse(call[1]?.body as string)).toEqual({ name: "Remote", type: "ssh" });
+		expect(JSON.parse(call[1]?.body as string)).toEqual({ type: "ssh" });
 	});
 
 	test("getConnection fetches by id", async () => {
-		mockJsonResponse(200, { id: "1", name: "Local", type: "local" });
+		mockJsonResponse(200, { id: "1", type: "local" });
 		const result = await getConnection("1");
 		expect(result.id).toBe("1");
 	});
 
 	test("updateConnection PUTs payload", async () => {
-		mockJsonResponse(200, { id: "1", name: "Updated", type: "local" });
-		const result = await updateConnection("1", { id: "1", name: "Updated", type: "local" });
-		expect(result.name).toBe("Updated");
+		mockJsonResponse(200, { id: "1", type: "local" });
+		const result = await updateConnection("1", { id: "1", type: "local" });
+		expect(result.type).toBe("local");
 
 		const call = vi.mocked(fetch).mock.calls[0];
 		expect(call[1]?.method).toBe("PUT");
@@ -93,7 +93,10 @@ describe("api client", () => {
 			data: ["session1", { name: "session2" }, { Name: "session3" }],
 		});
 		const result = await listSessions("1");
-		expect(result.data).toEqual(["session1", "session2", "session3"]);
+		expect(result.data).toHaveLength(3);
+		expect(result.data[0].name).toBe("session1");
+		expect(result.data[1].name).toBe("session2");
+		expect(result.data[2].name).toBe("session3");
 	});
 
 	test("listWindows returns windows", async () => {
@@ -171,7 +174,7 @@ describe("api client", () => {
 	});
 
 	test("URL encodes path parameters", async () => {
-		mockJsonResponse(200, { id: "conn#1", name: "Test", type: "local" });
+		mockJsonResponse(200, { id: "conn#1", type: "local" });
 		await getConnection("conn#1");
 
 		const call = vi.mocked(fetch).mock.calls[0];

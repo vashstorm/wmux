@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { createConnection, updateConnection, listConnectionHealth } from "../api/client.js";
+import { createConnection, updateConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 
@@ -15,7 +15,6 @@ export function NewConnectionForm() {
 		setError,
 		setConnectionHealth,
 	} = useAppState();
-	const [name, setName] = useState("");
 	const [type, setType] = useState<"local" | "ssh">("local");
 	const [host, setHost] = useState("");
 	const [port, setPort] = useState("");
@@ -27,7 +26,6 @@ export function NewConnectionForm() {
 
 	useEffect(() => {
 		if (editingConnection) {
-			setName(editingConnection.name);
 			setType(editingConnection.type as "local" | "ssh");
 			setHost(editingConnection.host ?? "");
 			setPort(editingConnection.port ? String(editingConnection.port) : "");
@@ -35,7 +33,6 @@ export function NewConnectionForm() {
 			setPrivateKeyPath(editingConnection.privateKeyPath ?? "");
 			setKnownHostsPath(editingConnection.knownHostsPath ?? "");
 		} else {
-			setName("");
 			setType("local");
 			setHost("");
 			setPort("");
@@ -59,7 +56,6 @@ export function NewConnectionForm() {
 
 		try {
 			const payload: {
-				name: string;
 				type: string;
 				host?: string;
 				port?: number;
@@ -67,7 +63,6 @@ export function NewConnectionForm() {
 				privateKeyPath?: string;
 				knownHostsPath?: string;
 			} = {
-				name: name.trim(),
 				type,
 			};
 
@@ -115,22 +110,16 @@ export function NewConnectionForm() {
 		}
 	};
 
+	const computedName = type === "local" ? "local" : (host.trim() || "ssh");
+
 	return (
 		<div className="new-connection-form-overlay" onClick={handleClose}>
 			<form className="new-connection-form" onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} data-testid="new-connection-form">
 				<h3 className="form-title">{isEditMode ? "Edit Connection" : "New Connection"}</h3>
 
 				<div className="form-field">
-					<label htmlFor="conn-name">Name *</label>
-					<input
-						id="conn-name"
-						type="text"
-						value={name}
-						onChange={(e) => setName(e.target.value)}
-						placeholder="My Server"
-						required
-						data-testid="connection-name-input"
-					/>
+					<label>Connection</label>
+					<div className="computed-name-display" data-testid="computed-connection-name">{computedName}</div>
 				</div>
 
 				<div className="form-field">
@@ -225,7 +214,7 @@ export function NewConnectionForm() {
 						type="submit"
 						className="form-button form-button-primary"
 						data-testid="save-connection"
-						disabled={!name.trim()}
+						disabled={type === "ssh" && (!host.trim() || !user.trim())}
 					>
 						{isEditMode ? "Update" : "Save"}
 					</button>

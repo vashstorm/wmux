@@ -243,7 +243,7 @@ func TestUpdateConfigRejectsSecretFields(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	srv := newTestServer(t, cfg)
 
-	body := []byte(`{"schemaVersion":1,"server":{"bind":"127.0.0.1:7331"},"auth":{"token":""},"tmux":{"path":"tmux"},"connections":[{"id":"ssh-1","name":"SSH","type":"ssh","host":"example.com","user":"root","password":"secret"}],"ui":{"theme":"dark"}}`)
+	body := []byte(`{"schemaVersion":1,"server":{"bind":"127.0.0.1:7331"},"auth":{"token":""},"tmux":{"path":"tmux"},"connections":[{"id":"ssh-1","type":"ssh","host":"example.com","user":"root","password":"secret"}],"ui":{"theme":"dark"}}`)
 	req := httptest.NewRequest("PUT", "/api/config", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer secret-token")
 	rec := httptest.NewRecorder()
@@ -267,7 +267,6 @@ func TestTerminalWebSocketAcceptsQueryToken(t *testing.T) {
 	cfg.Auth.Token = "secret-token"
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-test",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)

@@ -51,7 +51,6 @@ func TestSessionHandlersReturnBadRequestForUnsupportedConnectionType(t *testing.
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "unsupported-1",
-		Name: "Unsupported",
 		Type: "serial",
 	}}
 	srv := newTestServer(t, cfg)
@@ -86,7 +85,6 @@ func TestSessionHandlersRejectInvalidJSONPayloads(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)
@@ -115,7 +113,6 @@ func TestSessionHandlersSurfaceValidationErrorsForMissingNames(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
-		Name: "Local",
 		Type: "local",
 	}}
 	srv := newTestServer(t, cfg)
@@ -313,7 +310,6 @@ func TestSessionHandlersLocalResponsesIncludeAdapterPath(t *testing.T) {
 			cfg.Tmux.Path = adapterPath
 			cfg.Connections = []config.ConnectionConfig{{
 				ID:   "local-1",
-				Name: "Local",
 				Type: "local",
 			}}
 
@@ -342,7 +338,6 @@ func TestListSessionsReturnsSSHConnectionErrors(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "ssh-1",
-		Name: "Remote",
 		Type: "ssh",
 		User: "root",
 	}}
