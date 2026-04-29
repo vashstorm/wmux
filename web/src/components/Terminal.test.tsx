@@ -1,5 +1,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { Terminal as XTerm } from "@xterm/xterm";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { Terminal } from "./Terminal.js";
 import { TerminalWebSocket } from "../api/websocket.js";
 import type { SelectedPane } from "../state/store.js";
@@ -18,6 +20,9 @@ vi.mock("@xterm/xterm", () => ({
 	Terminal: vi.fn().mockImplementation(() => ({
 		cols: 80,
 		rows: 24,
+		unicode: {
+			activeVersion: "6",
+		},
 		open: mockXTermOpen,
 		write: mockXTermWrite,
 		writeln: mockXTermWriteln,
@@ -32,6 +37,12 @@ vi.mock("@xterm/addon-fit", () => ({
 	FitAddon: vi.fn().mockImplementation(() => ({
 		fit: mockFit,
 		proposeDimensions: mockProposeDimensions,
+	})),
+}));
+
+vi.mock("@xterm/addon-unicode11", () => ({
+	Unicode11Addon: vi.fn().mockImplementation(() => ({
+		activate: vi.fn(),
 	})),
 }));
 
@@ -128,6 +139,19 @@ describe("Terminal", () => {
 		expect(mockFit).toHaveBeenCalled();
 		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
+	});
+
+	test("uses Unicode 11 width tables for CJK terminal output", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		const xtermInstance = vi.mocked(XTerm).mock.results[0]!.value;
+		const unicodeAddon = vi.mocked(Unicode11Addon).mock.results[0]!.value;
+
+		expect(xtermOptions.allowProposedApi).toBe(true);
+		expect(Unicode11Addon).toHaveBeenCalledTimes(1);
+		expect(mockXTermLoadAddon).toHaveBeenCalledWith(unicodeAddon);
+		expect(xtermInstance.unicode.activeVersion).toBe("11");
 	});
 
 	test("writes output data to xterm when receiving output message", () => {

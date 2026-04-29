@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { getErrorMessage } from "../api/errors.js";
@@ -163,16 +164,19 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		if (!containerRef.current) return;
 
 		const terminal = new XTerm({
+			allowProposedApi: true,
 			cursorBlink: true,
 			customGlyphs: false,
 			fontFamily:
-				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
 			fontSize: 14,
 			theme: getXtermTheme(),
 		});
 
 		const fitAddon = new FitAddon();
 		terminal.loadAddon(fitAddon);
+		terminal.loadAddon(new Unicode11Addon());
+		terminal.unicode.activeVersion = "11";
 		terminal.loadAddon(new WebLinksAddon());
 
 		terminal.open(containerRef.current);

@@ -1101,6 +1101,11 @@
 	overflow: hidden;
 }
 
+.terminal-container .xterm .xterm-rows span.xterm-italic,
+.terminal-container .xterm .xterm-width-cache-measure-container .xterm-char-measure-element {
+	font-style: normal !important;
+}
+
 .terminal-disconnected-overlay {
 	position: absolute;
 	inset: 0;
