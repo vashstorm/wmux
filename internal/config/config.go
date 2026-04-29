@@ -59,9 +59,10 @@ type ConnectionConfig struct {
 }
 
 type UIConfig struct {
-	Theme            string `json:"theme"`
-	FontSize         int    `json:"fontSize"`
-	TerminalFontSize int    `json:"terminalFontSize"`
+	Theme              string `json:"theme"`
+	FontSize           int    `json:"fontSize"`
+	TerminalFontSize   int    `json:"terminalFontSize"`
+	TerminalFontWeight string `json:"terminalFontWeight"`
 }
 
 type Store struct {
@@ -111,9 +112,10 @@ func DefaultConfig() Config {
 		},
 		Connections: []ConnectionConfig{},
 		UI: UIConfig{
-			Theme:            "dark",
-			FontSize:         16,
-			TerminalFontSize: 14,
+			Theme:              "dark",
+			FontSize:           16,
+			TerminalFontSize:   14,
+			TerminalFontWeight: "normal",
 		},
 	}
 
@@ -355,6 +357,8 @@ const (
 	maxTerminalFontSize   = 32
 )
 
+var validTerminalFontWeights = []string{"normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900"}
+
 func normalizeConfig(cfg *Config) {
 	for i := range cfg.Connections {
 		if strings.TrimSpace(cfg.Connections[i].ID) == "" {
@@ -383,6 +387,20 @@ func normalizeConfig(cfg *Config) {
 	}
 	if cfg.UI.TerminalFontSize > maxTerminalFontSize {
 		cfg.UI.TerminalFontSize = maxTerminalFontSize
+	}
+
+	if cfg.UI.TerminalFontWeight == "" {
+		cfg.UI.TerminalFontWeight = "normal"
+	}
+	weightValid := false
+	for _, w := range validTerminalFontWeights {
+		if cfg.UI.TerminalFontWeight == w {
+			weightValid = true
+			break
+		}
+	}
+	if !weightValid {
+		cfg.UI.TerminalFontWeight = "normal"
 	}
 }
 

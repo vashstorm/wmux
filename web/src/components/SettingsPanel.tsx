@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
-import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize } from "../ui/fontSize.js";
+import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
 
 interface SettingsFormState {
 	bind: string;
@@ -13,6 +13,7 @@ interface SettingsFormState {
 	tokenConfigured: boolean;
 	fontSize: number;
 	terminalFontSize: number;
+	terminalFontWeight: string;
 }
 
 function buildFormState(config: AppConfig): SettingsFormState {
@@ -26,6 +27,7 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		tokenConfigured: Boolean(config.auth.tokenConfigured),
 		fontSize: config.ui.fontSize || 16,
 		terminalFontSize: config.ui.terminalFontSize || 14,
+		terminalFontWeight: normalizeTerminalFontWeight(config.ui.terminalFontWeight),
 	};
 }
 
@@ -107,6 +109,7 @@ export function SettingsPanel() {
 			theme: formState.theme,
 			fontSize: formState.fontSize,
 			terminalFontSize: formState.terminalFontSize,
+			terminalFontWeight: formState.terminalFontWeight,
 		});
 	}, [formState, setUISettings]);
 
@@ -156,6 +159,7 @@ export function SettingsPanel() {
 				theme: formState.theme,
 				fontSize: formState.fontSize,
 				terminalFontSize: formState.terminalFontSize,
+				terminalFontWeight: formState.terminalFontWeight,
 			},
 		};
 	};
@@ -169,11 +173,12 @@ export function SettingsPanel() {
 			setConnections(saved.connections);
 								document.documentElement.dataset.theme = saved.ui.theme;
 								applyUIFontSize(saved.ui.fontSize);
-								setUISettings({
-									theme: saved.ui.theme,
-									fontSize: saved.ui.fontSize,
-									terminalFontSize: saved.ui.terminalFontSize,
-								});
+							setUISettings({
+								theme: saved.ui.theme,
+								fontSize: saved.ui.fontSize,
+								terminalFontSize: saved.ui.terminalFontSize,
+								terminalFontWeight: saved.ui.terminalFontWeight,
+							});
 								setConfigConflict(null);
 								setShowSettingsPanel(false);
 		} catch (err: unknown) {
@@ -190,7 +195,7 @@ export function SettingsPanel() {
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
-							ui: { ...latest.ui, theme: payload.ui.theme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize },
+								ui: { ...latest.ui, theme: payload.ui.theme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
 							connections: latest.connections.map((connection) => {
 								if (connection.type !== "ssh") {
 									return connection;
@@ -235,6 +240,7 @@ export function SettingsPanel() {
 				theme: config.ui.theme,
 				fontSize: config.ui.fontSize,
 				terminalFontSize: config.ui.terminalFontSize,
+				terminalFontWeight: config.ui.terminalFontWeight,
 			});
 		}
 		closePanel();
@@ -526,24 +532,42 @@ export function SettingsPanel() {
 													</div>
 												</div>
 
-												<div className="form-field">
-													<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
-													<div className="font-size-control">
-														<input
-															id="settings-terminal-font-size"
-															type="range"
-															min={8}
-															max={32}
-															value={formState.terminalFontSize}
-															onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
-															data-testid="settings-terminal-font-size-input"
-														/>
-														<span className="font-size-value">{formState.terminalFontSize}px</span>
-													</div>
-												</div>
-											</div>
+									<div className="form-field">
+										<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+										<div className="font-size-control">
+											<input
+												id="settings-terminal-font-size"
+												type="range"
+												min={8}
+												max={32}
+												value={formState.terminalFontSize}
+												onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
+												data-testid="settings-terminal-font-size-input"
+											/>
+											<span className="font-size-value">{formState.terminalFontSize}px</span>
 										</div>
-									)}
+									</div>
+
+									<div className="form-field">
+										<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
+										<select
+											id="settings-terminal-font-weight"
+											value={formState.terminalFontWeight}
+											onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
+											data-testid="settings-terminal-font-weight-input"
+											className="font-weight-select"
+										>
+											{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
+												<option key={weight} value={weight}>
+													{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
+												</option>
+											))}
+										</select>
+										<p className="form-help-text">Font weight for terminal text rendering.</p>
+									</div>
+								</div>
+							</div>
+						)}
 								</div>
 
 								<div className="settings-footer">

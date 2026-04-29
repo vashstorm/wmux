@@ -9,26 +9,26 @@ import { TerminalWebSocket } from "../api/websocket.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
 
 const darkTheme: ITheme = {
-	background: "#050506",
-	foreground: "#e0e0e6",
-	cursor: "#00f2ff",
-	cursorAccent: "#050506",
-	selectionBackground: "rgba(0, 242, 255, 0.2)",
-	black: "#1a1a1a",
-	red: "#ff2d55",
-	green: "#00ff41",
-	yellow: "#ffb800",
-	blue: "#00f2ff",
-	magenta: "#bf00ff",
-	cyan: "#00f2ff",
-	white: "#e0e0e6",
-	brightBlack: "#4d4d4d",
-	brightRed: "#ff5e7d",
-	brightGreen: "#33ff67",
-	brightYellow: "#ffc633",
-	brightBlue: "#33f5ff",
-	brightMagenta: "#cc33ff",
-	brightCyan: "#33f5ff",
+	background: "#0a0e1a",
+	foreground: "#f8fafc",
+	cursor: "#f59e0b",
+	cursorAccent: "#0a0e1a",
+	selectionBackground: "rgba(245, 158, 11, 0.2)",
+	black: "#0f172a",
+	red: "#ef4444",
+	green: "#10b981",
+	yellow: "#f59e0b",
+	blue: "#8b5cf6",
+	magenta: "#a855f7",
+	cyan: "#06b6d4",
+	white: "#f8fafc",
+	brightBlack: "#334155",
+	brightRed: "#f87171",
+	brightGreen: "#34d399",
+	brightYellow: "#fbbf24",
+	brightBlue: "#a78bfa",
+	brightMagenta: "#c084fc",
+	brightCyan: "#22d3ee",
 	brightWhite: "#ffffff",
 };
 
@@ -170,6 +170,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			fontFamily:
 				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
 			fontSize: uiSettings.terminalFontSize,
+			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			theme: getXtermTheme(),
 		});
 
@@ -242,7 +243,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			wsRef.current?.close();
 			wsRef.current = null;
 		};
-	}, [connectWebSocket, uiSettings.terminalFontSize]);
+	}, [connectWebSocket, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
 
 	const handleReconnect = () => {
 		wsRef.current?.close();

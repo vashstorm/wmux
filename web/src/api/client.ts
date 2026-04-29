@@ -120,6 +120,7 @@ export interface AppConfig {
 		theme: string;
 		fontSize: number;
 		terminalFontSize: number;
+		terminalFontWeight: string;
 	};
 }
 

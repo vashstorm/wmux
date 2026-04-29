@@ -32,6 +32,8 @@
 		'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo,
 		Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
+	--font-display: 'Orbitron', 'Exo 2', 'CaskaydiaCove Nerd Font', sans-serif;
+
   /* Spacing scale (8px base grid) */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -66,77 +68,68 @@
 
 :root,
 [data-theme="dark"] {
-  /* Page & Base */
-  --color-background: #050506;
-  --color-text: #e0e0e6;
-  --color-text-secondary: #a0a0b0;
-  --color-text-muted: #62627a;
-  --color-text-disabled: #3a3a4a;
+  --color-background: #0a0e1a;
+  --color-text: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-text-disabled: #475569;
 
-  /* Surfaces - Tech Obsidian */
-  --color-panel: rgba(10, 10, 15, 0.75);
-  --color-surface: rgba(25, 25, 35, 0.6);
-  --color-surface-hover: rgba(40, 40, 55, 0.8);
-  --color-surface-elevated: rgba(30, 30, 40, 0.9);
-  
-  /* Glassmorphism */
-  --glass-blur: blur(12px);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-bright: rgba(0, 242, 255, 0.2);
+  --color-panel: rgba(15, 23, 42, 0.85);
+  --color-surface: rgba(30, 41, 59, 0.6);
+  --color-surface-hover: rgba(51, 65, 85, 0.8);
+  --color-surface-elevated: rgba(15, 23, 42, 0.95);
 
-  /* Borders */
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-strong: rgba(255, 255, 255, 0.15);
-  --color-border-subtle: rgba(255, 255, 255, 0.03);
-  --color-tab-indicator: #00f2ff;
+  --glass-blur: blur(16px);
+  --glass-border: rgba(245, 158, 11, 0.1);
+  --glass-border-bright: rgba(139, 92, 246, 0.25);
 
-  /* Accent — Cyberpunk Cyan */
-  --color-accent: #00f2ff;
-  --color-accent-hover: #00d7e6;
-  --color-accent-active: #00bcc9;
-  --color-accent-subtle: rgba(0, 242, 255, 0.15);
-  --color-accent-glow: 0 0 15px rgba(0, 242, 255, 0.4);
+  --color-border: rgba(245, 158, 11, 0.08);
+  --color-border-strong: rgba(245, 158, 11, 0.2);
+  --color-border-subtle: rgba(255, 255, 255, 0.04);
+  --color-tab-indicator: #f59e0b;
 
-  /* Semantic — Danger (Neon Red) */
-  --color-danger: #ff2d55;
-  --color-danger-hover: #e6294d;
-  --color-danger-active: #cc2444;
-  --color-danger-subtle: rgba(255, 45, 85, 0.15);
-  --color-danger-glow: 0 0 12px rgba(255, 45, 85, 0.3);
+  --color-accent: #f59e0b;
+  --color-accent-hover: #fbbf24;
+  --color-accent-active: #d97706;
+  --color-accent-subtle: rgba(245, 158, 11, 0.15);
+  --color-accent-glow: 0 0 20px rgba(245, 158, 11, 0.35);
 
-  /* Semantic — Warning (Amber) */
-  --color-warning: #ffb800;
-  --color-warning-hover: #e6a600;
-  --color-warning-active: #cc9300;
-  --color-warning-subtle: rgba(255, 184, 0, 0.12);
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-danger-active: #b91c1c;
+  --color-danger-subtle: rgba(239, 68, 68, 0.15);
+  --color-danger-glow: 0 0 12px rgba(239, 68, 68, 0.3);
 
-  /* Semantic — Success (Matrix Green) */
-  --color-success: #00ff41;
-  --color-success-subtle: rgba(0, 255, 65, 0.12);
-  --color-success-glow: 0 0 12px rgba(0, 255, 65, 0.3);
+  --color-warning: #f59e0b;
+  --color-warning-hover: #fbbf24;
+  --color-warning-active: #d97706;
+  --color-warning-subtle: rgba(245, 158, 11, 0.12);
 
-  /* Semantic — Attention */
-  --color-attention: #00b4d8;
-  --color-attention-explicit: #f77f00;
+  --color-success: #10b981;
+  --color-success-subtle: rgba(16, 185, 129, 0.12);
+  --color-success-glow: 0 0 12px rgba(16, 185, 129, 0.3);
+
+  --color-attention: #8b5cf6;
+  --color-attention-explicit: #a855f7;
 
   /* Inputs */
-  --color-input-bg: rgba(0, 0, 0, 0.3);
-  --color-input-text: #e0e0e6;
-  --color-input-border: rgba(255, 255, 255, 0.1);
+  --color-input-bg: rgba(15, 23, 42, 0.5);
+  --color-input-text: #f8fafc;
+  --color-input-border: rgba(245, 158, 11, 0.12);
 
   /* Overlay scrim */
-  --color-overlay-scrim: rgba(0, 0, 0, 0.85);
+  --color-overlay-scrim: rgba(2, 6, 23, 0.9);
 
   /* Banner backgrounds */
-  --color-banner-bg: rgba(15, 15, 20, 0.9);
-  --color-banner-warning-bg: rgba(255, 184, 0, 0.08);
-  --color-banner-warning-border: rgba(255, 184, 0, 0.3);
-  --color-banner-error-bg: rgba(255, 45, 85, 0.08);
-  --color-banner-error-border: rgba(255, 45, 85, 0.3);
+  --color-banner-bg: rgba(15, 23, 42, 0.95);
+  --color-banner-warning-bg: rgba(245, 158, 11, 0.08);
+  --color-banner-warning-border: rgba(245, 158, 11, 0.3);
+  --color-banner-error-bg: rgba(239, 68, 68, 0.08);
+  --color-banner-error-border: rgba(239, 68, 68, 0.3);
 
   /* Link defaults */
-  --color-link: #00f2ff;
-  --color-link-muted: #62627a;
+  --color-link: #f59e0b;
+  --color-link-muted: #64748b;
 }
 
 /* --------------------------------------------------------------------------

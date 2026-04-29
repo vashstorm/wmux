@@ -74,6 +74,7 @@ export interface UISettings {
 	theme: string;
 	fontSize: number;
 	terminalFontSize: number;
+	terminalFontWeight: string;
 }
 
 export interface AppState {
@@ -156,6 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		theme: "dark",
 		fontSize: 16,
 		terminalFontSize: 14,
+		terminalFontWeight: "normal",
 	});
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {

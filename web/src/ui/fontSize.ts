@@ -18,6 +18,33 @@ export function clampTerminalFontSize(size: number): number {
 	return size;
 }
 
+export const VALID_TERMINAL_FONT_WEIGHTS = [
+	"normal",
+	"bold",
+	"100",
+	"200",
+	"300",
+	"400",
+	"500",
+	"600",
+	"700",
+	"800",
+	"900",
+] as const;
+
+export type TerminalFontWeight = (typeof VALID_TERMINAL_FONT_WEIGHTS)[number];
+
+export const DEFAULT_TERMINAL_FONT_WEIGHT: TerminalFontWeight = "normal";
+
+export function normalizeTerminalFontWeight(value: string | undefined): TerminalFontWeight {
+	if (!value) return DEFAULT_TERMINAL_FONT_WEIGHT;
+	const normalized = value.trim().toLowerCase();
+	if (VALID_TERMINAL_FONT_WEIGHTS.includes(normalized as TerminalFontWeight)) {
+		return normalized as TerminalFontWeight;
+	}
+	return DEFAULT_TERMINAL_FONT_WEIGHT;
+}
+
 export function applyUIFontSize(baseSize: number): void {
 	const root = document.documentElement;
 	root.style.setProperty("--font-size-2xs", `${Math.round(baseSize * 0.625)}px`);

@@ -1,6 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
 @import './tokens.css';
 
-/* Reset and base styles */
 *,
 *::before,
 *::after {
@@ -20,10 +20,10 @@ body {
 	line-height: var(--line-height-normal);
 	color: var(--color-text);
 	background-color: var(--color-background);
-	background-image: 
-		linear-gradient(rgba(0, 242, 255, 0.02) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(0, 242, 255, 0.02) 1px, transparent 1px);
-	background-size: 40px 40px;
+	background-image:
+		radial-gradient(ellipse at 20% 50%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+		radial-gradient(ellipse at 80% 20%, rgba(245, 158, 11, 0.06) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
 	min-height: 100vh;
 	overflow: hidden;
 }

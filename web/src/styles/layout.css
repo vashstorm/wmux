@@ -39,11 +39,12 @@
 }
 
 .sidebar-brand {
+	font-family: var(--font-display);
 	font-size: var(--font-size-md);
 	font-weight: var(--font-weight-bold);
 	color: var(--color-accent);
 	text-transform: uppercase;
-	letter-spacing: 0.1em;
+	letter-spacing: 0.15em;
 	text-shadow: var(--color-accent-glow);
 }
 
@@ -281,11 +282,12 @@
 }
 
 .empty-state-title {
+	font-family: var(--font-display);
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-bold);
 	color: var(--color-accent);
 	text-transform: uppercase;
-	letter-spacing: 0.1em;
+	letter-spacing: 0.15em;
 	text-shadow: var(--color-accent-glow);
 }
 

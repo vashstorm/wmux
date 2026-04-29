@@ -20,6 +20,7 @@ config.jsonc
 .idea/
 .vscode/
 .sisyphus/
+.opencode/
 *.swp
 *.swo
 
