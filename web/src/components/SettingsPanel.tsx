@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -49,6 +49,13 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
+	const [activeTab, setActiveTab] = useState<"general" | "connections" | "appearance">("general");
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (scrollContainerRef.current) {
+			scrollContainerRef.current.scrollTop = 0;
+		}
+	}, [activeTab]);
 
 	const knownHostsPlaceholder = useMemo(() => "~/.ssh/known_hosts", []);
 
@@ -268,210 +275,292 @@ export function SettingsPanel() {
 		<div className="settings-panel-overlay">
 			<div className="settings-panel" data-testid="settings-panel">
 				<div className="settings-panel-header">
-					<h3 className="form-title">Settings</h3>
+					<div className="settings-panel-header-title">
+						<h3 className="form-title">Settings</h3>
+						<span className="settings-panel-subtitle">Configure your wmux workspace</span>
+					</div>
 					<button type="button" className="error-banner-dismiss" onClick={closePanel} aria-label="Close settings">
 						×
 					</button>
 				</div>
 
 				{isLoading || !formState ? (
-					<div className="settings-panel-loading">Loading settings...</div>
+					<div className="settings-panel-loading">
+						<div className="spinner" />
+						<span>Loading settings...</span>
+					</div>
 				) : (
 					<div className="settings-panel-body">
-						{/* Left: Connections */}
-						<div className="settings-connections-pane">
-							<div className="settings-connections-pane-header">
-								<span className="sidebar-section-label">Connections</span>
+						{/* Left: Sidebar Navigation */}
+						<aside className="settings-sidebar">
+							<nav className="settings-nav">
 								<button
 									type="button"
-									className="sidebar-section-action"
-									onClick={handleNewConnection}
-									title="New Connection"
+									className={`settings-nav-item ${activeTab === "general" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("general")}
 								>
-									+
+									<span className="nav-icon">⚙</span>
+									<span className="nav-label">General</span>
 								</button>
-							</div>
-							{connections.length === 0 ? (
-								<p className="settings-connections-empty">No connections configured</p>
-							) : (
-								<ul className="settings-connections-list">
-									{connections.map((connection) => {
-										const connHealth = connectionHealth[connection.id];
-										const statusClass =
-											connHealth?.status === "online"
-												? "is-online"
-												: connHealth?.status === "offline"
-													? "is-offline"
-													: "is-unknown";
-										const typeLabel = connection.type === "ssh" ? "SSH" : "Local";
-										const subtitle = connection.type === "ssh" && connection.host
-											? `${connection.user ?? ""}@${connection.host}${connection.port ? `:${connection.port}` : ""}`
-											: null;
+								<button
+									type="button"
+									className={`settings-nav-item ${activeTab === "connections" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("connections")}
+								>
+									<span className="nav-icon">🌐</span>
+									<span className="nav-label">Connections</span>
+								</button>
+								<button
+									type="button"
+									className={`settings-nav-item ${activeTab === "appearance" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("appearance")}
+								>
+									<span className="nav-icon">🎨</span>
+									<span className="nav-label">Appearance</span>
+								</button>
+							</nav>
 
-										return (
-											<li key={connection.id} className="settings-connection-item">
-												<div className="settings-connection-info">
-													<span
-														className={`connection-status-dot ${statusClass}`}
-														title={
-															connHealth?.status === "online"
-																? "Online"
-																: connHealth?.status === "offline"
-																	? `Offline: ${connHealth.errorCode ?? connHealth.message ?? "unknown"}`
-																	: "Unknown"
-														}
-														aria-label={`Connection status: ${connHealth?.status ?? "unknown"}`}
+							<div className="settings-sidebar-footer">
+								<div className="version-info">wmux v{window.performance ? "0.1.0" : "dev"}</div>
+							</div>
+						</aside>
+
+						{/* Right: Content Area */}
+						<div className="settings-main">
+							<form className="settings-form" onSubmit={handleSave}>
+								<div className="settings-content-scroll" ref={scrollContainerRef}>
+									{activeTab === "general" && (
+										<div className="settings-tab-content">
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">Server Configuration</h4>
+												<div className="form-field">
+													<label htmlFor="settings-bind">Server Bind</label>
+													<input
+														id="settings-bind"
+														type="text"
+														value={formState.bind}
+														onChange={(event) => updateField("bind", event.target.value)}
+														data-testid="settings-bind-input"
+														placeholder="127.0.0.1:7331"
 													/>
-													<div className="settings-connection-details">
-														<span className="settings-connection-name">{connectionDisplayName(connection)}</span>
-														<span className="settings-connection-meta">
-															{typeLabel}
-															{subtitle ? ` · ${subtitle}` : ""}
-														</span>
+													<p className="form-help-text">IP address and port the server listens on.</p>
+												</div>
+
+												<div className="form-field">
+													<label htmlFor="settings-tmux-path">tmux Path</label>
+													<input
+														id="settings-tmux-path"
+														type="text"
+														value={formState.tmuxPath}
+														onChange={(event) => updateField("tmuxPath", event.target.value)}
+														data-testid="settings-tmux-path-input"
+														placeholder="tmux"
+													/>
+													<p className="form-help-text">Path to the tmux executable on the server.</p>
+												</div>
+											</div>
+
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">Security & Auth</h4>
+												<div className="form-field">
+													<label htmlFor="settings-token">Auth Token</label>
+													<div className="password-input-wrapper">
+														<input
+															id="settings-token"
+															type="password"
+															value={formState.tokenInput}
+															onChange={(event) => updateField("tokenInput", event.target.value)}
+															placeholder={formState.tokenConfigured ? "••••••••••••••••" : "Optional on localhost"}
+															data-testid="settings-token-input"
+															autoComplete="new-password"
+														/>
+													</div>
+													<p className="form-help-text" data-testid="settings-token-status">
+														{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
+													</p>
+												</div>
+											</div>
+
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">SSH Environment</h4>
+												<div className="form-field">
+													<label htmlFor="settings-known-hosts">known_hosts Path</label>
+													<input
+														id="settings-known-hosts"
+														type="text"
+														value={formState.knownHostsPath}
+														onChange={(event) => updateField("knownHostsPath", event.target.value)}
+														data-testid="settings-known-hosts-input"
+														placeholder="~/.ssh/known_hosts"
+													/>
+													<p className="form-help-text">Default path for host key verification.</p>
+												</div>
+											</div>
+										</div>
+									)}
+
+									{activeTab === "connections" && (
+										<div className="settings-tab-content">
+											<div className="settings-connections-header">
+												<div className="settings-section-title">Managed Connections</div>
+												<button
+													type="button"
+													className="settings-new-connection-btn"
+													onClick={handleNewConnection}
+												>
+													+ NEW
+												</button>
+											</div>
+											
+											{connections.length === 0 ? (
+												<div className="settings-connections-empty">
+													<div className="empty-icon">🔌</div>
+													<p>No connections configured yet</p>
+													<button type="button" className="settings-new-connection-btn" onClick={handleNewConnection}>
+														+ NEW
+													</button>
+												</div>
+											) : (
+												<ul className="settings-connections-list">
+													{connections.map((connection) => {
+														const connHealth = connectionHealth[connection.id];
+														const statusClass =
+															connHealth?.status === "online"
+																? "is-online"
+																: connHealth?.status === "offline"
+																	? "is-offline"
+																	: "is-unknown";
+														const typeLabel = connection.type === "ssh" ? "SSH" : "Local";
+														const subtitle = connection.type === "ssh" && connection.host
+															? `${connection.user ?? ""}@${connection.host}${connection.port ? `:${connection.port}` : ""}`
+															: "System Terminal";
+
+														return (
+															<li key={connection.id} className="settings-connection-item">
+																<div className="settings-connection-info">
+																	<div
+																		className={`connection-status-dot ${statusClass}`}
+																		title={
+																			connHealth?.status === "online"
+																				? "Online"
+																				: connHealth?.status === "offline"
+																					? `Offline: ${connHealth.errorCode ?? connHealth.message ?? "unknown"}`
+																					: "Unknown"
+																		}
+																	/>
+																	<div className="settings-connection-details">
+																		<span className="settings-connection-name">{connectionDisplayName(connection)}</span>
+																		<span className="settings-connection-meta">
+																			{typeLabel} · {subtitle}
+																		</span>
+																	</div>
+																</div>
+																<div className="settings-connection-actions">
+																	<button
+																		type="button"
+																		className="connection-edit-btn"
+																		onClick={() => handleEditConnection(connection)}
+																		title="Edit connection"
+																	>
+																		✎
+																	</button>
+																	<button
+																		type="button"
+																		className="connection-delete-btn"
+																		onClick={() => handleDeleteConnection(connection)}
+																		title="Delete connection"
+																	>
+																		×
+																	</button>
+																</div>
+															</li>
+														);
+													})}
+												</ul>
+											)}
+										</div>
+									)}
+
+									{activeTab === "appearance" && (
+										<div className="settings-tab-content">
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">Theme & Layout</h4>
+												<div className="form-field">
+													<label htmlFor="settings-theme">Color Theme</label>
+													<div className="theme-grid">
+														<button
+															type="button"
+															className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
+															onClick={() => updateField("theme", "dark")}
+														>
+															<div className="theme-preview" />
+															<span>Dark Tech</span>
+														</button>
+														<button
+															type="button"
+															className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
+															onClick={() => updateField("theme", "light")}
+														>
+															<div className="theme-preview" />
+															<span>Classic Light</span>
+														</button>
 													</div>
 												</div>
-												<div className="settings-connection-actions">
-													<button
-														type="button"
-														className="connection-edit-btn"
-														onClick={() => handleEditConnection(connection)}
-														title="Edit connection"
-														aria-label="Edit connection"
-														data-testid={`settings-edit-connection-${connection.id}`}
-													>
-														✎
-													</button>
-													<button
-														type="button"
-														className="connection-delete-btn"
-														onClick={() => handleDeleteConnection(connection)}
-														title="Delete connection"
-														aria-label="Delete connection"
-														data-testid={`settings-delete-connection-${connection.id}`}
-													>
-														×
-													</button>
+											</div>
+
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">Typography</h4>
+												<div className="form-field">
+													<label htmlFor="settings-font-size">UI Font Size</label>
+													<div className="font-size-control">
+														<input
+															id="settings-font-size"
+															type="range"
+															min={12}
+															max={24}
+															value={formState.fontSize}
+															onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
+															data-testid="settings-font-size-input"
+														/>
+														<span className="font-size-value">{formState.fontSize}px</span>
+													</div>
 												</div>
-											</li>
-										);
-									})}
-								</ul>
-							)}
+
+												<div className="form-field">
+													<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+													<div className="font-size-control">
+														<input
+															id="settings-terminal-font-size"
+															type="range"
+															min={8}
+															max={32}
+															value={formState.terminalFontSize}
+															onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
+															data-testid="settings-terminal-font-size-input"
+														/>
+														<span className="font-size-value">{formState.terminalFontSize}px</span>
+													</div>
+												</div>
+											</div>
+										</div>
+									)}
+								</div>
+
+								<div className="settings-footer">
+									<div className="settings-footer-status">
+										{isSaving && <span className="saving-indicator">Saving changes...</span>}
+									</div>
+									<div className="form-actions">
+										<button type="button" className="btn btn-secondary" onClick={handleCancel}>
+											CANCEL
+										</button>
+										<button type="submit" className="btn btn-primary" disabled={isSaving || isLoading}>
+											{isSaving ? "SAVING..." : "SAVE"}
+										</button>
+									</div>
+								</div>
+							</form>
 						</div>
-
-						{/* Right: Settings form */}
-						<form className="settings-form-pane" onSubmit={handleSave}>
-							<div className="settings-divider-vertical" />
-
-							<div className="settings-form-fields">
-								<div className="form-field">
-									<label htmlFor="settings-bind">Server Bind</label>
-									<input
-										id="settings-bind"
-										type="text"
-										value={formState.bind}
-										onChange={(event) => updateField("bind", event.target.value)}
-										data-testid="settings-bind-input"
-									/>
-								</div>
-
-								<div className="form-field">
-									<label htmlFor="settings-token">Auth Token</label>
-									<input
-										id="settings-token"
-										type="password"
-										value={formState.tokenInput}
-										onChange={(event) => updateField("tokenInput", event.target.value)}
-										placeholder={formState.tokenConfigured ? "Token already configured" : "Optional on localhost"}
-										data-testid="settings-token-input"
-										autoComplete="new-password"
-									/>
-									<p className="form-help-text" data-testid="settings-token-status">
-										{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
-									</p>
-								</div>
-
-								<div className="form-field">
-									<label htmlFor="settings-tmux-path">tmux Path</label>
-									<input
-										id="settings-tmux-path"
-										type="text"
-										value={formState.tmuxPath}
-										onChange={(event) => updateField("tmuxPath", event.target.value)}
-										data-testid="settings-tmux-path-input"
-									/>
-								</div>
-
-								<div className="form-field">
-									<label htmlFor="settings-known-hosts">known_hosts Path</label>
-									<input
-										id="settings-known-hosts"
-										type="text"
-										value={formState.knownHostsPath}
-										onChange={(event) => updateField("knownHostsPath", event.target.value)}
-										data-testid="settings-known-hosts-input"
-									/>
-								</div>
-
-							<div className="form-field">
-								<label htmlFor="settings-theme">Theme</label>
-								<select
-									id="settings-theme"
-									value={formState.theme}
-									onChange={(event) => updateField("theme", event.target.value)}
-									data-testid="settings-theme-toggle"
-								>
-									<option value="dark">Dark</option>
-									<option value="light">Light</option>
-								</select>
-							</div>
-
-							<div className="form-field">
-								<label htmlFor="settings-font-size">UI Font Size</label>
-								<div className="font-size-control">
-									<input
-										id="settings-font-size"
-										type="range"
-										min={12}
-										max={24}
-										value={formState.fontSize}
-										onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
-										data-testid="settings-font-size-input"
-									/>
-									<span className="font-size-value">{formState.fontSize}px</span>
-								</div>
-							</div>
-
-							<div className="form-field">
-								<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
-								<div className="font-size-control">
-									<input
-										id="settings-terminal-font-size"
-										type="range"
-										min={8}
-										max={32}
-										value={formState.terminalFontSize}
-										onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
-										data-testid="settings-terminal-font-size-input"
-									/>
-									<span className="font-size-value">{formState.terminalFontSize}px</span>
-								</div>
-							</div>
-
-							{connections.some((connection) => connection.type === "ssh") ? (
-									<p className="form-help-text">Known hosts path applies to saved SSH connections.</p>
-								) : null}
-
-								<div className="form-actions">
-									<button type="button" className="form-button form-button-secondary" onClick={handleCancel}>
-										Cancel
-									</button>
-									<button type="submit" className="form-button form-button-primary" disabled={isSaving || isLoading}>
-										{isSaving ? "Saving..." : "Save"}
-									</button>
-								</div>
-							</div>
-						</form>
 					</div>
 				)}
 			</div>
