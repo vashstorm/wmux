@@ -597,12 +597,17 @@ func parseRemotePaneRow(row string) (tmux.Pane, error) {
 }
 
 func parseRemoteBoolField(value string) (bool, error) {
-	switch strings.TrimSpace(value) {
+	value = strings.TrimSpace(value)
+	switch value {
 	case "1", "true":
 		return true, nil
 	case "0", "false":
 		return false, nil
 	default:
+		// Some tmux fields (e.g., session_attached) return numeric counts > 1
+		if i, err := strconv.Atoi(value); err == nil {
+			return i != 0, nil
+		}
 		return false, fmt.Errorf("invalid boolean value %q", value)
 	}
 }

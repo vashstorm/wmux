@@ -55,6 +55,19 @@ func TestParseSessionRow(t *testing.T) {
 	}
 }
 
+func TestParseSessionRowAttachedCountGreaterThanOne(t *testing.T) {
+	row := strings.Join([]string{"$5", "wmux", "2", "3"}, fieldSeparator)
+	session, err := parseSessionRow(row)
+	if err != nil {
+		t.Fatalf("parseSessionRow() error = %v", err)
+	}
+
+	want := Session{ID: "$5", Name: "wmux", Attached: true, WindowCount: 3}
+	if !reflect.DeepEqual(session, want) {
+		t.Fatalf("parseSessionRow() = %#v, want %#v", session, want)
+	}
+}
+
 func TestParseWindowRow(t *testing.T) {
 	window, err := parseWindowRow("@2:editor:main:3:0:1:%5:zsh")
 	if err != nil {
