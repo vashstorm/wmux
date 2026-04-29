@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/panh/wmux/internal/config"
 	"github.com/panh/wmux/internal/protocol"
+	"github.com/panh/wmux/internal/semantic"
 	"github.com/panh/wmux/internal/session"
 )
 
@@ -22,14 +23,15 @@ type Options struct {
 }
 
 type Server struct {
-	store             *config.Store
-	assets            http.FileSystem
-	httpServer        *http.Server
-	mux               *http.ServeMux
-	sessionManager    session.Manager
-	websocketUpgrader websocket.Upgrader
-	logger            *slog.Logger
+	store                 *config.Store
+	assets                http.FileSystem
+	httpServer            *http.Server
+	mux                   *http.ServeMux
+	sessionManager        session.Manager
+	websocketUpgrader     websocket.Upgrader
+	logger                *slog.Logger
 	checkConnectionHealth func(config.ConnectionConfig, string) connectionHealthResponse
+	semanticStateManager  *semantic.StateManager
 }
 
 type healthResponse struct {
@@ -59,6 +61,7 @@ func New(options Options) *Server {
 				return true
 			},
 		},
+		semanticStateManager: semantic.NewStateManager(),
 	}
 
 	srv.registerRoutes()
@@ -83,6 +86,10 @@ func (s *Server) ListenAndServe() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
+}
+
+func (s *Server) ClearSemanticState(paneID string) {
+	s.semanticStateManager.ClearIfInputReceived(paneID)
 }
 
 func (s *Server) currentConfig() config.Config {

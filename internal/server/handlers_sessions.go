@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/panh/wmux/internal/semantic"
 	"github.com/panh/wmux/internal/sshclient"
 	"github.com/panh/wmux/internal/tmux"
 )
@@ -111,18 +112,28 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			allStates := make([]tmux.AttentionState, 0, len(windows))
+			allSemanticEvents := make([]semantic.SemanticEventType, 0, len(windows))
 			totalCount := 0
+			semanticTotalCount := 0
 			for _, w := range windows {
 				panes, err := adapter.ListPanes(response.Data[i].Name, w.Name)
 				if err != nil {
 					continue
 				}
+				s.detectPaneSemanticEvents(panes, adapter.Path)
 				wState, wCount := aggregatePaneAttention(panes)
+				wSemanticType, wSemanticCount := aggregatePaneSemanticAttention(panes)
 				allStates = append(allStates, wState)
 				totalCount += wCount
+				if wSemanticType != "" && wSemanticType != "none" {
+					allSemanticEvents = append(allSemanticEvents, semantic.SemanticEventType(wSemanticType))
+					semanticTotalCount += wSemanticCount
+				}
 			}
 			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
 			response.Data[i].AttentionCount = totalCount
+			response.Data[i].SemanticEventType = string(semantic.AggregateSemanticEvent(allSemanticEvents))
+			response.Data[i].SemanticEventCount = semanticTotalCount
 		}
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
@@ -199,7 +210,9 @@ func (s *Server) handleListWindows(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
+			s.detectPaneSemanticEvents(panes, adapter.Path)
 			response.Data[i].AttentionState, response.Data[i].AttentionCount = aggregatePaneAttention(panes)
+			response.Data[i].SemanticEventType, response.Data[i].SemanticEventCount = aggregatePaneSemanticAttention(panes)
 		}
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
@@ -260,6 +273,7 @@ func (s *Server) handleListPanes(w http.ResponseWriter, r *http.Request) {
 			s.writeSessionHTTPError(w, err)
 			return
 		}
+		s.detectPaneSemanticEvents(panes, adapter.Path)
 		response.Data = panes
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
@@ -722,4 +736,40 @@ func aggregatePaneAttention(panes []tmux.Pane) (tmux.AttentionState, int) {
 		}
 	}
 	return tmux.AggregateAttentionState(states), count
+}
+
+func aggregatePaneSemanticAttention(panes []tmux.Pane) (string, int) {
+	events := make([]semantic.SemanticEventType, 0, len(panes))
+	count := 0
+	for _, p := range panes {
+		if p.SemanticEventType != "" && p.SemanticEventType != "none" {
+			events = append(events, semantic.SemanticEventType(p.SemanticEventType))
+			count++
+		}
+	}
+	return string(semantic.AggregateSemanticEvent(events)), count
+}
+
+func (s *Server) detectPaneSemanticEvents(panes []tmux.Pane, tmuxPath string) {
+	capturer := semantic.NewLocalCapture(tmuxPath)
+	for i := range panes {
+		pane := &panes[i]
+		output, isAI := semantic.CaptureForClassification(capturer, pane.ID, pane.CurrentCommand)
+		if !isAI {
+			pane.SemanticEventType = "none"
+			pane.SemanticEventCount = 0
+			continue
+		}
+
+		event := semantic.Classify(output)
+		s.semanticStateManager.Update(pane.ID, event, output)
+		storedEvent := s.semanticStateManager.Get(pane.ID)
+
+		pane.SemanticEventType = string(storedEvent)
+		if storedEvent != semantic.EventNone {
+			pane.SemanticEventCount = 1
+		} else {
+			pane.SemanticEventCount = 0
+		}
+	}
 }
