@@ -1,10 +1,12 @@
 package tmux
 
 type Session struct {
-	ID         string
-	Name       string
-	Attached   bool
-	WindowCount int
+	ID             string
+	Name           string
+	Attached       bool
+	WindowCount    int
+	AttentionState AttentionState
+	AttentionCount int
 }
 
 type Window struct {
@@ -15,6 +17,8 @@ type Window struct {
 	PaneCount       int
 	ActivePaneID    string
 	ActivePaneTitle string
+	AttentionState  AttentionState
+	AttentionCount  int
 }
 
 type Pane struct {
@@ -26,4 +30,10 @@ type Pane struct {
 	Height int
 	Left   int
 	Top    int
+	Dead           bool
+	InputOff       bool
+	InMode         bool
+	AlternateOn    bool
+	CurrentCommand string
+	AttentionState AttentionState
 }

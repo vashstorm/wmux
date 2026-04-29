@@ -15,7 +15,7 @@ const (
 
 	sessionFormat = "#{session_id}" + fieldSeparator + "#{session_name}" + fieldSeparator + "#{session_attached}" + fieldSeparator + "#{session_windows}"
 	windowFormat  = "#{window_id}" + fieldSeparator + "#{window_name}" + fieldSeparator + "#{window_index}" + fieldSeparator + "#{window_active}" + fieldSeparator + "#{window_panes}" + fieldSeparator + "#{pane_id}" + fieldSeparator + "#{pane_title}"
-	paneFormat    = "#{pane_id}" + fieldSeparator + "#{pane_title}" + fieldSeparator + "#{pane_index}" + fieldSeparator + "#{pane_active}" + fieldSeparator + "#{pane_width}" + fieldSeparator + "#{pane_height}" + fieldSeparator + "#{pane_left}" + fieldSeparator + "#{pane_top}"
+	paneFormat    = "#{pane_id}" + fieldSeparator + "#{pane_title}" + fieldSeparator + "#{pane_index}" + fieldSeparator + "#{pane_active}" + fieldSeparator + "#{pane_width}" + fieldSeparator + "#{pane_height}" + fieldSeparator + "#{pane_left}" + fieldSeparator + "#{pane_top}" + fieldSeparator + "#{pane_dead}" + fieldSeparator + "#{pane_input_off}" + fieldSeparator + "#{pane_in_mode}" + fieldSeparator + "#{alternate_on}" + fieldSeparator + "#{pane_current_command}"
 
 	ErrorCodeNotFound      = "tmux_not_found"
 	ErrorCodeNoSessions    = "tmux_no_sessions"
@@ -522,7 +522,7 @@ func parseWindowRow(row string) (Window, error) {
 }
 
 func parsePaneRow(row string) (Pane, error) {
-	if fields, ok := splitFormattedFields(row, 8); ok {
+	if fields, ok := splitFormattedFields(row, 13); ok {
 		index, err := strconv.Atoi(fields[2])
 		if err != nil {
 			return Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
@@ -553,7 +553,35 @@ func parsePaneRow(row string) (Pane, error) {
 			return Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
 		}
 
-		return Pane{ID: fields[0], Title: fields[1], Index: index, Active: active, Width: width, Height: height, Left: left, Top: top}, nil
+		dead, err := parseBoolField(fields[8])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		inputOff, err := parseBoolField(fields[9])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		inMode, err := parseBoolField(fields[10])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		alternateOn, err := parseBoolField(fields[11])
+		if err != nil {
+			return Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		currentCommand := fields[12]
+
+		return Pane{
+			ID: fields[0], Title: fields[1], Index: index, Active: active,
+			Width: width, Height: height, Left: left, Top: top,
+			Dead: dead, InputOff: inputOff, InMode: inMode,
+			AlternateOn: alternateOn, CurrentCommand: currentCommand,
+			AttentionState: DeriveAttentionState(dead, inputOff, inMode, alternateOn, currentCommand),
+		}, nil
 	}
 
 	first := strings.Index(row, ":")
@@ -624,6 +652,8 @@ func parsePaneRow(row string) (Pane, error) {
 		Height: height,
 		Left:   left,
 		Top:    top,
+		Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "",
+		AttentionState: AttentionStateNone,
 	}, nil
 }
 

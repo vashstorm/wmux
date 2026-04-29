@@ -15,7 +15,7 @@ const (
 
 	remoteSessionFormat = "#{session_id}" + remoteFieldSeparator + "#{session_name}" + remoteFieldSeparator + "#{session_attached}" + remoteFieldSeparator + "#{session_windows}"
 	remoteWindowFormat  = "#{window_id}" + remoteFieldSeparator + "#{window_name}" + remoteFieldSeparator + "#{window_index}" + remoteFieldSeparator + "#{window_active}" + remoteFieldSeparator + "#{window_panes}" + remoteFieldSeparator + "#{pane_id}" + remoteFieldSeparator + "#{pane_title}"
-	remotePaneFormat    = "#{pane_id}" + remoteFieldSeparator + "#{pane_title}" + remoteFieldSeparator + "#{pane_index}" + remoteFieldSeparator + "#{pane_active}" + remoteFieldSeparator + "#{pane_width}" + remoteFieldSeparator + "#{pane_height}" + remoteFieldSeparator + "#{pane_left}" + remoteFieldSeparator + "#{pane_top}"
+	remotePaneFormat    = "#{pane_id}" + remoteFieldSeparator + "#{pane_title}" + remoteFieldSeparator + "#{pane_index}" + remoteFieldSeparator + "#{pane_active}" + remoteFieldSeparator + "#{pane_width}" + remoteFieldSeparator + "#{pane_height}" + remoteFieldSeparator + "#{pane_left}" + remoteFieldSeparator + "#{pane_top}" + remoteFieldSeparator + "#{pane_dead}" + remoteFieldSeparator + "#{pane_input_off}" + remoteFieldSeparator + "#{pane_in_mode}" + remoteFieldSeparator + "#{alternate_on}" + remoteFieldSeparator + "#{pane_current_command}"
 )
 
 type remoteCommandRunner func(binary string, args ...string) (string, error)
@@ -461,7 +461,7 @@ func parseRemoteWindowRow(row string) (tmux.Window, error) {
 }
 
 func parseRemotePaneRow(row string) (tmux.Pane, error) {
-	if fields, ok := splitRemoteFormattedFields(row, 8); ok {
+	if fields, ok := splitRemoteFormattedFields(row, 13); ok {
 		index, err := strconv.Atoi(fields[2])
 		if err != nil {
 			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid index: %w", row, err)
@@ -492,7 +492,35 @@ func parseRemotePaneRow(row string) (tmux.Pane, error) {
 			return tmux.Pane{}, fmt.Errorf("parse pane row %q: invalid top: %w", row, err)
 		}
 
-		return tmux.Pane{ID: fields[0], Title: fields[1], Index: index, Active: active, Width: width, Height: height, Left: left, Top: top}, nil
+		dead, err := parseRemoteBoolField(fields[8])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		inputOff, err := parseRemoteBoolField(fields[9])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		inMode, err := parseRemoteBoolField(fields[10])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		alternateOn, err := parseRemoteBoolField(fields[11])
+		if err != nil {
+			return tmux.Pane{}, fmt.Errorf("parse pane row %q: %w", row, err)
+		}
+
+		currentCommand := fields[12]
+
+		return tmux.Pane{
+			ID: fields[0], Title: fields[1], Index: index, Active: active,
+			Width: width, Height: height, Left: left, Top: top,
+			Dead: dead, InputOff: inputOff, InMode: inMode,
+			AlternateOn: alternateOn, CurrentCommand: currentCommand,
+			AttentionState: tmux.DeriveAttentionState(dead, inputOff, inMode, alternateOn, currentCommand),
+		}, nil
 	}
 
 	first := strings.Index(row, ":")
@@ -563,6 +591,8 @@ func parseRemotePaneRow(row string) (tmux.Pane, error) {
 		Height: height,
 		Left:   left,
 		Top:    top,
+		Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "",
+		AttentionState: tmux.AttentionStateNone,
 	}, nil
 }
 
