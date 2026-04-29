@@ -14,6 +14,8 @@ export interface TerminalWebSocketOptions {
 	session: string;
 	window?: string;
 	pane?: string;
+	rows?: number;
+	cols?: number;
 	token: string;
 	onMessage: (message: ServerMessage) => void;
 	onOpen?: () => void;
@@ -41,7 +43,7 @@ export class TerminalWebSocket {
 			return;
 		}
 
-		const { connectionId, session, window: windowId, pane, token } = this.options;
+		const { connectionId, session, window: windowId, pane, rows, cols, token } = this.options;
 		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 		const host = window.location.host;
 		const params = new URLSearchParams();
@@ -49,6 +51,8 @@ export class TerminalWebSocket {
 		params.set("session", session);
 		if (windowId) params.set("window", windowId);
 		if (pane) params.set("pane", pane);
+		if (isPositiveInteger(rows)) params.set("rows", String(rows));
+		if (isPositiveInteger(cols)) params.set("cols", String(cols));
 		params.set("token", token);
 		const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
 
@@ -148,4 +152,8 @@ export class TerminalWebSocket {
 	isConnected(): boolean {
 		return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
 	}
+}
+
+function isPositiveInteger(value: number | undefined): value is number {
+	return value !== undefined && Number.isInteger(value) && value > 0;
 }

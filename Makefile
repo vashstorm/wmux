@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build run clean test typecheck e2e
+.PHONY: build dev clean test typecheck e2e
 
 PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 VERSION ?= dev
@@ -11,7 +11,7 @@ build:
 	mkdir -p bin
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/wmux ./cmd/wmux
 
-run: build
+dev: build
 	./bin/wmux
 
 clean:

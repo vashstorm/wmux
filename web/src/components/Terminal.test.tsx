@@ -11,9 +11,13 @@ const mockXTermLoadAddon = vi.fn();
 const mockXTermDispose = vi.fn();
 const mockXTermOnData = vi.fn();
 const mockXTermOnResize = vi.fn();
+const mockFit = vi.fn();
+const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
 
 vi.mock("@xterm/xterm", () => ({
 	Terminal: vi.fn().mockImplementation(() => ({
+		cols: 80,
+		rows: 24,
 		open: mockXTermOpen,
 		write: mockXTermWrite,
 		writeln: mockXTermWriteln,
@@ -26,7 +30,8 @@ vi.mock("@xterm/xterm", () => ({
 
 vi.mock("@xterm/addon-fit", () => ({
 	FitAddon: vi.fn().mockImplementation(() => ({
-		fit: vi.fn(),
+		fit: mockFit,
+		proposeDimensions: mockProposeDimensions,
 	})),
 }));
 
@@ -71,6 +76,8 @@ describe("Terminal", () => {
 		mockClose.mockClear();
 		mockXTermWrite.mockClear();
 		mockXTermWriteln.mockClear();
+		mockFit.mockClear();
+		mockProposeDimensions.mockClear();
 		capturedOnMessage = null;
 		vi.mocked(TerminalWebSocket).mockClear();
 	});
@@ -112,6 +119,15 @@ describe("Terminal", () => {
 		expect(callArgs.session).toBe("dev");
 		expect(callArgs.window).toBe("@1");
 		expect(callArgs.pane).toBe("%1");
+	});
+
+	test("passes fitted dimensions to WebSocket for the initial PTY size", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
+		expect(mockFit).toHaveBeenCalled();
+		expect(callArgs.cols).toBe(120);
+		expect(callArgs.rows).toBe(40);
 	});
 
 	test("writes output data to xterm when receiving output message", () => {

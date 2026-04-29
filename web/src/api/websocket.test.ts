@@ -47,7 +47,7 @@ describe("TerminalWebSocket", () => {
 	}
 
 	test("constructs correct WebSocket URL", () => {
-		const socket = createSocket();
+		const socket = createSocket({ rows: 40, cols: 120 });
 		socket.connect();
 
 		const call = vi.mocked(WebSocket).mock.calls[0]!;
@@ -56,7 +56,19 @@ describe("TerminalWebSocket", () => {
 		expect(url).toContain("session=dev");
 		expect(url).toContain("window=win-1");
 		expect(url).toContain("pane=%251");
+		expect(url).toContain("rows=40");
+		expect(url).toContain("cols=120");
 		expect(url).toContain("token=secret");
+	});
+
+	test("omits invalid terminal dimensions from WebSocket URL", () => {
+		const socket = createSocket({ rows: 0, cols: -1 });
+		socket.connect();
+
+		const call = vi.mocked(WebSocket).mock.calls[0]!;
+		const url = call[0] as string;
+		expect(url).not.toContain("rows=");
+		expect(url).not.toContain("cols=");
 	});
 
 	test("constructs WebSocket URL with empty token", () => {

@@ -63,6 +63,17 @@ interface TerminalProps {
 	selectedPane: SelectedPane;
 }
 
+interface TerminalSize {
+	cols: number;
+	rows: number;
+}
+
+function normalizeTerminalSize(cols: number | undefined, rows: number | undefined): TerminalSize | null {
+	if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
+	if (!cols || !rows || cols <= 0 || rows <= 0) return null;
+	return { cols, rows };
+}
+
 export function Terminal({ selectedPane }: TerminalProps) {
 	const { setError } = useAppState();
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -73,8 +84,23 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	const connectWebSocket = useCallback(() => {
+	const fitAndReadSize = useCallback((): TerminalSize | null => {
+		const terminal = terminalRef.current;
+		const fitAddon = fitAddonRef.current;
+		if (!terminal || !fitAddon) return null;
+
+		const proposed = fitAddon.proposeDimensions();
+		fitAddon.fit();
+
+		return normalizeTerminalSize(
+			proposed?.cols ?? terminal.cols,
+			proposed?.rows ?? terminal.rows,
+		);
+	}, []);
+
+	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
 		const token = sessionStorage.getItem("wmux-auth-token") ?? "";
+		const terminalSize = initialSize ?? fitAndReadSize();
 
 		setDisconnected(false);
 		setErrorMessage(null);
@@ -84,9 +110,11 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			session: selectedPane.session,
 			window: selectedPane.window,
 			pane: selectedPane.pane,
+			rows: terminalSize?.rows,
+			cols: terminalSize?.cols,
 			token,
 			onMessage: (message) => {
-					switch (message.type) {
+				switch (message.type) {
 					case "output": {
 						terminalRef.current?.write(message.data);
 						break;
@@ -125,7 +153,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		ws.connect();
 		wsRef.current = ws;
-	}, [selectedPane, setError]);
+	}, [fitAndReadSize, selectedPane, setError]);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -143,10 +171,9 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		terminal.loadAddon(new WebLinksAddon());
 
 		terminal.open(containerRef.current);
-		fitAddon.fit();
-
 		terminalRef.current = terminal;
 		fitAddonRef.current = fitAddon;
+		const initialSize = fitAndReadSize();
 
 		terminal.onData((data) => {
 			wsRef.current?.send({ type: "input", data });
@@ -166,7 +193,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		resizeObserverRef.current = resizeObserver;
 
-		connectWebSocket();
+		connectWebSocket(initialSize);
 
 		const themeObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
