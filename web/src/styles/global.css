@@ -20,6 +20,10 @@ body {
 	line-height: var(--line-height-normal);
 	color: var(--color-text);
 	background-color: var(--color-background);
+	background-image: 
+		linear-gradient(rgba(0, 242, 255, 0.02) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(0, 242, 255, 0.02) 1px, transparent 1px);
+	background-size: 40px 40px;
 	min-height: 100vh;
 	overflow: hidden;
 }
@@ -28,24 +32,27 @@ body {
 	width: 100vw;
 	height: 100vh;
 	overflow: hidden;
+	position: relative;
 }
 
 /* Typography utilities */
 h1, h2, h3, h4, h5, h6 {
 	font-weight: var(--font-weight-bold);
 	line-height: var(--line-height-normal);
+	letter-spacing: -0.01em;
 }
 
 /* Focus styles */
 :focus-visible {
 	outline: 2px solid var(--color-accent);
 	outline-offset: -1px;
+	box-shadow: var(--color-accent-glow);
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-	width: 10px;
-	height: 10px;
+	width: 4px;
+	height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -53,15 +60,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: var(--color-surface-hover);
-	border: 2px solid transparent;
-	background-clip: padding-box;
+	background: var(--color-text-disabled);
+	border-radius: 10px;
+	transition: background var(--transition-base);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--color-border-strong);
-	border: 2px solid transparent;
-	background-clip: padding-box;
+	background: var(--color-accent);
+	box-shadow: var(--color-accent-glow);
 }
 
 /* Selection */

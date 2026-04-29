@@ -61,70 +61,78 @@
 }
 
 /* --------------------------------------------------------------------------
-   Dark Theme (default)
+   Dark Theme (Tech Edition)
    -------------------------------------------------------------------------- */
 
 :root,
 [data-theme="dark"] {
-  /* Page */
-  --color-background: #201d1d;
-  --color-text: #fdfcfc;
-  --color-text-secondary: #9a9898;
-  --color-text-muted: #6e6e73;
-  --color-text-disabled: #5a5858;
+  /* Page & Base */
+  --color-background: #050506;
+  --color-text: #e0e0e6;
+  --color-text-secondary: #a0a0b0;
+  --color-text-muted: #62627a;
+  --color-text-disabled: #3a3a4a;
 
-  /* Surfaces */
-  --color-panel: #201d1d;
-  --color-surface: #302c2c;
-  --color-surface-hover: #3d3838;
-  --color-surface-elevated: #302c2c;
+  /* Surfaces - Tech Obsidian */
+  --color-panel: rgba(10, 10, 15, 0.75);
+  --color-surface: rgba(25, 25, 35, 0.6);
+  --color-surface-hover: rgba(40, 40, 55, 0.8);
+  --color-surface-elevated: rgba(30, 30, 40, 0.9);
+  
+  /* Glassmorphism */
+  --glass-blur: blur(12px);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-bright: rgba(0, 242, 255, 0.2);
 
   /* Borders */
-  --color-border: rgba(15, 0, 0, 0.12);
-  --color-border-strong: #646262;
-  --color-border-subtle: rgba(15, 0, 0, 0.08);
-  --color-tab-indicator: #9a9898;
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-strong: rgba(255, 255, 255, 0.15);
+  --color-border-subtle: rgba(255, 255, 255, 0.03);
+  --color-tab-indicator: #00f2ff;
 
-  /* Accent — Apple HIG blue */
-  --color-accent: #007aff;
-  --color-accent-hover: #0056b3;
-  --color-accent-active: #004085;
-  --color-accent-subtle: rgba(0, 122, 255, 0.12);
+  /* Accent — Cyberpunk Cyan */
+  --color-accent: #00f2ff;
+  --color-accent-hover: #00d7e6;
+  --color-accent-active: #00bcc9;
+  --color-accent-subtle: rgba(0, 242, 255, 0.15);
+  --color-accent-glow: 0 0 15px rgba(0, 242, 255, 0.4);
 
-  /* Semantic — Danger */
-  --color-danger: #ff3b30;
-  --color-danger-hover: #d70015;
-  --color-danger-active: #a50011;
-  --color-danger-subtle: rgba(255, 59, 48, 0.12);
+  /* Semantic — Danger (Neon Red) */
+  --color-danger: #ff2d55;
+  --color-danger-hover: #e6294d;
+  --color-danger-active: #cc2444;
+  --color-danger-subtle: rgba(255, 45, 85, 0.15);
+  --color-danger-glow: 0 0 12px rgba(255, 45, 85, 0.3);
 
-  /* Semantic — Warning */
-  --color-warning: #ff9f0a;
-  --color-warning-hover: #cc7f08;
-  --color-warning-active: #995f06;
-  --color-warning-subtle: rgba(255, 159, 10, 0.12);
+  /* Semantic — Warning (Amber) */
+  --color-warning: #ffb800;
+  --color-warning-hover: #e6a600;
+  --color-warning-active: #cc9300;
+  --color-warning-subtle: rgba(255, 184, 0, 0.12);
 
-  /* Semantic — Success */
-  --color-success: #30d158;
-  --color-success-subtle: rgba(48, 209, 88, 0.12);
+  /* Semantic — Success (Matrix Green) */
+  --color-success: #00ff41;
+  --color-success-subtle: rgba(0, 255, 65, 0.12);
+  --color-success-glow: 0 0 12px rgba(0, 255, 65, 0.3);
 
   /* Inputs */
-  --color-input-bg: #f8f7f7;
-  --color-input-text: #201d1d;
-  --color-input-border: rgba(15, 0, 0, 0.12);
+  --color-input-bg: rgba(0, 0, 0, 0.3);
+  --color-input-text: #e0e0e6;
+  --color-input-border: rgba(255, 255, 255, 0.1);
 
   /* Overlay scrim */
-  --color-overlay-scrim: rgba(32, 29, 29, 0.65);
+  --color-overlay-scrim: rgba(0, 0, 0, 0.85);
 
   /* Banner backgrounds */
-  --color-banner-bg: #302c2c;
-  --color-banner-warning-bg: rgba(255, 159, 10, 0.10);
-  --color-banner-warning-border: rgba(255, 159, 10, 0.40);
-  --color-banner-error-bg: rgba(255, 59, 48, 0.10);
-  --color-banner-error-border: rgba(255, 59, 48, 0.35);
+  --color-banner-bg: rgba(15, 15, 20, 0.9);
+  --color-banner-warning-bg: rgba(255, 184, 0, 0.08);
+  --color-banner-warning-border: rgba(255, 184, 0, 0.3);
+  --color-banner-error-bg: rgba(255, 45, 85, 0.08);
+  --color-banner-error-border: rgba(255, 45, 85, 0.3);
 
   /* Link defaults */
-  --color-link: #fdfcfc;
-  --color-link-muted: #9a9898;
+  --color-link: #00f2ff;
+  --color-link-muted: #62627a;
 }
 
 /* --------------------------------------------------------------------------
