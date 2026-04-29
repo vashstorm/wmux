@@ -105,7 +105,7 @@ export function MainPanel() {
 				</h1>
 			</header>
 
-			<main className="main-content">
+			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
 				{hasSelectedPane ? (
 					<div className="main-workspace">
 						<WindowTabs

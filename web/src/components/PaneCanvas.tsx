@@ -10,15 +10,26 @@ interface PaneCanvasProps {
 }
 
 function computeBounds(panes: PaneData[]) {
+	let minLeft = Infinity;
+	let minTop = Infinity;
 	let maxRight = 0;
 	let maxBottom = 0;
 	for (const pane of panes) {
 		const right = pane.left + pane.width;
 		const bottom = pane.top + pane.height;
+		if (pane.left < minLeft) minLeft = pane.left;
+		if (pane.top < minTop) minTop = pane.top;
 		if (right > maxRight) maxRight = right;
 		if (bottom > maxBottom) maxBottom = bottom;
 	}
-	return { maxRight, maxBottom };
+	if (!Number.isFinite(minLeft)) minLeft = 0;
+	if (!Number.isFinite(minTop)) minTop = 0;
+	return {
+		minLeft,
+		minTop,
+		width: maxRight - minLeft,
+		height: maxBottom - minTop,
+	};
 }
 
 function scaleToPercent(value: number, max: number): string {
@@ -41,10 +52,10 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 		<div className="pane-canvas" data-testid="pane-canvas">
 			{panes.map((pane) => {
 				const isActive = pane.id === selectedPaneId;
-				const left = scaleToPercent(pane.left, bounds.maxRight);
-				const top = scaleToPercent(pane.top, bounds.maxBottom);
-				const width = scaleToPercent(pane.width, bounds.maxRight);
-				const height = scaleToPercent(pane.height, bounds.maxBottom);
+				const left = scaleToPercent(pane.left - bounds.minLeft, bounds.width);
+				const top = scaleToPercent(pane.top - bounds.minTop, bounds.height);
+				const width = scaleToPercent(pane.width, bounds.width);
+				const height = scaleToPercent(pane.height, bounds.height);
 
 				return (
 					<div

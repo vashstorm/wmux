@@ -180,4 +180,45 @@ describe("PaneCanvas", () => {
 		expect(boxes[1]!.style.left).toBe(`${(81 / 161) * 100}%`);
 		expect(boxes[1]!.style.width).toBe(`${(80 / 161) * 100}%`);
 	});
+
+	test("normalizes pane geometry when tmux reports a non-zero origin", () => {
+		const offsetPanes: PaneData[] = [
+			{
+				id: "%1",
+				title: "top",
+				index: 0,
+				active: true,
+				width: 100,
+				height: 20,
+				left: 4,
+				top: 2,
+			},
+			{
+				id: "%2",
+				title: "bottom",
+				index: 1,
+				active: false,
+				width: 100,
+				height: 20,
+				left: 4,
+				top: 22,
+			},
+		];
+
+		render(
+			<PaneCanvas
+				panes={offsetPanes}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const boxes = screen.getAllByTestId(/pane-box/);
+		expect(boxes[0]!.style.left).toBe("0%");
+		expect(boxes[0]!.style.top).toBe("0%");
+		expect(boxes[0]!.style.width).toBe("100%");
+		expect(boxes[0]!.style.height).toBe("50%");
+		expect(boxes[1]!.style.top).toBe("50%");
+	});
 });
