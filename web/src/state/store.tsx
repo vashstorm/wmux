@@ -11,6 +11,8 @@ export interface WindowSummary {
 	activePaneTitle: string;
 	attentionState?: "none" | "attention" | "explicit";
 	attentionCount?: number;
+	semanticEventType: string;
+	semanticEventCount: number;
 }
 
 export interface PaneData {
@@ -23,6 +25,8 @@ export interface PaneData {
 	left: number;
 	top: number;
 	attentionState?: "none" | "attention" | "explicit";
+	semanticEventType: string;
+	semanticEventCount: number;
 }
 
 export interface SessionWindowState {
@@ -53,6 +57,8 @@ function windowInfoToSummary(w: WindowInfo): WindowSummary {
 		activePaneTitle: w.ActivePaneTitle,
 		attentionState: w.AttentionState,
 		attentionCount: w.AttentionCount,
+		semanticEventType: w.SemanticEventType ?? "none",
+		semanticEventCount: w.SemanticEventCount ?? 0,
 	};
 }
 
@@ -67,6 +73,8 @@ function paneInfoToData(p: PaneInfo): PaneData {
 		left: p.Left,
 		top: p.Top,
 		attentionState: p.AttentionState,
+		semanticEventType: p.SemanticEventType ?? "none",
+		semanticEventCount: p.SemanticEventCount ?? 0,
 	};
 }
 

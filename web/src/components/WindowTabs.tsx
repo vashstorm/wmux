@@ -34,6 +34,11 @@ export function WindowTabs({ windows, selectedWindowId, onSelectWindow }: Window
 								{window.attentionCount}
 							</span>
 						)}
+						{window.semanticEventType !== "none" && window.semanticEventType !== "" && window.semanticEventCount > 0 && (
+							<span className="semantic-badge" title={window.semanticEventType}>
+								AI {window.semanticEventCount}
+							</span>
+						)}
 						{window.activePaneTitle && (
 							<span className="window-tab-pane-title">{window.activePaneTitle}</span>
 						)}

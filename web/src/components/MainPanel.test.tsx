@@ -68,6 +68,8 @@ const windowOne: WindowSummary = {
 	paneCount: 1,
 	activePaneID: "%1",
 	activePaneTitle: "bash",
+	semanticEventType: "none",
+	semanticEventCount: 0,
 };
 
 const windowTwo: WindowSummary = {
@@ -78,6 +80,8 @@ const windowTwo: WindowSummary = {
 	paneCount: 1,
 	activePaneID: "%3",
 	activePaneTitle: "node",
+	semanticEventType: "none",
+	semanticEventCount: 0,
 };
 
 const activeWindowTwo: WindowInfo = {

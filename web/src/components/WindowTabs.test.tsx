@@ -12,6 +12,8 @@ const mockWindows: WindowSummary[] = [
 		paneCount: 2,
 		activePaneID: "%1",
 		activePaneTitle: "bash",
+		semanticEventType: "none",
+		semanticEventCount: 0,
 	},
 	{
 		id: "@2",
@@ -21,6 +23,8 @@ const mockWindows: WindowSummary[] = [
 		paneCount: 1,
 		activePaneID: "%3",
 		activePaneTitle: "node",
+		semanticEventType: "none",
+		semanticEventCount: 0,
 	},
 ];
 
@@ -110,6 +114,8 @@ describe("WindowTabs", () => {
 				paneCount: 1,
 				activePaneID: "%1",
 				activePaneTitle: "very-long-title-that-might-overflow",
+				semanticEventType: "none",
+				semanticEventCount: 0,
 			},
 		];
 
@@ -137,6 +143,8 @@ describe("attention rendering", () => {
 			activePaneTitle: "bash",
 			attentionState: "attention",
 			attentionCount: 1,
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -163,6 +171,8 @@ describe("attention rendering", () => {
 			activePaneTitle: "bash",
 			attentionState: "attention",
 			attentionCount: 1,
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -189,6 +199,8 @@ describe("attention rendering", () => {
 			activePaneTitle: "bash",
 			attentionState: "explicit",
 			attentionCount: 2,
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -215,6 +227,8 @@ describe("attention rendering", () => {
 			paneCount: 2,
 			activePaneID: "%1",
 			activePaneTitle: "bash",
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -226,5 +240,82 @@ describe("attention rendering", () => {
 		);
 
 		expect(document.querySelector(".attention-badge")).toBeNull();
+	});
+});
+
+describe("semantic indicator rendering", () => {
+	test("window with semanticEventType shows AI badge", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			semanticEventType: "choice_required",
+			semanticEventCount: 2,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		const badge = document.querySelector(".semantic-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge?.textContent).toContain("AI");
+		expect(badge?.textContent).toContain("2");
+	});
+
+	test("window with semanticEventType none shows no badge", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			semanticEventType: "none",
+			semanticEventCount: 0,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(document.querySelector(".semantic-badge")).toBeNull();
+	});
+
+	test("window with zero semanticEventCount shows no badge", () => {
+		const win: WindowSummary = {
+			id: "@1",
+			name: "editor",
+			index: 0,
+			active: true,
+			paneCount: 2,
+			activePaneID: "%1",
+			activePaneTitle: "bash",
+			semanticEventType: "user_response_required",
+			semanticEventCount: 0,
+		};
+
+		render(
+			<WindowTabs
+				windows={[win]}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(document.querySelector(".semantic-badge")).toBeNull();
 	});
 });

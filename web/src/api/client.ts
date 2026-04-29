@@ -79,6 +79,8 @@ export interface SessionInfoData {
 	windowCount?: number;
 	attentionState?: "none" | "attention" | "explicit";
 	attentionCount?: number;
+	semanticEventType?: string;
+	semanticEventCount?: number;
 }
 
 export interface SessionsListResponse {
@@ -167,6 +169,8 @@ export interface WindowInfo {
 	ActivePaneTitle: string;
 	AttentionState?: "none" | "attention" | "explicit";
 	AttentionCount?: number;
+	SemanticEventType?: string;
+	SemanticEventCount?: number;
 }
 
 export interface WindowsListResponse {
@@ -187,6 +191,8 @@ export interface PaneInfo {
 	Left: number;
 	Top: number;
 	AttentionState?: "none" | "attention" | "explicit";
+	SemanticEventType?: string;
+	SemanticEventCount?: number;
 }
 
 export interface PanesListResponse {
@@ -206,14 +212,14 @@ export async function listPanes(connectionId: string, sessionName: string, windo
 	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as PanesListResponse;
 }
 
-type NormalizedSession = { id: string; name: string; attached: boolean; windowCount: number; attentionState?: "none" | "attention" | "explicit"; attentionCount?: number };
+type NormalizedSession = { id: string; name: string; attached: boolean; windowCount: number; attentionState?: "none" | "attention" | "explicit"; attentionCount?: number; semanticEventType?: string; semanticEventCount?: number };
 
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
 	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as {
 		connectionId: string;
 		mode: string;
 		adapterPath?: string;
-		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number; AttentionState?: "none" | "attention" | "explicit"; attentionState?: "none" | "attention" | "explicit"; AttentionCount?: number; attentionCount?: number }>;
+		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number; AttentionState?: "none" | "attention" | "explicit"; attentionState?: "none" | "attention" | "explicit"; AttentionCount?: number; attentionCount?: number; SemanticEventType?: string; semanticEventType?: string; SemanticEventCount?: number; semanticEventCount?: number }>;
 	};
 	return {
 		...response,
@@ -229,6 +235,8 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 					windowCount: s.windowCount ?? s.WindowCount ?? 0,
 					attentionState: s.attentionState ?? s.AttentionState,
 					attentionCount: s.attentionCount ?? s.AttentionCount,
+					semanticEventType: s.semanticEventType ?? s.SemanticEventType,
+					semanticEventCount: s.semanticEventCount ?? s.SemanticEventCount,
 				};
 			})
 			.filter((s) => s.name.length > 0),

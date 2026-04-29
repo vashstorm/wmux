@@ -19,6 +19,8 @@ const mockPanes: PaneData[] = [
 		height: 24,
 		left: 0,
 		top: 0,
+		semanticEventType: "none",
+		semanticEventCount: 0,
 	},
 	{
 		id: "%2",
@@ -29,6 +31,8 @@ const mockPanes: PaneData[] = [
 		height: 24,
 		left: 0,
 		top: 25,
+		semanticEventType: "none",
+		semanticEventCount: 0,
 	},
 ];
 
@@ -152,6 +156,8 @@ describe("PaneCanvas", () => {
 				height: 24,
 				left: 0,
 				top: 0,
+				semanticEventType: "none",
+				semanticEventCount: 0,
 			},
 			{
 				id: "%2",
@@ -162,6 +168,8 @@ describe("PaneCanvas", () => {
 				height: 24,
 				left: 81,
 				top: 0,
+				semanticEventType: "none",
+				semanticEventCount: 0,
 			},
 		];
 
@@ -191,6 +199,8 @@ describe("PaneCanvas", () => {
 				height: 20,
 				left: 4,
 				top: 2,
+				semanticEventType: "none",
+				semanticEventCount: 0,
 			},
 			{
 				id: "%2",
@@ -201,6 +211,8 @@ describe("PaneCanvas", () => {
 				height: 20,
 				left: 4,
 				top: 22,
+				semanticEventType: "none",
+				semanticEventCount: 0,
 			},
 		];
 
@@ -234,6 +246,8 @@ describe("attention rendering", () => {
 			left: 0,
 			top: 0,
 			attentionState: "attention",
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -261,6 +275,8 @@ describe("attention rendering", () => {
 			left: 0,
 			top: 0,
 			attentionState: "explicit",
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -288,6 +304,8 @@ describe("attention rendering", () => {
 			left: 0,
 			top: 0,
 			attentionState: "attention",
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -316,6 +334,8 @@ describe("attention rendering", () => {
 			left: 0,
 			top: 0,
 			attentionState: "attention",
+			semanticEventType: "none",
+			semanticEventCount: 0,
 		};
 
 		render(
@@ -330,5 +350,61 @@ describe("attention rendering", () => {
 		const box = screen.getByTestId("pane-box-active");
 		expect(box).toHaveClass("is-active");
 		expect(box).toHaveClass("is-attention");
+	});
+});
+
+describe("semantic indicator rendering", () => {
+	test("pane with semanticEventType shows indicator with event type name", () => {
+		const semanticPane: PaneData = {
+			id: "%3",
+			title: "editor",
+			index: 0,
+			active: false,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			semanticEventType: "choice_required",
+			semanticEventCount: 1,
+		};
+
+		render(
+			<PaneCanvas
+				panes={[semanticPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const indicator = screen.getByTestId("pane-semantic-indicator");
+		expect(indicator).toBeInTheDocument();
+		expect(indicator).toHaveTextContent("choice_required");
+	});
+
+	test("pane with semanticEventType none shows no indicator", () => {
+		const normalPane: PaneData = {
+			id: "%3",
+			title: "bash",
+			index: 0,
+			active: false,
+			width: 80,
+			height: 24,
+			left: 0,
+			top: 0,
+			semanticEventType: "none",
+			semanticEventCount: 0,
+		};
+
+		render(
+			<PaneCanvas
+				panes={[normalPane]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		expect(document.querySelector(".semantic-pane-indicator")).toBeNull();
 	});
 });

@@ -348,3 +348,74 @@ describe("session card attention rendering", () => {
 		expect(badge?.textContent).toBe("2");
 	});
 });
+
+describe("session card semantic badge rendering", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockListConnections.mockResolvedValue([{ id: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+	});
+
+	test("session card with semanticEventCount shows AI badge", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false, semanticEventType: "choice_required", semanticEventCount: 3 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const badge = document.querySelector(".semantic-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge?.textContent).toContain("AI");
+		expect(badge?.textContent).toContain("3");
+	});
+
+	test("session card with zero semanticEventCount shows no badge", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false, semanticEventType: "none", semanticEventCount: 0 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		expect(document.querySelector(".semantic-badge")).toBeNull();
+	});
+
+	test("session card with no semantic fields shows no badge", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1", attached: false }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		expect(document.querySelector(".semantic-badge")).toBeNull();
+	});
+});

@@ -456,6 +456,11 @@ export function Sidebar() {
                                     {session.attentionCount}
                                   </span>
                                 )}
+                                {typeof session.semanticEventCount === "number" && session.semanticEventCount > 0 && (
+                                  <span className="semantic-badge" title="AI events">
+                                    AI {session.semanticEventCount}
+                                  </span>
+                                )}
                               </div>
                             </button>
                             <div className="session-card-actions">

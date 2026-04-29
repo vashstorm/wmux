@@ -1832,6 +1832,40 @@
 	pointer-events: none;
 }
 
+/* Semantic AI attention indicators */
+.semantic-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 16px;
+	height: 14px;
+	padding: 0 3px;
+	border-radius: 7px;
+	font-size: 9px;
+	font-weight: var(--font-weight-semibold);
+	line-height: 1;
+	color: var(--color-semantic);
+	background-color: var(--color-semantic-bg);
+	flex-shrink: 0;
+}
+
+.semantic-pane-indicator {
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	z-index: 2;
+	pointer-events: none;
+	font-size: var(--font-size-2xs);
+	color: var(--color-semantic);
+	background-color: var(--color-semantic-bg);
+	padding: 1px 4px;
+	border-radius: var(--radius-sm);
+	white-space: nowrap;
+	max-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .pane-canvas-empty {
 	flex: 1;
 	display: flex;

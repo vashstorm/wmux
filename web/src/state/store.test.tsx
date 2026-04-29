@@ -352,3 +352,91 @@ describe("attention field mapping", () => {
 		expect(screen.getByTestId("pane-attention-state").textContent).toBe("explicit");
 	});
 });
+
+describe("semantic field normalization", () => {
+	function TestSemanticComponent() {
+		const state = useAppState();
+		return (
+			<div>
+				<button
+					data-testid="set-windows-semantic"
+					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash", SemanticEventType: "choice_required", SemanticEventCount: 3 }])}
+				>
+					Set Windows Semantic
+				</button>
+				<button
+					data-testid="set-windows-no-semantic"
+					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" }])}
+				>
+					Set Windows No Semantic
+				</button>
+				<button
+					data-testid="set-panes-semantic"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "vim", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0, SemanticEventType: "blocked_error", SemanticEventCount: 1 }])}
+				>
+					Set Panes Semantic
+				</button>
+				<button
+					data-testid="set-panes-no-semantic"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "bash", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 }])}
+				>
+					Set Panes No Semantic
+				</button>
+				<span data-testid="window-semantic-type">
+					{state.windows["1:session1"]?.windows[0]?.semanticEventType ?? "null"}
+				</span>
+				<span data-testid="window-semantic-count">
+					{state.windows["1:session1"]?.windows[0]?.semanticEventCount ?? "null"}
+				</span>
+				<span data-testid="pane-semantic-type">
+					{state.windows["1:session1"]?.loadedPanes["@1"]?.[0]?.semanticEventType ?? "null"}
+				</span>
+				<span data-testid="pane-semantic-count">
+					{state.windows["1:session1"]?.loadedPanes["@1"]?.[0]?.semanticEventCount ?? "null"}
+				</span>
+			</div>
+		);
+	}
+
+	function renderWithProvider() {
+		return render(
+			<AppProvider>
+				<TestSemanticComponent />
+			</AppProvider>,
+		);
+	}
+
+	test("setWindows maps SemanticEventType to window summary", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-semantic"));
+		expect(screen.getByTestId("window-semantic-type").textContent).toBe("choice_required");
+	});
+
+	test("setWindows maps SemanticEventCount to window summary", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-semantic"));
+		expect(screen.getByTestId("window-semantic-count").textContent).toBe("3");
+	});
+
+	test("setWindows defaults semantic fields to none/0 when absent", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
+		expect(screen.getByTestId("window-semantic-type").textContent).toBe("none");
+		expect(screen.getByTestId("window-semantic-count").textContent).toBe("0");
+	});
+
+	test("setPanes maps SemanticEventType to pane data", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
+		fireEvent.click(screen.getByTestId("set-panes-semantic"));
+		expect(screen.getByTestId("pane-semantic-type").textContent).toBe("blocked_error");
+	});
+
+	test("setPanes defaults semantic fields to none/0 when absent", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
+		fireEvent.click(screen.getByTestId("set-panes-no-semantic"));
+		expect(screen.getByTestId("pane-semantic-type").textContent).toBe("none");
+		expect(screen.getByTestId("pane-semantic-count").textContent).toBe("0");
+	});
+});
