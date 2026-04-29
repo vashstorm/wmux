@@ -184,6 +184,8 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		fitAddonRef.current = fitAddon;
 		const initialSize = fitAndReadSize();
 
+		terminal.focus();
+
 		terminal.onData((data) => {
 			wsRef.current?.send({ type: "input", data });
 		});

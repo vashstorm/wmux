@@ -13,7 +13,7 @@ const (
 	defaultRemoteTmuxPath = "tmux"
 	remoteFieldSeparator  = "\x1f"
 
-	remoteSessionFormat = "#{session_id}" + remoteFieldSeparator + "#{session_name}" + remoteFieldSeparator + "#{session_attached}"
+	remoteSessionFormat = "#{session_id}" + remoteFieldSeparator + "#{session_name}" + remoteFieldSeparator + "#{session_attached}" + remoteFieldSeparator + "#{session_windows}"
 	remoteWindowFormat  = "#{window_id}" + remoteFieldSeparator + "#{window_name}" + remoteFieldSeparator + "#{window_index}" + remoteFieldSeparator + "#{window_active}" + remoteFieldSeparator + "#{window_panes}" + remoteFieldSeparator + "#{pane_id}" + remoteFieldSeparator + "#{pane_title}"
 	remotePaneFormat    = "#{pane_id}" + remoteFieldSeparator + "#{pane_title}" + remoteFieldSeparator + "#{pane_index}" + remoteFieldSeparator + "#{pane_active}" + remoteFieldSeparator + "#{pane_width}" + remoteFieldSeparator + "#{pane_height}" + remoteFieldSeparator + "#{pane_left}" + remoteFieldSeparator + "#{pane_top}"
 )
@@ -357,13 +357,18 @@ func parseRemotePanesOutput(output string) ([]tmux.Pane, error) {
 }
 
 func parseRemoteSessionRow(row string) (tmux.Session, error) {
-	if fields, ok := splitRemoteFormattedFields(row, 3); ok {
+	if fields, ok := splitRemoteFormattedFields(row, 4); ok {
 		attached, err := parseRemoteBoolField(fields[2])
 		if err != nil {
 			return tmux.Session{}, fmt.Errorf("parse session row %q: %w", row, err)
 		}
 
-		return tmux.Session{ID: fields[0], Name: fields[1], Attached: attached}, nil
+		windowCount, err := strconv.Atoi(fields[3])
+		if err != nil {
+			return tmux.Session{}, fmt.Errorf("parse session row %q: invalid window count: %w", row, err)
+		}
+
+		return tmux.Session{ID: fields[0], Name: fields[1], Attached: attached, WindowCount: windowCount}, nil
 	}
 
 	first, last, ok := splitRemoteFirstLast(row)
@@ -377,9 +382,10 @@ func parseRemoteSessionRow(row string) (tmux.Session, error) {
 	}
 
 	return tmux.Session{
-		ID:       row[:first],
-		Name:     row[first+1 : last],
-		Attached: attached,
+		ID:          row[:first],
+		Name:        row[first+1 : last],
+		Attached:    attached,
+		WindowCount: 0,
 	}, nil
 }
 

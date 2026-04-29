@@ -13,7 +13,7 @@ const (
 	defaultBinaryPath = "tmux"
 	fieldSeparator    = "\x1f"
 
-	sessionFormat = "#{session_id}" + fieldSeparator + "#{session_name}" + fieldSeparator + "#{session_attached}"
+	sessionFormat = "#{session_id}" + fieldSeparator + "#{session_name}" + fieldSeparator + "#{session_attached}" + fieldSeparator + "#{session_windows}"
 	windowFormat  = "#{window_id}" + fieldSeparator + "#{window_name}" + fieldSeparator + "#{window_index}" + fieldSeparator + "#{window_active}" + fieldSeparator + "#{window_panes}" + fieldSeparator + "#{pane_id}" + fieldSeparator + "#{pane_title}"
 	paneFormat    = "#{pane_id}" + fieldSeparator + "#{pane_title}" + fieldSeparator + "#{pane_index}" + fieldSeparator + "#{pane_active}" + fieldSeparator + "#{pane_width}" + fieldSeparator + "#{pane_height}" + fieldSeparator + "#{pane_left}" + fieldSeparator + "#{pane_top}"
 
@@ -418,13 +418,18 @@ func parsePanesOutput(output string) ([]Pane, error) {
 }
 
 func parseSessionRow(row string) (Session, error) {
-	if fields, ok := splitFormattedFields(row, 3); ok {
+	if fields, ok := splitFormattedFields(row, 4); ok {
 		attached, err := parseBoolField(fields[2])
 		if err != nil {
 			return Session{}, fmt.Errorf("parse session row %q: %w", row, err)
 		}
 
-		return Session{ID: fields[0], Name: fields[1], Attached: attached}, nil
+		windowCount, err := strconv.Atoi(fields[3])
+		if err != nil {
+			return Session{}, fmt.Errorf("parse session row %q: invalid window count: %w", row, err)
+		}
+
+		return Session{ID: fields[0], Name: fields[1], Attached: attached, WindowCount: windowCount}, nil
 	}
 
 	first, last, ok := splitFirstLast(row)
@@ -438,9 +443,10 @@ func parseSessionRow(row string) (Session, error) {
 	}
 
 	return Session{
-		ID:       row[:first],
-		Name:     row[first+1 : last],
-		Attached: attached,
+		ID:          row[:first],
+		Name:        row[first+1 : last],
+		Attached:    attached,
+		WindowCount: 0,
 	}, nil
 }
 

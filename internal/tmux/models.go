@@ -1,9 +1,10 @@
 package tmux
 
 type Session struct {
-	ID       string
-	Name     string
-	Attached bool
+	ID         string
+	Name       string
+	Attached   bool
+	WindowCount int
 }
 
 type Window struct {

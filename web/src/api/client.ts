@@ -76,6 +76,7 @@ export interface SessionInfoData {
 	id?: string;
 	name?: string;
 	attached?: boolean;
+	windowCount?: number;
 }
 
 export interface SessionsListResponse {
@@ -202,22 +203,23 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 		connectionId: string;
 		mode: string;
 		adapterPath?: string;
-		data: Array<{ ID?: string; Name?: string; Attached?: boolean; id?: string; name?: string; attached?: boolean }>;
+		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number }>;
 	};
 	return {
 		...response,
 		data: (response.data ?? [])
 			.map((s) => {
 				if (typeof s === "string") {
-					return { id: "", name: s, attached: false };
+					return { id: "", name: s, attached: false, windowCount: 0 };
 				}
 				return {
 					id: s.id ?? s.ID ?? "",
 					name: s.name ?? s.Name ?? "",
 					attached: s.attached ?? s.Attached ?? false,
+					windowCount: s.windowCount ?? s.WindowCount ?? 0,
 				};
 			})
-			.filter((s): s is { id: string; name: string; attached: boolean } => s.name.length > 0),
+			.filter((s): s is { id: string; name: string; attached: boolean; windowCount: number } => s.name.length > 0),
 	};
 }
 

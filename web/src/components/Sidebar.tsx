@@ -401,12 +401,22 @@ export function Sidebar() {
                               data-testid={`session-open-${sname}`}
                             >
                               <div className="session-card-top">
-                                <span className="session-card-name">{sname}</span>
+                                <span className="session-card-name" title={sname}>{sname}</span>
+                              </div>
+                              <div className="session-card-meta">
                                 {session.attached && (
-                                  <span className="session-card-badge">active</span>
+                                  <span className="session-card-status-icon" title="active">
+                                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
+                                      <circle cx="4" cy="4" r="4"/>
+                                    </svg>
+                                  </span>
+                                )}
+                                {typeof session.windowCount === "number" && session.windowCount > 0 && (
+                                  <span className="session-card-meta-count">
+                                    {session.windowCount} window{session.windowCount === 1 ? "" : "s"}
+                                  </span>
                                 )}
                               </div>
-                              <span className="session-card-hint">Click to open terminal</span>
                             </button>
                             <div className="session-card-actions">
                               <button
