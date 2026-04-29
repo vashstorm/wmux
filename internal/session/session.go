@@ -57,7 +57,7 @@ func BuildTarget(sessionName, windowName, paneName string) (string, error) {
 	return values.Encode(), nil
 }
 
-func (m *Manager) AttachLocal(connID, tmuxPath, target string, wsConn *websocket.Conn, initialSize WindowSize) error {
+func (m *Manager) AttachLocal(connID, tmuxPath, target string, wsConn *websocket.Conn, initialSize WindowSize, onInput func()) error {
 	parsedTarget, err := parseAttachTarget(target)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (m *Manager) AttachLocal(connID, tmuxPath, target string, wsConn *websocket
 		return err
 	}
 
-	return m.attach(connID, parsedTarget.display(), wsConn, terminal)
+	return m.attach(connID, parsedTarget.display(), wsConn, terminal, onInput)
 }
 
 func (m *Manager) AttachSSH(connID string, sshClient *sshclient.Client, target string, wsConn *websocket.Conn, initialSize WindowSize) error {
@@ -86,7 +86,7 @@ func (m *Manager) AttachSSH(connID string, sshClient *sshclient.Client, target s
 		return err
 	}
 
-	return m.attach(connID, parsedTarget.display(), wsConn, terminal)
+	return m.attach(connID, parsedTarget.display(), wsConn, terminal, nil)
 }
 
 func (m *Manager) ListActive() []ActiveSession {
@@ -117,7 +117,7 @@ func (m *Manager) Detach(connID string) {
 	<-active.Done
 }
 
-func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal terminalIO) error {
+func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal terminalIO, onInput func()) error {
 	if strings.TrimSpace(connID) == "" {
 		_ = terminal.Close()
 		return fmt.Errorf("connection id is required")
@@ -148,7 +148,7 @@ func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal
 		close(done)
 	}()
 
-	return newBridge(wsConn, terminal).Run(ctx)
+	return newBridge(wsConn, terminal, onInput).Run(ctx)
 }
 
 func (m *Manager) register(active ActiveSession) error {

@@ -191,7 +191,7 @@ func TestAttachLocalCloseKeepsTmuxSession(t *testing.T) {
 			errCh <- upgradeErr
 			return
 		}
-		errCh <- manager.AttachLocal("conn-1", "tmux", target, conn, WindowSize{Rows: 24, Cols: 80})
+		errCh <- manager.AttachLocal("conn-1", "tmux", target, conn, WindowSize{Rows: 24, Cols: 80}, nil)
 	}))
 	defer server.Close()
 
@@ -324,7 +324,7 @@ func openTerminalSession(t *testing.T, manager *Manager, target string, terminal
 			errCh <- err
 			return
 		}
-		errCh <- manager.attach("conn-1", target, conn, terminal)
+		errCh <- manager.attach("conn-1", target, conn, terminal, nil)
 	}))
 	t.Cleanup(server.Close)
 
@@ -385,4 +385,59 @@ func websocketURL(rawURL string) string {
 	}
 
 	return parsed.String()
+}
+
+func TestBridgeCallsOnInputCallback(t *testing.T) {
+	manager := NewManager()
+	terminal := newFakeTerminal()
+
+	var (
+		mu     sync.Mutex
+		called int
+	)
+	onInput := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		called++
+	}
+
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	errCh := make(chan error, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- manager.attach("conn-1", "test-target", conn, terminal, onInput)
+	}))
+	t.Cleanup(server.Close)
+
+	conn, _, err := websocket.DefaultDialer.Dial(websocketURL(server.URL), nil)
+	if err != nil {
+		t.Fatalf("failed to dial websocket test server: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+
+	if err := conn.WriteJSON(protocol.ClientMessage{Type: protocol.ClientMessageTypeInput, Data: "y\n"}); err != nil {
+		t.Fatalf("failed to send input message: %v", err)
+	}
+
+	waitForCondition(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return called >= 1
+	}, "onInput callback invocation")
+
+	if err := conn.WriteJSON(protocol.ClientMessage{Type: protocol.ClientMessageTypeClose}); err != nil {
+		t.Fatalf("failed to send close message: %v", err)
+	}
+	assertNoSessionError(t, errCh)
+
+	mu.Lock()
+	gotCalled := called
+	mu.Unlock()
+	if gotCalled < 1 {
+		t.Fatalf("expected onInput to be called at least once, got %d", gotCalled)
+	}
 }

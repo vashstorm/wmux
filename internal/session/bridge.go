@@ -35,10 +35,11 @@ type terminalIO interface {
 type terminalBridge struct {
 	wsConn   *websocket.Conn
 	terminal terminalIO
+	onInput  func()
 }
 
-func newBridge(wsConn *websocket.Conn, terminal terminalIO) terminalBridge {
-	return terminalBridge{wsConn: wsConn, terminal: terminal}
+func newBridge(wsConn *websocket.Conn, terminal terminalIO, onInput func()) terminalBridge {
+	return terminalBridge{wsConn: wsConn, terminal: terminal, onInput: onInput}
 }
 
 func (b terminalBridge) Run(parent context.Context) error {
@@ -127,6 +128,9 @@ func (b terminalBridge) readPump(ctx context.Context, cancel context.CancelFunc,
 				sendTerminalError(ctx, outbound, "terminal_write_failed", "failed to forward terminal input")
 				cancel()
 				return
+			}
+			if b.onInput != nil {
+				b.onInput()
 			}
 		case protocol.ClientMessageTypeResize:
 			size, err := validateWindowSize(WindowSize{Rows: message.Rows, Cols: message.Cols})
