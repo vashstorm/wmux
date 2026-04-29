@@ -3,13 +3,12 @@ import type { APIRequestContext } from "../../web/node_modules/@playwright/test/
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
-async function createLocalConnection(request: APIRequestContext, name: string) {
+async function createLocalConnection(request: APIRequestContext) {
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
 		},
 		data: {
-			name,
 			type: "local",
 		},
 	});
@@ -30,8 +29,7 @@ test.describe("session window pane navigation", () => {
 	}
 
 	test("clicking session loads window tabs in main panel", async ({ page, request }) => {
-		const connectionName = "Session Load Test";
-		await createLocalConnection(request, connectionName);
+		await createLocalConnection(request);
 		await page.goto("/");
 
 		const sessionCard = getSessionCardLocator(page, terminalSessionName);
@@ -43,8 +41,7 @@ test.describe("session window pane navigation", () => {
 	});
 
 	test("active window tab is highlighted by default", async ({ page, request }) => {
-		const connectionName = "Active Tab Test";
-		await createLocalConnection(request, connectionName);
+		await createLocalConnection(request);
 		await page.goto("/");
 
 		const sessionCard = getSessionCardLocator(page, terminalSessionName);
@@ -56,8 +53,7 @@ test.describe("session window pane navigation", () => {
 	});
 
 	test("clicking pane box updates selected pane", async ({ page, request }) => {
-		const connectionName = "Pane Click Test";
-		await createLocalConnection(request, connectionName);
+		await createLocalConnection(request);
 		await page.goto("/");
 
 		const sessionCard = getSessionCardLocator(page, terminalSessionName);
@@ -73,8 +69,7 @@ test.describe("session window pane navigation", () => {
 	});
 
 	test("main title shows human-readable names", async ({ page, request }) => {
-		const connectionName = "Title Names Test";
-		await createLocalConnection(request, connectionName);
+		await createLocalConnection(request);
 		await page.goto("/");
 
 		const sessionCard = getSessionCardLocator(page, terminalSessionName);

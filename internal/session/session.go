@@ -144,7 +144,7 @@ func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal
 
 	defer func() {
 		cancel()
-		m.unregister(connID)
+		m.unregister(connID, done)
 		close(done)
 	}()
 
@@ -158,19 +158,21 @@ func (m *Manager) register(active ActiveSession) error {
 	if m.sessions == nil {
 		m.sessions = make(map[string]ActiveSession)
 	}
-	if _, exists := m.sessions[active.ConnectionID]; exists {
-		return fmt.Errorf("connection %q already has an active terminal session", active.ConnectionID)
+	if existing, exists := m.sessions[active.ConnectionID]; exists {
+		existing.cancel()
 	}
 
 	m.sessions[active.ConnectionID] = active
 	return nil
 }
 
-func (m *Manager) unregister(connID string) {
+func (m *Manager) unregister(connID string, done chan struct{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	delete(m.sessions, connID)
+	if existing, ok := m.sessions[connID]; ok && existing.Done == done {
+		delete(m.sessions, connID)
+	}
 }
 
 func (s WindowSize) normalize() WindowSize {

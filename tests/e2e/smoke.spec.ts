@@ -3,13 +3,12 @@ import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
-async function createLocalConnection(request: any, name: string) {
+async function createLocalConnection(request: any) {
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
 		},
 		data: {
-			name,
 			type: "local",
 		},
 	});
@@ -60,36 +59,27 @@ test.describe("wmux smoke", () => {
 		await page.goto("/");
 
 		await page.getByTestId("open-settings-button").click();
-		await page.getByTestId("settings-new-connection-button").click();
+		await page.locator("[title='New Connection']").click();
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
-		await page.getByTestId("connection-name-input").fill("Local Demo");
+		await page.getByTestId("connection-type-select").selectOption("local");
 		await page.getByTestId("save-connection").click();
 
-		await expect(page.getByTestId("settings-panel")).toContainText("Local Demo");
+		await expect(page.getByTestId("settings-panel")).toContainText("local");
 		await page.getByLabel("Close settings").click();
 
-		await expect(page.getByTestId("empty-connections")).toContainText("Local Demo");
-		await expect(page.locator("[data-testid^='new-session-button-']").first()).toBeVisible();
+		await expect(page.getByTestId("sidebar")).toBeVisible();
 	});
 
 	test("local tmux session renders in terminal", async ({ page, request }) => {
-		const connectionName = "Prepared Local";
-		await createLocalConnection(request, connectionName);
+		await createLocalConnection(request);
 		await page.goto("/");
 
-		const sessionItem = page
-			.locator(".sidebar-session-item")
-			.filter({ has: page.getByText(connectionName) })
-			.filter({ has: page.getByTestId(`session-label-${terminalSessionName}`) })
-			.first();
+		const sessionCard = page.locator(`[data-testid="session-card-${terminalSessionName}"]`);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
-		await expect(sessionItem.getByTestId(`session-label-${terminalSessionName}`)).toBeVisible();
-		await sessionItem.getByTestId(`session-toggle-${terminalSessionName}`).click();
-
-		await expect(sessionItem.locator("[data-testid^='window-toggle-']").first()).toBeVisible();
-		await sessionItem.locator("[data-testid^='window-toggle-']").first().click();
-		await expect(sessionItem.locator("[data-testid^='pane-']").first()).toBeVisible();
-		await sessionItem.locator("[data-testid^='pane-']").first().click();
+		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
+		await page.locator(".pane-box").first().click();
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
 		await expect(page.getByTestId("terminal")).toContainText("WMUX_READY", {

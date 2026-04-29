@@ -24,13 +24,13 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await page.getByTestId("settings-new-connection-button").click();
+		await page.locator("[title='New Connection']").click();
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
 
-		await page.getByTestId("connection-name-input").fill("Test Local Connection");
+		await page.getByTestId("connection-type-select").selectOption("local");
 		await page.getByTestId("save-connection").click();
 
-		await expect(page.getByTestId("settings-panel")).toContainText("Test Local Connection");
+		await expect(page.getByTestId("settings-panel")).toContainText("local");
 	});
 
 	test("edits existing connection", async ({ page, request }) => {
@@ -39,7 +39,6 @@ test.describe("settings panel", () => {
 				Authorization: "Bearer playwright-token",
 			},
 			data: {
-				name: "Connection To Edit",
 				type: "local",
 			},
 		});
@@ -51,17 +50,19 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await expect(page.getByTestId("settings-panel")).toContainText("Connection To Edit");
+		await expect(page.getByTestId("settings-panel")).toContainText("local");
 
 		await page.getByTestId(`settings-edit-connection-${connection.id}`).click();
 
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
-		await expect(page.getByTestId("connection-name-input")).toHaveValue("Connection To Edit");
+		await expect(page.getByTestId("computed-connection-name")).toContainText("local");
 
-		await page.getByTestId("connection-name-input").fill("Edited Connection Name");
+		await page.getByTestId("connection-type-select").selectOption("ssh");
+		await page.getByTestId("connection-host-input").fill("example.com");
+		await page.getByTestId("connection-user-input").fill("root");
 		await page.getByTestId("save-connection").click();
 
-		await expect(page.getByTestId("settings-panel")).toContainText("Edited Connection Name");
+		await expect(page.getByTestId("settings-panel")).toContainText("example.com");
 	});
 
 	test("deletes connection with confirm", async ({ page, request }) => {
@@ -70,7 +71,6 @@ test.describe("settings panel", () => {
 				Authorization: "Bearer playwright-token",
 			},
 			data: {
-				name: "Connection To Delete",
 				type: "local",
 			},
 		});
@@ -82,7 +82,7 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await expect(page.getByTestId("settings-panel")).toContainText("Connection To Delete");
+		await expect(page.getByTestId("settings-panel")).toContainText("local");
 
 		await page.getByTestId(`settings-delete-connection-${connection.id}`).press("Enter");
 
@@ -91,7 +91,7 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("confirm-dialog-confirm").press("Enter");
 
-		await expect(page.getByTestId("settings-panel")).not.toContainText("Connection To Delete", {
+		await expect(page.getByTestId(`settings-delete-connection-${connection.id}`)).toHaveCount(0, {
 			timeout: 5000,
 		});
 	});

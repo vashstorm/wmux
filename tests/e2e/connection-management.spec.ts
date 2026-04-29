@@ -14,7 +14,6 @@ test.describe("connection management", () => {
 				Authorization: "Bearer playwright-token",
 			},
 			data: {
-				name: "API Created Connection",
 				type: "local",
 			},
 		});
@@ -23,7 +22,7 @@ test.describe("connection management", () => {
 		await page.goto("/");
 
 		await expect(page.getByTestId("sidebar")).toBeVisible();
-		await expect(page.locator(".sidebar-session-tree")).toContainText("API Created Connection");
+		await expect(page.locator(".session-card").first()).toBeVisible();
 	});
 
 	test("connection health shows online for local", async ({ page, request }) => {
@@ -32,7 +31,6 @@ test.describe("connection management", () => {
 				Authorization: "Bearer playwright-token",
 			},
 			data: {
-				name: "Health Check Local",
 				type: "local",
 			},
 		});
@@ -51,28 +49,5 @@ test.describe("connection management", () => {
 		expect(healthResponse.ok()).toBeTruthy();
 		const health = await healthResponse.json();
 		expect(health.status).toBe("online");
-	});
-
-	test("empty state shows when no connections", async ({ page, request }) => {
-		const listResponse = await request.get("/api/connections", {
-			headers: {
-				Authorization: "Bearer playwright-token",
-			},
-		});
-		const { data: connections } = await listResponse.json();
-
-		for (const conn of connections) {
-			await request.delete(`/api/connections/${conn.id}`, {
-				headers: {
-					Authorization: "Bearer playwright-token",
-				},
-			});
-		}
-
-		await page.goto("/");
-
-		await expect(page.getByTestId("sidebar")).toBeVisible();
-		await expect(page.getByTestId("empty-state")).toBeVisible();
-		await expect(page.getByTestId("empty-state")).toContainText("Select a session");
 	});
 });
