@@ -50,37 +50,39 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 
 	return (
 		<div className="pane-canvas" data-testid="pane-canvas">
-			{panes.map((pane) => {
-				const isActive = pane.id === selectedPaneId;
-				const left = scaleToPercent(pane.left - bounds.minLeft, bounds.width);
-				const top = scaleToPercent(pane.top - bounds.minTop, bounds.height);
-				const width = scaleToPercent(pane.width, bounds.width);
-				const height = scaleToPercent(pane.height, bounds.height);
+			<div className="pane-canvas-stage">
+				{panes.map((pane) => {
+					const isActive = pane.id === selectedPaneId;
+					const left = scaleToPercent(pane.left - bounds.minLeft, bounds.width);
+					const top = scaleToPercent(pane.top - bounds.minTop, bounds.height);
+					const width = scaleToPercent(pane.width, bounds.width);
+					const height = scaleToPercent(pane.height, bounds.height);
 
-				return (
-					<div
-						key={pane.id}
-						className={`pane-box${isActive ? " is-active" : ""}`}
-						data-testid={isActive ? "pane-box-active" : "pane-box"}
-						style={{
-							position: "absolute",
-							left,
-							top,
-							width,
-							height,
-						}}
-						onClick={() => onSelectPane(pane.id)}
-						title={pane.title}
-					>
-						<div className="pane-box-label">{pane.title}</div>
-						{isActive && selectedPane && (
-							<div className="pane-box-terminal">
-								<Terminal selectedPane={selectedPane} />
-							</div>
-						)}
-					</div>
-				);
-			})}
+					return (
+						<div
+							key={pane.id}
+							className={`pane-box${isActive ? " is-active" : ""}`}
+							data-testid={isActive ? "pane-box-active" : "pane-box"}
+							style={{
+								position: "absolute",
+								left,
+								top,
+								width,
+								height,
+							}}
+							onClick={() => onSelectPane(pane.id)}
+							title={pane.title}
+						>
+							<div className="pane-box-label">{pane.title}</div>
+							{isActive && selectedPane && (
+								<div className="pane-box-terminal">
+									<Terminal selectedPane={selectedPane} />
+								</div>
+							)}
+						</div>
+					);
+				})}
+			</div>
 		</div>
 	);
 }

@@ -1,8 +1,15 @@
+import { useCallback, useEffect } from "react";
 import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
-import { listPanes } from "../api/client.js";
+import { listPanes, listWindows } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
+
+const ACTIVE_WINDOW_SYNC_INTERVAL_MS = 1000;
+
+interface SelectWindowOptions {
+	forcePanes?: boolean;
+}
 
 export function MainPanel() {
 	const {
@@ -10,6 +17,7 @@ export function MainPanel() {
 		windows,
 		setSelectedPane,
 		setPanes,
+		setWindows,
 		setError,
 	} = useAppState();
 
@@ -26,12 +34,16 @@ export function MainPanel() {
 		? (sessionWindowState?.loadedPanes[currentWindowId] ?? [])
 		: [];
 
-	const handleSelectWindow = async (windowId: string, activePaneId: string) => {
+	const handleSelectWindow = useCallback(async (
+		windowId: string,
+		activePaneId: string,
+		options: SelectWindowOptions = {},
+	) => {
 		if (!selectedPane) return;
 
 		const loadedPanesForWindow = sessionWindowState?.loadedPanes[windowId];
 
-		if (!loadedPanesForWindow || loadedPanesForWindow.length === 0) {
+		if (options.forcePanes || !loadedPanesForWindow || loadedPanesForWindow.length === 0) {
 			try {
 				const panesResponse = await listPanes(
 					selectedPane.connectionId,
@@ -55,7 +67,7 @@ export function MainPanel() {
 				} else {
 					setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to load panes" });
 				}
-				// Still update the window selection with the provided pane ID as fallback
+				// 加载失败时仍使用传入的 pane ID 更新窗口选择。
 				setSelectedPane({
 					connectionId: selectedPane.connectionId,
 					session: selectedPane.session,
@@ -71,7 +83,49 @@ export function MainPanel() {
 				pane: activePaneId,
 			});
 		}
-	};
+	}, [selectedPane, sessionWindowState, setError, setPanes, setSelectedPane]);
+
+	useEffect(() => {
+		if (!selectedPane) return;
+
+		let cancelled = false;
+		let inFlight = false;
+
+		const syncActiveWindow = async () => {
+			if (cancelled || inFlight) return;
+
+			inFlight = true;
+			try {
+				const windowsResponse = await listWindows(
+					selectedPane.connectionId,
+					selectedPane.session,
+				);
+				if (cancelled) return;
+
+				const nextWindows = windowsResponse.data ?? [];
+				const activeWindow = nextWindows.find((window) => window.Active);
+				if (!activeWindow || activeWindow.ID === selectedPane.window) return;
+
+				setWindows(selectedPane.connectionId, selectedPane.session, nextWindows);
+				await handleSelectWindow(activeWindow.ID, activeWindow.ActivePaneID, {
+					forcePanes: true,
+				});
+			} catch {
+				// 保持终端输入顺滑；显式 API 操作仍会显示错误。
+			} finally {
+				inFlight = false;
+			}
+		};
+
+		const intervalId = window.setInterval(() => {
+			void syncActiveWindow();
+		}, ACTIVE_WINDOW_SYNC_INTERVAL_MS);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(intervalId);
+		};
+	}, [handleSelectWindow, selectedPane, setWindows]);
 
 	const handleSelectPane = (paneId: string) => {
 		if (!selectedPane) return;

@@ -203,7 +203,7 @@
 
 /* Session form in sidebar */
 .sidebar-session-form {
-	padding: var(--spacing-sm);
+	padding: 1px;
 	background-color: var(--color-surface);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-sm);
@@ -462,7 +462,7 @@
 	display: flex;
 	align-items: flex-start;
 	gap: var(--spacing-sm);
-	padding: var(--spacing-md);
+	padding: var(--spacing-sm);
 	margin-bottom: var(--spacing-lg);
 	background-color: var(--color-banner-warning-bg);
 	border: 1px solid var(--color-banner-warning-border);
@@ -1500,6 +1500,15 @@
 	min-height: 0;
 	background-color: var(--color-background);
 	overflow: hidden;
+	padding: 1px;
+}
+
+.pane-canvas-stage {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	min-width: 0;
+	min-height: 0;
 }
 
 .pane-box {
