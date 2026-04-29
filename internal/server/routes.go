@@ -6,8 +6,10 @@ func (s *Server) registerRoutes() {
 	s.handleAPI("GET /api/health", s.handleHealth)
 
 	s.handleAPI("GET /api/connections", s.handleListConnections)
+	s.handleAPI("GET /api/connections/health", s.handleListConnectionHealth)
 	s.handleAPI("POST /api/connections", s.handleCreateConnection)
 	s.handleAPI("GET /api/connections/{id}", s.handleGetConnection)
+	s.handleAPI("GET /api/connections/{id}/health", s.handleGetConnectionHealth)
 	s.handleAPI("PUT /api/connections/{id}", s.handleUpdateConnection)
 	s.handleAPI("DELETE /api/connections/{id}", s.handleDeleteConnection)
 

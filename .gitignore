@@ -19,6 +19,7 @@ config.jsonc
 # IDE
 .idea/
 .vscode/
+.sisyphus/
 *.swp
 *.swo
 

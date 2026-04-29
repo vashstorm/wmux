@@ -1,0 +1,34 @@
+import "@testing-library/jest-dom/vitest";
+
+const AUTH_TOKEN_KEY = "wmux-auth-token";
+const TEST_AUTH_TOKEN = "test-auth-token";
+
+sessionStorage.setItem(AUTH_TOKEN_KEY, TEST_AUTH_TOKEN);
+
+if (!window.matchMedia) {
+	Object.defineProperty(window, "matchMedia", {
+		writable: true,
+		value: (query: string): MediaQueryList => ({
+			matches: false,
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		}),
+	});
+}
+
+if (!window.ResizeObserver) {
+	class ResizeObserverMock implements ResizeObserver {
+		observe(): void {}
+
+		unobserve(): void {}
+
+		disconnect(): void {}
+	}
+
+	window.ResizeObserver = ResizeObserverMock;
+}

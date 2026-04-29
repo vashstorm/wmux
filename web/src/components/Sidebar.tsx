@@ -117,6 +117,14 @@ export function Sidebar() {
     return flatSessions.filter((s) => s.sessionName.toLowerCase().includes(query));
   }, [flatSessions, searchQuery]);
 
+  const connectionsWithoutSessions = useMemo(() => {
+    if (searchQuery.trim()) {
+      return [];
+    }
+
+    return connections.filter((connection) => (sessions[connection.id] ?? []).length === 0);
+  }, [connections, sessions, searchQuery]);
+
   const toggleSession = useCallback(async (connectionId: string, sessionName: string) => {
     setSessionExpand((prev) => {
       const key = `${connectionId}:${sessionName}`;
@@ -344,163 +352,243 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar-content">
-        {filteredSessions.length === 0 ? (
+        {filteredSessions.length === 0 && connectionsWithoutSessions.length === 0 ? (
           <div className="sidebar-empty">
             {searchQuery ? "No sessions match your search" : "No sessions yet"}
           </div>
         ) : (
-          <ul className="sidebar-session-tree">
-            {filteredSessions.map((flatSession) => {
-              const { connectionId, connectionName, sessionName } = flatSession;
-              const sessionKey = `${connectionId}:${sessionName}`;
-              const sessState = sessionExpand[sessionKey];
-              const sessExpanded = sessState?.expanded ?? false;
-              const sessionWindows = windows[sessionKey] ?? [];
-              const connHealth = connectionHealth[connectionId];
-              const isOnline = connHealth?.status === "online";
-              const isRenaming = renamingSession === sessionKey;
+          <>
+            {filteredSessions.length > 0 ? (
+              <ul className="sidebar-session-tree">
+                {filteredSessions.map((flatSession) => {
+                  const { connectionId, connectionName, sessionName } = flatSession;
+                  const sessionKey = `${connectionId}:${sessionName}`;
+                  const sessState = sessionExpand[sessionKey];
+                  const sessExpanded = sessState?.expanded ?? false;
+                  const sessionWindows = windows[sessionKey] ?? [];
+                  const connHealth = connectionHealth[connectionId];
+                  const isOnline = connHealth?.status === "online";
+                  const isRenaming = renamingSession === sessionKey;
 
-              return (
-                <li key={sessionKey} className="sidebar-session-item">
-                  <div className="sidebar-session-row">
-                    <button
-                      type="button"
-                      className="connection-tree-toggle"
-                      onClick={() => toggleSession(connectionId, sessionName)}
-                      aria-expanded={sessExpanded}
-                      data-testid={`session-toggle-${sessionName}`}
-                    >
-                      {sessExpanded ? "▼" : "▶"}
-                    </button>
+                  return (
+                    <li key={sessionKey} className="sidebar-session-item">
+                      <div className="sidebar-session-row">
+                        <button
+                          type="button"
+                          className="connection-tree-toggle"
+                          onClick={() => toggleSession(connectionId, sessionName)}
+                          aria-expanded={sessExpanded}
+                          data-testid={`session-toggle-${sessionName}`}
+                        >
+                          {sessExpanded ? "▼" : "▶"}
+                        </button>
 
-                    <span
-                      className="connection-badge"
-                      style={{
-                        color: getConnectionColor(connectionId),
-                        borderColor: `${getConnectionColor(connectionId)}40`,
-                      }}
-                      title={connectionName}
-                    >
-                      <span
-                        className="connection-badge-dot"
-                        style={{
-                          backgroundColor: isOnline ? "var(--color-success)" : connHealth?.status === "offline" ? "var(--color-error)" : "var(--color-text-disabled)",
-                        }}
-                      />
-                      {connectionName}
-                    </span>
+                        <span
+                          className="connection-badge"
+                          style={{
+                            color: getConnectionColor(connectionId),
+                            borderColor: `${getConnectionColor(connectionId)}40`,
+                          }}
+                          title={connectionName}
+                        >
+                          <span
+                            className="connection-badge-dot"
+                            style={{
+                              backgroundColor: isOnline ? "var(--color-success)" : connHealth?.status === "offline" ? "var(--color-error)" : "var(--color-text-disabled)",
+                            }}
+                          />
+                          {connectionName}
+                        </span>
 
-                    {isRenaming ? (
-                      <input
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={() => submitRename(connectionId, sessionName)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") submitRename(connectionId, sessionName);
-                          if (e.key === "Escape") { setRenamingSession(null); setRenameValue(""); }
-                        }}
-                        autoFocus
-                        className="session-rename-input"
-                        data-testid={`rename-session-input-${sessionName}`}
-                      />
-                    ) : (
-                      <span className="sidebar-session-label" data-testid={`session-label-${sessionName}`}>
-                        {sessionName}
-                      </span>
-                    )}
+                        {isRenaming ? (
+                          <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onBlur={() => submitRename(connectionId, sessionName)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") submitRename(connectionId, sessionName);
+                              if (e.key === "Escape") { setRenamingSession(null); setRenameValue(""); }
+                            }}
+                            autoFocus
+                            className="session-rename-input"
+                            data-testid={`rename-session-input-${sessionName}`}
+                          />
+                        ) : (
+                          <span className="sidebar-session-label" data-testid={`session-label-${sessionName}`}>
+                            {sessionName}
+                          </span>
+                        )}
 
-                    <div className="sidebar-session-actions">
-                      <button
-                        type="button"
-                        className="session-action-btn"
-                        onClick={() => handleRenameSession(connectionId, sessionName)}
-                        title="Rename"
-                        data-testid={`rename-session-${sessionName}`}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        className="session-action-btn session-action-danger"
-                        onClick={() => handleKillSession(connectionId, sessionName)}
-                        title="Kill session"
-                        data-testid={`kill-session-${sessionName}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
+                        <div className="sidebar-session-actions">
+                          <button
+                            type="button"
+                            className="session-action-btn"
+                            onClick={() => handleRenameSession(connectionId, sessionName)}
+                            title="Rename"
+                            data-testid={`rename-session-${sessionName}`}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            className="session-action-btn session-action-danger"
+                            onClick={() => handleKillSession(connectionId, sessionName)}
+                            title="Kill session"
+                            data-testid={`kill-session-${sessionName}`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
 
-                  {sessExpanded && (
-                    <ul className="sidebar-window-tree">
-                      {sessionWindows.map((win) => {
-                        const winKey = `${sessionKey}:${win.id}`;
-                        const winExpanded = windowExpand[winKey] ?? false;
+                      {sessExpanded && (
+                        <ul className="sidebar-window-tree">
+                          {sessionWindows.map((win) => {
+                            const winKey = `${sessionKey}:${win.id}`;
+                            const winExpanded = windowExpand[winKey] ?? false;
 
-                        return (
-                          <li key={win.id} className="sidebar-window-item">
-                            <div className="sidebar-window-row">
+                            return (
+                              <li key={win.id} className="sidebar-window-item">
+                                <div className="sidebar-window-row">
+                                  <button
+                                    type="button"
+                                    className="window-toggle"
+                                    onClick={() => toggleWindow(connectionId, sessionName, win.id)}
+                                    aria-expanded={winExpanded}
+                                    data-testid={`window-toggle-${win.id}`}
+                                  >
+                                    {winExpanded ? "▼" : "▶"}
+                                  </button>
+                                  <span className="sidebar-window-label" data-testid={`window-label-${win.id}`}>{win.name}</span>
+                                  <button
+                                    type="button"
+                                    className="session-action-btn session-action-danger"
+                                    onClick={() => handleKillWindow(connectionId, sessionName, win.id)}
+                                    title="Kill window"
+                                    data-testid={`kill-window-${win.id}`}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+
+                                {winExpanded && (
+                                  <ul className="sidebar-pane-tree">
+                                    {win.panes.map((pane) => {
+                                      const isSelected =
+                                        selectedPane?.connectionId === connectionId &&
+                                        selectedPane?.session === sessionName &&
+                                        selectedPane?.window === win.id &&
+                                        selectedPane?.pane === pane.id;
+                                      return (
+                                        <li key={pane.id} className="sidebar-pane-item">
+                                          <button
+                                            type="button"
+                                            className={`sidebar-pane-row${isSelected ? " is-selected" : ""}`}
+                                            onClick={() => handlePaneSelect(connectionId, sessionName, win.id, pane.id)}
+                                            data-testid={`pane-${pane.id}`}
+                                          >
+                                            <span className="sidebar-pane-label">Pane {pane.index}</span>
+                                            <button
+                                              type="button"
+                                              className="session-action-btn session-action-danger"
+                                              onClick={(e) => { e.stopPropagation(); handleKillPane(connectionId, sessionName, win.id, pane.id); }}
+                                              title="Kill pane"
+                                              data-testid={`kill-pane-${pane.id}`}
+                                            >
+                                              ×
+                                            </button>
+                                          </button>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </li>
+                            );
+                          })}
+
+                          {showNewSessionForConnection === connectionId ? (
+                            <li className="sidebar-add-item">
+                              <form className="sidebar-session-form" onSubmit={(e) => handleCreateSession(e, connectionId)}>
+                                <input
+                                  type="text"
+                                  value={newSessionName}
+                                  onChange={(e) => setNewSessionName(e.target.value)}
+                                  placeholder="Session name"
+                                  autoFocus
+                                  data-testid="new-session-name-input"
+                                />
+                                <div className="sidebar-session-form-actions">
+                                  <button
+                                    type="button"
+                                    className="form-button form-button-secondary"
+                                    onClick={() => {
+                                      setShowNewSessionForConnection(null);
+                                      setNewSessionName("");
+                                    }}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button type="submit" className="form-button form-button-primary">Create</button>
+                                </div>
+                              </form>
+                            </li>
+                          ) : (
+                            <li className="sidebar-add-item">
                               <button
                                 type="button"
-                                className="window-toggle"
-                                onClick={() => toggleWindow(connectionId, sessionName, win.id)}
-                                aria-expanded={winExpanded}
-                                data-testid={`window-toggle-${win.id}`}
+                                className="sidebar-add-btn"
+                                onClick={() => setShowNewSessionForConnection(connectionId)}
+                                data-testid={`new-session-button-${connectionId}`}
                               >
-                                {winExpanded ? "▼" : "▶"}
+                                + New Session
                               </button>
-                              <span className="sidebar-window-label" data-testid={`window-label-${win.id}`}>{win.name}</span>
-                              <button
-                                type="button"
-                                className="session-action-btn session-action-danger"
-                                onClick={() => handleKillWindow(connectionId, sessionName, win.id)}
-                                title="Kill window"
-                                data-testid={`kill-window-${win.id}`}
-                              >
-                                ×
-                              </button>
-                            </div>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
 
-                            {winExpanded && (
-                              <ul className="sidebar-pane-tree">
-                                {win.panes.map((pane) => {
-                                  const isSelected =
-                                    selectedPane?.connectionId === connectionId &&
-                                    selectedPane?.session === sessionName &&
-                                    selectedPane?.window === win.id &&
-                                    selectedPane?.pane === pane.id;
-                                  return (
-                                    <li key={pane.id} className="sidebar-pane-item">
-                                      <button
-                                        type="button"
-                                        className={`sidebar-pane-row${isSelected ? " is-selected" : ""}`}
-                                        onClick={() => handlePaneSelect(connectionId, sessionName, win.id, pane.id)}
-                                        data-testid={`pane-${pane.id}`}
-                                      >
-                                        <span className="sidebar-pane-label">Pane {pane.index}</span>
-                                        <button
-                                          type="button"
-                                          className="session-action-btn session-action-danger"
-                                          onClick={(e) => { e.stopPropagation(); handleKillPane(connectionId, sessionName, win.id, pane.id); }}
-                                          title="Kill pane"
-                                          data-testid={`kill-pane-${pane.id}`}
-                                        >
-                                          ×
-                                        </button>
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            )}
-                          </li>
-                        );
-                      })}
+            {connectionsWithoutSessions.length > 0 ? (
+              <div className="sidebar-empty-connections" data-testid="empty-connections">
+                {connectionsWithoutSessions.map((connection) => {
+                  const connHealth = connectionHealth[connection.id];
+                  const isOnline = connHealth?.status === "online";
 
-                      {showNewSessionForConnection === connectionId ? (
-                        <li className="sidebar-add-item">
-                          <form className="sidebar-session-form" onSubmit={(e) => handleCreateSession(e, connectionId)}>
+                  return (
+                    <div
+                      key={connection.id}
+                      className="sidebar-session-item"
+                      data-testid={`empty-connection-${connection.id}`}
+                    >
+                      <div className="sidebar-session-row">
+                        <span
+                          className="connection-badge"
+                          style={{
+                            color: getConnectionColor(connection.id),
+                            borderColor: `${getConnectionColor(connection.id)}40`,
+                          }}
+                          title={connection.name}
+                        >
+                          <span
+                            className="connection-badge-dot"
+                            style={{
+                              backgroundColor: isOnline ? "var(--color-success)" : connHealth?.status === "offline" ? "var(--color-error)" : "var(--color-text-disabled)",
+                            }}
+                          />
+                          {connection.name}
+                        </span>
+                        <span className="sidebar-session-label">No sessions yet</span>
+                      </div>
+
+                      {showNewSessionForConnection === connection.id ? (
+                        <div className="sidebar-add-item">
+                          <form className="sidebar-session-form" onSubmit={(e) => handleCreateSession(e, connection.id)}>
                             <input
                               type="text"
                               value={newSessionName}
@@ -523,25 +611,25 @@ export function Sidebar() {
                               <button type="submit" className="form-button form-button-primary">Create</button>
                             </div>
                           </form>
-                        </li>
+                        </div>
                       ) : (
-                        <li className="sidebar-add-item">
+                        <div className="sidebar-add-item">
                           <button
                             type="button"
                             className="sidebar-add-btn"
-                            onClick={() => setShowNewSessionForConnection(connectionId)}
-                            data-testid={`new-session-button-${connectionId}`}
+                            onClick={() => setShowNewSessionForConnection(connection.id)}
+                            data-testid={`new-session-button-${connection.id}`}
                           >
                             + New Session
                           </button>
-                        </li>
+                        </div>
                       )}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </aside>

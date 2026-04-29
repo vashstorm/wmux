@@ -57,11 +57,27 @@ export interface ConnectionsListResponse {
 	data: ConnectionConfig[];
 }
 
+export interface SessionInfo {
+	ID?: string;
+	Name?: string;
+	Attached?: boolean;
+	id?: string;
+	name?: string;
+	attached?: boolean;
+}
+
 export interface SessionsListResponse {
 	connectionId: string;
 	mode: string;
 	adapterPath?: string;
 	data: string[];
+}
+
+interface RawSessionsListResponse {
+	connectionId: string;
+	mode: string;
+	adapterPath?: string;
+	data: SessionInfo[];
 }
 
 export interface OperationResponse {
@@ -172,10 +188,12 @@ export async function listPanes(connectionId: string, sessionName: string, windo
 }
 
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
-	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as SessionsListResponse;
+	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as RawSessionsListResponse;
 	return {
 		...response,
-		data: response.data ?? [],
+		data: (response.data ?? [])
+			.map((session) => (typeof session === "string" ? session : (session.name ?? session.Name ?? "")))
+			.filter((sessionName): sessionName is string => sessionName.length > 0),
 	};
 }
 

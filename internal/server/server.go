@@ -26,6 +26,7 @@ type Server struct {
 	mux               *http.ServeMux
 	sessionManager    session.Manager
 	websocketUpgrader websocket.Upgrader
+	checkConnectionHealth func(config.ConnectionConfig, string) connectionHealthResponse
 }
 
 type healthResponse struct {
@@ -43,6 +44,7 @@ func New(options Options) *Server {
 		assets:         options.Assets,
 		mux:            mux,
 		sessionManager: session.NewManager(),
+		checkConnectionHealth: checkConnectionHealth,
 		websocketUpgrader: websocket.Upgrader{
 			CheckOrigin: func(*http.Request) bool {
 				return true

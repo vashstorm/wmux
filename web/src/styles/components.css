@@ -583,7 +583,7 @@
 .new-connection-form-overlay {
 	position: fixed;
 	inset: 0;
-	z-index: var(--z-modal);
+	z-index: var(--z-toast);
 	display: flex;
 	align-items: center;
 	justify-content: center;

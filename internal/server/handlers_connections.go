@@ -5,17 +5,44 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/panh/wmux/internal/config"
+	"github.com/panh/wmux/internal/sshclient"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 type connectionsListResponse struct {
 	Data []config.ConnectionConfig `json:"data"`
 }
 
+type connectionHealthResponse struct {
+	ConnectionID string `json:"connectionId"`
+	Status       string `json:"status"`
+	CheckedAt    string `json:"checkedAt"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	Message      string `json:"message,omitempty"`
+}
+
+type connectionHealthListResponse struct {
+	Data []connectionHealthResponse `json:"data"`
+}
+
 func (s *Server) handleListConnections(w http.ResponseWriter, _ *http.Request) {
 	cfg := s.currentConfig()
 	s.writeJSON(w, http.StatusOK, connectionsListResponse{Data: cfg.Connections})
+}
+
+func (s *Server) handleListConnectionHealth(w http.ResponseWriter, _ *http.Request) {
+	cfg := s.currentConfig()
+	checker := s.connectionHealthChecker()
+	data := make([]connectionHealthResponse, 0, len(cfg.Connections))
+
+	for _, connection := range cfg.Connections {
+		data = append(data, checker(connection, cfg.Tmux.Path))
+	}
+
+	s.writeJSON(w, http.StatusOK, connectionHealthListResponse{Data: data})
 }
 
 func (s *Server) handleCreateConnection(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +90,17 @@ func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, http.StatusOK, connection)
+}
+
+func (s *Server) handleGetConnectionHealth(w http.ResponseWriter, r *http.Request) {
+	connectionID := r.PathValue("id")
+	connection, ok := s.findConnectionByID(connectionID)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", "connection not found")
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, s.connectionHealthChecker()(connection, s.currentConfig().Tmux.Path))
 }
 
 func (s *Server) handleUpdateConnection(w http.ResponseWriter, r *http.Request) {
@@ -164,4 +202,79 @@ func (s *Server) findConnectionByID(connectionID string) (config.ConnectionConfi
 	}
 
 	return config.ConnectionConfig{}, false
+}
+
+func (s *Server) connectionHealthChecker() func(config.ConnectionConfig, string) connectionHealthResponse {
+	if s.checkConnectionHealth != nil {
+		return s.checkConnectionHealth
+	}
+
+	return checkConnectionHealth
+}
+
+func checkConnectionHealth(conn config.ConnectionConfig, tmuxPath string) connectionHealthResponse {
+	checkedAt := time.Now().UTC().Format(time.RFC3339)
+	response := connectionHealthResponse{
+		ConnectionID: conn.ID,
+		CheckedAt:    checkedAt,
+	}
+
+	switch strings.ToLower(strings.TrimSpace(conn.Type)) {
+	case "local":
+		if err := tmux.DetectBinary(tmuxPath); err != nil {
+			return connectionHealthOfflineResponse(response, err)
+		}
+
+		if _, err := tmux.NewAdapter(tmuxPath).ListSessions(); err != nil {
+			if code := errorCode(err); code == tmux.ErrorCodeNoSessions {
+				response.Status = "online"
+				return response
+			}
+			return connectionHealthOfflineResponse(response, err)
+		}
+
+		response.Status = "online"
+		return response
+	case "ssh":
+		client := sshclient.New(sshclient.Config{
+			Host:           conn.Host,
+			Port:           conn.Port,
+			User:           conn.User,
+			PrivateKeyPath: conn.PrivateKeyPath,
+			KnownHostsPath: conn.KnownHostsPath,
+		})
+		if err := client.Connect(); err != nil {
+			return connectionHealthOfflineResponse(response, err)
+		}
+		defer func() { _ = client.Close() }()
+
+		response.Status = "online"
+		return response
+	default:
+		response.Status = "offline"
+		response.ErrorCode = "unsupported_connection_type"
+		response.Message = fmt.Sprintf("unsupported connection type %q", conn.Type)
+		return response
+	}
+}
+
+func connectionHealthOfflineResponse(response connectionHealthResponse, err error) connectionHealthResponse {
+	response.Status = "offline"
+	response.ErrorCode = errorCode(err)
+	response.Message = err.Error()
+	return response
+}
+
+func errorCode(err error) string {
+	var tmuxErr *tmux.Error
+	if errors.As(err, &tmuxErr) && tmuxErr != nil {
+		return tmuxErr.Code
+	}
+
+	var sshErr *sshclient.Error
+	if errors.As(err, &sshErr) && sshErr != nil {
+		return sshErr.Code
+	}
+
+	return "unknown_error"
 }

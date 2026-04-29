@@ -8,4 +8,11 @@ export default defineConfig({
 		outDir: "dist",
 		emptyOutDir: true,
 	},
+	test: {
+		globals: true,
+		environment: "jsdom",
+		include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+		passWithNoTests: true,
+		setupFiles: ["./src/test/setup.ts"],
+	},
 });
