@@ -118,6 +118,8 @@ export interface AppConfig {
 	connections: ConnectionConfig[];
 	ui: {
 		theme: string;
+		fontSize: number;
+		terminalFontSize: number;
 	};
 }
 

@@ -33,6 +33,8 @@
   ],
 
   "ui": {
-    "theme": "dark"
+    "theme": "dark",
+    "fontSize": 16,
+    "terminalFontSize": 14
   }
 }

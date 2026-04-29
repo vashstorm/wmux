@@ -59,7 +59,9 @@ type ConnectionConfig struct {
 }
 
 type UIConfig struct {
-	Theme string `json:"theme"`
+	Theme            string `json:"theme"`
+	FontSize         int    `json:"fontSize"`
+	TerminalFontSize int    `json:"terminalFontSize"`
 }
 
 type Store struct {
@@ -109,7 +111,9 @@ func DefaultConfig() Config {
 		},
 		Connections: []ConnectionConfig{},
 		UI: UIConfig{
-			Theme: "dark",
+			Theme:            "dark",
+			FontSize:         16,
+			TerminalFontSize: 14,
 		},
 	}
 
@@ -344,6 +348,13 @@ func marshalConfig(cfg Config) ([]byte, error) {
 	return append(data, '\n'), nil
 }
 
+const (
+	minUIFontSize         = 12
+	maxUIFontSize         = 24
+	minTerminalFontSize   = 8
+	maxTerminalFontSize   = 32
+)
+
 func normalizeConfig(cfg *Config) {
 	for i := range cfg.Connections {
 		if strings.TrimSpace(cfg.Connections[i].ID) == "" {
@@ -352,6 +363,26 @@ func normalizeConfig(cfg *Config) {
 		if strings.EqualFold(cfg.Connections[i].Type, "ssh") && strings.TrimSpace(cfg.Connections[i].KnownHostsPath) == "" {
 			cfg.Connections[i].KnownHostsPath = defaultKnownHostsPath
 		}
+	}
+
+	if cfg.UI.FontSize == 0 {
+		cfg.UI.FontSize = 16
+	}
+	if cfg.UI.FontSize < minUIFontSize {
+		cfg.UI.FontSize = minUIFontSize
+	}
+	if cfg.UI.FontSize > maxUIFontSize {
+		cfg.UI.FontSize = maxUIFontSize
+	}
+
+	if cfg.UI.TerminalFontSize == 0 {
+		cfg.UI.TerminalFontSize = 14
+	}
+	if cfg.UI.TerminalFontSize < minTerminalFontSize {
+		cfg.UI.TerminalFontSize = minTerminalFontSize
+	}
+	if cfg.UI.TerminalFontSize > maxTerminalFontSize {
+		cfg.UI.TerminalFontSize = maxTerminalFontSize
 	}
 }
 

@@ -76,7 +76,7 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 }
 
 export function Terminal({ selectedPane }: TerminalProps) {
-	const { setError } = useAppState();
+	const { setError, uiSettings } = useAppState();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -169,7 +169,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			customGlyphs: false,
 			fontFamily:
 				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
-			fontSize: 14,
+			fontSize: uiSettings.terminalFontSize,
 			theme: getXtermTheme(),
 		});
 
@@ -242,7 +242,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			wsRef.current?.close();
 			wsRef.current = null;
 		};
-	}, [connectWebSocket]);
+	}, [connectWebSocket, uiSettings.terminalFontSize]);
 
 	const handleReconnect = () => {
 		wsRef.current?.close();

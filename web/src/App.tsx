@@ -4,8 +4,9 @@ import "./styles/components.css";
 import "./styles/fonts.css";
 
 import { useEffect } from "react";
-import { AppProvider } from "./state/store.js";
+import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig } from "./api/client.js";
+import { applyUIFontSize } from "./ui/fontSize.js";
 import { MainPanel } from "./components/MainPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { ErrorBanner } from "./components/ErrorBanner.js";
@@ -14,21 +15,28 @@ import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
 
-function ThemeInit() {
+function UISettingsInit() {
+	const { setUISettings } = useAppState();
+
 	useEffect(() => {
 		void getConfig().then((config) => {
-			document.documentElement.dataset.theme = config.ui.theme;
-		}).catch(() => {
-			// silently ignore — theme will fall back to default dark
-		});
-	}, []);
+			const theme = config.ui.theme || "dark";
+			const fontSize = config.ui.fontSize || 16;
+			const terminalFontSize = config.ui.terminalFontSize || 14;
+
+			document.documentElement.dataset.theme = theme;
+			applyUIFontSize(fontSize);
+			setUISettings({ theme, fontSize, terminalFontSize });
+		}).catch(() => undefined);
+	}, [setUISettings]);
+
 	return null;
 }
 
 export function App() {
 	return (
 		<AppProvider>
-			<ThemeInit />
+			<UISettingsInit />
 			<div className="app-shell" data-testid="app-shell">
 				<ConfigConflictBanner />
 				<Sidebar />

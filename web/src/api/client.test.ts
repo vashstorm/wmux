@@ -131,14 +131,14 @@ describe("api client", () => {
 	});
 
 	test("getConfig returns config", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark" } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14 } });
 		const result = await getConfig();
 		expect(result.schemaVersion).toBe(1);
 	});
 
 	test("updateConfig PUTs payload", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light" } });
-		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light" } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14 } });
+		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14 } });
 		expect(result.ui.theme).toBe("light");
 	});
 

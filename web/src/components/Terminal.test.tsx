@@ -72,6 +72,11 @@ vi.mock("../api/websocket.js", () => ({
 vi.mock("../state/store.js", () => ({
 	useAppState: vi.fn(() => ({
 		setError: vi.fn(),
+		uiSettings: {
+			theme: "dark",
+			fontSize: 16,
+			terminalFontSize: 14,
+		},
 	})),
 }));
 

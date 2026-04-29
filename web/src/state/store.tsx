@@ -70,6 +70,12 @@ function paneInfoToData(p: PaneInfo): PaneData {
 	};
 }
 
+export interface UISettings {
+	theme: string;
+	fontSize: number;
+	terminalFontSize: number;
+}
+
 export interface AppState {
 	connections: ConnectionConfig[];
 	selectedConnectionId: string | null;
@@ -89,6 +95,7 @@ export interface AppState {
 	selectedPane: SelectedPane | null;
 	connectionHealth: Record<string, ConnectionHealth>;
 	editingConnection: ConnectionConfig | null;
+	uiSettings: UISettings;
 }
 
 export interface ConfigConflictState {
@@ -121,6 +128,7 @@ interface AppContextValue extends AppState {
 	setSelectedPane: (pane: SelectedPane | null) => void;
 	setConnectionHealth: (health: Record<string, ConnectionHealth>) => void;
 	setEditingConnection: (connection: ConnectionConfig | null) => void;
+	setUISettings: (settings: UISettings) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -144,6 +152,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [selectedPane, setSelectedPane] = useState<SelectedPane | null>(null);
 	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
+	const [uiSettings, setUISettingsState] = useState<UISettings>({
+		theme: "dark",
+		fontSize: 16,
+		terminalFontSize: 14,
+	});
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {
 		setConnectionsState(newConnections);
@@ -204,6 +217,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
+	const setUISettings = useCallback((settings: UISettings) => {
+		setUISettingsState(settings);
+	}, []);
+
 	const value: AppContextValue = {
 		connections,
 		selectedConnectionId,
@@ -233,6 +250,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setSelectedPane,
 		setConnectionHealth,
 		setEditingConnection,
+		uiSettings,
+		setUISettings,
 	};
 
 	return (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
+import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize } from "../ui/fontSize.js";
 
 interface SettingsFormState {
 	bind: string;
@@ -10,6 +11,8 @@ interface SettingsFormState {
 	theme: string;
 	tokenInput: string;
 	tokenConfigured: boolean;
+	fontSize: number;
+	terminalFontSize: number;
 }
 
 function buildFormState(config: AppConfig): SettingsFormState {
@@ -21,6 +24,8 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		theme: config.ui.theme,
 		tokenInput: "",
 		tokenConfigured: Boolean(config.auth.tokenConfigured),
+		fontSize: config.ui.fontSize || 16,
+		terminalFontSize: config.ui.terminalFontSize || 14,
 	};
 }
 
@@ -38,6 +43,7 @@ export function SettingsPanel() {
 		showConfirm,
 		connectionHealth,
 		setConnectionHealth,
+		setUISettings,
 	} = useAppState();
 	const [config, setConfig] = useState<AppConfig | null>(null);
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
@@ -85,11 +91,17 @@ export function SettingsPanel() {
 	}, [showSettingsPanel]);
 
 	useEffect(() => {
-		if (!formState?.theme) {
+		if (!formState) {
 			return;
 		}
 		document.documentElement.dataset.theme = formState.theme;
-	}, [formState?.theme]);
+		applyUIFontSize(formState.fontSize);
+		setUISettings({
+			theme: formState.theme,
+			fontSize: formState.fontSize,
+			terminalFontSize: formState.terminalFontSize,
+		});
+	}, [formState, setUISettings]);
 
 	if (!showSettingsPanel) {
 		return null;
@@ -135,6 +147,8 @@ export function SettingsPanel() {
 			ui: {
 				...config.ui,
 				theme: formState.theme,
+				fontSize: formState.fontSize,
+				terminalFontSize: formState.terminalFontSize,
 			},
 		};
 	};
@@ -146,9 +160,15 @@ export function SettingsPanel() {
 			setConfig(saved);
 			setFormState(buildFormState(saved));
 			setConnections(saved.connections);
-			document.documentElement.dataset.theme = saved.ui.theme;
-			setConfigConflict(null);
-			setShowSettingsPanel(false);
+								document.documentElement.dataset.theme = saved.ui.theme;
+								applyUIFontSize(saved.ui.fontSize);
+								setUISettings({
+									theme: saved.ui.theme,
+									fontSize: saved.ui.fontSize,
+									terminalFontSize: saved.ui.terminalFontSize,
+								});
+								setConfigConflict(null);
+								setShowSettingsPanel(false);
 		} catch (err: unknown) {
 			if (err instanceof ApiError && err.code === "conflict") {
 				setConfigConflict({
@@ -163,7 +183,7 @@ export function SettingsPanel() {
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
-							ui: { ...latest.ui, theme: payload.ui.theme },
+							ui: { ...latest.ui, theme: payload.ui.theme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize },
 							connections: latest.connections.map((connection) => {
 								if (connection.type !== "ssh") {
 									return connection;
@@ -203,6 +223,12 @@ export function SettingsPanel() {
 		if (config) {
 			setFormState(buildFormState(config));
 			document.documentElement.dataset.theme = config.ui.theme;
+			applyUIFontSize(config.ui.fontSize);
+			setUISettings({
+				theme: config.ui.theme,
+				fontSize: config.ui.fontSize,
+				terminalFontSize: config.ui.terminalFontSize,
+			});
 		}
 		closePanel();
 	};
@@ -387,20 +413,52 @@ export function SettingsPanel() {
 									/>
 								</div>
 
-								<div className="form-field">
-									<label htmlFor="settings-theme">Theme</label>
-									<select
-										id="settings-theme"
-										value={formState.theme}
-										onChange={(event) => updateField("theme", event.target.value)}
-										data-testid="settings-theme-toggle"
-									>
-										<option value="dark">Dark</option>
-										<option value="light">Light</option>
-									</select>
-								</div>
+							<div className="form-field">
+								<label htmlFor="settings-theme">Theme</label>
+								<select
+									id="settings-theme"
+									value={formState.theme}
+									onChange={(event) => updateField("theme", event.target.value)}
+									data-testid="settings-theme-toggle"
+								>
+									<option value="dark">Dark</option>
+									<option value="light">Light</option>
+								</select>
+							</div>
 
-								{connections.some((connection) => connection.type === "ssh") ? (
+							<div className="form-field">
+								<label htmlFor="settings-font-size">UI Font Size</label>
+								<div className="font-size-control">
+									<input
+										id="settings-font-size"
+										type="range"
+										min={12}
+										max={24}
+										value={formState.fontSize}
+										onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
+										data-testid="settings-font-size-input"
+									/>
+									<span className="font-size-value">{formState.fontSize}px</span>
+								</div>
+							</div>
+
+							<div className="form-field">
+								<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+								<div className="font-size-control">
+									<input
+										id="settings-terminal-font-size"
+										type="range"
+										min={8}
+										max={32}
+										value={formState.terminalFontSize}
+										onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
+										data-testid="settings-terminal-font-size-input"
+									/>
+									<span className="font-size-value">{formState.terminalFontSize}px</span>
+								</div>
+							</div>
+
+							{connections.some((connection) => connection.type === "ssh") ? (
 									<p className="form-help-text">Known hosts path applies to saved SSH connections.</p>
 								) : null}
 

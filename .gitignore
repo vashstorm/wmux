@@ -1,6 +1,6 @@
 # Build output
 bin/
-wmux
+/wmux
 dist/
 
 # Dependencies

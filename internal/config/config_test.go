@@ -26,6 +26,65 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.UI.Theme != "dark" {
 		t.Fatalf("unexpected theme: %q", cfg.UI.Theme)
 	}
+
+	if cfg.UI.FontSize != 16 {
+		t.Fatalf("unexpected UI font size: %d", cfg.UI.FontSize)
+	}
+
+	if cfg.UI.TerminalFontSize != 14 {
+		t.Fatalf("unexpected terminal font size: %d", cfg.UI.TerminalFontSize)
+	}
+}
+
+func TestNormalizeConfigClampsFontSizes(t *testing.T) {
+	tests := []struct {
+		name             string
+		fontSize         int
+		terminalFontSize int
+		wantUIFontSize   int
+		wantTerminalFontSize int
+	}{
+		{"default zeros", 0, 0, 16, 14},
+		{"valid values", 18, 20, 18, 20},
+		{"ui too small", 8, 10, 12, 10},
+		{"ui too large", 30, 10, 24, 10},
+		{"terminal too small", 16, 4, 16, 8},
+		{"terminal too large", 16, 40, 16, 32},
+		{"both at min", 12, 8, 12, 8},
+		{"both at max", 24, 32, 24, 32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			cfg.UI.FontSize = tt.fontSize
+			cfg.UI.TerminalFontSize = tt.terminalFontSize
+
+			dir := t.TempDir()
+			path := filepath.Join(dir, "config.jsonc")
+			store, err := config.Load(path)
+			if err != nil {
+				t.Fatalf("load config: %v", err)
+			}
+			store.Config.UI.FontSize = tt.fontSize
+			store.Config.UI.TerminalFontSize = tt.terminalFontSize
+			if err := store.Save(); err != nil {
+				t.Fatalf("save config: %v", err)
+			}
+
+			reloaded, err := config.Load(path)
+			if err != nil {
+				t.Fatalf("reload config: %v", err)
+			}
+
+			if reloaded.Config.UI.FontSize != tt.wantUIFontSize {
+				t.Fatalf("UI font size: got %d, want %d", reloaded.Config.UI.FontSize, tt.wantUIFontSize)
+			}
+			if reloaded.Config.UI.TerminalFontSize != tt.wantTerminalFontSize {
+				t.Fatalf("terminal font size: got %d, want %d", reloaded.Config.UI.TerminalFontSize, tt.wantTerminalFontSize)
+			}
+		})
+	}
 }
 
 func TestLoadFromExistingFile(t *testing.T) {
