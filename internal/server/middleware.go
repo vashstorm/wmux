@@ -106,6 +106,10 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 				status = http.StatusOK
 			}
 
+			if r.Method == http.MethodGet && status < 400 {
+				return
+			}
+
 			level := slog.LevelInfo
 			switch {
 			case status >= 500:
