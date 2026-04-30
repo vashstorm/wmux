@@ -182,7 +182,7 @@ func (r Remote) AttachSession(target, term string, rows, cols int) (*Session, er
 		return nil, fmt.Errorf("request SSH PTY: %w", err)
 	}
 
-	command := buildRemoteExecCommand(r.binaryPath(), "attach-session", "-t", target)
+	command := buildRemoteExecCommand(r.binaryPath(), tmuxAttachArgs(target)...)
 	if err := session.Start(command); err != nil {
 		_ = session.Close()
 		return nil, fmt.Errorf("start remote tmux attach-session: %w", err)
@@ -211,6 +211,10 @@ func (e *remoteNoSessionsError) Unwrap() error {
 
 func buildRemoteListSessionsArgs() []string {
 	return []string{"list-sessions", "-F", remoteSessionFormat}
+}
+
+func tmuxAttachArgs(target string) []string {
+	return []string{"attach-session", "-f", "ignore-size", "-t", target}
 }
 
 func buildRemoteListWindowsArgs(session string) ([]string, error) {
@@ -591,7 +595,7 @@ func parseRemotePaneRow(row string) (tmux.Pane, error) {
 		Height: height,
 		Left:   left,
 		Top:    top,
-		Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "",
+		Dead:   false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "",
 		AttentionState: tmux.AttentionStateNone,
 	}, nil
 }

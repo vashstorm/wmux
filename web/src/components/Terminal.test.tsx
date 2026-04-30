@@ -16,6 +16,8 @@ const mockXTermOnResize = vi.fn();
 const mockXTermFocus = vi.fn();
 const mockFit = vi.fn();
 const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
+const mockWsSend = vi.fn();
+let capturedOnResize: ((size: { cols: number; rows: number }) => void) | null = null;
 
 vi.mock("@xterm/xterm", () => ({
 	Terminal: vi.fn().mockImplementation(() => ({
@@ -30,7 +32,10 @@ vi.mock("@xterm/xterm", () => ({
 		loadAddon: mockXTermLoadAddon,
 		dispose: mockXTermDispose,
 		onData: mockXTermOnData,
-		onResize: mockXTermOnResize,
+		onResize: vi.fn((callback: (size: { cols: number; rows: number }) => void) => {
+			capturedOnResize = callback;
+			mockXTermOnResize(callback);
+		}),
 		focus: mockXTermFocus,
 	})),
 }));
@@ -63,6 +68,7 @@ vi.mock("../api/websocket.js", () => ({
 		capturedOnMessage = options.onMessage;
 		return {
 			connect: mockConnect,
+			send: mockWsSend,
 			close: mockClose,
 			isConnected: vi.fn(() => false),
 		};
@@ -97,6 +103,8 @@ describe("Terminal", () => {
 		mockXTermFocus.mockClear();
 		mockFit.mockClear();
 		mockProposeDimensions.mockClear();
+		mockWsSend.mockClear();
+		capturedOnResize = null;
 		capturedOnMessage = null;
 		vi.mocked(TerminalWebSocket).mockClear();
 	});
@@ -147,6 +155,25 @@ describe("Terminal", () => {
 		expect(mockFit).toHaveBeenCalled();
 		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
+	});
+
+	test("does not resend duplicate terminal resize dimensions", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		expect(capturedOnResize).not.toBeNull();
+		capturedOnResize!({ cols: 120, rows: 40 });
+
+		expect(mockWsSend).not.toHaveBeenCalled();
+	});
+
+	test("sends terminal resize when dimensions change", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		expect(capturedOnResize).not.toBeNull();
+		capturedOnResize!({ cols: 121, rows: 40 });
+
+		expect(mockWsSend).toHaveBeenCalledTimes(1);
+		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 121, rows: 40 });
 	});
 
 	test("uses Unicode 11 width tables for CJK terminal output", () => {

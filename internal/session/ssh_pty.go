@@ -69,7 +69,7 @@ func newSSHPTY(sshClient *sshclient.Client, target attachTarget, initialSize Win
 	}
 	terminal.copyOutput(stdout, stderr)
 
-	command := buildRemoteExecCommand(defaultRemoteTmuxPath, "attach-session", "-t", target.sessionTarget())
+	command := buildRemoteExecCommand(defaultRemoteTmuxPath, tmuxAttachArgs(target.sessionTarget())...)
 	if err := session.Start(command); err != nil {
 		terminal.closePipe(nil)
 		_ = session.Close()

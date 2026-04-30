@@ -83,6 +83,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const wsRef = useRef<TerminalWebSocket | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 	const resizeFrameRef = useRef<number | null>(null);
+	const lastSentSizeRef = useRef<TerminalSize | null>(null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -93,7 +94,10 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		if (!terminal || !fitAddon || !container) return null;
 
 		const proposed = fitAddon.proposeDimensions();
-		if (proposed) {
+		if (
+			proposed &&
+			(proposed.cols !== terminal.cols || proposed.rows !== terminal.rows)
+		) {
 			fitAddon.fit();
 		}
 
@@ -106,6 +110,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
 		const token = sessionStorage.getItem("wmux-auth-token") ?? "";
 		const terminalSize = initialSize ?? fitAndReadSize();
+		lastSentSizeRef.current = terminalSize;
 
 		setDisconnected(false);
 		setErrorMessage(null);
@@ -192,6 +197,17 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		});
 
 		terminal.onResize(({ cols, rows }) => {
+			const nextSize = normalizeTerminalSize(cols, rows);
+			if (!nextSize) return;
+			const previousSize = lastSentSizeRef.current;
+			if (
+				previousSize &&
+				previousSize.cols === nextSize.cols &&
+				previousSize.rows === nextSize.rows
+			) {
+				return;
+			}
+			lastSentSizeRef.current = nextSize;
 			wsRef.current?.send({ type: "resize", cols, rows });
 		});
 
@@ -240,6 +256,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			terminal.dispose();
 			terminalRef.current = null;
 			fitAddonRef.current = null;
+			lastSentSizeRef.current = null;
 			wsRef.current?.close();
 			wsRef.current = null;
 		};

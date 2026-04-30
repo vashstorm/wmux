@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,14 @@ func TestNewManager(t *testing.T) {
 	manager := NewManager()
 	if len(manager.ListActive()) != 0 {
 		t.Fatalf("expected no active sessions, got %d", len(manager.ListActive()))
+	}
+}
+
+func TestTmuxAttachArgsUseIgnoreSize(t *testing.T) {
+	got := tmuxAttachArgs("dev")
+	want := []string{"attach-session", "-f", "ignore-size", "-t", "dev"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("tmuxAttachArgs() = %#v, want %#v", got, want)
 	}
 }
 
