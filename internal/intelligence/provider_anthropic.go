@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/panh/wmux/internal/config"
@@ -54,11 +53,11 @@ func NewAnthropicProvider(cfg config.IntelligenceConfig) (*AnthropicProvider, er
 		return nil, &ProviderError{Category: ErrCategoryDisabled, Err: errors.New("intelligence disabled")}
 	}
 
-	apiKey := os.Getenv(cfg.EnvKeyRef)
+	apiKey := strings.TrimSpace(cfg.APIKey)
 	if apiKey == "" {
 		return nil, &ProviderError{
 			Category: ErrCategoryMissingCreds,
-			Err:      fmt.Errorf("env var %q is empty", cfg.EnvKeyRef),
+			Err:      errors.New("api key is empty"),
 		}
 	}
 

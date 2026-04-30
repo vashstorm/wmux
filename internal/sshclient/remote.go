@@ -214,7 +214,7 @@ func buildRemoteListSessionsArgs() []string {
 }
 
 func tmuxAttachArgs(target string) []string {
-	return []string{"attach-session", "-f", "ignore-size", "-t", target}
+	return []string{"attach-session", "-t", target}
 }
 
 func buildRemoteListWindowsArgs(session string) ([]string, error) {

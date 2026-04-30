@@ -10,7 +10,8 @@ import (
 
 type configResponse struct {
 	config.Config
-	Auth configAuthResponse `json:"auth"`
+	Auth         configAuthResponse         `json:"auth"`
+	Intelligence configIntelligenceResponse `json:"intelligence"`
 }
 
 type configAuthResponse struct {
@@ -18,12 +19,22 @@ type configAuthResponse struct {
 	TokenConfigured bool   `json:"tokenConfigured"`
 }
 
+type configIntelligenceResponse struct {
+	config.IntelligenceConfig
+	APIKeyConfigured bool `json:"apiKeyConfigured"`
+}
+
 func newConfigResponse(cfg config.Config) configResponse {
+	sanitized := SanitizeConfig(cfg)
 	return configResponse{
-		Config: SanitizeConfig(cfg),
+		Config: sanitized,
 		Auth: configAuthResponse{
 			Token:           "",
 			TokenConfigured: strings.TrimSpace(cfg.Auth.Token) != "",
+		},
+		Intelligence: configIntelligenceResponse{
+			IntelligenceConfig: sanitized.Intelligence,
+			APIKeyConfigured:   strings.TrimSpace(cfg.Intelligence.APIKey) != "",
 		},
 	}
 }
@@ -42,6 +53,9 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	current := s.currentConfig()
 	if strings.TrimSpace(payload.Auth.Token) == "" {
 		payload.Auth.Token = current.Auth.Token
+	}
+	if strings.TrimSpace(payload.Intelligence.APIKey) == "" {
+		payload.Intelligence.APIKey = current.Intelligence.APIKey
 	}
 
 	if err := payload.ValidateAuth(); err != nil {

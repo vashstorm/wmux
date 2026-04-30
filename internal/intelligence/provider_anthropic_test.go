@@ -36,10 +36,9 @@ func TestAnthropicProviderValidResponse(t *testing.T) {
 		Enabled:  true,
 		Provider: "anthropic",
 		Model:    "claude-3-haiku-20240307",
-		EnvKeyRef: "TEST_ANTHROPIC_KEY",
-		BaseURL:  ts.URL,
+		APIKey:  "test-key",
+		BaseURL: ts.URL,
 	}
-	t.Setenv("TEST_ANTHROPIC_KEY", "test-key")
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
 	if err != nil {
@@ -82,10 +81,9 @@ func TestAnthropicProviderTimeout(t *testing.T) {
 		Enabled:   true,
 		Provider:  "anthropic",
 		Model:     "claude-3-haiku-20240307",
-		EnvKeyRef: "TEST_ANTHROPIC_KEY",
+		APIKey:    "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_ANTHROPIC_KEY", "test-key")
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
 	if err != nil {
@@ -136,10 +134,9 @@ func TestAnthropicProviderRateLimited(t *testing.T) {
 		Enabled:   true,
 		Provider:  "anthropic",
 		Model:     "claude-3-haiku-20240307",
-		EnvKeyRef: "TEST_ANTHROPIC_KEY",
+		APIKey:    "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_ANTHROPIC_KEY", "test-key")
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
 	if err != nil {
@@ -168,7 +165,7 @@ func TestAnthropicProviderMissingCreds(t *testing.T) {
 		Enabled:   true,
 		Provider:  "anthropic",
 		Model:     "claude-3-haiku-20240307",
-		EnvKeyRef: "MISSING_KEY",
+		APIKey:    "",
 	}
 
 	_, err := intelligence.NewAnthropicProvider(cfg)
@@ -209,10 +206,9 @@ func TestAnthropicProviderName(t *testing.T) {
 		Enabled:   true,
 		Provider:  "anthropic",
 		Model:     "claude-3-haiku-20240307",
-		EnvKeyRef: "TEST_KEY",
+		APIKey:    "test",
 		BaseURL:   "http://localhost",
 	}
-	t.Setenv("TEST_KEY", "test")
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
 	if err != nil {

@@ -44,7 +44,8 @@ const defaultConfig = {
 		enabled: false,
 		provider: "anthropic",
 		model: "claude-sonnet-4-20250514",
-		envKeyRef: "ANTHROPIC_API_KEY",
+		apiKey: "",
+		apiKeyConfigured: false,
 		baseURL: "",
 		maxBytes: 4096,
 		timeoutSec: 30,
@@ -82,7 +83,7 @@ describe("SettingsPanel intelligence section", () => {
 		fireEvent.click(intelligenceNavButton);
 	}
 
-	test("When intelligence.enabled is false provider/model/envKeyRef inputs are disabled", async () => {
+	test("When intelligence.enabled is false provider/model/apiKey/baseURL inputs are disabled", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -101,14 +102,16 @@ describe("SettingsPanel intelligence section", () => {
 
 		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
 		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
+		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
 
 		expect(providerSelect.disabled).toBe(true);
 		expect(modelInput.disabled).toBe(true);
-		expect(envKeyRefInput.disabled).toBe(true);
+		expect(apiKeyInput.disabled).toBe(true);
+		expect(baseURLInput.disabled).toBe(true);
 	});
 
-	test("When intelligence enabled toggle is turned on provider/model/envKeyRef inputs become enabled", async () => {
+	test("When intelligence enabled toggle is turned on provider/model/apiKey/baseURL inputs become enabled", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -130,11 +133,13 @@ describe("SettingsPanel intelligence section", () => {
 
 		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
 		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
+		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
 
 		expect(providerSelect.disabled).toBe(false);
 		expect(modelInput.disabled).toBe(false);
-		expect(envKeyRefInput.disabled).toBe(false);
+		expect(apiKeyInput.disabled).toBe(false);
+		expect(baseURLInput.disabled).toBe(false);
 	});
 
 	test("Save payload includes intelligence object with all fields from form", async () => {
@@ -161,6 +166,12 @@ describe("SettingsPanel intelligence section", () => {
 		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
 		fireEvent.change(modelInput, { target: { value: "gpt-4" } });
 
+		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		fireEvent.change(apiKeyInput, { target: { value: "sk-test-key" } });
+
+		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
+		fireEvent.change(baseURLInput, { target: { value: "https://api.openrouter.ai/v1" } });
+
 		const saveButton = screen.getByRole("button", { name: /SAVE/i });
 		fireEvent.click(saveButton);
 
@@ -173,6 +184,8 @@ describe("SettingsPanel intelligence section", () => {
 		expect(callArg?.intelligence?.enabled).toBe(true);
 		expect(callArg?.intelligence?.model).toBe("gpt-4");
 		expect(callArg?.intelligence?.provider).toBe("anthropic");
+		expect(callArg?.intelligence?.apiKey).toBe("sk-test-key");
+		expect(callArg?.intelligence?.baseURL).toBe("https://api.openrouter.ai/v1");
 	});
 
 	test("Intelligence form fields load from existing config values", async () => {
@@ -183,7 +196,9 @@ describe("SettingsPanel intelligence section", () => {
 				enabled: true,
 				provider: "openai",
 				model: "gpt-4o",
-				envKeyRef: "OPENAI_API_KEY",
+				apiKey: "",
+				apiKeyConfigured: true,
+				baseURL: "https://api.openai.com/v1",
 				maxBytes: 8192,
 				timeoutSec: 60,
 				minSessionIntervalSec: 120,
@@ -217,8 +232,11 @@ describe("SettingsPanel intelligence section", () => {
 		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
 		expect(modelInput.value).toBe("gpt-4o");
 
-		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
-		expect(envKeyRefInput.value).toBe("OPENAI_API_KEY");
+		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		expect(apiKeyInput.placeholder).toBe("••••••••••••••••");
+
+		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
+		expect(baseURLInput.value).toBe("https://api.openai.com/v1");
 	});
 
 	test("When intelligence is enabled without model, save is blocked and error is shown", async () => {
@@ -256,7 +274,7 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByText("Intelligence model is required when enabled")).toBeInTheDocument();
 	});
 
-	test("When intelligence is enabled without envKeyRef, save is blocked", async () => {
+	test("When intelligence is enabled without apiKey and none configured, save is blocked", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -276,14 +294,48 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
 
-		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
-		fireEvent.change(envKeyRefInput, { target: { value: "" } });
+		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		fireEvent.change(apiKeyInput, { target: { value: "" } });
 
 		const saveButton = screen.getByRole("button", { name: /SAVE/i });
 		fireEvent.click(saveButton);
 
 		await waitFor(() => {
 			expect(mockUpdateConfig).not.toHaveBeenCalled();
+		});
+	});
+
+	test("When intelligence is enabled with blank apiKey but already configured, save is allowed", async () => {
+		const configWithKey = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				apiKeyConfigured: true,
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithKey);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockResolvedValue(configWithKey);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).toHaveBeenCalled();
 		});
 	});
 });

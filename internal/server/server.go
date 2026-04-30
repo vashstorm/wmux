@@ -188,6 +188,7 @@ func (s *Server) decodeJSON(r *http.Request, dst any) error {
 func SanitizeConfig(cfg config.Config) config.Config {
 	sanitized := cfg
 	sanitized.Auth.Token = ""
+	sanitized.Intelligence.APIKey = ""
 	return sanitized
 }
 

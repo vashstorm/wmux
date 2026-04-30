@@ -71,7 +71,7 @@ type IntelligenceConfig struct {
 	Enabled               bool   `json:"enabled"`
 	Provider              string `json:"provider,omitempty"`
 	Model                 string `json:"model,omitempty"`
-	EnvKeyRef             string `json:"envKeyRef,omitempty"`
+	APIKey                string `json:"apiKey,omitempty"`
 	BaseURL               string `json:"baseURL,omitempty"`
 	MaxBytes              int    `json:"maxBytes,omitempty"`
 	TimeoutSec            int    `json:"timeoutSec,omitempty"`
@@ -298,12 +298,9 @@ func (c Config) ValidateIntelligence() error {
 		return errors.New("intelligence model is required when enabled")
 	}
 
-	envKeyRef := strings.TrimSpace(c.Intelligence.EnvKeyRef)
-	if envKeyRef == "" {
-		return errors.New("intelligence envKeyRef is required when enabled")
-	}
-	if os.Getenv(envKeyRef) == "" {
-		return fmt.Errorf("intelligence envKeyRef %q is not set", envKeyRef)
+	apiKey := strings.TrimSpace(c.Intelligence.APIKey)
+	if apiKey == "" {
+		return errors.New("intelligence apiKey is required when enabled")
 	}
 
 	baseURL := strings.TrimSpace(c.Intelligence.BaseURL)

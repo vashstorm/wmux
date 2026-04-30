@@ -21,8 +21,8 @@ func TestDefaultConfigIncludesIntelligenceDefaults(t *testing.T) {
 	if cfg.Intelligence.Model != "" {
 		t.Fatalf("default model = %q, want empty", cfg.Intelligence.Model)
 	}
-	if cfg.Intelligence.EnvKeyRef != "" {
-		t.Fatalf("default env key ref = %q, want empty", cfg.Intelligence.EnvKeyRef)
+	if cfg.Intelligence.APIKey != "" {
+		t.Fatalf("default api key = %q, want empty", cfg.Intelligence.APIKey)
 	}
 	if cfg.Intelligence.MaxBytes != 12000 {
 		t.Fatalf("default max bytes = %d, want 12000", cfg.Intelligence.MaxBytes)
@@ -42,8 +42,6 @@ func TestDefaultConfigIncludesIntelligenceDefaults(t *testing.T) {
 }
 
 func TestLoadEnabledIntelligenceConfig(t *testing.T) {
-	t.Setenv("WMUX_TEST_LLM_KEY", "test-key")
-
 	path := filepath.Join(t.TempDir(), "config.jsonc")
 	content := `{
 	  "schemaVersion": 1,
@@ -56,7 +54,7 @@ func TestLoadEnabledIntelligenceConfig(t *testing.T) {
 	    "enabled": true,
 	    "provider": "openai",
 	    "model": "gpt-4o-mini",
-	    "envKeyRef": "WMUX_TEST_LLM_KEY",
+	    "apiKey": "test-key",
 	    "baseURL": "https://api.example.test/v1"
 	  }
 	}`
@@ -73,7 +71,7 @@ func TestLoadEnabledIntelligenceConfig(t *testing.T) {
 	if !got.Enabled {
 		t.Fatal("intelligence should be enabled")
 	}
-	if got.Provider != "openai" || got.Model != "gpt-4o-mini" || got.EnvKeyRef != "WMUX_TEST_LLM_KEY" {
+	if got.Provider != "openai" || got.Model != "gpt-4o-mini" || got.APIKey != "test-key" {
 		t.Fatalf("unexpected intelligence identity fields: %#v", got)
 	}
 	if got.BaseURL != "https://api.example.test/v1" {
@@ -84,9 +82,7 @@ func TestLoadEnabledIntelligenceConfig(t *testing.T) {
 	}
 }
 
-func TestLoadEnabledIntelligenceRequiresEnvKey(t *testing.T) {
-	t.Setenv("WMUX_MISSING_LLM_KEY", "")
-
+func TestLoadEnabledIntelligenceRequiresAPIKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.jsonc")
 	content := `{
 	  "schemaVersion": 1,
@@ -99,7 +95,7 @@ func TestLoadEnabledIntelligenceRequiresEnvKey(t *testing.T) {
 	    "enabled": true,
 	    "provider": "anthropic",
 	    "model": "claude-3-5-haiku-latest",
-	    "envKeyRef": "WMUX_MISSING_LLM_KEY"
+	    "apiKey": ""
 	  }
 	}`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -108,21 +104,19 @@ func TestLoadEnabledIntelligenceRequiresEnvKey(t *testing.T) {
 
 	_, err := config.Load(path)
 	if err == nil {
-		t.Fatal("expected missing env key error")
+		t.Fatal("expected missing api key error")
 	}
-	if !strings.Contains(err.Error(), "WMUX_MISSING_LLM_KEY") {
-		t.Fatalf("error %q should mention missing env key", err.Error())
+	if !strings.Contains(err.Error(), "apiKey") {
+		t.Fatalf("error %q should mention missing api key", err.Error())
 	}
 }
 
 func TestValidateIntelligenceRejectsInvalidBaseURL(t *testing.T) {
-	t.Setenv("WMUX_TEST_LLM_KEY", "test-key")
-
 	cfg := config.DefaultConfig()
 	cfg.Intelligence.Enabled = true
 	cfg.Intelligence.Provider = "openai"
 	cfg.Intelligence.Model = "gpt-4o-mini"
-	cfg.Intelligence.EnvKeyRef = "WMUX_TEST_LLM_KEY"
+	cfg.Intelligence.APIKey = "test-key"
 	cfg.Intelligence.BaseURL = "ftp://api.example.test"
 
 	err := cfg.ValidateIntelligence()

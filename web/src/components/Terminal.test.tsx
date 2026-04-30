@@ -17,6 +17,7 @@ const mockXTermFocus = vi.fn();
 const mockFit = vi.fn();
 const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
 const mockWsSend = vi.fn();
+const mockSetError = vi.fn();
 let capturedOnResize: ((size: { cols: number; rows: number }) => void) | null = null;
 
 vi.mock("@xterm/xterm", () => ({
@@ -77,7 +78,7 @@ vi.mock("../api/websocket.js", () => ({
 
 vi.mock("../state/store.js", () => ({
 	useAppState: vi.fn(() => ({
-		setError: vi.fn(),
+		setError: mockSetError,
 		uiSettings: {
 			theme: "dark",
 			fontSize: 16,
@@ -104,6 +105,7 @@ describe("Terminal", () => {
 		mockFit.mockClear();
 		mockProposeDimensions.mockClear();
 		mockWsSend.mockClear();
+		mockSetError.mockClear();
 		capturedOnResize = null;
 		capturedOnMessage = null;
 		vi.mocked(TerminalWebSocket).mockClear();
@@ -155,6 +157,15 @@ describe("Terminal", () => {
 		expect(mockFit).toHaveBeenCalled();
 		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
+	});
+
+	test("does not recreate WebSocket when pane identifiers are unchanged", () => {
+		const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />);
+
+		rerender(<Terminal selectedPane={{ ...mockSelectedPane }} />);
+
+		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		expect(mockClose).not.toHaveBeenCalled();
 	});
 
 	test("does not resend duplicate terminal resize dimensions", () => {

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/creack/pty"
 	"github.com/panh/wmux/internal/tmux"
@@ -37,6 +38,7 @@ func newLocalPTY(tmuxPath string, target attachTarget, initialSize WindowSize) (
 	}
 
 	cmd := exec.Command(adapter.Path, tmuxAttachArgs(target.sessionTarget())...)
+	cmd.Env = localPTYEnv(os.Environ())
 	file, err := pty.StartWithSize(cmd, toPTYWindowSize(initialSize))
 	if err != nil {
 		return nil, fmt.Errorf("start tmux attach session: %w", err)
@@ -81,4 +83,16 @@ func toPTYWindowSize(size WindowSize) *pty.Winsize {
 
 func tmuxAttachArgs(target string) []string {
 	return []string{"attach-session", "-f", "ignore-size", "-t", target}
+}
+
+func localPTYEnv(base []string) []string {
+	env := make([]string, 0, len(base)+1)
+	for _, entry := range base {
+		if !strings.HasPrefix(entry, "TERM=") {
+			env = append(env, entry)
+		}
+	}
+
+	env = append(env, "TERM="+defaultTerminalType)
+	return env
 }

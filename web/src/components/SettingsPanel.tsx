@@ -17,7 +17,9 @@ interface SettingsFormState {
 	intelligenceEnabled: boolean;
 	intelligenceProvider: string;
 	intelligenceModel: string;
-	intelligenceEnvKeyRef: string;
+	intelligenceAPIKey: string;
+	intelligenceAPIKeyConfigured: boolean;
+	intelligenceBaseURL: string;
 	intelligenceMaxBytes: number;
 	intelligenceTimeoutSec: number;
 	intelligenceMinSessionIntervalSec: number;
@@ -41,7 +43,9 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		intelligenceEnabled: intel?.enabled ?? false,
 		intelligenceProvider: intel?.provider ?? "anthropic",
 		intelligenceModel: intel?.model ?? "",
-		intelligenceEnvKeyRef: intel?.envKeyRef ?? "",
+		intelligenceAPIKey: "",
+		intelligenceAPIKeyConfigured: intel?.apiKeyConfigured ?? false,
+		intelligenceBaseURL: intel?.baseURL ?? "",
 		intelligenceMaxBytes: intel?.maxBytes ?? 4096,
 		intelligenceTimeoutSec: intel?.timeoutSec ?? 30,
 		intelligenceMinSessionIntervalSec: intel?.minSessionIntervalSec ?? 60,
@@ -184,8 +188,8 @@ export function SettingsPanel() {
 				enabled: formState.intelligenceEnabled,
 				provider: formState.intelligenceProvider.trim() || undefined,
 				model: formState.intelligenceModel.trim() || undefined,
-				envKeyRef: formState.intelligenceEnvKeyRef.trim() || undefined,
-				baseURL: config.intelligence?.baseURL,
+				apiKey: formState.intelligenceAPIKey.trim(),
+				baseURL: formState.intelligenceBaseURL.trim() || undefined,
 				maxBytes: formState.intelligenceMaxBytes,
 				timeoutSec: formState.intelligenceTimeoutSec,
 				minSessionIntervalSec: formState.intelligenceMinSessionIntervalSec,
@@ -227,18 +231,31 @@ export function SettingsPanel() {
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
 								ui: { ...latest.ui, theme: payload.ui.theme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
-							connections: latest.connections.map((connection) => {
-								if (connection.type !== "ssh") {
-									return connection;
-								}
-								const pendingConnection = payload.connections.find((item) => item.id === connection.id);
-								return {
-									...connection,
-									knownHostsPath: pendingConnection?.knownHostsPath ?? connection.knownHostsPath,
+								intelligence: {
+									...latest.intelligence,
+									enabled: payload.intelligence.enabled,
+									provider: payload.intelligence.provider,
+									model: payload.intelligence.model,
+									apiKey: payload.intelligence.apiKey,
+									baseURL: payload.intelligence.baseURL,
+									maxBytes: payload.intelligence.maxBytes,
+									timeoutSec: payload.intelligence.timeoutSec,
+									minSessionIntervalSec: payload.intelligence.minSessionIntervalSec,
+									maxConcurrency: payload.intelligence.maxConcurrency,
+									cacheTTLSec: payload.intelligence.cacheTTLSec,
+								},
+									connections: latest.connections.map((connection) => {
+										if (connection.type !== "ssh") {
+											return connection;
+										}
+										const pendingConnection = payload.connections.find((item) => item.id === connection.id);
+										return {
+											...connection,
+											knownHostsPath: pendingConnection?.knownHostsPath ?? connection.knownHostsPath,
+										};
+									}),
 								};
-							}),
-						};
-						await performSave(retryPayload);
+								await performSave(retryPayload);
 					},
 				});
 				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
@@ -269,10 +286,10 @@ export function SettingsPanel() {
 				setError({ code: "bad_request", message: "Intelligence model is required when enabled" });
 				return;
 			}
-			if (!formState.intelligenceEnvKeyRef.trim()) {
-				setError({ code: "bad_request", message: "Intelligence environment key reference is required when enabled" });
-				return;
-			}
+		if (!formState.intelligenceAPIKey.trim() && !formState.intelligenceAPIKeyConfigured) {
+			setError({ code: "bad_request", message: "Intelligence API key is required when enabled" });
+			return;
+		}
 		}
 
 		await performSave(payload);
@@ -581,18 +598,37 @@ export function SettingsPanel() {
 													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-env-key-ref">Environment Key Reference</label>
+										<div className="form-field">
+											<label htmlFor="intelligence-api-key">API Key</label>
+											<div className="password-input-wrapper">
 												<input
-													id="intelligence-env-key-ref"
-													type="text"
-													value={formState.intelligenceEnvKeyRef}
-													onChange={(event) => updateField("intelligenceEnvKeyRef", event.target.value)}
-													data-testid="intelligence-env-key-ref-input"
-													placeholder="ANTHROPIC_API_KEY"
+													id="intelligence-api-key"
+													type="password"
+													value={formState.intelligenceAPIKey}
+													onChange={(event) => updateField("intelligenceAPIKey", event.target.value)}
+													data-testid="intelligence-api-key-input"
+													placeholder={formState.intelligenceAPIKeyConfigured ? "••••••••••••••••" : "sk-..."}
 													disabled={!formState.intelligenceEnabled}
+													autoComplete="new-password"
 												/>
 											</div>
+											<p className="form-help-text">
+												{formState.intelligenceAPIKeyConfigured ? "A key is configured. Enter a new value to replace it." : "No API key configured yet."}
+											</p>
+										</div>
+										<div className="form-field">
+											<label htmlFor="intelligence-base-url">Base URL</label>
+											<input
+												id="intelligence-base-url"
+												type="text"
+												value={formState.intelligenceBaseURL}
+												onChange={(event) => updateField("intelligenceBaseURL", event.target.value)}
+												data-testid="intelligence-base-url-input"
+												placeholder="https://api.openrouter.ai/v1"
+												disabled={!formState.intelligenceEnabled}
+											/>
+											<p className="form-help-text">Optional custom endpoint for OpenAI-compatible providers.</p>
+										</div>
 											<div className="form-field">
 												<label htmlFor="intelligence-max-bytes">Max Bytes</label>
 												<input

@@ -44,11 +44,9 @@ func TestOpenAIProviderValidResponse(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "TEST_OPENAI_KEY",
+		APIKey: "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_OPENAI_KEY", "test-key")
-
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
@@ -111,11 +109,9 @@ func TestOpenAIProviderInvalidEnum(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "TEST_OPENAI_KEY",
+		APIKey: "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_OPENAI_KEY", "test-key")
-
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
@@ -150,11 +146,9 @@ func TestOpenAIProviderTimeout(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "TEST_OPENAI_KEY",
+		APIKey: "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_OPENAI_KEY", "test-key")
-
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
@@ -204,11 +198,9 @@ func TestOpenAIProviderRateLimited(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "TEST_OPENAI_KEY",
+		APIKey: "test-key",
 		BaseURL:   ts.URL,
 	}
-	t.Setenv("TEST_OPENAI_KEY", "test-key")
-
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
 		t.Fatalf("failed to create provider: %v", err)
@@ -236,7 +228,7 @@ func TestOpenAIProviderMissingCreds(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "MISSING_KEY",
+		APIKey: "",
 	}
 
 	_, err := intelligence.NewOpenAIProvider(cfg)
@@ -277,10 +269,9 @@ func TestOpenAIProviderName(t *testing.T) {
 		Enabled:   true,
 		Provider:  "openai",
 		Model:     "gpt-4o-mini",
-		EnvKeyRef: "TEST_KEY",
-		BaseURL:   "http://localhost",
+		APIKey:  "test",
+		BaseURL: "http://localhost",
 	}
-	t.Setenv("TEST_KEY", "test")
 
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {

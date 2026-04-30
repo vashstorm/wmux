@@ -23,6 +23,7 @@ type WindowSize struct {
 }
 
 type ActiveSession struct {
+	ID           string
 	ConnectionID string
 	Target       string
 	Done         chan struct{}
@@ -33,6 +34,7 @@ type ActiveSession struct {
 type Manager struct {
 	mu       sync.Mutex
 	sessions map[string]ActiveSession
+	nextID   uint64
 }
 
 func NewManager() Manager {
@@ -99,7 +101,13 @@ func (m *Manager) ListActive() []ActiveSession {
 	}
 
 	sort.Slice(active, func(i, j int) bool {
-		return active[i].ConnectionID < active[j].ConnectionID
+		if active[i].ConnectionID != active[j].ConnectionID {
+			return active[i].ConnectionID < active[j].ConnectionID
+		}
+		if active[i].Target != active[j].Target {
+			return active[i].Target < active[j].Target
+		}
+		return active[i].ID < active[j].ID
 	})
 
 	return active
@@ -107,14 +115,23 @@ func (m *Manager) ListActive() []ActiveSession {
 
 func (m *Manager) Detach(connID string) {
 	m.mu.Lock()
-	active, ok := m.sessions[connID]
+	activeSessions := make([]ActiveSession, 0, len(m.sessions))
+	for _, active := range m.sessions {
+		if active.ConnectionID == connID {
+			activeSessions = append(activeSessions, active)
+		}
+	}
 	m.mu.Unlock()
-	if !ok {
+	if len(activeSessions) == 0 {
 		return
 	}
 
-	active.cancel()
-	<-active.Done
+	for _, active := range activeSessions {
+		active.cancel()
+	}
+	for _, active := range activeSessions {
+		<-active.Done
+	}
 }
 
 func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal terminalIO, onInput func()) error {
@@ -136,42 +153,46 @@ func (m *Manager) attach(connID, target string, wsConn *websocket.Conn, terminal
 		cancel:       cancel,
 	}
 
-	if err := m.register(active); err != nil {
-		cancel()
-		_ = terminal.Close()
-		return err
-	}
+	active = m.register(active)
 
 	defer func() {
 		cancel()
-		m.unregister(connID, done)
+		m.unregister(active.ID, done)
 		close(done)
 	}()
 
 	return newBridge(wsConn, terminal, onInput).Run(ctx)
 }
 
-func (m *Manager) register(active ActiveSession) error {
+func (m *Manager) register(active ActiveSession) ActiveSession {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.sessions == nil {
 		m.sessions = make(map[string]ActiveSession)
 	}
-	if existing, exists := m.sessions[active.ConnectionID]; exists {
-		existing.cancel()
-	}
 
-	m.sessions[active.ConnectionID] = active
-	return nil
+	active.ID = m.nextSessionIDLocked(active.ConnectionID)
+	m.sessions[active.ID] = active
+	return active
 }
 
-func (m *Manager) unregister(connID string, done chan struct{}) {
+func (m *Manager) unregister(sessionID string, done chan struct{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if existing, ok := m.sessions[connID]; ok && existing.Done == done {
-		delete(m.sessions, connID)
+	if existing, ok := m.sessions[sessionID]; ok && existing.Done == done {
+		delete(m.sessions, sessionID)
+	}
+}
+
+func (m *Manager) nextSessionIDLocked(connID string) string {
+	for {
+		m.nextID++
+		id := fmt.Sprintf("%s#%d", connID, m.nextID)
+		if _, exists := m.sessions[id]; !exists {
+			return id
+		}
 	}
 }
 

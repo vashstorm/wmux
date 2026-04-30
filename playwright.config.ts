@@ -92,7 +92,7 @@ if (shouldInitialize) {
 					enabled: true,
 					provider: "openai",
 					model: "fake-model",
-					envKeyRef: "WMUX_FAKE_KEY",
+					apiKey: "playwright-fake-key",
 					baseURL: `http://127.0.0.1:${fakeLLMPort}`,
 					maxBytes: 4096,
 					timeoutSec: 5,

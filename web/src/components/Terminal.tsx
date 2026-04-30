@@ -77,6 +77,7 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 
 export function Terminal({ selectedPane }: TerminalProps) {
 	const { setError, uiSettings } = useAppState();
+	const { connectionId, session, window: windowId, pane } = selectedPane;
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -116,10 +117,10 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		setErrorMessage(null);
 
 		const ws = new TerminalWebSocket({
-			connectionId: selectedPane.connectionId,
-			session: selectedPane.session,
-			window: selectedPane.window,
-			pane: selectedPane.pane,
+			connectionId,
+			session,
+			window: windowId,
+			pane,
 			rows: terminalSize?.rows,
 			cols: terminalSize?.cols,
 			token,
@@ -163,7 +164,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		ws.connect();
 		wsRef.current = ws;
-	}, [fitAndReadSize, selectedPane, setError]);
+	}, [connectionId, fitAndReadSize, pane, session, setError, windowId]);
 
 	useEffect(() => {
 		if (!containerRef.current) return;

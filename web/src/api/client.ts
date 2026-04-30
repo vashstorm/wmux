@@ -115,13 +115,14 @@ export interface IntelligenceConfig {
 	enabled: boolean;
 	provider?: string;
 	model?: string;
-	envKeyRef?: string;
+	apiKey?: string;
 	baseURL?: string;
 	maxBytes: number;
 	timeoutSec: number;
 	minSessionIntervalSec: number;
 	maxConcurrency: number;
 	cacheTTLSec: number;
+	apiKeyConfigured?: boolean;
 }
 
 export interface AppConfig {

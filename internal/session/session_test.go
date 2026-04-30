@@ -33,6 +33,23 @@ func TestTmuxAttachArgsUseIgnoreSize(t *testing.T) {
 	}
 }
 
+func TestLocalPTYEnvAddsDefaultTERMWhenMissing(t *testing.T) {
+	env := localPTYEnv([]string{"HOME=/tmp/wmux-test", "PATH=/usr/bin"})
+	if !slices.Contains(env, "TERM="+defaultTerminalType) {
+		t.Fatalf("expected TERM fallback in env, got %#v", env)
+	}
+}
+
+func TestLocalPTYEnvForcesBrowserTerminalType(t *testing.T) {
+	env := localPTYEnv([]string{"TERM=screen-256color", "PATH=/usr/bin"})
+	if slices.Contains(env, "TERM=screen-256color") {
+		t.Fatalf("expected inherited TERM to be replaced, got %#v", env)
+	}
+	if !slices.Contains(env, "TERM="+defaultTerminalType) {
+		t.Fatalf("expected forced TERM fallback in env, got %#v", env)
+	}
+}
+
 func TestBridgeHandlesInputResizeAndClose(t *testing.T) {
 	manager := NewManager()
 	terminal := newFakeTerminal()
@@ -167,6 +184,44 @@ func TestManagerDetachCancelsActiveSession(t *testing.T) {
 	if len(manager.ListActive()) != 0 {
 		t.Fatalf("expected no active sessions after detach, got %#v", manager.ListActive())
 	}
+}
+
+func TestManagerAllowsMultipleActiveSessionsForSameConnection(t *testing.T) {
+	manager := NewManager()
+	firstTerminal := newFakeTerminal()
+	secondTerminal := newFakeTerminal()
+
+	firstConn, firstErrCh := openTerminalSessionWithConnID(t, &manager, "conn-1", "session-one", firstTerminal)
+	secondConn, secondErrCh := openTerminalSessionWithConnID(t, &manager, "conn-1", "session-two", secondTerminal)
+
+	waitForCondition(t, func() bool {
+		return len(manager.ListActive()) == 2
+	}, "multiple active sessions for one connection")
+
+	if err := firstConn.WriteJSON(protocol.ClientMessage{Type: protocol.ClientMessageTypeClose}); err != nil {
+		t.Fatalf("failed to close first terminal session: %v", err)
+	}
+	assertNoSessionError(t, firstErrCh)
+
+	waitForCondition(t, func() bool {
+		return len(manager.ListActive()) == 1
+	}, "remaining active session after closing one terminal")
+
+	if secondTerminal.closeCalls() != 0 {
+		t.Fatalf("expected second terminal to remain open, got %d closes", secondTerminal.closeCalls())
+	}
+
+	if err := secondConn.WriteJSON(protocol.ClientMessage{Type: protocol.ClientMessageTypeInput, Data: "pwd\n"}); err != nil {
+		t.Fatalf("failed to send input to remaining terminal: %v", err)
+	}
+
+	waitForCondition(t, func() bool {
+		inputs := secondTerminal.inputsSnapshot()
+		return len(inputs) == 1 && inputs[0] == "pwd\n"
+	}, "input forwarding for remaining terminal")
+
+	manager.Detach("conn-1")
+	assertNoSessionError(t, secondErrCh)
 }
 
 func TestAttachLocalCloseKeepsTmuxSession(t *testing.T) {
@@ -323,6 +378,10 @@ func (f writerFunc) Write(data []byte) (int, error) {
 }
 
 func openTerminalSession(t *testing.T, manager *Manager, target string, terminal terminalIO) (*websocket.Conn, <-chan error) {
+	return openTerminalSessionWithConnID(t, manager, "conn-1", target, terminal)
+}
+
+func openTerminalSessionWithConnID(t *testing.T, manager *Manager, connID, target string, terminal terminalIO) (*websocket.Conn, <-chan error) {
 	t.Helper()
 
 	errCh := make(chan error, 1)
@@ -333,7 +392,7 @@ func openTerminalSession(t *testing.T, manager *Manager, target string, terminal
 			errCh <- err
 			return
 		}
-		errCh <- manager.attach("conn-1", target, conn, terminal, nil)
+		errCh <- manager.attach(connID, target, conn, terminal, nil)
 	}))
 	t.Cleanup(server.Close)
 
