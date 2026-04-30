@@ -256,9 +256,25 @@ export function SettingsPanel() {
 	const handleSave = async (event: React.FormEvent) => {
 		event.preventDefault();
 		const payload = buildPayload();
-		if (!payload) {
+		if (!payload || !formState) {
 			return;
 		}
+
+		if (formState.intelligenceEnabled) {
+			if (!formState.intelligenceProvider.trim()) {
+				setError({ code: "bad_request", message: "Intelligence provider is required when enabled" });
+				return;
+			}
+			if (!formState.intelligenceModel.trim()) {
+				setError({ code: "bad_request", message: "Intelligence model is required when enabled" });
+				return;
+			}
+			if (!formState.intelligenceEnvKeyRef.trim()) {
+				setError({ code: "bad_request", message: "Intelligence environment key reference is required when enabled" });
+				return;
+			}
+		}
+
 		await performSave(payload);
 	};
 

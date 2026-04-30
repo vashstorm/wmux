@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsPanel } from "./SettingsPanel.js";
+import { ErrorBanner } from "./ErrorBanner.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import * as client from "../api/client.js";
 
@@ -218,5 +219,71 @@ describe("SettingsPanel intelligence section", () => {
 
 		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
 		expect(envKeyRefInput.value).toBe("OPENAI_API_KEY");
+	});
+
+	test("When intelligence is enabled without model, save is blocked and error is shown", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
+		fireEvent.change(modelInput, { target: { value: "" } });
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).not.toHaveBeenCalled();
+		});
+
+		expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		expect(screen.getByText("Intelligence model is required when enabled")).toBeInTheDocument();
+	});
+
+	test("When intelligence is enabled without envKeyRef, save is blocked", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const envKeyRefInput = screen.getByTestId("intelligence-env-key-ref-input") as HTMLInputElement;
+		fireEvent.change(envKeyRefInput, { target: { value: "" } });
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).not.toHaveBeenCalled();
+		});
 	});
 });
