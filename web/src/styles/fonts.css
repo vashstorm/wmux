@@ -6,9 +6,19 @@
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
 	src:
+		local("CaskaydiaCove Nerd Font Light"),
+		url("/fonts/CaskaydiaCoveNerdFont-Light.ttf") format("truetype");
+	font-weight: 100 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
 		local("CaskaydiaCove Nerd Font"),
 		url("/fonts/CaskaydiaCoveNerdFont-Regular.ttf") format("truetype");
-	font-weight: 400;
+	font-weight: 400 600;
 	font-style: normal;
 	font-display: swap;
 }
@@ -18,8 +28,18 @@
 	src:
 		local("CaskaydiaCove Nerd Font Bold"),
 		url("/fonts/CaskaydiaCoveNerdFont-Bold.ttf") format("truetype");
-	font-weight: 700;
+	font-weight: 600 900;
 	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src:
+		local("CaskaydiaCove Nerd Font Light Italic"),
+		url("/fonts/CaskaydiaCoveNerdFont-LightItalic.ttf") format("truetype");
+	font-weight: 100 400;
+	font-style: italic;
 	font-display: swap;
 }
 
@@ -28,7 +48,7 @@
 	src:
 		local("CaskaydiaCove Nerd Font Italic"),
 		url("/fonts/CaskaydiaCoveNerdFont-Italic.ttf") format("truetype");
-	font-weight: 400;
+	font-weight: 400 600;
 	font-style: italic;
 	font-display: swap;
 }
@@ -38,7 +58,7 @@
 	src:
 		local("CaskaydiaCove Nerd Font Bold Italic"),
 		url("/fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf") format("truetype");
-	font-weight: 700;
+	font-weight: 600 900;
 	font-style: italic;
 	font-display: swap;
 }

@@ -176,6 +176,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
 			fontSize: uiSettings.terminalFontSize,
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
+			fontWeightBold: "bold",
 			theme: getXtermTheme(),
 		});
 
