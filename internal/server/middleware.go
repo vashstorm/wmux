@@ -110,7 +110,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 				return
 			}
 
-			level := slog.LevelInfo
+			level := slog.LevelDebug
 			switch {
 			case status >= 500:
 				level = slog.LevelError

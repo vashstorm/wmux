@@ -80,7 +80,7 @@ func main() {
 	logger.Info("starting wmux",
 		slog.String("version", version),
 		slog.String("config", *configPath),
-		slog.String("bind", store.Config.Server.Bind),
+		slog.String("bind", "http://"+store.Config.Server.Bind),
 	)
 
 	select {
