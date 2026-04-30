@@ -76,6 +76,11 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByText("AI Intelligence")).toBeInTheDocument();
 	});
 
+	function navigateToIntelligenceTab() {
+		const intelligenceNavButton = screen.getByRole("button", { name: /AI Intelligence/i });
+		fireEvent.click(intelligenceNavButton);
+	}
+
 	test("When intelligence.enabled is false provider/model/envKeyRef inputs are disabled", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
@@ -90,6 +95,8 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 		});
+
+		navigateToIntelligenceTab();
 
 		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
 		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
@@ -114,6 +121,8 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 		});
+
+		navigateToIntelligenceTab();
 
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
@@ -142,6 +151,8 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 		});
+
+		navigateToIntelligenceTab();
 
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
@@ -193,6 +204,8 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 		});
+
+		navigateToIntelligenceTab();
 
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		expect(enableToggle.checked).toBe(true);

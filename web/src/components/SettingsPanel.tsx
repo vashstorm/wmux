@@ -70,7 +70,7 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [activeTab, setActiveTab] = useState<"general" | "connections" | "appearance">("general");
+	const [activeTab, setActiveTab] = useState<"general" | "connections" | "appearance" | "intelligence">("general");
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -355,6 +355,14 @@ export function SettingsPanel() {
 									<span className="nav-icon">🎨</span>
 									<span className="nav-label">Appearance</span>
 								</button>
+								<button
+									type="button"
+									className={`settings-nav-item ${activeTab === "intelligence" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("intelligence")}
+								>
+									<span className="nav-icon">✨</span>
+									<span className="nav-label">AI Intelligence</span>
+								</button>
 							</nav>
 
 							<div className="settings-sidebar-footer">
@@ -433,109 +441,8 @@ export function SettingsPanel() {
 													<p className="form-help-text">Default path for host key verification.</p>
 												</div>
 											</div>
-
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">AI Intelligence</h4>
-												<div className="form-field form-field-toggle">
-													<label htmlFor="intelligence-enabled">Enable AI Intelligence</label>
-													<input
-														id="intelligence-enabled"
-														type="checkbox"
-														checked={formState.intelligenceEnabled}
-														onChange={(event) => updateField("intelligenceEnabled", event.target.checked)}
-														data-testid="intelligence-enabled-checkbox"
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-provider">Provider</label>
-													<select
-														id="intelligence-provider"
-														value={formState.intelligenceProvider}
-														onChange={(event) => updateField("intelligenceProvider", event.target.value)}
-														data-testid="intelligence-provider-select"
-														disabled={!formState.intelligenceEnabled}
-													>
-														<option value="anthropic">anthropic</option>
-														<option value="openai">openai</option>
-													</select>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-model">Model</label>
-													<input
-														id="intelligence-model"
-														type="text"
-														value={formState.intelligenceModel}
-														onChange={(event) => updateField("intelligenceModel", event.target.value)}
-														data-testid="intelligence-model-input"
-														placeholder="claude-sonnet-4-20250514"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-env-key-ref">Environment Key Reference</label>
-													<input
-														id="intelligence-env-key-ref"
-														type="text"
-														value={formState.intelligenceEnvKeyRef}
-														onChange={(event) => updateField("intelligenceEnvKeyRef", event.target.value)}
-														data-testid="intelligence-env-key-ref-input"
-														placeholder="ANTHROPIC_API_KEY"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-max-bytes">Max Bytes</label>
-													<input
-														id="intelligence-max-bytes"
-														type="number"
-														value={formState.intelligenceMaxBytes}
-														onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
-														data-testid="intelligence-max-bytes-input"
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-timeout-sec">Timeout (seconds)</label>
-													<input
-														id="intelligence-timeout-sec"
-														type="number"
-														value={formState.intelligenceTimeoutSec}
-														onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
-														data-testid="intelligence-timeout-sec-input"
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (seconds)</label>
-													<input
-														id="intelligence-min-session-interval-sec"
-														type="number"
-														value={formState.intelligenceMinSessionIntervalSec}
-														onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
-														data-testid="intelligence-min-session-interval-sec-input"
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
-													<input
-														id="intelligence-max-concurrency"
-														type="number"
-														value={formState.intelligenceMaxConcurrency}
-														onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
-														data-testid="intelligence-max-concurrency-input"
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (seconds)</label>
-													<input
-														id="intelligence-cache-ttl-sec"
-														type="number"
-														value={formState.intelligenceCacheTTLSec}
-														onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
-														data-testid="intelligence-cache-ttl-sec-input"
-													/>
-												</div>
-											</div>
 										</div>
-									)}
+								)}
 
 									{activeTab === "connections" && (
 										<div className="settings-tab-content">
@@ -619,10 +526,115 @@ export function SettingsPanel() {
 										</div>
 									)}
 
-									{activeTab === "appearance" && (
-										<div className="settings-tab-content">
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">Theme & Layout</h4>
+								{activeTab === "intelligence" && (
+									<div className="settings-tab-content">
+										<div className="settings-form-section">
+											<h4 className="settings-section-title">AI Intelligence</h4>
+											<div className="form-field form-field-toggle">
+												<label htmlFor="intelligence-enabled">Enable AI Intelligence</label>
+												<input
+													id="intelligence-enabled"
+													type="checkbox"
+													checked={formState.intelligenceEnabled}
+													onChange={(event) => updateField("intelligenceEnabled", event.target.checked)}
+													data-testid="intelligence-enabled-checkbox"
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-provider">Provider</label>
+												<select
+													id="intelligence-provider"
+													value={formState.intelligenceProvider}
+													onChange={(event) => updateField("intelligenceProvider", event.target.value)}
+													data-testid="intelligence-provider-select"
+													disabled={!formState.intelligenceEnabled}
+												>
+													<option value="anthropic">anthropic</option>
+													<option value="openai">openai</option>
+												</select>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-model">Model</label>
+												<input
+													id="intelligence-model"
+													type="text"
+													value={formState.intelligenceModel}
+													onChange={(event) => updateField("intelligenceModel", event.target.value)}
+													data-testid="intelligence-model-input"
+													placeholder="claude-sonnet-4-20250514"
+													disabled={!formState.intelligenceEnabled}
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-env-key-ref">Environment Key Reference</label>
+												<input
+													id="intelligence-env-key-ref"
+													type="text"
+													value={formState.intelligenceEnvKeyRef}
+													onChange={(event) => updateField("intelligenceEnvKeyRef", event.target.value)}
+													data-testid="intelligence-env-key-ref-input"
+													placeholder="ANTHROPIC_API_KEY"
+													disabled={!formState.intelligenceEnabled}
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-max-bytes">Max Bytes</label>
+												<input
+													id="intelligence-max-bytes"
+													type="number"
+													value={formState.intelligenceMaxBytes}
+													onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
+													data-testid="intelligence-max-bytes-input"
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-timeout-sec">Timeout (seconds)</label>
+												<input
+													id="intelligence-timeout-sec"
+													type="number"
+													value={formState.intelligenceTimeoutSec}
+													onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
+													data-testid="intelligence-timeout-sec-input"
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (seconds)</label>
+												<input
+													id="intelligence-min-session-interval-sec"
+													type="number"
+													value={formState.intelligenceMinSessionIntervalSec}
+													onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
+													data-testid="intelligence-min-session-interval-sec-input"
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
+												<input
+													id="intelligence-max-concurrency"
+													type="number"
+													value={formState.intelligenceMaxConcurrency}
+													onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
+													data-testid="intelligence-max-concurrency-input"
+												/>
+											</div>
+											<div className="form-field">
+												<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (seconds)</label>
+												<input
+													id="intelligence-cache-ttl-sec"
+													type="number"
+													value={formState.intelligenceCacheTTLSec}
+													onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
+													data-testid="intelligence-cache-ttl-sec-input"
+												/>
+											</div>
+										</div>
+									</div>
+								)}
+
+								{activeTab === "appearance" && (
+									<div className="settings-tab-content">
+										<div className="settings-form-section">
+											<h4 className="settings-section-title">Theme & Layout</h4>
 												<div className="form-field">
 													<label htmlFor="settings-theme">Color Theme</label>
 													<div className="theme-grid">
