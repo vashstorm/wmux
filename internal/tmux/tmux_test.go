@@ -382,6 +382,20 @@ func TestListPanesReturnsErrorOnCommandFailure(t *testing.T) {
 	assertErrorCode(t, err, ErrorCodeCommandFailed)
 }
 
+func TestAdapterCapturePane(t *testing.T) {
+	adapter := newFakeAdapter(t, fakeExecConfig{
+		stdout: "$ git status\nOn branch main\n",
+	})
+
+	got, err := adapter.CapturePane("%1")
+	if err != nil {
+		t.Fatalf("CapturePane() error = %v", err)
+	}
+	if got != "$ git status\nOn branch main" {
+		t.Fatalf("CapturePane() = %q", got)
+	}
+}
+
 func TestLocalTmuxIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping tmux integration in short mode")

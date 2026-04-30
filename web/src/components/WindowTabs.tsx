@@ -24,7 +24,7 @@ export function WindowTabs({ windows, selectedWindowId, onSelectWindow }: Window
 						className={`window-tab${isActive ? " is-active" : ""}${isAttentionExplicit ? " is-attention-explicit" : ""}${isAttention && !isAttentionExplicit ? " is-attention" : ""}`}
 						data-testid={isActive ? "window-tab-active" : "window-tab"}
 						onClick={() => onSelectWindow(window.id, window.activePaneID)}
-						title={window.name}
+						title={window.intelligenceApp ? `${window.name} [${window.intelligenceApp}${window.intelligenceStatus && window.intelligenceStatus !== "none" ? ` · ${window.intelligenceStatus}` : ""}]` : window.name}
 					>
 						<span className="window-tab-index">{window.index}</span>
 						<span className="window-tab-name">{window.name}</span>
@@ -32,11 +32,6 @@ export function WindowTabs({ windows, selectedWindowId, onSelectWindow }: Window
 						{(isAttention || isAttentionExplicit) && typeof window.attentionCount === "number" && window.attentionCount > 0 && (
 							<span className={`attention-badge${isAttention && !isAttentionExplicit ? " is-soft" : ""}`}>
 								{window.attentionCount}
-							</span>
-						)}
-						{window.semanticEventType !== "none" && window.semanticEventType !== "" && window.semanticEventCount > 0 && (
-							<span className="semantic-badge" title={window.semanticEventType}>
-								AI {window.semanticEventCount}
 							</span>
 						)}
 						{window.activePaneTitle && (

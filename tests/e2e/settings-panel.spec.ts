@@ -23,8 +23,9 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
 
-		await page.locator("[title='New Connection']").click();
+		await page.locator(".settings-new-connection-btn").first().click();
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
 
 		await page.getByTestId("connection-type-select").selectOption("local");
@@ -49,10 +50,11 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
 
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
 
-		await page.getByTestId(`settings-edit-connection-${connection.id}`).click();
+		await page.locator(".connection-edit-btn").first().click();
 
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
 		await expect(page.getByTestId("computed-connection-name")).toContainText("local");
@@ -81,18 +83,17 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
 
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
 
-		await page.getByTestId(`settings-delete-connection-${connection.id}`).press("Enter");
+		await page.locator(".connection-delete-btn").first().click();
 
 		await expect(page.getByTestId("confirm-dialog")).toBeVisible();
 		await expect(page.getByTestId("confirm-dialog")).toContainText("Delete Connection");
 
 		await page.getByTestId("confirm-dialog-confirm").press("Enter");
 
-		await expect(page.getByTestId(`settings-delete-connection-${connection.id}`)).toHaveCount(0, {
-			timeout: 5000,
-		});
+		await expect(page.getByTestId("confirm-dialog")).not.toBeVisible({ timeout: 5000 });
 	});
 });

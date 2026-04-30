@@ -44,8 +44,6 @@ func (s *Server) handleTerminalWebSocket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	paneID := strings.TrimSpace(r.URL.Query().Get("pane"))
-
 	initialSize, err := parseInitialTerminalSize(r)
 	if err != nil {
 		s.writeTerminalError(conn, "bad_request", err.Error())
@@ -54,8 +52,7 @@ func (s *Server) handleTerminalWebSocket(w http.ResponseWriter, r *http.Request)
 
 	switch connection.Type {
 	case "local":
-		onInput := func() { s.semanticStateManager.ClearIfInputReceived(paneID) }
-		if err := s.sessionManager.AttachLocal(connection.ID, s.currentConfig().Tmux.Path, target, conn, initialSize, onInput); err != nil {
+		if err := s.sessionManager.AttachLocal(connection.ID, s.currentConfig().Tmux.Path, target, conn, initialSize, nil); err != nil {
 			s.writeTerminalAttachError(conn, err)
 		}
 	case "ssh":

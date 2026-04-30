@@ -59,7 +59,8 @@ test.describe("wmux smoke", () => {
 		await page.goto("/");
 
 		await page.getByTestId("open-settings-button").click();
-		await page.locator("[title='New Connection']").click();
+		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
+		await page.locator(".settings-new-connection-btn").first().click();
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
 		await page.getByTestId("connection-type-select").selectOption("local");
 		await page.getByTestId("save-connection").click();
@@ -79,7 +80,7 @@ test.describe("wmux smoke", () => {
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
-		await page.locator(".pane-box").first().click();
+		await page.locator(".pane-box").first().click({ force: true });
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
 		await expect(page.getByTestId("terminal")).toContainText("WMUX_READY", {

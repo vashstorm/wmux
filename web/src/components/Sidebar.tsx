@@ -8,6 +8,7 @@ import {
   createSession,
   killSession,
   renameSession,
+  analyzeSession,
   type SessionInfoData,
   type WindowInfo,
   type PaneInfo,
@@ -16,6 +17,13 @@ import { getErrorMessage } from "../api/errors.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
 
 const SESSION_SYNC_INTERVAL_MS = 2000;
+
+const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
+	dead_loop: "Loop",
+	blocked: "Blocked",
+	waiting: "Waiting",
+	running: "Running",
+};
 
 function isApiError(err: unknown): err is Error & { code: string; message: string } {
   return err instanceof Error && "code" in err && "message" in err;
@@ -34,6 +42,7 @@ export function Sidebar() {
     setConnectionHealth,
     sessions,
     setSessions,
+    updateSession,
     setSelectedPane,
     selectedPane,
     setWindows,
@@ -46,6 +55,8 @@ export function Sidebar() {
   const [renamingSession, setRenamingSession] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const prevSelectedRef = useRef<string | null>(null);
+  const analyzeDedupeRef = useRef<Map<string, number>>(new Map());
+  const analyzeInFlightRef = useRef<Set<string>>(new Set());
 
   // Auto-select first connection on mount / when selected connection is removed
   useEffect(() => {
@@ -93,6 +104,63 @@ export function Sidebar() {
     try {
       const response = await listSessions(connectionId);
       setSessions(connectionId, response.data ?? []);
+
+      // Trigger async analyze for local sessions with stale/missing intelligence
+      if (response.mode === "local") {
+        const now = Date.now();
+        const dedupeWindowMs = 60000; // 60 seconds
+
+        for (const session of response.data ?? []) {
+          const sessionName = session.name;
+          if (!sessionName) continue;
+
+          const dedupeKey = `${connectionId}:${sessionName}`;
+
+          // Check if intelligence is missing or stale
+          const hasIntelligence = session.intelligenceStatus !== undefined;
+          const isStale = session.intelligenceStale === true;
+
+          if (hasIntelligence && !isStale) continue;
+
+          // Frontend-side dedupe: skip if triggered within last 60s
+          const lastTriggered = analyzeDedupeRef.current.get(dedupeKey);
+          if (lastTriggered !== undefined && now - lastTriggered < dedupeWindowMs) {
+            continue;
+          }
+
+          // In-flight dedupe: skip if already in flight
+          if (analyzeInFlightRef.current.has(dedupeKey)) {
+            continue;
+          }
+
+          // Mark as triggered and in-flight
+          analyzeDedupeRef.current.set(dedupeKey, now);
+          analyzeInFlightRef.current.add(dedupeKey);
+
+          // Fire-and-forget analyze
+          analyzeSession(connectionId, sessionName)
+            .then((result) => {
+              if (result.intelligence) {
+                updateSession(connectionId, sessionName, {
+                  intelligenceApp: result.intelligence.app,
+                  intelligenceStatus: result.intelligence.status,
+                  intelligenceSummary: result.intelligence.summary,
+                  intelligenceSource: result.intelligence.source,
+                  intelligenceConfidence: result.intelligence.confidence,
+                  intelligenceStale: result.intelligence.stale,
+                  intelligenceUpdatedAt: result.intelligence.updatedAt,
+                  intelligenceError: result.intelligence.error,
+                });
+              }
+            })
+            .catch(() => {
+              // Silently skip on error
+            })
+            .finally(() => {
+              analyzeInFlightRef.current.delete(dedupeKey);
+            });
+        }
+      }
     } catch (err) {
       if (isApiError(err)) {
         if (err.code !== "connection_failed" && err.code !== "unknown_error") {
@@ -100,7 +168,7 @@ export function Sidebar() {
         }
       }
     }
-  }, [setSessions, setError]);
+  }, [setSessions, setError, updateSession]);
 
   // Initial load of connections list
   useEffect(() => {
@@ -456,12 +524,17 @@ export function Sidebar() {
                                     {session.attentionCount}
                                   </span>
                                 )}
-                                {typeof session.semanticEventCount === "number" && session.semanticEventCount > 0 && (
-                                  <span className="semantic-badge" title="AI events">
-                                    AI {session.semanticEventCount}
+                                {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceStale || session.intelligenceError) && (
+                                  <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStale ? " is-stale" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
+                                    {session.intelligenceError ? "Error" : session.intelligenceStale ? "Stale" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
                                   </span>
                                 )}
                               </div>
+                              {session.intelligenceSummary && (
+                                <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
+                                  {session.intelligenceSummary}
+                                </p>
+                              )}
                             </button>
                             <div className="session-card-actions">
                               <button

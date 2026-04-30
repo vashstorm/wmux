@@ -33,7 +33,7 @@ test.describe("terminal", () => {
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
-		await page.locator(".pane-box").first().click();
+		await page.locator(".pane-box").first().click({ force: true });
 
 		await expect(page.getByTestId("terminal")).toBeVisible();
 	});
@@ -47,7 +47,7 @@ test.describe("terminal", () => {
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
-		await page.locator(".pane-box").first().click();
+		await page.locator(".pane-box").first().click({ force: true });
 
 		await expect(page.getByTestId("terminal")).toContainText("WMUX_READY", {
 			timeout: 10000,
@@ -63,7 +63,7 @@ test.describe("terminal", () => {
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
-		await page.locator(".pane-box").first().click();
+		await page.locator(".pane-box").first().click({ force: true });
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
 	});

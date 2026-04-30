@@ -14,6 +14,7 @@ import {
 	updateConfig,
 	listConnectionHealth,
 	getConnectionHealth,
+	analyzeSession,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -131,14 +132,14 @@ describe("api client", () => {
 	});
 
 	test("getConfig returns config", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		const result = await getConfig();
 		expect(result.schemaVersion).toBe(1);
 	});
 
 	test("updateConfig PUTs payload", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" } });
-		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		expect(result.ui.theme).toBe("light");
 	});
 
@@ -179,5 +180,116 @@ describe("api client", () => {
 
 		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[0]).toContain(encodeURIComponent("conn#1"));
+	});
+
+	describe("intelligence field normalization", () => {
+		test("listSessions normalizes uppercase intelligence fields", async () => {
+			mockJsonResponse(200, {
+				connectionId: "1",
+				mode: "local",
+				data: [{
+					name: "session1",
+					IntelligenceApp: "claude",
+					IntelligenceStatus: "waiting",
+					IntelligenceSummary: "Waiting for input",
+					IntelligenceSource: "anthropic/claude-3",
+					IntelligenceConfidence: 0.9,
+					IntelligenceStale: false,
+					IntelligenceUpdatedAt: "2026-04-30T10:00:00Z",
+				}],
+			});
+			const result = await listSessions("1");
+			expect(result.data[0]!.intelligenceApp).toBe("claude");
+			expect(result.data[0]!.intelligenceStatus).toBe("waiting");
+			expect(result.data[0]!.intelligenceSummary).toBe("Waiting for input");
+			expect(result.data[0]!.intelligenceSource).toBe("anthropic/claude-3");
+			expect(result.data[0]!.intelligenceConfidence).toBe(0.9);
+			expect(result.data[0]!.intelligenceStale).toBe(false);
+			expect(result.data[0]!.intelligenceUpdatedAt).toBe("2026-04-30T10:00:00Z");
+		});
+
+		test("listSessions normalizes lowercase intelligence fields", async () => {
+			mockJsonResponse(200, {
+				connectionId: "1",
+				mode: "local",
+				data: [{
+					name: "session1",
+					intelligenceApp: "codex",
+					intelligenceStatus: "running",
+					intelligenceSummary: "Processing",
+					intelligenceSource: "openai/gpt-4",
+					intelligenceConfidence: 0.8,
+					intelligenceStale: true,
+					intelligenceUpdatedAt: "2026-04-30T09:00:00Z",
+				}],
+			});
+			const result = await listSessions("1");
+			expect(result.data[0]!.intelligenceApp).toBe("codex");
+			expect(result.data[0]!.intelligenceStatus).toBe("running");
+		});
+
+		test("listSessions prefers lowercase over uppercase intelligence fields", async () => {
+			mockJsonResponse(200, {
+				connectionId: "1",
+				mode: "local",
+				data: [{
+					name: "session1",
+					IntelligenceApp: "uppercase-app",
+					intelligenceApp: "lowercase-app",
+					IntelligenceStatus: "uppercase-status",
+					intelligenceStatus: "lowercase-status",
+				}],
+			});
+			const result = await listSessions("1");
+			expect(result.data[0]!.intelligenceApp).toBe("lowercase-app");
+			expect(result.data[0]!.intelligenceStatus).toBe("lowercase-status");
+		});
+	});
+
+	describe("analyzeSession", () => {
+		test("analyzeSession POSTs to analyze endpoint", async () => {
+			mockJsonResponse(200, {
+				connectionId: "conn1",
+				session: "session1",
+				status: "ok",
+				updated: 1,
+				skipped: 0,
+				errors: 0,
+				intelligence: {
+					app: "claude",
+					status: "waiting",
+					summary: "Waiting for input",
+					source: "anthropic/claude-3",
+					confidence: 0.9,
+					stale: false,
+					updatedAt: "2026-04-30T10:00:00Z",
+				},
+			});
+			const result = await analyzeSession("conn1", "session1");
+			expect(result.status).toBe("ok");
+			expect(result.updated).toBe(1);
+			expect(result.intelligence?.app).toBe("claude");
+			expect(result.intelligence?.status).toBe("waiting");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/connections/conn1/sessions/session1/analyze");
+			expect(call[1]?.method).toBe("POST");
+		});
+
+		test("analyzeSession URL encodes connection and session", async () => {
+			mockJsonResponse(200, {
+				connectionId: "conn#1",
+				session: "session#2",
+				status: "ok",
+				updated: 0,
+				skipped: 1,
+				errors: 0,
+			});
+			await analyzeSession("conn#1", "session#2");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain(encodeURIComponent("conn#1"));
+			expect(call[0]).toContain(encodeURIComponent("session#2"));
+		});
 	});
 });

@@ -17,6 +17,7 @@ func (s *Server) registerRoutes() {
 	s.handleAPI("POST /api/connections/{id}/sessions", s.handleCreateSession)
 	s.handleAPI("GET /api/connections/{id}/sessions/{session}/windows", s.handleListWindows)
 	s.handleAPI("POST /api/connections/{id}/sessions/{session}/windows", s.handleCreateWindow)
+	s.handleAPI("POST /api/connections/{id}/sessions/{session}/analyze", s.handleAnalyzeSession)
 	s.handleAPI("GET /api/connections/{id}/sessions/{session}/windows/{window}/panes", s.handleListPanes)
 	s.handleAPI("DELETE /api/connections/{id}/sessions/{session}", s.handleDeleteSession)
 	s.handleAPI("PATCH /api/connections/{id}/sessions/{session}", s.handleRenameSession)

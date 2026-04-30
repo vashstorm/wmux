@@ -14,10 +14,20 @@ interface SettingsFormState {
 	fontSize: number;
 	terminalFontSize: number;
 	terminalFontWeight: string;
+	intelligenceEnabled: boolean;
+	intelligenceProvider: string;
+	intelligenceModel: string;
+	intelligenceEnvKeyRef: string;
+	intelligenceMaxBytes: number;
+	intelligenceTimeoutSec: number;
+	intelligenceMinSessionIntervalSec: number;
+	intelligenceMaxConcurrency: number;
+	intelligenceCacheTTLSec: number;
 }
 
 function buildFormState(config: AppConfig): SettingsFormState {
 	const sshConnection = config.connections.find((connection) => connection.type === "ssh");
+	const intel = config.intelligence;
 	return {
 		bind: config.server.bind,
 		tmuxPath: config.tmux.path,
@@ -28,6 +38,15 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		fontSize: config.ui.fontSize || 16,
 		terminalFontSize: config.ui.terminalFontSize || 14,
 		terminalFontWeight: normalizeTerminalFontWeight(config.ui.terminalFontWeight),
+		intelligenceEnabled: intel?.enabled ?? false,
+		intelligenceProvider: intel?.provider ?? "anthropic",
+		intelligenceModel: intel?.model ?? "",
+		intelligenceEnvKeyRef: intel?.envKeyRef ?? "",
+		intelligenceMaxBytes: intel?.maxBytes ?? 4096,
+		intelligenceTimeoutSec: intel?.timeoutSec ?? 30,
+		intelligenceMinSessionIntervalSec: intel?.minSessionIntervalSec ?? 60,
+		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,
+		intelligenceCacheTTLSec: intel?.cacheTTLSec ?? 300,
 	};
 }
 
@@ -160,6 +179,18 @@ export function SettingsPanel() {
 				fontSize: formState.fontSize,
 				terminalFontSize: formState.terminalFontSize,
 				terminalFontWeight: formState.terminalFontWeight,
+			},
+			intelligence: {
+				enabled: formState.intelligenceEnabled,
+				provider: formState.intelligenceProvider.trim() || undefined,
+				model: formState.intelligenceModel.trim() || undefined,
+				envKeyRef: formState.intelligenceEnvKeyRef.trim() || undefined,
+				baseURL: config.intelligence?.baseURL,
+				maxBytes: formState.intelligenceMaxBytes,
+				timeoutSec: formState.intelligenceTimeoutSec,
+				minSessionIntervalSec: formState.intelligenceMinSessionIntervalSec,
+				maxConcurrency: formState.intelligenceMaxConcurrency,
+				cacheTTLSec: formState.intelligenceCacheTTLSec,
 			},
 		};
 	};
@@ -400,6 +431,107 @@ export function SettingsPanel() {
 														placeholder="~/.ssh/known_hosts"
 													/>
 													<p className="form-help-text">Default path for host key verification.</p>
+												</div>
+											</div>
+
+											<div className="settings-form-section">
+												<h4 className="settings-section-title">AI Intelligence</h4>
+												<div className="form-field form-field-toggle">
+													<label htmlFor="intelligence-enabled">Enable AI Intelligence</label>
+													<input
+														id="intelligence-enabled"
+														type="checkbox"
+														checked={formState.intelligenceEnabled}
+														onChange={(event) => updateField("intelligenceEnabled", event.target.checked)}
+														data-testid="intelligence-enabled-checkbox"
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-provider">Provider</label>
+													<select
+														id="intelligence-provider"
+														value={formState.intelligenceProvider}
+														onChange={(event) => updateField("intelligenceProvider", event.target.value)}
+														data-testid="intelligence-provider-select"
+														disabled={!formState.intelligenceEnabled}
+													>
+														<option value="anthropic">anthropic</option>
+														<option value="openai">openai</option>
+													</select>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-model">Model</label>
+													<input
+														id="intelligence-model"
+														type="text"
+														value={formState.intelligenceModel}
+														onChange={(event) => updateField("intelligenceModel", event.target.value)}
+														data-testid="intelligence-model-input"
+														placeholder="claude-sonnet-4-20250514"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-env-key-ref">Environment Key Reference</label>
+													<input
+														id="intelligence-env-key-ref"
+														type="text"
+														value={formState.intelligenceEnvKeyRef}
+														onChange={(event) => updateField("intelligenceEnvKeyRef", event.target.value)}
+														data-testid="intelligence-env-key-ref-input"
+														placeholder="ANTHROPIC_API_KEY"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-max-bytes">Max Bytes</label>
+													<input
+														id="intelligence-max-bytes"
+														type="number"
+														value={formState.intelligenceMaxBytes}
+														onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
+														data-testid="intelligence-max-bytes-input"
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-timeout-sec">Timeout (seconds)</label>
+													<input
+														id="intelligence-timeout-sec"
+														type="number"
+														value={formState.intelligenceTimeoutSec}
+														onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
+														data-testid="intelligence-timeout-sec-input"
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (seconds)</label>
+													<input
+														id="intelligence-min-session-interval-sec"
+														type="number"
+														value={formState.intelligenceMinSessionIntervalSec}
+														onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
+														data-testid="intelligence-min-session-interval-sec-input"
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
+													<input
+														id="intelligence-max-concurrency"
+														type="number"
+														value={formState.intelligenceMaxConcurrency}
+														onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
+														data-testid="intelligence-max-concurrency-input"
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (seconds)</label>
+													<input
+														id="intelligence-cache-ttl-sec"
+														type="number"
+														value={formState.intelligenceCacheTTLSec}
+														onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
+														data-testid="intelligence-cache-ttl-sec-input"
+													/>
 												</div>
 											</div>
 										</div>

@@ -83,11 +83,6 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
-							{pane.semanticEventType !== "none" && pane.semanticEventType !== "" && (
-								<div className="semantic-pane-indicator" data-testid="pane-semantic-indicator">
-									{pane.semanticEventType}
-								</div>
-							)}
 							{(isAttention || isAttentionExplicit) && (
 								<div className="pane-box-attention-indicator">
 									<span className="attention-badge" />

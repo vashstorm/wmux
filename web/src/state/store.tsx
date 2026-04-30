@@ -11,8 +11,14 @@ export interface WindowSummary {
 	activePaneTitle: string;
 	attentionState?: "none" | "attention" | "explicit";
 	attentionCount?: number;
-	semanticEventType: string;
-	semanticEventCount: number;
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
 }
 
 export interface PaneData {
@@ -25,8 +31,14 @@ export interface PaneData {
 	left: number;
 	top: number;
 	attentionState?: "none" | "attention" | "explicit";
-	semanticEventType: string;
-	semanticEventCount: number;
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
 }
 
 export interface SessionWindowState {
@@ -57,8 +69,14 @@ function windowInfoToSummary(w: WindowInfo): WindowSummary {
 		activePaneTitle: w.ActivePaneTitle,
 		attentionState: w.AttentionState,
 		attentionCount: w.AttentionCount,
-		semanticEventType: w.SemanticEventType ?? "none",
-		semanticEventCount: w.SemanticEventCount ?? 0,
+		intelligenceApp: w.IntelligenceApp,
+		intelligenceStatus: w.IntelligenceStatus,
+		intelligenceSummary: w.IntelligenceSummary,
+		intelligenceSource: w.IntelligenceSource,
+		intelligenceConfidence: w.IntelligenceConfidence,
+		intelligenceStale: w.IntelligenceStale,
+		intelligenceUpdatedAt: w.IntelligenceUpdatedAt,
+		intelligenceError: w.IntelligenceError,
 	};
 }
 
@@ -73,8 +91,14 @@ function paneInfoToData(p: PaneInfo): PaneData {
 		left: p.Left,
 		top: p.Top,
 		attentionState: p.AttentionState,
-		semanticEventType: p.SemanticEventType ?? "none",
-		semanticEventCount: p.SemanticEventCount ?? 0,
+		intelligenceApp: p.IntelligenceApp,
+		intelligenceStatus: p.IntelligenceStatus,
+		intelligenceSummary: p.IntelligenceSummary,
+		intelligenceSource: p.IntelligenceSource,
+		intelligenceConfidence: p.IntelligenceConfidence,
+		intelligenceStale: p.IntelligenceStale,
+		intelligenceUpdatedAt: p.IntelligenceUpdatedAt,
+		intelligenceError: p.IntelligenceError,
 	};
 }
 
@@ -125,6 +149,7 @@ interface AppContextValue extends AppState {
 	setConnections: (connections: ConnectionConfig[]) => void;
 	setSelectedConnectionId: (id: string | null) => void;
 	setSessions: (connectionId: string, sessions: SessionInfoData[]) => void;
+	updateSession: (connectionId: string, sessionName: string, updates: Partial<SessionInfoData>) => void;
 	setWindows: (connectionId: string, session: string, windows: WindowInfo[]) => void;
 	setPanes: (connectionId: string, session: string, windowId: string, panes: PaneInfo[]) => void;
 	setLoading: (key: keyof AppState["loading"], value: boolean) => void;
@@ -174,6 +199,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const setSessions = useCallback((connectionId: string, newSessions: SessionInfoData[]) => {
 		setSessionsState((prev) => ({ ...prev, [connectionId]: newSessions }));
+	}, []);
+
+	const updateSession = useCallback((connectionId: string, sessionName: string, updates: Partial<SessionInfoData>) => {
+		setSessionsState((prev) => ({
+			...prev,
+			[connectionId]: (prev[connectionId] ?? []).map((s) =>
+				s.name === sessionName ? { ...s, ...updates } : s
+			),
+		}));
 	}, []);
 
 	const setWindows = useCallback((connectionId: string, session: string, newWindows: WindowInfo[]) => {
@@ -248,6 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setConnections,
 		setSelectedConnectionId,
 		setSessions,
+		updateSession,
 		setWindows,
 		setPanes,
 		setLoading,

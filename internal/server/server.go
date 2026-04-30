@@ -3,17 +3,21 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"mime"
 	"net/http"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/panh/wmux/internal/config"
+	"github.com/panh/wmux/internal/intelligence"
 	"github.com/panh/wmux/internal/protocol"
-	"github.com/panh/wmux/internal/semantic"
 	"github.com/panh/wmux/internal/session"
+	"github.com/panh/wmux/internal/tmux"
 )
 
 type Options struct {
@@ -31,7 +35,8 @@ type Server struct {
 	websocketUpgrader     websocket.Upgrader
 	logger                *slog.Logger
 	checkConnectionHealth func(config.ConnectionConfig, string) connectionHealthResponse
-	semanticStateManager  *semantic.StateManager
+	intelligenceStore     *intelligence.Store
+	intelligenceAnalyzer  *intelligence.Analyzer
 }
 
 type healthResponse struct {
@@ -50,23 +55,44 @@ func New(options Options) *Server {
 
 	mux := http.NewServeMux()
 	srv := &Server{
-		store:          options.Store,
-		assets:         options.Assets,
-		mux:            mux,
-		sessionManager: session.NewManager(),
-		logger:         logger,
+		store:                 options.Store,
+		assets:                options.Assets,
+		mux:                   mux,
+		sessionManager:        session.NewManager(),
+		logger:                logger,
 		checkConnectionHealth: checkConnectionHealth,
 		websocketUpgrader: websocket.Upgrader{
 			CheckOrigin: func(*http.Request) bool {
 				return true
 			},
 		},
-		semanticStateManager: semantic.NewStateManager(),
+	}
+
+	cfg := srv.currentConfig()
+	tmuxAdapter := tmux.NewAdapter(cfg.Tmux.Path)
+	if cfg.Intelligence.Enabled {
+		dbPath, err := intelligenceDBPath()
+		if err != nil {
+			logger.Warn("failed to determine intelligence db path, using in-memory fallback", slog.String("error", err.Error()))
+			dbPath = ":memory:"
+		}
+
+		store, err := intelligence.NewStore(dbPath)
+		if err != nil {
+			logger.Warn("failed to initialize intelligence store", slog.String("error", err.Error()))
+		} else {
+			provider, err := intelligence.NewProvider(cfg.Intelligence)
+			if err != nil {
+				logger.Warn("failed to initialize intelligence provider", slog.String("error", err.Error()))
+				_ = store.Close()
+			} else {
+				srv.intelligenceStore = store
+				srv.intelligenceAnalyzer = intelligence.NewAnalyzer(provider, store, cfg.Intelligence.MaxConcurrency, tmuxAdapter.CapturePane)
+			}
+		}
 	}
 
 	srv.registerRoutes()
-
-	cfg := srv.currentConfig()
 
 	srv.httpServer = &http.Server{
 		Addr:    cfg.Server.Bind,
@@ -86,10 +112,6 @@ func (s *Server) ListenAndServe() error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
-}
-
-func (s *Server) ClearSemanticState(paneID string) {
-	s.semanticStateManager.ClearIfInputReceived(paneID)
 }
 
 func (s *Server) currentConfig() config.Config {
@@ -173,4 +195,16 @@ func cloneRequestWithPath(r *http.Request, requestPath string) *http.Request {
 	clone := r.Clone(r.Context())
 	clone.URL.Path = requestPath
 	return clone
+}
+
+func intelligenceDBPath() (string, error) {
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		cacheDir = os.TempDir()
+	}
+	dir := filepath.Join(cacheDir, "wmux")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create intelligence cache dir: %w", err)
+	}
+	return filepath.Join(dir, "intelligence.db"), nil
 }

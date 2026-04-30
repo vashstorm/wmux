@@ -246,6 +246,17 @@ func (a Adapter) SelectPane(target string) error {
 	return nil
 }
 
+func (a Adapter) CapturePane(paneID string) (string, error) {
+	if err := requireValue("pane ID", paneID); err != nil {
+		return "", err
+	}
+	output, err := a.run("capture-pane", "-p", "-t", paneID, "-J")
+	if err != nil {
+		return "", fmt.Errorf("tmux capture-pane: %w", err)
+	}
+	return output, nil
+}
+
 func buildListSessionsArgs() []string {
 	return []string{"list-sessions", "-F", sessionFormat}
 }

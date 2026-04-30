@@ -79,8 +79,14 @@ export interface SessionInfoData {
 	windowCount?: number;
 	attentionState?: "none" | "attention" | "explicit";
 	attentionCount?: number;
-	semanticEventType?: string;
-	semanticEventCount?: number;
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
 }
 
 export interface SessionsListResponse {
@@ -105,6 +111,19 @@ export interface HealthResponse {
 	status: string;
 }
 
+export interface IntelligenceConfig {
+	enabled: boolean;
+	provider?: string;
+	model?: string;
+	envKeyRef?: string;
+	baseURL?: string;
+	maxBytes: number;
+	timeoutSec: number;
+	minSessionIntervalSec: number;
+	maxConcurrency: number;
+	cacheTTLSec: number;
+}
+
 export interface AppConfig {
 	schemaVersion: number;
 	server: {
@@ -124,6 +143,7 @@ export interface AppConfig {
 		terminalFontSize: number;
 		terminalFontWeight: string;
 	};
+	intelligence: IntelligenceConfig;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -169,8 +189,14 @@ export interface WindowInfo {
 	ActivePaneTitle: string;
 	AttentionState?: "none" | "attention" | "explicit";
 	AttentionCount?: number;
-	SemanticEventType?: string;
-	SemanticEventCount?: number;
+	IntelligenceApp?: string;
+	IntelligenceStatus?: string;
+	IntelligenceSummary?: string;
+	IntelligenceSource?: string;
+	IntelligenceConfidence?: number;
+	IntelligenceStale?: boolean;
+	IntelligenceUpdatedAt?: string;
+	IntelligenceError?: string;
 }
 
 export interface WindowsListResponse {
@@ -191,8 +217,14 @@ export interface PaneInfo {
 	Left: number;
 	Top: number;
 	AttentionState?: "none" | "attention" | "explicit";
-	SemanticEventType?: string;
-	SemanticEventCount?: number;
+	IntelligenceApp?: string;
+	IntelligenceStatus?: string;
+	IntelligenceSummary?: string;
+	IntelligenceSource?: string;
+	IntelligenceConfidence?: number;
+	IntelligenceStale?: boolean;
+	IntelligenceUpdatedAt?: string;
+	IntelligenceError?: string;
 }
 
 export interface PanesListResponse {
@@ -212,14 +244,58 @@ export async function listPanes(connectionId: string, sessionName: string, windo
 	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as PanesListResponse;
 }
 
-type NormalizedSession = { id: string; name: string; attached: boolean; windowCount: number; attentionState?: "none" | "attention" | "explicit"; attentionCount?: number; semanticEventType?: string; semanticEventCount?: number };
+type NormalizedSession = {
+	id: string;
+	name: string;
+	attached: boolean;
+	windowCount: number;
+	attentionState?: "none" | "attention" | "explicit";
+	attentionCount?: number;
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
+};
 
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
 	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as {
 		connectionId: string;
 		mode: string;
 		adapterPath?: string;
-		data: Array<{ ID?: string; Name?: string; Attached?: boolean; WindowCount?: number; id?: string; name?: string; attached?: boolean; windowCount?: number; AttentionState?: "none" | "attention" | "explicit"; attentionState?: "none" | "attention" | "explicit"; AttentionCount?: number; attentionCount?: number; SemanticEventType?: string; semanticEventType?: string; SemanticEventCount?: number; semanticEventCount?: number }>;
+		data: Array<{
+			ID?: string;
+			Name?: string;
+			Attached?: boolean;
+			WindowCount?: number;
+			id?: string;
+			name?: string;
+			attached?: boolean;
+			windowCount?: number;
+			AttentionState?: "none" | "attention" | "explicit";
+			attentionState?: "none" | "attention" | "explicit";
+			AttentionCount?: number;
+			attentionCount?: number;
+			IntelligenceApp?: string;
+			intelligenceApp?: string;
+			IntelligenceStatus?: string;
+			intelligenceStatus?: string;
+			IntelligenceSummary?: string;
+			intelligenceSummary?: string;
+			IntelligenceSource?: string;
+			intelligenceSource?: string;
+			IntelligenceConfidence?: number;
+			intelligenceConfidence?: number;
+			IntelligenceStale?: boolean;
+			intelligenceStale?: boolean;
+			IntelligenceUpdatedAt?: string;
+			intelligenceUpdatedAt?: string;
+			IntelligenceError?: string;
+			intelligenceError?: string;
+		}>;
 	};
 	return {
 		...response,
@@ -235,8 +311,14 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 					windowCount: s.windowCount ?? s.WindowCount ?? 0,
 					attentionState: s.attentionState ?? s.AttentionState,
 					attentionCount: s.attentionCount ?? s.AttentionCount,
-					semanticEventType: s.semanticEventType ?? s.SemanticEventType,
-					semanticEventCount: s.semanticEventCount ?? s.SemanticEventCount,
+					intelligenceApp: s.intelligenceApp ?? s.IntelligenceApp,
+					intelligenceStatus: s.intelligenceStatus ?? s.IntelligenceStatus,
+					intelligenceSummary: s.intelligenceSummary ?? s.IntelligenceSummary,
+					intelligenceSource: s.intelligenceSource ?? s.IntelligenceSource,
+					intelligenceConfidence: s.intelligenceConfidence ?? s.IntelligenceConfidence,
+					intelligenceStale: s.intelligenceStale ?? s.IntelligenceStale,
+					intelligenceUpdatedAt: s.intelligenceUpdatedAt ?? s.IntelligenceUpdatedAt,
+					intelligenceError: s.intelligenceError ?? s.IntelligenceError,
 				};
 			})
 			.filter((s) => s.name.length > 0),
@@ -330,4 +412,32 @@ export async function updateConfig(data: AppConfig): Promise<AppConfig> {
 		method: "PUT",
 		body: JSON.stringify(data),
 	})) as AppConfig;
+}
+
+export interface SessionIntelligence {
+	app: string;
+	status: string;
+	summary: string;
+	source: string;
+	confidence: number;
+	stale: boolean;
+	updatedAt: string;
+	error?: string;
+}
+
+export interface AnalyzeSessionResponse {
+	connectionId: string;
+	session: string;
+	status: string;
+	updated: number;
+	skipped: number;
+	errors: number;
+	intelligence?: SessionIntelligence;
+}
+
+export async function analyzeSession(connectionId: string, session: string): Promise<AnalyzeSessionResponse> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/analyze`, {
+		method: "POST",
+		body: JSON.stringify({}),
+	})) as AnalyzeSessionResponse;
 }

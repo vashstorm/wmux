@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ type Config struct {
 	Tmux          TmuxConfig         `json:"tmux"`
 	Connections   []ConnectionConfig `json:"connections"`
 	UI            UIConfig           `json:"ui"`
+	Intelligence  IntelligenceConfig `json:"intelligence"`
 }
 
 type ServerConfig struct {
@@ -63,6 +65,19 @@ type UIConfig struct {
 	FontSize           int    `json:"fontSize"`
 	TerminalFontSize   int    `json:"terminalFontSize"`
 	TerminalFontWeight string `json:"terminalFontWeight"`
+}
+
+type IntelligenceConfig struct {
+	Enabled               bool   `json:"enabled"`
+	Provider              string `json:"provider,omitempty"`
+	Model                 string `json:"model,omitempty"`
+	EnvKeyRef             string `json:"envKeyRef,omitempty"`
+	BaseURL               string `json:"baseURL,omitempty"`
+	MaxBytes              int    `json:"maxBytes,omitempty"`
+	TimeoutSec            int    `json:"timeoutSec,omitempty"`
+	MinSessionIntervalSec int    `json:"minSessionIntervalSec,omitempty"`
+	MaxConcurrency        int    `json:"maxConcurrency,omitempty"`
+	CacheTTLSec           int    `json:"cacheTTLSec,omitempty"`
 }
 
 type Store struct {
@@ -116,6 +131,13 @@ func DefaultConfig() Config {
 			FontSize:           16,
 			TerminalFontSize:   14,
 			TerminalFontWeight: "normal",
+		},
+		Intelligence: IntelligenceConfig{
+			MaxBytes:              12000,
+			TimeoutSec:            8,
+			MinSessionIntervalSec: 60,
+			MaxConcurrency:        3,
+			CacheTTLSec:           300,
 		},
 	}
 
@@ -259,6 +281,45 @@ func (c Config) ValidateAuth() error {
 	return nil
 }
 
+func (c Config) ValidateIntelligence() error {
+	if !c.Intelligence.Enabled {
+		return nil
+	}
+
+	provider := strings.TrimSpace(c.Intelligence.Provider)
+	if provider == "" {
+		return errors.New("intelligence provider is required when enabled")
+	}
+	if provider != "anthropic" && provider != "openai" {
+		return fmt.Errorf("intelligence provider must be anthropic or openai, got %q", provider)
+	}
+
+	if strings.TrimSpace(c.Intelligence.Model) == "" {
+		return errors.New("intelligence model is required when enabled")
+	}
+
+	envKeyRef := strings.TrimSpace(c.Intelligence.EnvKeyRef)
+	if envKeyRef == "" {
+		return errors.New("intelligence envKeyRef is required when enabled")
+	}
+	if os.Getenv(envKeyRef) == "" {
+		return fmt.Errorf("intelligence envKeyRef %q is not set", envKeyRef)
+	}
+
+	baseURL := strings.TrimSpace(c.Intelligence.BaseURL)
+	if baseURL != "" {
+		parsed, err := url.Parse(baseURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("intelligence baseURL must be a valid http or https URL")
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return fmt.Errorf("intelligence baseURL must use http or https")
+		}
+	}
+
+	return nil
+}
+
 func (c Config) IsLocalhostBind() bool {
 	host := extractBindHost(c.Server.Bind)
 	if host == "" {
@@ -336,11 +397,17 @@ func parseConfig(data []byte) (Config, error) {
 	}
 
 	normalizeConfig(&cfg)
+	if err := cfg.ValidateIntelligence(); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
 func marshalConfig(cfg Config) ([]byte, error) {
 	normalizeConfig(&cfg)
+	if err := cfg.ValidateIntelligence(); err != nil {
+		return nil, err
+	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -351,10 +418,10 @@ func marshalConfig(cfg Config) ([]byte, error) {
 }
 
 const (
-	minUIFontSize         = 12
-	maxUIFontSize         = 24
-	minTerminalFontSize   = 8
-	maxTerminalFontSize   = 32
+	minUIFontSize       = 12
+	maxUIFontSize       = 24
+	minTerminalFontSize = 8
+	maxTerminalFontSize = 32
 )
 
 var validTerminalFontWeights = []string{"normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900"}
@@ -401,6 +468,22 @@ func normalizeConfig(cfg *Config) {
 	}
 	if !weightValid {
 		cfg.UI.TerminalFontWeight = "normal"
+	}
+
+	if cfg.Intelligence.MaxBytes == 0 {
+		cfg.Intelligence.MaxBytes = 12000
+	}
+	if cfg.Intelligence.TimeoutSec == 0 {
+		cfg.Intelligence.TimeoutSec = 8
+	}
+	if cfg.Intelligence.MinSessionIntervalSec == 0 {
+		cfg.Intelligence.MinSessionIntervalSec = 60
+	}
+	if cfg.Intelligence.MaxConcurrency == 0 {
+		cfg.Intelligence.MaxConcurrency = 3
+	}
+	if cfg.Intelligence.CacheTTLSec == 0 {
+		cfg.Intelligence.CacheTTLSec = 300
 	}
 }
 

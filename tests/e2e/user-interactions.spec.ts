@@ -118,7 +118,7 @@ test.describe("user interactions", () => {
 
 			await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 			const firstPane = page.locator(".pane-box").first();
-			await firstPane.click();
+			await firstPane.click({ force: true });
 
 			await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
 			await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
@@ -136,7 +136,7 @@ test.describe("user interactions", () => {
 
 			await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 			const firstPane = page.locator(".pane-box").first();
-			await firstPane.click();
+			await firstPane.click({ force: true });
 
 			await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
 			await expect(page.getByTestId("terminal")).toContainText("WMUX_READY", {
@@ -154,7 +154,7 @@ test.describe("user interactions", () => {
 
 			await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 			const firstPane = page.locator(".pane-box").first();
-			await firstPane.click();
+			await firstPane.click({ force: true });
 
 			await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
 

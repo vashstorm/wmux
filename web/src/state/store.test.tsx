@@ -353,46 +353,38 @@ describe("attention field mapping", () => {
 	});
 });
 
-describe("semantic field normalization", () => {
-	function TestSemanticComponent() {
+describe("updateSession", () => {
+	function TestUpdateSessionComponent() {
 		const state = useAppState();
 		return (
 			<div>
 				<button
-					data-testid="set-windows-semantic"
-					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash", SemanticEventType: "choice_required", SemanticEventCount: 3 }])}
+					data-testid="set-initial-sessions"
+					onClick={() => state.setSessions("conn1", [
+						{ name: "session1", attached: false },
+						{ name: "session2", attached: true },
+					])}
 				>
-					Set Windows Semantic
+					Set Initial Sessions
 				</button>
 				<button
-					data-testid="set-windows-no-semantic"
-					onClick={() => state.setWindows("1", "session1", [{ ID: "@1", Name: "editor", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" }])}
+					data-testid="update-session1"
+					onClick={() => state.updateSession("conn1", "session1", {
+						intelligenceApp: "claude",
+						intelligenceStatus: "waiting",
+						intelligenceSummary: "Waiting for input",
+					})}
 				>
-					Set Windows No Semantic
+					Update Session1
 				</button>
-				<button
-					data-testid="set-panes-semantic"
-					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "vim", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0, SemanticEventType: "blocked_error", SemanticEventCount: 1 }])}
-				>
-					Set Panes Semantic
-				</button>
-				<button
-					data-testid="set-panes-no-semantic"
-					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "bash", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 }])}
-				>
-					Set Panes No Semantic
-				</button>
-				<span data-testid="window-semantic-type">
-					{state.windows["1:session1"]?.windows[0]?.semanticEventType ?? "null"}
+				<span data-testid="session1-status">
+					{state.sessions["conn1"]?.find(s => s.name === "session1")?.intelligenceStatus ?? "null"}
 				</span>
-				<span data-testid="window-semantic-count">
-					{state.windows["1:session1"]?.windows[0]?.semanticEventCount ?? "null"}
+				<span data-testid="session2-attached">
+					{state.sessions["conn1"]?.find(s => s.name === "session2")?.attached ? "true" : "false"}
 				</span>
-				<span data-testid="pane-semantic-type">
-					{state.windows["1:session1"]?.loadedPanes["@1"]?.[0]?.semanticEventType ?? "null"}
-				</span>
-				<span data-testid="pane-semantic-count">
-					{state.windows["1:session1"]?.loadedPanes["@1"]?.[0]?.semanticEventCount ?? "null"}
+				<span data-testid="sessions-count">
+					{(state.sessions["conn1"] ?? []).length}
 				</span>
 			</div>
 		);
@@ -401,42 +393,68 @@ describe("semantic field normalization", () => {
 	function renderWithProvider() {
 		return render(
 			<AppProvider>
-				<TestSemanticComponent />
+				<TestUpdateSessionComponent />
 			</AppProvider>,
 		);
 	}
 
-	test("setWindows maps SemanticEventType to window summary", () => {
+	test("updateSession updates only the target session", () => {
 		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-windows-semantic"));
-		expect(screen.getByTestId("window-semantic-type").textContent).toBe("choice_required");
+		fireEvent.click(screen.getByTestId("set-initial-sessions"));
+		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
+		expect(screen.getByTestId("session1-status").textContent).toBe("null");
+		expect(screen.getByTestId("session2-attached").textContent).toBe("true");
+
+		fireEvent.click(screen.getByTestId("update-session1"));
+		expect(screen.getByTestId("session1-status").textContent).toBe("waiting");
+		expect(screen.getByTestId("session2-attached").textContent).toBe("true");
+		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
 	});
 
-	test("setWindows maps SemanticEventCount to window summary", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-windows-semantic"));
-		expect(screen.getByTestId("window-semantic-count").textContent).toBe("3");
-	});
+	test("updateSession does not affect other connections", () => {
+		function TestMultiConnectionComponent() {
+			const state = useAppState();
+			return (
+				<div>
+					<button
+						data-testid="set-conn1-sessions"
+						onClick={() => state.setSessions("conn1", [{ name: "s1", attached: false }])}
+					>
+						Set Conn1
+					</button>
+					<button
+						data-testid="set-conn2-sessions"
+						onClick={() => state.setSessions("conn2", [{ name: "s2", attached: true }])}
+					>
+						Set Conn2
+					</button>
+					<button
+						data-testid="update-conn1"
+						onClick={() => state.updateSession("conn1", "s1", { intelligenceStatus: "running" })}
+					>
+						Update Conn1
+					</button>
+					<span data-testid="conn1-status">
+						{state.sessions["conn1"]?.[0]?.intelligenceStatus ?? "null"}
+					</span>
+					<span data-testid="conn2-attached">
+						{state.sessions["conn2"]?.[0]?.attached ? "true" : "false"}
+					</span>
+				</div>
+			);
+		}
 
-	test("setWindows defaults semantic fields to none/0 when absent", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
-		expect(screen.getByTestId("window-semantic-type").textContent).toBe("none");
-		expect(screen.getByTestId("window-semantic-count").textContent).toBe("0");
-	});
+		render(
+			<AppProvider>
+				<TestMultiConnectionComponent />
+			</AppProvider>,
+		);
 
-	test("setPanes maps SemanticEventType to pane data", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
-		fireEvent.click(screen.getByTestId("set-panes-semantic"));
-		expect(screen.getByTestId("pane-semantic-type").textContent).toBe("blocked_error");
-	});
+		fireEvent.click(screen.getByTestId("set-conn1-sessions"));
+		fireEvent.click(screen.getByTestId("set-conn2-sessions"));
+		fireEvent.click(screen.getByTestId("update-conn1"));
 
-	test("setPanes defaults semantic fields to none/0 when absent", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-windows-no-semantic"));
-		fireEvent.click(screen.getByTestId("set-panes-no-semantic"));
-		expect(screen.getByTestId("pane-semantic-type").textContent).toBe("none");
-		expect(screen.getByTestId("pane-semantic-count").textContent).toBe("0");
+		expect(screen.getByTestId("conn1-status").textContent).toBe("running");
+		expect(screen.getByTestId("conn2-attached").textContent).toBe("true");
 	});
 });

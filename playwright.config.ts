@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { defineConfig } from "./web/node_modules/@playwright/test/index.js";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,23 @@ process.env.WMUX_PLAYWRIGHT_SESSION = sessionName;
 process.env.WMUX_PLAYWRIGHT_WINDOW = windowName;
 
 if (shouldInitialize) {
+	const fakeLLMPort = 19876;
+	process.env.WMUX_FAKE_KEY = "playwright-fake-key";
+	process.env.WMUX_FAKE_LLM_PORT = String(fakeLLMPort);
+	const fakeLLMProc = spawn("bun", ["run", join(process.cwd(), "tests/e2e/helpers/fake-llm-server.ts")], {
+		env: { ...process.env },
+		stdio: "ignore",
+		detached: false,
+	});
+	spawnSync("sleep", ["0.8"]);
+	process.on("exit", () => {
+		try {
+			fakeLLMProc.kill();
+		} catch {
+			// Ignore fake LLM cleanup errors.
+		}
+	});
+
 	try {
 		execFileSync("tmux", ["kill-session", "-t", sessionName], { stdio: "ignore" });
 	} catch {
@@ -71,6 +88,18 @@ if (shouldInitialize) {
 				ui: {
 					theme: "dark",
 				},
+				intelligence: {
+					enabled: true,
+					provider: "openai",
+					model: "fake-model",
+					envKeyRef: "WMUX_FAKE_KEY",
+					baseURL: `http://127.0.0.1:${fakeLLMPort}`,
+					maxBytes: 4096,
+					timeoutSec: 5,
+					minSessionIntervalSec: 2,
+					maxConcurrency: 3,
+					cacheTTLSec: 10,
+				},
 			},
 			null,
 			2,
@@ -80,6 +109,7 @@ if (shouldInitialize) {
 
 export default defineConfig({
 	testDir: "./tests/e2e",
+	workers: 1,
 	timeout: 30_000,
 	expect: {
 		timeout: 5_000,

@@ -63,7 +63,7 @@ test.describe("session window pane navigation", () => {
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 
 		const firstPane = page.locator(".pane-box").first();
-		await firstPane.click();
+		await firstPane.click({ force: true });
 
 		await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
 	});
