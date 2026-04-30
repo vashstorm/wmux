@@ -36,7 +36,7 @@ func newLocalPTY(tmuxPath string, target attachTarget, initialSize WindowSize) (
 		}
 	}
 
-	cmd := exec.Command(adapter.Path, "attach-session", "-t", target.sessionTarget())
+	cmd := exec.Command(adapter.Path, tmuxAttachArgs(target.sessionTarget())...)
 	file, err := pty.StartWithSize(cmd, toPTYWindowSize(initialSize))
 	if err != nil {
 		return nil, fmt.Errorf("start tmux attach session: %w", err)
@@ -77,4 +77,8 @@ func (p *localPTY) Close() error {
 
 func toPTYWindowSize(size WindowSize) *pty.Winsize {
 	return &pty.Winsize{Rows: uint16(size.Rows), Cols: uint16(size.Cols)}
+}
+
+func tmuxAttachArgs(target string) []string {
+	return []string{"attach-session", "-f", "ignore-size", "-t", target}
 }

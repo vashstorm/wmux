@@ -17,37 +17,37 @@ func TestParseRemotePaneRowWithAttentionFields(t *testing.T) {
 	}{
 		{
 			name: "dead pane explicit",
-			row: strings.Join([]string{"%1", "main", "0", "1", "120", "40", "0", "0", "1", "0", "0", "0", "bash"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%1", "main", "0", "1", "120", "40", "0", "0", "1", "0", "0", "0", "bash"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%1", Title: "main", Index: 0, Active: true, Width: 120, Height: 40, Left: 0, Top: 0, Dead: true, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: tmux.AttentionStateExplicit},
 		},
 		{
 			name: "input off explicit",
-			row: strings.Join([]string{"%2", "logs", "1", "0", "80", "24", "0", "40", "0", "1", "0", "0", "bash"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%2", "logs", "1", "0", "80", "24", "0", "40", "0", "1", "0", "0", "bash"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%2", Title: "logs", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 40, Dead: false, InputOff: true, InMode: false, AlternateOn: false, CurrentCommand: "bash", AttentionState: tmux.AttentionStateExplicit},
 		},
 		{
 			name: "in mode attention",
-			row: strings.Join([]string{"%3", "vim", "2", "0", "80", "24", "0", "0", "0", "0", "1", "0", "bash"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%3", "vim", "2", "0", "80", "24", "0", "0", "0", "0", "1", "0", "bash"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%3", Title: "vim", Index: 2, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: true, AlternateOn: false, CurrentCommand: "bash", AttentionState: tmux.AttentionStateAttention},
 		},
 		{
 			name: "alternate on with TUI attention",
-			row: strings.Join([]string{"%4", "editor", "3", "0", "100", "30", "10", "0", "0", "0", "0", "1", "vim"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%4", "editor", "3", "0", "100", "30", "10", "0", "0", "0", "0", "1", "vim"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%4", Title: "editor", Index: 3, Active: false, Width: 100, Height: 30, Left: 10, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "vim", AttentionState: tmux.AttentionStateAttention},
 		},
 		{
 			name: "alternate on with shell none",
-			row: strings.Join([]string{"%5", "shell", "4", "0", "80", "24", "0", "0", "0", "0", "0", "1", "bash"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%5", "shell", "4", "0", "80", "24", "0", "0", "0", "0", "0", "1", "bash"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%5", Title: "shell", Index: 4, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "bash", AttentionState: tmux.AttentionStateNone},
 		},
 		{
 			name: "alternate on with login shell none",
-			row: strings.Join([]string{"%6", "login", "5", "0", "80", "24", "0", "0", "0", "0", "0", "1", "-bash"}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%6", "login", "5", "0", "80", "24", "0", "0", "0", "0", "0", "1", "-bash"}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%6", Title: "login", Index: 5, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: true, CurrentCommand: "-bash", AttentionState: tmux.AttentionStateNone},
 		},
 		{
 			name: "empty command none",
-			row: strings.Join([]string{"%7", "empty", "6", "0", "80", "24", "0", "0", "0", "0", "0", "0", ""}, remoteFieldSeparator),
+			row:  strings.Join([]string{"%7", "empty", "6", "0", "80", "24", "0", "0", "0", "0", "0", "0", ""}, remoteFieldSeparator),
 			want: tmux.Pane{ID: "%7", Title: "empty", Index: 6, Active: false, Width: 80, Height: 24, Left: 0, Top: 0, Dead: false, InputOff: false, InMode: false, AlternateOn: false, CurrentCommand: "", AttentionState: tmux.AttentionStateNone},
 		},
 	}
@@ -141,5 +141,13 @@ func TestRemoteListPanesReturnsErrorOnCommandFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "remote tmux list-panes") {
 		t.Fatalf("expected remote tmux list-panes error, got %q", err.Error())
+	}
+}
+
+func TestTmuxAttachArgsUseIgnoreSize(t *testing.T) {
+	got := tmuxAttachArgs("dev")
+	want := []string{"attach-session", "-f", "ignore-size", "-t", "dev"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("tmuxAttachArgs() = %#v, want %#v", got, want)
 	}
 }
