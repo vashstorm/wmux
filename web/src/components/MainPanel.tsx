@@ -190,7 +190,7 @@ export function MainPanel() {
 	};
 
 	const buildTitle = () => {
-		if (!hasSelectedPane || !selectedPane) return "Wmux";
+		if (!hasSelectedPane || !selectedPane) return "";
 
 		const sessionName = selectedPane.session;
 		const windowSummary = windowSummaries.find((w) => w.id === selectedPane.window);

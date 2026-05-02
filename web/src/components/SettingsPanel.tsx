@@ -445,6 +445,7 @@ export function SettingsPanel() {
 										<div className="settings-tab-content">
 											<div className="settings-form-section">
 												<h4 className="settings-section-title">Server Configuration</h4>
+											<div className="settings-fields-grid">
 												<div className="form-field">
 													<label htmlFor="settings-bind">Server Bind</label>
 													<input
@@ -455,7 +456,7 @@ export function SettingsPanel() {
 														data-testid="settings-bind-input"
 														placeholder="127.0.0.1:7331"
 													/>
-													<p className="form-help-text">IP address and port the server listens on.</p>
+													<p className="form-help-text">IP address and port to listen on.</p>
 												</div>
 
 												<div className="form-field">
@@ -468,8 +469,9 @@ export function SettingsPanel() {
 														data-testid="settings-tmux-path-input"
 														placeholder="tmux"
 													/>
-													<p className="form-help-text">Path to the tmux executable on the server.</p>
+													<p className="form-help-text">Path to the tmux executable.</p>
 												</div>
+											</div>
 											</div>
 
 											<div className="settings-form-section">
@@ -919,146 +921,149 @@ export function SettingsPanel() {
 
 										<div className="settings-form-section">
 											<h4 className="settings-section-title">Global Settings</h4>
-											<div className="form-field">
-												<label htmlFor="intelligence-max-bytes">Max Bytes</label>
-												<input
-													id="intelligence-max-bytes"
-													type="number"
-													value={formState.intelligenceMaxBytes}
-													onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
-													data-testid="intelligence-max-bytes-input"
-													disabled={!formState.intelligenceEnabled}
-												/>
-											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-timeout-sec">Timeout (seconds)</label>
-												<input
-													id="intelligence-timeout-sec"
-													type="number"
-													value={formState.intelligenceTimeoutSec}
-													onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
-													data-testid="intelligence-timeout-sec-input"
-													disabled={!formState.intelligenceEnabled}
-												/>
-											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (seconds)</label>
-												<input
-													id="intelligence-min-session-interval-sec"
-													type="number"
-													value={formState.intelligenceMinSessionIntervalSec}
-													onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
-													data-testid="intelligence-min-session-interval-sec-input"
-													disabled={!formState.intelligenceEnabled}
-												/>
-											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
-												<input
-													id="intelligence-max-concurrency"
-													type="number"
-													value={formState.intelligenceMaxConcurrency}
-													onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
-													data-testid="intelligence-max-concurrency-input"
-													disabled={!formState.intelligenceEnabled}
-												/>
-											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (seconds)</label>
-												<input
-													id="intelligence-cache-ttl-sec"
-													type="number"
-													value={formState.intelligenceCacheTTLSec}
-													onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
-													data-testid="intelligence-cache-ttl-sec-input"
-													disabled={!formState.intelligenceEnabled}
-												/>
+											<div className="settings-fields-grid">
+												<div className="form-field">
+													<label htmlFor="intelligence-max-bytes">Max Bytes</label>
+													<input
+														id="intelligence-max-bytes"
+														type="number"
+														value={formState.intelligenceMaxBytes}
+														onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
+														data-testid="intelligence-max-bytes-input"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-timeout-sec">Timeout (sec)</label>
+													<input
+														id="intelligence-timeout-sec"
+														type="number"
+														value={formState.intelligenceTimeoutSec}
+														onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
+														data-testid="intelligence-timeout-sec-input"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (sec)</label>
+													<input
+														id="intelligence-min-session-interval-sec"
+														type="number"
+														value={formState.intelligenceMinSessionIntervalSec}
+														onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
+														data-testid="intelligence-min-session-interval-sec-input"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
+													<input
+														id="intelligence-max-concurrency"
+														type="number"
+														value={formState.intelligenceMaxConcurrency}
+														onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
+														data-testid="intelligence-max-concurrency-input"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
+												<div className="form-field">
+													<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (sec)</label>
+													<input
+														id="intelligence-cache-ttl-sec"
+														type="number"
+														value={formState.intelligenceCacheTTLSec}
+														onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
+														data-testid="intelligence-cache-ttl-sec-input"
+														disabled={!formState.intelligenceEnabled}
+													/>
+												</div>
 											</div>
 										</div>
 									</div>
 								)}
 
-								{activeTab === "appearance" && (
-									<div className="settings-tab-content">
-										<div className="settings-form-section">
-											<h4 className="settings-section-title">Theme & Layout</h4>
-												<div className="form-field">
-													<label htmlFor="settings-theme">Color Theme</label>
-													<div className="theme-grid">
-														<button
-															type="button"
-															className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
-															onClick={() => updateField("theme", "dark")}
-														>
-															<div className="theme-preview" />
-															<span>Dark Tech</span>
-														</button>
-														<button
-															type="button"
-															className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
-															onClick={() => updateField("theme", "light")}
-														>
-															<div className="theme-preview" />
-															<span>Classic Light</span>
-														</button>
-													</div>
-												</div>
+							{activeTab === "appearance" && (
+								<div className="settings-tab-content">
+									<div className="settings-form-section">
+										<h4 className="settings-section-title">Theme</h4>
+										<div className="form-field">
+											<div className="theme-grid">
+												<button
+													type="button"
+													className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
+													onClick={() => updateField("theme", "dark")}
+												>
+													<div className="theme-preview" />
+													<span>Dark Tech</span>
+												</button>
+												<button
+													type="button"
+													className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
+													onClick={() => updateField("theme", "light")}
+												>
+													<div className="theme-preview" />
+													<span>Classic Light</span>
+												</button>
 											</div>
-
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">Typography</h4>
-												<div className="form-field">
-													<label htmlFor="settings-font-size">UI Font Size</label>
-													<div className="font-size-control">
-														<input
-															id="settings-font-size"
-															type="range"
-															min={12}
-															max={24}
-															value={formState.fontSize}
-															onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
-															data-testid="settings-font-size-input"
-														/>
-														<span className="font-size-value">{formState.fontSize}px</span>
-													</div>
-												</div>
-
-									<div className="form-field">
-										<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
-										<div className="font-size-control">
-											<input
-												id="settings-terminal-font-size"
-												type="range"
-												min={8}
-												max={32}
-												value={formState.terminalFontSize}
-												onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
-												data-testid="settings-terminal-font-size-input"
-											/>
-											<span className="font-size-value">{formState.terminalFontSize}px</span>
 										</div>
 									</div>
 
-									<div className="form-field">
-										<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
-										<select
-											id="settings-terminal-font-weight"
-											value={formState.terminalFontWeight}
-											onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
-											data-testid="settings-terminal-font-weight-input"
-											className="font-weight-select"
-										>
-											{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
-												<option key={weight} value={weight}>
-													{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
-												</option>
-											))}
-										</select>
-										<p className="form-help-text">Font weight for terminal text rendering.</p>
+									<div className="settings-form-section">
+										<h4 className="settings-section-title">Typography</h4>
+										<div className="form-field">
+											<label htmlFor="settings-font-size">UI Font Size</label>
+											<div className="font-size-control">
+												<input
+													id="settings-font-size"
+													type="range"
+													min={12}
+													max={24}
+													value={formState.fontSize}
+													onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
+													data-testid="settings-font-size-input"
+												/>
+												<span className="font-size-value">{formState.fontSize}px</span>
+											</div>
+										</div>
+
+										<div className="settings-fields-grid">
+											<div className="form-field">
+												<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+												<div className="font-size-control">
+													<input
+														id="settings-terminal-font-size"
+														type="range"
+														min={8}
+														max={32}
+														value={formState.terminalFontSize}
+														onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
+														data-testid="settings-terminal-font-size-input"
+													/>
+													<span className="font-size-value">{formState.terminalFontSize}px</span>
+												</div>
+											</div>
+
+											<div className="form-field">
+												<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
+												<select
+													id="settings-terminal-font-weight"
+													value={formState.terminalFontWeight}
+													onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
+													data-testid="settings-terminal-font-weight-input"
+													className="font-weight-select"
+												>
+													{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
+														<option key={weight} value={weight}>
+															{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
+														</option>
+													))}
+												</select>
+												<p className="form-help-text">Font weight for terminal text.</p>
+											</div>
+										</div>
 									</div>
 								</div>
-							</div>
-						)}
+							)}
 								</div>
 
 								<div className="settings-footer">
