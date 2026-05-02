@@ -45,6 +45,11 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	force := r.URL.Query().Get("force") == "true"
+	if force && s.intelligenceAnalyzer != nil {
+		s.intelligenceAnalyzer.ResetSessionTimer(sessionName)
+	}
+
 	cfg := s.currentConfig()
 
 	if s.intelligenceAnalyzer == nil {
@@ -66,7 +71,11 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 	allPanes := make([]tmux.Pane, 0)
 	windowByPane := make(map[string]string)
 	for _, window := range windows {
-		panes, err := adapter.ListPanes(sessionName, window.Name)
+		target := window.ID
+		if target == "" {
+			target = window.Name
+		}
+		panes, err := adapter.ListPanes(sessionName, target)
 		if err != nil {
 			continue
 		}
@@ -113,6 +122,19 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 		skipped = len(allPanes)
 	}
 
+	if s.intelligenceStore != nil && len(allPanes) > 0 {
+		keepPaneIDs := make([]string, len(allPanes))
+		for i, pane := range allPanes {
+			keepPaneIDs[i] = pane.ID
+		}
+		if cleanupErr := s.intelligenceStore.DeleteExcept(sessionName, keepPaneIDs); cleanupErr != nil {
+			s.logger.Warn("failed to cleanup stale intelligence results",
+				slog.String("session", sessionName),
+				slog.String("error", cleanupErr.Error()),
+			)
+		}
+	}
+
 	s.writeJSON(w, http.StatusOK, analyzeResponse{
 		ConnectionID: connection.ID,
 		Session:      sessionName,
@@ -154,26 +176,47 @@ func formatIntelligenceTime(t time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-func (s *Server) attachCachedSessionIntelligence(sessions []tmux.Session) {
+func (s *Server) attachCachedSessionIntelligence(session *tmux.Session, paneIDs []string) {
 	if s.intelligenceStore == nil {
 		return
 	}
 	cacheTTLSec := s.currentConfig().Intelligence.CacheTTLSec
 
-	for i := range sessions {
-		results, err := s.intelligenceStore.GetBySession(sessions[i].Name, cacheTTLSec)
-		if err != nil || len(results) == 0 {
-			continue
-		}
-		agg := intelligence.AggregateSessionIntelligence(results, "")
-		if agg.PaneID == "" {
-			continue
-		}
-		applySessionResult(&sessions[i], agg)
-		sessions[i].IntelligencePaneCount = len(results)
-		sessions[i].IntelligenceWindowCount = countIntelligenceWindows(results)
-		sessions[i].IntelligenceAppCounts = intelligence.CountApplications(results)
+	results, err := s.intelligenceStore.GetBySession(session.Name, cacheTTLSec)
+	if err != nil || len(results) == 0 {
+		return
 	}
+
+	filtered := filterResultsByPaneIDs(results, paneIDs)
+	if len(filtered) == 0 {
+		return
+	}
+
+	agg := intelligence.AggregateSessionIntelligence(filtered, "")
+	if agg.PaneID == "" {
+		return
+	}
+	applySessionResult(session, agg)
+	session.IntelligencePaneCount = len(filtered)
+	session.IntelligenceWindowCount = countIntelligenceWindows(filtered)
+	session.IntelligenceAppCounts = intelligence.CountApplications(filtered)
+}
+
+func filterResultsByPaneIDs(results []intelligence.Result, paneIDs []string) []intelligence.Result {
+	if len(paneIDs) == 0 {
+		return results
+	}
+	allowed := make(map[string]struct{}, len(paneIDs))
+	for _, id := range paneIDs {
+		allowed[id] = struct{}{}
+	}
+	filtered := make([]intelligence.Result, 0, len(results))
+	for _, result := range results {
+		if _, ok := allowed[result.PaneID]; ok {
+			filtered = append(filtered, result)
+		}
+	}
+	return filtered
 }
 
 func (s *Server) attachCachedWindowIntelligence(sessionName string, windows []tmux.Window) {

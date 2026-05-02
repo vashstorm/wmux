@@ -112,19 +112,27 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			}
 			allStates := make([]tmux.AttentionState, 0, len(windows))
 			totalCount := 0
+			allPaneIDs := make([]string, 0)
 			for _, w := range windows {
-				panes, err := adapter.ListPanes(response.Data[i].Name, w.Name)
+				target := w.ID
+				if target == "" {
+					target = w.Name
+				}
+				panes, err := adapter.ListPanes(response.Data[i].Name, target)
 				if err != nil {
 					continue
 				}
 				wState, wCount := aggregatePaneAttention(panes)
 				allStates = append(allStates, wState)
 				totalCount += wCount
+				for _, p := range panes {
+					allPaneIDs = append(allPaneIDs, p.ID)
+				}
 			}
 			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
 			response.Data[i].AttentionCount = totalCount
+			s.attachCachedSessionIntelligence(&response.Data[i], allPaneIDs)
 		}
-		s.attachCachedSessionIntelligence(response.Data)
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
 			Host:           connection.Host,
@@ -149,6 +157,7 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			}
 			allStates := make([]tmux.AttentionState, 0, len(windows))
 			totalCount := 0
+			allPaneIDs := make([]string, 0)
 			for _, w := range windows {
 				panes, err := remote.ListPanes(buildWindowTarget(response.Data[i].Name, w.Name))
 				if err != nil {
@@ -157,9 +166,13 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 				wState, wCount := aggregatePaneAttention(panes)
 				allStates = append(allStates, wState)
 				totalCount += wCount
+				for _, p := range panes {
+					allPaneIDs = append(allPaneIDs, p.ID)
+				}
 			}
 			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
 			response.Data[i].AttentionCount = totalCount
+			s.attachCachedSessionIntelligence(&response.Data[i], allPaneIDs)
 		}
 	default:
 		s.writeError(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("unsupported connection type %q", connection.Type))

@@ -62,7 +62,7 @@ func TestAggregateSessionIntelligence(t *testing.T) {
 	t.Run("highest priority status wins", func(t *testing.T) {
 		got := AggregateSessionIntelligence([]Result{
 			{PaneID: "%1", Status: StatusRunning, Summary: "running", UpdatedAt: now},
-			{PaneID: "%2", Status: StatusWaiting, Summary: "waiting", UpdatedAt: now},
+			{PaneID: "%2", Status: StatusWaitingConfirm, Summary: "waiting", UpdatedAt: now},
 			{PaneID: "%3", Status: StatusBlocked, Summary: "blocked", UpdatedAt: now},
 		}, "%1")
 		if got.Status != StatusBlocked || got.Summary != "blocked" {
@@ -94,7 +94,7 @@ func TestAggregateSessionIntelligence(t *testing.T) {
 		got := AggregateSessionIntelligence([]Result{
 			{PaneID: "%1", Status: StatusNone, Summary: "none", UpdatedAt: now.Add(4 * time.Minute)},
 			{PaneID: "%2", Status: StatusRunning, Summary: "running", UpdatedAt: now.Add(3 * time.Minute)},
-			{PaneID: "%3", Status: StatusWaiting, Summary: "waiting", UpdatedAt: now.Add(2 * time.Minute)},
+			{PaneID: "%3", Status: StatusWaitingIdle, Summary: "waiting", UpdatedAt: now.Add(2 * time.Minute)},
 			{PaneID: "%4", Status: StatusBlocked, Summary: "blocked", UpdatedAt: now.Add(time.Minute)},
 			{PaneID: "%5", Status: StatusDeadLoop, Summary: "dead loop", UpdatedAt: now},
 		}, "%1")

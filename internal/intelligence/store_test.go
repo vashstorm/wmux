@@ -21,7 +21,7 @@ func TestStoreCacheMiss(t *testing.T) {
 
 func TestStoreCacheHit(t *testing.T) {
 	store := newTestStore(t)
-	want := testResult("%1", "dev", "@1", StatusWaiting, time.Now())
+	want := testResult("%1", "dev", "@1", StatusWaitingConfirm, time.Now())
 
 	if err := store.Set(want); err != nil {
 		t.Fatalf("Set returned error: %v", err)

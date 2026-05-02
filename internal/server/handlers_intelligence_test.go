@@ -26,7 +26,7 @@ func TestAnalyzeSessionIntelligenceUpdatesTargetSession(t *testing.T) {
 
 	fake := intelligence.NewFakeProvider(intelligence.FakeProviderConfig{
 		App:        intelligence.AppClaude,
-		Status:     intelligence.StatusWaiting,
+		Status:     intelligence.StatusWaitingConfirm,
 		Summary:    "Waiting for user input",
 		Confidence: 0.92,
 	})
@@ -44,7 +44,7 @@ func TestAnalyzeSessionIntelligenceUpdatesTargetSession(t *testing.T) {
 	if payload.Intelligence == nil {
 		t.Fatal("expected aggregate intelligence in analyze response")
 	}
-	if payload.Intelligence.App != "claude" || payload.Intelligence.Status != "waiting" {
+	if payload.Intelligence.App != "claude" || payload.Intelligence.Status != "waiting_confirm" {
 		t.Fatalf("unexpected intelligence aggregate: %#v", payload.Intelligence)
 	}
 	if payload.Intelligence.Summary != "Waiting for user input" {
@@ -122,7 +122,7 @@ func TestAnalyzeSessionSwitchesActiveProvider(t *testing.T) {
 	})
 	anthropicFake := intelligence.NewFakeProvider(intelligence.FakeProviderConfig{
 		App:        intelligence.AppClaude,
-		Status:     intelligence.StatusWaiting,
+		Status:     intelligence.StatusWaitingIdle,
 		Summary:    "Anthropic analysis",
 		Confidence: 0.95,
 	})

@@ -18,8 +18,6 @@ import (
 	openai_shared "github.com/openai/openai-go/shared"
 )
 
-const openaiSystemPrompt = anthropicSystemPrompt
-
 type OpenAIProvider struct {
 	client  *openai.Client
 	model   string
@@ -66,12 +64,13 @@ func (p *OpenAIProvider) isDeepseekV4() bool {
 }
 
 func (p *OpenAIProvider) analyzeViaHTTP(ctx context.Context, input AnalyzeInput) (Result, error) {
-	userMessage := fmt.Sprintf("Current command: [%s]\nTerminal content:\n%s", input.CurrentCommand, input.RawContent)
+	systemPrompt := SystemPromptFor(ProviderOpenAI)
+	userMessage := BuildUserPrompt(input)
 
 	body := map[string]any{
 		"model": p.model,
 		"messages": []map[string]string{
-			{"role": "system", "content": openaiSystemPrompt},
+			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": userMessage},
 		},
 		"response_format": map[string]string{"type": "json_object"},
@@ -151,12 +150,13 @@ func (p *OpenAIProvider) analyzeViaHTTP(ctx context.Context, input AnalyzeInput)
 }
 
 func (p *OpenAIProvider) analyzeViaSDK(ctx context.Context, input AnalyzeInput) (Result, error) {
-	userMessage := fmt.Sprintf("Current command: [%s]\nTerminal content:\n%s", input.CurrentCommand, input.RawContent)
+	systemPrompt := SystemPromptFor(ProviderOpenAI)
+	userMessage := BuildUserPrompt(input)
 
 	resp, err := p.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: openai_shared.ChatModel(p.model),
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(openaiSystemPrompt),
+			openai.SystemMessage(systemPrompt),
 			openai.UserMessage(userMessage),
 		},
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
@@ -212,6 +212,8 @@ func (p *OpenAIProvider) parseResponse(content string, input AnalyzeInput) (Resu
 		}
 	}
 
+	app = p.inferApplicationFromCommand(input.CurrentCommand, app)
+
 	summary := resp.Summary
 	if len(summary) > 120 {
 		summary = summary[:120]
@@ -238,6 +240,22 @@ func (p *OpenAIProvider) parseResponse(content string, input AnalyzeInput) (Resu
 		Reason:      reason,
 		Source:      p.name,
 	}, nil
+}
+
+func (p *OpenAIProvider) inferApplicationFromCommand(currentCommand string, aiApp Application) Application {
+	cmd := strings.ToLower(strings.TrimSpace(currentCommand))
+	switch {
+	case cmd == "ocx" || cmd == "opencode":
+		return AppOpenCode
+	case cmd == "claude":
+		return AppClaude
+	case cmd == "codex":
+		return AppCodex
+	case cmd == "zsh" || cmd == "bash" || cmd == "sh":
+		return AppZsh
+	default:
+		return aiApp
+	}
 }
 
 func (p *OpenAIProvider) mapError(err error) *ProviderError {

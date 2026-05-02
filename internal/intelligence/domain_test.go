@@ -47,9 +47,10 @@ func TestStatusPriority(t *testing.T) {
 		status Status
 		want   int
 	}{
-		{status: StatusDeadLoop, want: 4},
-		{status: StatusBlocked, want: 3},
-		{status: StatusWaiting, want: 2},
+		{status: StatusDeadLoop, want: 5},
+		{status: StatusBlocked, want: 4},
+		{status: StatusWaitingConfirm, want: 3},
+		{status: StatusWaitingIdle, want: 2},
 		{status: StatusRunning, want: 1},
 		{status: StatusNone, want: 0},
 	}

@@ -20,21 +20,24 @@ const (
 type Status string
 
 const (
-	StatusDeadLoop Status = "dead_loop"
-	StatusBlocked  Status = "blocked"
-	StatusWaiting  Status = "waiting"
-	StatusRunning  Status = "running"
-	StatusNone     Status = "none"
+	StatusDeadLoop       Status = "dead_loop"
+	StatusBlocked        Status = "blocked"
+	StatusWaitingConfirm Status = "waiting_confirm"
+	StatusWaitingIdle    Status = "waiting_idle"
+	StatusRunning        Status = "running"
+	StatusNone           Status = "none"
 )
 
 // StatusPriority returns an integer priority where higher means more urgent.
 func StatusPriority(s Status) int {
 	switch s {
 	case StatusDeadLoop:
-		return 4
+		return 5
 	case StatusBlocked:
+		return 4
+	case StatusWaitingConfirm:
 		return 3
-	case StatusWaiting:
+	case StatusWaitingIdle:
 		return 2
 	case StatusRunning:
 		return 1
@@ -68,8 +71,10 @@ func NormalizeStatus(s string) Status {
 		return StatusDeadLoop
 	case StatusBlocked:
 		return StatusBlocked
-	case StatusWaiting:
-		return StatusWaiting
+	case StatusWaitingConfirm:
+		return StatusWaitingConfirm
+	case StatusWaitingIdle:
+		return StatusWaitingIdle
 	case StatusRunning:
 		return StatusRunning
 	case StatusNone:

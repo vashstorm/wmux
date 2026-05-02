@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -143,6 +144,37 @@ func (s *Store) IsExpired(result Result, cacheTTLSec int) bool {
 		return false
 	}
 	return !result.UpdatedAt.Add(time.Duration(cacheTTLSec) * time.Second).After(time.Now())
+}
+
+func (s *Store) DeleteExcept(sessionName string, keepPaneIDs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(keepPaneIDs) == 0 {
+		_, err := s.db.Exec(`DELETE FROM intelligence_results WHERE session_name = ?`, sessionName)
+		if err != nil {
+			return fmt.Errorf("delete all session results: %w", err)
+		}
+		return nil
+	}
+
+	placeholders := make([]string, len(keepPaneIDs))
+	args := make([]any, 0, len(keepPaneIDs)+1)
+	args = append(args, sessionName)
+	for i, id := range keepPaneIDs {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(
+		`DELETE FROM intelligence_results WHERE session_name = ? AND pane_id NOT IN (%s)`,
+		strings.Join(placeholders, ","),
+	)
+	_, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("delete stale session results: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) init() error {

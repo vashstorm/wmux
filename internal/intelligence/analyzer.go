@@ -107,6 +107,12 @@ func (a *Analyzer) skipSession(sessionName string, minSessionIntervalSec int) bo
 	return false
 }
 
+func (a *Analyzer) ResetSessionTimer(sessionName string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.lastRun, sessionName)
+}
+
 func (a *Analyzer) recordRun(sessionName string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

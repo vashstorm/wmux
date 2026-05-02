@@ -14,33 +14,6 @@ import (
 	anthropic_option "github.com/anthropics/anthropic-sdk-go/option"
 )
 
-const anthropicSystemPrompt = `You analyze terminal pane content and classify what application is running and its status.
-
-CRITICAL: Respond in Chinese. All text fields must be in Chinese.
-
-Return a JSON object with these exact fields:
-- application: one of "claude", "codex", "opencode", "zsh", "unknown"
-- status: one of "dead_loop", "blocked", "waiting", "running", "none"
-- summary: one sentence, max 120 characters, in Chinese, describing what the pane is doing
-- confidence: float 0.0-1.0
-- reason: optional, max 240 characters, in Chinese
-
-Status rules (follow strictly):
-- "dead_loop": repeating without progress
-- "blocked": blocked by error or permission issue
-- "waiting": a command IS running and paused for user input or external resource
-- "running": actively executing with visible output
-- "none": shell is idle at prompt with NO command running. This is the default for zsh/bash showing only a prompt.
-
-Application rules:
-- "claude": Claude CLI by Anthropic
-- "codex": OpenAI Codex CLI
-- "opencode": OpenCode CLI
-- "zsh": zsh shell (default when none of above)
-- "unknown": cannot determine
-
-IMPORTANT: If you see a shell prompt with no running command, status MUST be "none", NOT "waiting".`
-
 type llmResponse struct {
 	Application string  `json:"application"`
 	Status      string  `json:"status"`
@@ -80,13 +53,14 @@ func NewAnthropicProvider(cfg config.IntelligenceProviderConfig) (*AnthropicProv
 }
 
 func (p *AnthropicProvider) Analyze(ctx context.Context, input AnalyzeInput) (Result, error) {
-	userMessage := fmt.Sprintf("Current command: [%s]\nTerminal content:\n%s", input.CurrentCommand, input.RawContent)
+	systemPrompt := SystemPromptFor(ProviderAnthropic)
+	userMessage := BuildUserPrompt(input)
 
 	msg, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(p.model),
 		MaxTokens: 256,
 		System: []anthropic.TextBlockParam{{
-			Text: anthropicSystemPrompt,
+			Text: systemPrompt,
 		}},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(userMessage)),
