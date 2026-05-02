@@ -87,11 +87,45 @@ func (s *Server) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 		payload.Auth.Token = current.Auth.Token
 	}
 
+	// Build a set of provider names in the new payload to detect renames.
+	newNames := make(map[string]bool, len(payload.Intelligence.Providers))
+	for _, p := range payload.Intelligence.Providers {
+		newNames[strings.TrimSpace(p.Name)] = true
+	}
+
+	// existingMatched tracks which existing providers have been consumed.
+	existingMatched := make(map[string]bool, len(current.Intelligence.Providers))
+
 	for i := range payload.Intelligence.Providers {
 		if strings.TrimSpace(payload.Intelligence.Providers[i].APIKey) == "" {
+			matched := false
+
+			// First pass: direct name match (regular edit, no rename).
 			for _, existing := range current.Intelligence.Providers {
 				if existing.Name == payload.Intelligence.Providers[i].Name {
 					payload.Intelligence.Providers[i].APIKey = existing.APIKey
+					existingMatched[existing.Name] = true
+					matched = true
+					break
+				}
+			}
+			if matched {
+				continue
+			}
+
+			// Second pass: the provider may have been renamed. Find an existing
+			// provider whose name is NOT present in the new payload (it was
+			// either deleted or renamed to the current provider's name).
+			for _, existing := range current.Intelligence.Providers {
+				if existingMatched[existing.Name] {
+					continue
+				}
+				if strings.TrimSpace(existing.APIKey) == "" {
+					continue
+				}
+				if !newNames[existing.Name] {
+					payload.Intelligence.Providers[i].APIKey = existing.APIKey
+					existingMatched[existing.Name] = true
 					break
 				}
 			}

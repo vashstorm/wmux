@@ -171,7 +171,6 @@ export function SettingsPanel() {
 				provider: p.provider,
 				model: p.model,
 				baseURL: p.baseURL,
-				apiKeyConfigured: p.apiKeyConfigured,
 			};
 			if (p.apiKey) {
 				result.apiKey = p.apiKey;
