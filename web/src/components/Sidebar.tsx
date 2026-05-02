@@ -21,7 +21,8 @@ const SESSION_SYNC_INTERVAL_MS = 2000;
 const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
 	dead_loop: "Loop",
 	blocked: "Blocked",
-	waiting: "Waiting",
+	waiting_confirm: "Confirm",
+	waiting_idle: "Idle",
 	running: "Running",
 };
 
@@ -381,10 +382,6 @@ export function Sidebar() {
     }
   };
 
-  const isSessionActive = (sessionName: string) => {
-    return selectedPane?.connectionId === selectedConnectionId && selectedPane?.session === sessionName;
-  };
-
   return (
     <aside className="sidebar" data-testid="sidebar">
       <div className="sidebar-header">
@@ -486,13 +483,12 @@ export function Sidebar() {
                   {filteredSessions.map((session) => {
                     const sname = session.name ?? "";
                     if (!sname) return null;
-                    const isActive = isSessionActive(sname);
                     const isRenaming = renamingSession === sname;
 
                     return (
                       <div
                         key={sname}
-                        className={`session-card${isActive ? " is-active" : ""}${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}`}
+                        className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}`}
                         data-testid={`session-card-${sname}`}
                       >
                         {isRenaming ? (
@@ -541,9 +537,9 @@ export function Sidebar() {
                                       {session.attentionCount}
                                     </span>
                                   )}
-                                  {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceStale || session.intelligenceError) && (
-                                    <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStale ? " is-stale" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
-                                      {session.intelligenceError ? "Error" : session.intelligenceStale ? "Stale" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
+                                  {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
+                                    <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
+                                      {session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
                                     </span>
                                   )}
                                   {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
@@ -557,7 +553,7 @@ export function Sidebar() {
                                   })}
                                 </div>
                                 {session.intelligenceSummary && (
-                                  <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
+                                  <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
                                     {session.intelligenceSummary}
                                   </p>
                                 )}
