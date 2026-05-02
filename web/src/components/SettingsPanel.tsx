@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { getConfig, type AppConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
+
+interface ProviderFormState extends IntelligenceProviderConfig {
+	isNew: boolean;
+	apiKeyInput: string;
+	originalName: string;
+}
 
 interface SettingsFormState {
 	bind: string;
@@ -15,16 +21,14 @@ interface SettingsFormState {
 	terminalFontSize: number;
 	terminalFontWeight: string;
 	intelligenceEnabled: boolean;
-	intelligenceProvider: string;
-	intelligenceModel: string;
-	intelligenceAPIKey: string;
-	intelligenceAPIKeyConfigured: boolean;
-	intelligenceBaseURL: string;
+	intelligenceActiveProvider: string;
+	intelligenceProviders: IntelligenceProviderConfig[];
 	intelligenceMaxBytes: number;
 	intelligenceTimeoutSec: number;
 	intelligenceMinSessionIntervalSec: number;
 	intelligenceMaxConcurrency: number;
 	intelligenceCacheTTLSec: number;
+	editingProvider: ProviderFormState | null;
 }
 
 function buildFormState(config: AppConfig): SettingsFormState {
@@ -41,16 +45,14 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		terminalFontSize: config.ui.terminalFontSize || 14,
 		terminalFontWeight: normalizeTerminalFontWeight(config.ui.terminalFontWeight),
 		intelligenceEnabled: intel?.enabled ?? false,
-		intelligenceProvider: intel?.provider ?? "anthropic",
-		intelligenceModel: intel?.model ?? "",
-		intelligenceAPIKey: "",
-		intelligenceAPIKeyConfigured: intel?.apiKeyConfigured ?? false,
-		intelligenceBaseURL: intel?.baseURL ?? "",
+		intelligenceActiveProvider: intel?.activeProvider ?? "",
+		intelligenceProviders: intel?.providers ?? [],
 		intelligenceMaxBytes: intel?.maxBytes ?? 4096,
 		intelligenceTimeoutSec: intel?.timeoutSec ?? 30,
 		intelligenceMinSessionIntervalSec: intel?.minSessionIntervalSec ?? 60,
 		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,
 		intelligenceCacheTTLSec: intel?.cacheTTLSec ?? 300,
+		editingProvider: null,
 	};
 }
 
@@ -163,6 +165,20 @@ export function SettingsPanel() {
 				: connection,
 		);
 
+		const providers = formState.intelligenceProviders.map((p) => {
+			const result: IntelligenceProviderConfig = {
+				name: p.name,
+				provider: p.provider,
+				model: p.model,
+				baseURL: p.baseURL,
+				apiKeyConfigured: p.apiKeyConfigured,
+			};
+			if (p.apiKey) {
+				result.apiKey = p.apiKey;
+			}
+			return result;
+		});
+
 		return {
 			...config,
 			server: {
@@ -186,10 +202,8 @@ export function SettingsPanel() {
 			},
 			intelligence: {
 				enabled: formState.intelligenceEnabled,
-				provider: formState.intelligenceProvider.trim() || undefined,
-				model: formState.intelligenceModel.trim() || undefined,
-				apiKey: formState.intelligenceAPIKey.trim(),
-				baseURL: formState.intelligenceBaseURL.trim() || undefined,
+				activeProvider: formState.intelligenceActiveProvider || undefined,
+				providers,
 				maxBytes: formState.intelligenceMaxBytes,
 				timeoutSec: formState.intelligenceTimeoutSec,
 				minSessionIntervalSec: formState.intelligenceMinSessionIntervalSec,
@@ -234,10 +248,8 @@ export function SettingsPanel() {
 								intelligence: {
 									...latest.intelligence,
 									enabled: payload.intelligence.enabled,
-									provider: payload.intelligence.provider,
-									model: payload.intelligence.model,
-									apiKey: payload.intelligence.apiKey,
-									baseURL: payload.intelligence.baseURL,
+									activeProvider: payload.intelligence.activeProvider,
+									providers: payload.intelligence.providers,
 									maxBytes: payload.intelligence.maxBytes,
 									timeoutSec: payload.intelligence.timeoutSec,
 									minSessionIntervalSec: payload.intelligence.minSessionIntervalSec,
@@ -278,18 +290,41 @@ export function SettingsPanel() {
 		}
 
 		if (formState.intelligenceEnabled) {
-			if (!formState.intelligenceProvider.trim()) {
-				setError({ code: "bad_request", message: "Intelligence provider is required when enabled" });
+			if (formState.intelligenceProviders.length === 0) {
+				setError({ code: "bad_request", message: "At least one provider is required when intelligence is enabled" });
 				return;
 			}
-			if (!formState.intelligenceModel.trim()) {
-				setError({ code: "bad_request", message: "Intelligence model is required when enabled" });
+			if (!formState.intelligenceActiveProvider.trim()) {
+				setError({ code: "bad_request", message: "An active provider must be selected when intelligence is enabled" });
 				return;
 			}
-		if (!formState.intelligenceAPIKey.trim() && !formState.intelligenceAPIKeyConfigured) {
-			setError({ code: "bad_request", message: "Intelligence API key is required when enabled" });
-			return;
-		}
+			const activeExists = formState.intelligenceProviders.some(
+				(p) => p.name === formState.intelligenceActiveProvider
+			);
+			if (!activeExists) {
+				setError({ code: "bad_request", message: "Selected active provider does not exist" });
+				return;
+			}
+			const names = new Set<string>();
+			for (const provider of formState.intelligenceProviders) {
+				if (!provider.name.trim()) {
+					setError({ code: "bad_request", message: "All providers must have a name" });
+					return;
+				}
+				if (!provider.provider.trim()) {
+					setError({ code: "bad_request", message: "All providers must have a provider type" });
+					return;
+				}
+				if (!provider.model.trim()) {
+					setError({ code: "bad_request", message: "All providers must have a model" });
+					return;
+				}
+				if (names.has(provider.name)) {
+					setError({ code: "bad_request", message: `Provider name "${provider.name}" must be unique` });
+					return;
+				}
+				names.add(provider.name);
+			}
 		}
 
 		await performSave(payload);
@@ -573,62 +608,318 @@ export function SettingsPanel() {
 													data-testid="intelligence-enabled-checkbox"
 												/>
 											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-provider">Provider</label>
-												<select
-													id="intelligence-provider"
-													value={formState.intelligenceProvider}
-													onChange={(event) => updateField("intelligenceProvider", event.target.value)}
-													data-testid="intelligence-provider-select"
+										</div>
+
+										<div className="settings-form-section">
+											<h4 className="settings-section-title">Providers</h4>
+											<div className="intelligence-providers-header">
+												<button
+													type="button"
+													className="intelligence-add-provider-btn"
+													onClick={() => setFormState((current) =>
+														current ? {
+															...current,
+															editingProvider: {
+																name: "",
+																provider: "anthropic",
+																model: "",
+																apiKey: "",
+																baseURL: "",
+																apiKeyConfigured: false,
+																isNew: true,
+																apiKeyInput: "",
+															originalName: "",
+															},
+														} : current
+													)}
 													disabled={!formState.intelligenceEnabled}
+													data-testid="intelligence-add-provider-btn"
 												>
-													<option value="anthropic">anthropic</option>
-													<option value="openai">openai</option>
-												</select>
+													+ ADD PROVIDER
+												</button>
 											</div>
-											<div className="form-field">
-												<label htmlFor="intelligence-model">Model</label>
-												<input
-													id="intelligence-model"
-													type="text"
-													value={formState.intelligenceModel}
-													onChange={(event) => updateField("intelligenceModel", event.target.value)}
-													data-testid="intelligence-model-input"
-													placeholder="claude-sonnet-4-20250514"
-													disabled={!formState.intelligenceEnabled}
-												/>
-											</div>
-										<div className="form-field">
-											<label htmlFor="intelligence-api-key">API Key</label>
-											<div className="password-input-wrapper">
-												<input
-													id="intelligence-api-key"
-													type="password"
-													value={formState.intelligenceAPIKey}
-													onChange={(event) => updateField("intelligenceAPIKey", event.target.value)}
-													data-testid="intelligence-api-key-input"
-													placeholder={formState.intelligenceAPIKeyConfigured ? "••••••••••••••••" : "sk-..."}
-													disabled={!formState.intelligenceEnabled}
-													autoComplete="new-password"
-												/>
-											</div>
-											<p className="form-help-text">
-												{formState.intelligenceAPIKeyConfigured ? "A key is configured. Enter a new value to replace it." : "No API key configured yet."}
-											</p>
+
+											{formState.editingProvider && (
+												<div className="intelligence-provider-editor" data-testid="intelligence-provider-editor">
+													<div className="form-field">
+														<label htmlFor="provider-editor-name">Name</label>
+														<input
+															id="provider-editor-name"
+															type="text"
+															value={formState.editingProvider.name}
+															onChange={(event) => setFormState((current) =>
+																current && current.editingProvider
+																	? {
+																		...current,
+																		editingProvider: { ...current.editingProvider, name: event.target.value },
+																	}
+																	: current
+															)}
+															data-testid="provider-editor-name-input"
+															placeholder="my-anthropic"
+														/>
+													</div>
+													<div className="form-field">
+														<label htmlFor="provider-editor-type">Provider Type</label>
+														<select
+															id="provider-editor-type"
+															value={formState.editingProvider.provider}
+															onChange={(event) => setFormState((current) =>
+																current && current.editingProvider
+																	? {
+																		...current,
+																		editingProvider: { ...current.editingProvider, provider: event.target.value },
+																	}
+																	: current
+															)}
+															data-testid="provider-editor-type-select"
+														>
+															<option value="anthropic">anthropic</option>
+															<option value="openai">openai</option>
+														</select>
+													</div>
+													<div className="form-field">
+														<label htmlFor="provider-editor-model">Model</label>
+														<input
+															id="provider-editor-model"
+															type="text"
+															value={formState.editingProvider.model}
+															onChange={(event) => setFormState((current) =>
+																current && current.editingProvider
+																	? {
+																		...current,
+																		editingProvider: { ...current.editingProvider, model: event.target.value },
+																	}
+																	: current
+															)}
+															data-testid="provider-editor-model-input"
+															placeholder="claude-sonnet-4-20250514"
+														/>
+													</div>
+													<div className="form-field">
+														<label htmlFor="provider-editor-api-key">API Key</label>
+														<div className="password-input-wrapper">
+															<input
+																id="provider-editor-api-key"
+																type="password"
+																value={formState.editingProvider.apiKeyInput}
+																onChange={(event) => setFormState((current) =>
+																	current && current.editingProvider
+																		? {
+																			...current,
+																			editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
+																		}
+																		: current
+																)}
+																data-testid="provider-editor-api-key-input"
+																placeholder={formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
+																autoComplete="new-password"
+															/>
+														</div>
+														<p className="form-help-text">
+															{formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew
+																? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
+																: "API key is required for new providers."}
+														</p>
+													</div>
+													<div className="form-field">
+														<label htmlFor="provider-editor-base-url">Base URL</label>
+														<input
+															id="provider-editor-base-url"
+															type="text"
+															value={formState.editingProvider.baseURL ?? ""}
+															onChange={(event) => setFormState((current) =>
+																current && current.editingProvider
+																	? {
+																		...current,
+																		editingProvider: { ...current.editingProvider, baseURL: event.target.value },
+																	}
+																	: current
+															)}
+															data-testid="provider-editor-base-url-input"
+															placeholder="https://api.openrouter.ai/v1"
+														/>
+														<p className="form-help-text">Optional custom endpoint for OpenAI-compatible providers.</p>
+													</div>
+													<div className="intelligence-editor-actions">
+														<button
+															type="button"
+															className="btn btn-secondary"
+															onClick={() => setFormState((current) =>
+																current ? { ...current, editingProvider: null } : current
+															)}
+														>
+															CANCEL
+														</button>
+														<button
+															type="button"
+															className="btn btn-primary"
+															onClick={() => {
+																if (!formState) return;
+																const editor = formState.editingProvider;
+																if (!editor) return;
+																if (!editor.name.trim()) {
+																	setError({ code: "bad_request", message: "Provider name is required" });
+																	return;
+																}
+																if (!editor.model.trim()) {
+																	setError({ code: "bad_request", message: "Provider model is required" });
+																	return;
+																}
+																if (editor.isNew && !editor.apiKeyInput.trim()) {
+																	setError({ code: "bad_request", message: "API key is required for new providers" });
+																	return;
+																}
+																const duplicateName = formState.intelligenceProviders.some(
+													(p) => p.name === editor.name.trim() && p.name !== (editor.isNew ? "" : editor.originalName)
+																);
+																const existingProvider = formState.editingProvider && !formState.editingProvider.isNew
+													? formState.intelligenceProviders.find((p) => p.name === editor.originalName)
+																	: undefined;
+																if (duplicateName && existingProvider?.name !== editor.name.trim()) {
+																	setError({ code: "bad_request", message: `Provider name "${editor.name.trim()}" already exists` });
+																	return;
+																}
+
+																const updatedProvider: IntelligenceProviderConfig = {
+																	name: editor.name.trim(),
+																	provider: editor.provider,
+																	model: editor.model.trim(),
+																	baseURL: editor.baseURL?.trim() || undefined,
+																	apiKeyConfigured: editor.apiKeyConfigured || (editor.apiKeyInput.trim().length > 0),
+																};
+																if (editor.apiKeyInput.trim()) {
+																	updatedProvider.apiKey = editor.apiKeyInput.trim();
+																}
+
+																setFormState((current) => {
+																	if (!current || !current.editingProvider) return current;
+																	const isNew = current.editingProvider.isNew;
+																	const existingIndex = current.intelligenceProviders.findIndex(
+																		(p) => p.name === (isNew ? current.editingProvider?.name : current.editingProvider?.originalName) && !isNew
+																	);
+																	let providers: IntelligenceProviderConfig[];
+																	if (isNew) {
+																		providers = [...current.intelligenceProviders, updatedProvider];
+																	} else if (existingIndex >= 0) {
+																		providers = [...current.intelligenceProviders];
+																		providers[existingIndex] = updatedProvider;
+																	} else {
+																		providers = current.intelligenceProviders;
+																	}
+																	return {
+																		...current,
+																		intelligenceProviders: providers,
+																		editingProvider: null,
+																	};
+																});
+															}}
+															data-testid="provider-editor-save-btn"
+														>
+															SAVE PROVIDER
+														</button>
+													</div>
+												</div>
+											)}
+
+											{formState.intelligenceProviders.length === 0 && !formState.editingProvider ? (
+												<div className="intelligence-providers-empty" data-testid="intelligence-providers-empty">
+													<div className="empty-icon">🤖</div>
+													<p>No providers configured yet. Add a provider to get started.</p>
+												</div>
+											) : (
+												<ul className="intelligence-providers-list" data-testid="intelligence-providers-list">
+													{formState.intelligenceProviders.map((provider) => {
+														const isActive = provider.name === formState.intelligenceActiveProvider;
+														return (
+															<li
+																key={provider.name}
+																className={`intelligence-provider-card ${isActive ? "is-active" : ""}`}
+																data-testid={`intelligence-provider-card-${provider.name}`}
+															>
+																<div className="intelligence-provider-info">
+																	<div className="intelligence-provider-name">{provider.name}</div>
+																	<div className="intelligence-provider-meta">
+																		<span className="intelligence-provider-badge" data-testid={`provider-type-badge-${provider.name}`}>
+																			{provider.provider}
+																		</span>
+																		<span className="intelligence-provider-model">{provider.model}</span>
+																		{provider.apiKeyConfigured && (
+																			<span className="intelligence-provider-key-status" title="API key configured">🔑</span>
+																		)}
+																	</div>
+																</div>
+																<div className="intelligence-provider-actions">
+																	<button
+																		type="button"
+																		className={`intelligence-set-active-btn ${isActive ? "is-active" : ""}`}
+																		onClick={() => setFormState((current) =>
+																			current ? { ...current, intelligenceActiveProvider: provider.name } : current
+																		)}
+																		disabled={!formState.intelligenceEnabled}
+																		title={isActive ? "Active provider" : "Set as active provider"}
+																		data-testid={`provider-set-active-${provider.name}`}
+																	>
+																		{isActive ? "★ ACTIVE" : "SET ACTIVE"}
+																	</button>
+																	<button
+																		type="button"
+																		className="intelligence-edit-btn"
+																		onClick={() => setFormState((current) =>
+																			current ? {
+																				...current,
+																				editingProvider: {
+																					...provider,
+																					isNew: false,
+																					apiKeyInput: "",
+																					originalName: provider.name,
+																				},
+																			} : current
+																		)}
+																		disabled={!formState.intelligenceEnabled}
+																		title="Edit provider"
+																		data-testid={`provider-edit-${provider.name}`}
+																	>
+																		✎
+																	</button>
+																	<button
+																		type="button"
+																		className="intelligence-delete-btn"
+																		onClick={() => {
+																			setFormState((current) => {
+																				if (!current) return current;
+																				const providers = current.intelligenceProviders.filter(
+																					(p) => p.name !== provider.name
+																				);
+																				const activeProvider = current.intelligenceActiveProvider === provider.name
+																					? (providers[0]?.name ?? "")
+																					: current.intelligenceActiveProvider;
+																				return {
+																					...current,
+																					intelligenceProviders: providers,
+																					intelligenceActiveProvider: activeProvider,
+																				};
+																			});
+																		}}
+																		disabled={!formState.intelligenceEnabled}
+																		title="Delete provider"
+																		data-testid={`provider-delete-${provider.name}`}
+																	>
+																		×
+																	</button>
+																</div>
+																{isActive && (
+																	<div className="intelligence-provider-active-indicator" data-testid={`provider-active-indicator-${provider.name}`} />
+																)}
+															</li>
+														);
+													})}
+												</ul>
+											)}
 										</div>
-										<div className="form-field">
-											<label htmlFor="intelligence-base-url">Base URL</label>
-											<input
-												id="intelligence-base-url"
-												type="text"
-												value={formState.intelligenceBaseURL}
-												onChange={(event) => updateField("intelligenceBaseURL", event.target.value)}
-												data-testid="intelligence-base-url-input"
-												placeholder="https://api.openrouter.ai/v1"
-												disabled={!formState.intelligenceEnabled}
-											/>
-											<p className="form-help-text">Optional custom endpoint for OpenAI-compatible providers.</p>
-										</div>
+
+										<div className="settings-form-section">
+											<h4 className="settings-section-title">Global Settings</h4>
 											<div className="form-field">
 												<label htmlFor="intelligence-max-bytes">Max Bytes</label>
 												<input
@@ -637,6 +928,7 @@ export function SettingsPanel() {
 													value={formState.intelligenceMaxBytes}
 													onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
 													data-testid="intelligence-max-bytes-input"
+													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
 											<div className="form-field">
@@ -647,6 +939,7 @@ export function SettingsPanel() {
 													value={formState.intelligenceTimeoutSec}
 													onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
 													data-testid="intelligence-timeout-sec-input"
+													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
 											<div className="form-field">
@@ -657,6 +950,7 @@ export function SettingsPanel() {
 													value={formState.intelligenceMinSessionIntervalSec}
 													onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
 													data-testid="intelligence-min-session-interval-sec-input"
+													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
 											<div className="form-field">
@@ -667,6 +961,7 @@ export function SettingsPanel() {
 													value={formState.intelligenceMaxConcurrency}
 													onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
 													data-testid="intelligence-max-concurrency-input"
+													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
 											<div className="form-field">
@@ -677,6 +972,7 @@ export function SettingsPanel() {
 													value={formState.intelligenceCacheTTLSec}
 													onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
 													data-testid="intelligence-cache-ttl-sec-input"
+													disabled={!formState.intelligenceEnabled}
 												/>
 											</div>
 										</div>

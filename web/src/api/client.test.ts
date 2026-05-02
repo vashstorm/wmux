@@ -132,14 +132,14 @@ describe("api client", () => {
 	});
 
 	test("getConfig returns config", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		const result = await getConfig();
 		expect(result.schemaVersion).toBe(1);
 	});
 
 	test("updateConfig PUTs payload", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
-		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		expect(result.ui.theme).toBe("light");
 	});
 
@@ -244,6 +244,152 @@ describe("api client", () => {
 			expect(result.data[0]!.intelligenceApp).toBe("lowercase-app");
 			expect(result.data[0]!.intelligenceStatus).toBe("lowercase-status");
 		});
+	});
+
+	test("getConfig response includes intelligence fields", async () => {
+		mockJsonResponse(200, {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "", tokenConfigured: false },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: {
+				enabled: true,
+				activeProvider: "main",
+				providers: [
+					{ name: "main", provider: "openai", model: "gpt-4o", apiKeyConfigured: true, baseURL: "https://custom.api.com/v1" },
+				],
+				maxBytes: 8192,
+				timeoutSec: 10,
+				minSessionIntervalSec: 30,
+				maxConcurrency: 5,
+				cacheTTLSec: 600,
+			},
+		});
+		const result = await getConfig();
+		expect(result.intelligence.enabled).toBe(true);
+		expect(result.intelligence.activeProvider).toBe("main");
+		expect(result.intelligence.providers).toHaveLength(1);
+		expect(result.intelligence.providers[0]!.name).toBe("main");
+		expect(result.intelligence.providers[0]!.provider).toBe("openai");
+		expect(result.intelligence.providers[0]!.model).toBe("gpt-4o");
+		expect(result.intelligence.providers[0]!.apiKeyConfigured).toBe(true);
+		expect(result.intelligence.providers[0]!.baseURL).toBe("https://custom.api.com/v1");
+		expect(result.intelligence.maxBytes).toBe(8192);
+		expect(result.intelligence.timeoutSec).toBe(10);
+		expect(result.intelligence.minSessionIntervalSec).toBe(30);
+		expect(result.intelligence.maxConcurrency).toBe(5);
+		expect(result.intelligence.cacheTTLSec).toBe(600);
+	});
+
+	test("getConfig returns empty providers when intelligence is disabled", async () => {
+		mockJsonResponse(200, {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "", tokenConfigured: false },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 },
+		});
+		const result = await getConfig();
+		expect(result.intelligence.enabled).toBe(false);
+		expect(result.intelligence.providers).toHaveLength(0);
+	});
+
+	test("updateConfig sends intelligence providers in PUT body", async () => {
+		mockJsonResponse(200, {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "" },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: {
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [{ name: "my-provider", provider: "anthropic", model: "claude-3", baseURL: "https://api.example.com" }],
+				maxBytes: 4096,
+				timeoutSec: 8,
+				minSessionIntervalSec: 60,
+				maxConcurrency: 3,
+				cacheTTLSec: 300,
+			},
+		});
+
+		const payload = {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "" },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: {
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [{ name: "my-provider", provider: "anthropic", model: "claude-3", apiKey: "secret", baseURL: "https://api.example.com" }],
+				maxBytes: 4096,
+				timeoutSec: 8,
+				minSessionIntervalSec: 60,
+				maxConcurrency: 3,
+				cacheTTLSec: 300,
+			},
+		};
+		await updateConfig(payload);
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		const body = JSON.parse(call[1]?.body as string);
+		expect(body.intelligence.enabled).toBe(true);
+		expect(body.intelligence.activeProvider).toBe("my-provider");
+		expect(body.intelligence.providers).toHaveLength(1);
+		expect(body.intelligence.providers[0].apiKey).toBe("secret");
+	});
+
+	test("updateConfig sends apiKey only when provided", async () => {
+		mockJsonResponse(200, {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "" },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: { enabled: true, activeProvider: "p1", providers: [{ name: "p1", provider: "openai", model: "gpt-4", apiKeyConfigured: true }], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 },
+		});
+
+		const payload = {
+			schemaVersion: 1,
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "" },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			intelligence: {
+				enabled: true,
+				activeProvider: "p1",
+				providers: [{ name: "p1", provider: "openai", model: "gpt-4" }],
+				maxBytes: 12000,
+				timeoutSec: 8,
+				minSessionIntervalSec: 60,
+				maxConcurrency: 3,
+				cacheTTLSec: 300,
+			},
+		};
+		await updateConfig(payload);
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		const body = JSON.parse(call[1]?.body as string);
+		expect(body.intelligence.providers[0].apiKey).toBeUndefined();
+	});
+
+	test("getConfig throws ApiError on failure", async () => {
+		mockJsonResponse(500, { error: { code: "internal_error", message: "server error" } });
+		await expect(getConfig()).rejects.toMatchObject({ code: "internal_error", message: "server error", status: 500 });
+	});
+
+	test("updateConfig throws ApiError on conflict", async () => {
+		mockJsonResponse(409, { error: { code: "conflict", message: "config file changed on disk" } });
+		await expect(updateConfig({} as any)).rejects.toMatchObject({ code: "conflict", message: "config file changed on disk", status: 409 });
 	});
 
 	describe("analyzeSession", () => {

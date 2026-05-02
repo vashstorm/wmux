@@ -55,11 +55,7 @@ type AnthropicProvider struct {
 	name   string
 }
 
-func NewAnthropicProvider(cfg config.IntelligenceConfig) (*AnthropicProvider, error) {
-	if !cfg.Enabled {
-		return nil, &ProviderError{Category: ErrCategoryDisabled, Err: errors.New("intelligence disabled")}
-	}
-
+func NewAnthropicProvider(cfg config.IntelligenceProviderConfig) (*AnthropicProvider, error) {
 	apiKey := strings.TrimSpace(cfg.APIKey)
 	if apiKey == "" {
 		return nil, &ProviderError{

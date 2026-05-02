@@ -23,11 +23,7 @@ type OpenAIProvider struct {
 	name   string
 }
 
-func NewOpenAIProvider(cfg config.IntelligenceConfig) (*OpenAIProvider, error) {
-	if !cfg.Enabled {
-		return nil, &ProviderError{Category: ErrCategoryDisabled, Err: errors.New("intelligence disabled")}
-	}
-
+func NewOpenAIProvider(cfg config.IntelligenceProviderConfig) (*OpenAIProvider, error) {
 	apiKey := strings.TrimSpace(cfg.APIKey)
 	if apiKey == "" {
 		return nil, &ProviderError{

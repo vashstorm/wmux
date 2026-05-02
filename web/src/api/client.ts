@@ -111,18 +111,24 @@ export interface HealthResponse {
 	status: string;
 }
 
-export interface IntelligenceConfig {
-	enabled: boolean;
-	provider?: string;
-	model?: string;
+export interface IntelligenceProviderConfig {
+	name: string;
+	provider: string;
+	model: string;
 	apiKey?: string;
 	baseURL?: string;
+	apiKeyConfigured?: boolean;
+}
+
+export interface IntelligenceConfig {
+	enabled: boolean;
+	activeProvider?: string;
+	providers: IntelligenceProviderConfig[];
 	maxBytes: number;
 	timeoutSec: number;
 	minSessionIntervalSec: number;
 	maxConcurrency: number;
 	cacheTTLSec: number;
-	apiKeyConfigured?: boolean;
 }
 
 export interface AppConfig {

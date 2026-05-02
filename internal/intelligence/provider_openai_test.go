@@ -40,12 +40,11 @@ func TestOpenAIProviderValidResponse(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey: "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
@@ -105,12 +104,11 @@ func TestOpenAIProviderInvalidEnum(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey: "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
@@ -118,8 +116,8 @@ func TestOpenAIProviderInvalidEnum(t *testing.T) {
 	}
 
 	_, err = provider.Analyze(context.Background(), intelligence.AnalyzeInput{
-		PaneID:      "test-pane",
-		RawContent:  "test",
+		PaneID:     "test-pane",
+		RawContent: "test",
 	})
 
 	if err == nil {
@@ -142,12 +140,11 @@ func TestOpenAIProviderTimeout(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey: "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
@@ -194,12 +191,11 @@ func TestOpenAIProviderRateLimited(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey: "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 	provider, err := intelligence.NewOpenAIProvider(cfg)
 	if err != nil {
@@ -224,11 +220,10 @@ func TestOpenAIProviderRateLimited(t *testing.T) {
 }
 
 func TestOpenAIProviderMissingCreds(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey: "",
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "",
 	}
 
 	_, err := intelligence.NewOpenAIProvider(cfg)
@@ -245,32 +240,12 @@ func TestOpenAIProviderMissingCreds(t *testing.T) {
 	}
 }
 
-func TestOpenAIProviderDisabled(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled: false,
-	}
-
-	_, err := intelligence.NewOpenAIProvider(cfg)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var provErr *intelligence.ProviderError
-	if !errorAsProviderError(err, &provErr) {
-		t.Fatalf("expected ProviderError, got %T", err)
-	}
-	if provErr.Category != intelligence.ErrCategoryDisabled {
-		t.Errorf("expected disabled, got %v", provErr.Category)
-	}
-}
-
 func TestOpenAIProviderName(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "openai",
-		Model:     "gpt-4o-mini",
-		APIKey:  "test",
-		BaseURL: "http://localhost",
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "openai",
+		Model:    "gpt-4o-mini",
+		APIKey:   "test",
+		BaseURL:  "http://localhost",
 	}
 
 	provider, err := intelligence.NewOpenAIProvider(cfg)

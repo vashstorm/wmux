@@ -44,6 +44,8 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg := s.currentConfig()
+
 	if s.intelligenceAnalyzer == nil {
 		s.writeJSON(w, http.StatusOK, analyzeResponse{
 			ConnectionID: connection.ID,
@@ -53,7 +55,6 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := s.currentConfig()
 	adapter := tmux.NewAdapter(cfg.Tmux.Path)
 	windows, err := adapter.ListWindows(sessionName)
 	if err != nil {

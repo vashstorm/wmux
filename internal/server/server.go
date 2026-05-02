@@ -81,14 +81,8 @@ func New(options Options) *Server {
 		if err != nil {
 			logger.Warn("failed to initialize intelligence store", slog.String("error", err.Error()))
 		} else {
-			provider, err := intelligence.NewProvider(cfg.Intelligence)
-			if err != nil {
-				logger.Warn("failed to initialize intelligence provider", slog.String("error", err.Error()))
-				_ = store.Close()
-			} else {
-				srv.intelligenceStore = store
-				srv.intelligenceAnalyzer = intelligence.NewAnalyzer(provider, store, cfg.Intelligence.MaxConcurrency, tmuxAdapter.CapturePane)
-			}
+			srv.intelligenceStore = store
+			srv.intelligenceAnalyzer = intelligence.NewAnalyzer(store, cfg.Intelligence.MaxConcurrency, tmuxAdapter.CapturePane, intelligence.NewProvider)
 		}
 	}
 
@@ -188,7 +182,13 @@ func (s *Server) decodeJSON(r *http.Request, dst any) error {
 func SanitizeConfig(cfg config.Config) config.Config {
 	sanitized := cfg
 	sanitized.Auth.Token = ""
-	sanitized.Intelligence.APIKey = ""
+	if len(cfg.Intelligence.Providers) > 0 {
+		sanitized.Intelligence.Providers = make([]config.IntelligenceProviderConfig, len(cfg.Intelligence.Providers))
+		copy(sanitized.Intelligence.Providers, cfg.Intelligence.Providers)
+		for i := range sanitized.Intelligence.Providers {
+			sanitized.Intelligence.Providers[i].APIKey = ""
+		}
+	}
 	return sanitized
 }
 

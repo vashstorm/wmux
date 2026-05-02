@@ -42,11 +42,8 @@ const defaultConfig = {
 	ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 	intelligence: {
 		enabled: false,
-		provider: "anthropic",
-		model: "claude-sonnet-4-20250514",
-		apiKey: "",
-		apiKeyConfigured: false,
-		baseURL: "",
+		activeProvider: "",
+		providers: [] as Array<{ name: string; provider: string; model: string; apiKey?: string; apiKeyConfigured?: boolean; baseURL?: string }>,
 		maxBytes: 4096,
 		timeoutSec: 30,
 		minSessionIntervalSec: 60,
@@ -83,7 +80,7 @@ describe("SettingsPanel intelligence section", () => {
 		fireEvent.click(intelligenceNavButton);
 	}
 
-	test("When intelligence.enabled is false provider/model/apiKey/baseURL inputs are disabled", async () => {
+	test("When intelligence.enabled is false add provider button is disabled", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -100,18 +97,11 @@ describe("SettingsPanel intelligence section", () => {
 
 		navigateToIntelligenceTab();
 
-		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
-		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
-		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
-
-		expect(providerSelect.disabled).toBe(true);
-		expect(modelInput.disabled).toBe(true);
-		expect(apiKeyInput.disabled).toBe(true);
-		expect(baseURLInput.disabled).toBe(true);
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn") as HTMLButtonElement;
+		expect(addProviderBtn.disabled).toBe(true);
 	});
 
-	test("When intelligence enabled toggle is turned on provider/model/apiKey/baseURL inputs become enabled", async () => {
+	test("When intelligence enabled toggle is turned on add provider button becomes enabled", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -131,18 +121,45 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
 
-		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
-		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
-		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
-
-		expect(providerSelect.disabled).toBe(false);
-		expect(modelInput.disabled).toBe(false);
-		expect(apiKeyInput.disabled).toBe(false);
-		expect(baseURLInput.disabled).toBe(false);
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn") as HTMLButtonElement;
+		expect(addProviderBtn.disabled).toBe(false);
 	});
 
-	test("Save payload includes intelligence object with all fields from form", async () => {
+	test("Add provider opens editor form", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
+		});
+
+		expect(screen.getByTestId("provider-editor-name-input")).toBeInTheDocument();
+		expect(screen.getByTestId("provider-editor-type-select")).toBeInTheDocument();
+		expect(screen.getByTestId("provider-editor-model-input")).toBeInTheDocument();
+		expect(screen.getByTestId("provider-editor-api-key-input")).toBeInTheDocument();
+		expect(screen.getByTestId("provider-editor-base-url-input")).toBeInTheDocument();
+	});
+
+	test("Save payload includes intelligence object with providers array", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockUpdateConfig.mockResolvedValue(defaultConfig);
@@ -163,14 +180,26 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
 
-		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		fireEvent.change(modelInput, { target: { value: "gpt-4" } });
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
 
-		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		fireEvent.change(nameInput, { target: { value: "my-anthropic" } });
+
+		const modelInput = screen.getByTestId("provider-editor-model-input") as HTMLInputElement;
+		fireEvent.change(modelInput, { target: { value: "claude-sonnet-4" } });
+
+		const apiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
 		fireEvent.change(apiKeyInput, { target: { value: "sk-test-key" } });
 
-		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
+		const baseURLInput = screen.getByTestId("provider-editor-base-url-input") as HTMLInputElement;
 		fireEvent.change(baseURLInput, { target: { value: "https://api.openrouter.ai/v1" } });
+
+		const saveProviderBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveProviderBtn);
+
+		const setActiveBtn = screen.getByTestId("provider-set-active-my-anthropic");
+		fireEvent.click(setActiveBtn);
 
 		const saveButton = screen.getByRole("button", { name: /SAVE/i });
 		fireEvent.click(saveButton);
@@ -182,10 +211,12 @@ describe("SettingsPanel intelligence section", () => {
 		const callArg = mockUpdateConfig.mock.calls[0]?.[0];
 		expect(callArg).toBeDefined();
 		expect(callArg?.intelligence?.enabled).toBe(true);
-		expect(callArg?.intelligence?.model).toBe("gpt-4");
-		expect(callArg?.intelligence?.provider).toBe("anthropic");
-		expect(callArg?.intelligence?.apiKey).toBe("sk-test-key");
-		expect(callArg?.intelligence?.baseURL).toBe("https://api.openrouter.ai/v1");
+		expect(callArg?.intelligence?.activeProvider).toBe("my-anthropic");
+		expect(callArg?.intelligence?.providers).toHaveLength(1);
+		expect(callArg?.intelligence?.providers[0]?.name).toBe("my-anthropic");
+		expect(callArg?.intelligence?.providers[0]?.provider).toBe("anthropic");
+		expect(callArg?.intelligence?.providers[0]?.model).toBe("claude-sonnet-4");
+		expect(callArg?.intelligence?.providers[0]?.baseURL).toBe("https://api.openrouter.ai/v1");
 	});
 
 	test("Intelligence form fields load from existing config values", async () => {
@@ -194,11 +225,17 @@ describe("SettingsPanel intelligence section", () => {
 			intelligence: {
 				...defaultConfig.intelligence,
 				enabled: true,
-				provider: "openai",
-				model: "gpt-4o",
-				apiKey: "",
-				apiKeyConfigured: true,
-				baseURL: "https://api.openai.com/v1",
+				activeProvider: "my-openai",
+				providers: [
+					{
+						name: "my-openai",
+						provider: "openai",
+						model: "gpt-4o",
+						apiKey: "",
+						apiKeyConfigured: true,
+						baseURL: "https://api.openai.com/v1",
+					},
+				],
 				maxBytes: 8192,
 				timeoutSec: 60,
 				minSessionIntervalSec: 120,
@@ -226,20 +263,12 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		expect(enableToggle.checked).toBe(true);
 
-		const providerSelect = screen.getByTestId("intelligence-provider-select") as HTMLSelectElement;
-		expect(providerSelect.value).toBe("openai");
-
-		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		expect(modelInput.value).toBe("gpt-4o");
-
-		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
-		expect(apiKeyInput.placeholder).toBe("••••••••••••••••");
-
-		const baseURLInput = screen.getByTestId("intelligence-base-url-input") as HTMLInputElement;
-		expect(baseURLInput.value).toBe("https://api.openai.com/v1");
+		expect(screen.getByText("my-openai")).toBeInTheDocument();
+		expect(screen.getByText("gpt-4o")).toBeInTheDocument();
+		expect(screen.getByTestId("provider-type-badge-my-openai")).toHaveTextContent("openai");
 	});
 
-	test("When intelligence is enabled without model, save is blocked and error is shown", async () => {
+	test("When intelligence is enabled without providers, save is blocked and error is shown", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -260,8 +289,50 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
 
-		const modelInput = screen.getByTestId("intelligence-model-input") as HTMLInputElement;
-		fireEvent.change(modelInput, { target: { value: "" } });
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).not.toHaveBeenCalled();
+		});
+
+		expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		expect(screen.getByText("At least one provider is required when intelligence is enabled")).toBeInTheDocument();
+	});
+
+	test("When intelligence is enabled without activeProvider, save is blocked", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "",
+				providers: [
+					{
+						name: "my-provider",
+						provider: "anthropic",
+						model: "claude-sonnet-4",
+						apiKeyConfigured: true,
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
 
 		const saveButton = screen.getByRole("button", { name: /SAVE/i });
 		fireEvent.click(saveButton);
@@ -271,10 +342,346 @@ describe("SettingsPanel intelligence section", () => {
 		});
 
 		expect(screen.getByTestId("error-banner")).toBeInTheDocument();
-		expect(screen.getByText("Intelligence model is required when enabled")).toBeInTheDocument();
+		expect(screen.getByText("An active provider must be selected when intelligence is enabled")).toBeInTheDocument();
 	});
 
-	test("When intelligence is enabled without apiKey and none configured, save is blocked", async () => {
+	test("Delete provider removes it from the list", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{
+						name: "my-provider",
+						provider: "anthropic",
+						model: "claude-sonnet-4",
+						apiKeyConfigured: true,
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const deleteBtn = screen.getByTestId("provider-delete-my-provider");
+		fireEvent.click(deleteBtn);
+
+		expect(screen.queryByText("my-provider")).not.toBeInTheDocument();
+	});
+
+	test("Edit existing provider opens editor with pre-populated fields", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{
+						name: "my-provider",
+						provider: "openai",
+						model: "gpt-4o",
+						apiKeyConfigured: true,
+						baseURL: "https://api.openai.com/v1",
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const editBtn = screen.getByTestId("provider-edit-my-provider");
+		fireEvent.click(editBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
+		});
+
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		expect(nameInput.value).toBe("my-provider");
+		const typeSelect = screen.getByTestId("provider-editor-type-select") as HTMLSelectElement;
+		expect(typeSelect.value).toBe("openai");
+		const modelInput = screen.getByTestId("provider-editor-model-input") as HTMLInputElement;
+		expect(modelInput.value).toBe("gpt-4o");
+		const baseURLInput = screen.getByTestId("provider-editor-base-url-input") as HTMLInputElement;
+		expect(baseURLInput.value).toBe("https://api.openai.com/v1");
+		const apiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
+		expect(apiKeyInput.value).toBe("");
+	});
+
+	test("Edit provider and modify fields updates provider in list", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{
+						name: "my-provider",
+						provider: "anthropic",
+						model: "claude-3",
+						apiKeyConfigured: true,
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const editBtn = screen.getByTestId("provider-edit-my-provider");
+		fireEvent.click(editBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
+		});
+
+		const modelInput = screen.getByTestId("provider-editor-model-input") as HTMLInputElement;
+		fireEvent.change(modelInput, { target: { value: "claude-sonnet-4" } });
+
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		fireEvent.change(nameInput, { target: { value: "updated-name" } });
+
+		const saveProviderBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveProviderBtn);
+
+		expect(screen.getByText("updated-name")).toBeInTheDocument();
+		expect(screen.getByText("claude-sonnet-4")).toBeInTheDocument();
+	});
+
+	test("Delete active provider auto-selects remaining provider", async () => {
+		const configWithProviders = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "provider-a",
+				providers: [
+					{ name: "provider-a", provider: "anthropic", model: "claude", apiKeyConfigured: true },
+					{ name: "provider-b", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProviders);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("★ ACTIVE");
+
+		const deleteBtn = screen.getByTestId("provider-delete-provider-a");
+		fireEvent.click(deleteBtn);
+
+		expect(screen.queryByText("provider-a")).not.toBeInTheDocument();
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("★ ACTIVE");
+	});
+
+	test("Duplicate provider name in editor shows error", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "existing",
+				providers: [
+					{ name: "existing", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		fireEvent.change(nameInput, { target: { value: "existing" } });
+		const modelInput = screen.getByTestId("provider-editor-model-input") as HTMLInputElement;
+		fireEvent.change(modelInput, { target: { value: "gpt-4" } });
+		const apiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
+		fireEvent.change(apiKeyInput, { target: { value: "sk-test" } });
+
+		const saveBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveBtn);
+
+		const errorBanner = await screen.findByTestId("error-banner");
+		expect(errorBanner.textContent).toMatch(/Provider name "existing" already exists/);
+	});
+
+	test("Missing name in editor shows validation error", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		const saveBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("Provider name is required")).toBeInTheDocument();
+	});
+
+	test("Missing model in editor shows validation error", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		fireEvent.change(nameInput, { target: { value: "my-provider" } });
+
+		const saveBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("Provider model is required")).toBeInTheDocument();
+	});
+
+	test("Missing API key for new provider shows validation error", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
+		fireEvent.change(nameInput, { target: { value: "my-provider" } });
+		const modelInput = screen.getByTestId("provider-editor-model-input") as HTMLInputElement;
+		fireEvent.change(modelInput, { target: { value: "gpt-4" } });
+
+		const saveBtn = screen.getByTestId("provider-editor-save-btn");
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("API key is required for new providers")).toBeInTheDocument();
+	});
+
+	test("Cancel button dismisses editor", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -294,34 +701,64 @@ describe("SettingsPanel intelligence section", () => {
 		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
 		fireEvent.click(enableToggle);
 
-		const apiKeyInput = screen.getByTestId("intelligence-api-key-input") as HTMLInputElement;
-		fireEvent.change(apiKeyInput, { target: { value: "" } });
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
 
-		const saveButton = screen.getByRole("button", { name: /SAVE/i });
-		fireEvent.click(saveButton);
+		expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
 
-		await waitFor(() => {
-			expect(mockUpdateConfig).not.toHaveBeenCalled();
-		});
+		const cancelBtns = screen.getAllByRole("button", { name: /CANCEL/i });
+		fireEvent.click(cancelBtns[0]!);
+
+		expect(screen.queryByTestId("intelligence-provider-editor")).not.toBeInTheDocument();
 	});
 
-	test("When intelligence is enabled with blank apiKey but already configured, save is allowed", async () => {
-		const configWithKey = {
-			...defaultConfig,
-			intelligence: {
-				...defaultConfig.intelligence,
-				enabled: true,
-				apiKeyConfigured: true,
-			},
-		};
-		mockGetConfig.mockResolvedValue(configWithKey);
+	test("Add multiple providers shows all in list", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
-		mockUpdateConfig.mockResolvedValue(configWithKey);
 
 		render(
 			<TestWrapper>
 				{enableSettingsPanel()}
 				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		function addProvider(name: string, model: string, apiKey: string) {
+			const addBtn = screen.getByTestId("intelligence-add-provider-btn");
+			fireEvent.click(addBtn);
+			fireEvent.change(screen.getByTestId("provider-editor-name-input"), { target: { value: name } });
+			fireEvent.change(screen.getByTestId("provider-editor-model-input"), { target: { value: model } });
+			fireEvent.change(screen.getByTestId("provider-editor-api-key-input"), { target: { value: apiKey } });
+			fireEvent.click(screen.getByTestId("provider-editor-save-btn"));
+		}
+
+		addProvider("provider-a", "gpt-4", "key-a");
+		addProvider("provider-b", "claude-3", "key-b");
+
+		expect(screen.getByText("provider-a")).toBeInTheDocument();
+		expect(screen.getByText("provider-b")).toBeInTheDocument();
+		expect(screen.getByTestId("intelligence-providers-list").children).toHaveLength(2);
+	});
+
+	test("Save when intelligence is disabled succeeds", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockResolvedValue(defaultConfig);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
 			</TestWrapper>,
 		);
 
@@ -337,5 +774,532 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(mockUpdateConfig).toHaveBeenCalled();
 		});
+
+		const callArg = mockUpdateConfig.mock.calls[0]?.[0];
+		expect(callArg?.intelligence?.enabled).toBe(false);
+	});
+
+	test("API error during save shows error banner", async () => {
+		const { ApiError } = await import("../api/errors.js");
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockRejectedValue(new ApiError("internal_error", "something went wrong", 500));
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+	});
+
+	test("BaseURL field is optional and can be left blank", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockResolvedValue(defaultConfig);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		fireEvent.change(screen.getByTestId("provider-editor-name-input"), { target: { value: "no-baseurl" } });
+		fireEvent.change(screen.getByTestId("provider-editor-model-input"), { target: { value: "gpt-4" } });
+		fireEvent.change(screen.getByTestId("provider-editor-api-key-input"), { target: { value: "key" } });
+
+		fireEvent.click(screen.getByTestId("provider-editor-save-btn"));
+
+		const setActiveBtn = screen.getByTestId("provider-set-active-no-baseurl");
+		fireEvent.click(setActiveBtn);
+
+		const saveBtn = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).toHaveBeenCalled();
+		});
+		const callArg = mockUpdateConfig.mock.calls[0]?.[0];
+		expect(callArg?.intelligence?.providers[0]?.baseURL).toBeUndefined();
+	});
+
+	test("Active indicator is rendered for the active provider", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{ name: "my-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect(screen.getByTestId("provider-active-indicator-my-provider")).toBeInTheDocument();
+	});
+
+	test("apiKeyInput is empty when editing existing provider with configured key", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{
+						name: "my-provider",
+						provider: "openai",
+						model: "gpt-4",
+						apiKeyConfigured: true,
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const editBtn = screen.getByTestId("provider-edit-my-provider");
+		fireEvent.click(editBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
+		});
+
+		const apiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
+		expect(apiKeyInput.value).toBe("");
+		expect(apiKeyInput.placeholder).toContain("leave blank to keep existing");
+	});
+
+	test("Password placeholder differs between new and existing providers", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "existing-prov",
+				providers: [
+					{ name: "existing-prov", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const addProviderBtn = screen.getByTestId("intelligence-add-provider-btn");
+		fireEvent.click(addProviderBtn);
+
+		const newApiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
+		expect(newApiKeyInput.placeholder).toBe("sk-...");
+	});
+
+	test("Global settings fields are disabled when intelligence is off", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect((screen.getByTestId("intelligence-max-bytes-input") as HTMLInputElement).disabled).toBe(true);
+		expect((screen.getByTestId("intelligence-timeout-sec-input") as HTMLInputElement).disabled).toBe(true);
+		expect((screen.getByTestId("intelligence-min-session-interval-sec-input") as HTMLInputElement).disabled).toBe(true);
+		expect((screen.getByTestId("intelligence-max-concurrency-input") as HTMLInputElement).disabled).toBe(true);
+		expect((screen.getByTestId("intelligence-cache-ttl-sec-input") as HTMLInputElement).disabled).toBe(true);
+	});
+
+	test("Empty state shown when no providers and no editor open", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		fireEvent.click(enableToggle);
+
+		expect(screen.getByTestId("intelligence-providers-empty")).toBeInTheDocument();
+	});
+
+	test("SET ACTIVE button is disabled when intelligence is off", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: false,
+				activeProvider: "",
+				providers: [
+					{ name: "idle-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect((screen.getByTestId("provider-set-active-idle-provider") as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	test("Edit and delete buttons are disabled when intelligence is off", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: false,
+				providers: [
+					{ name: "frozen", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect((screen.getByTestId("provider-edit-frozen") as HTMLButtonElement).disabled).toBe(true);
+		expect((screen.getByTestId("provider-delete-frozen") as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	test("Active provider card has is-active class", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "active-one",
+				providers: [
+					{ name: "active-one", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+					{ name: "inactive", provider: "anthropic", model: "claude", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect(screen.getByTestId("intelligence-provider-card-active-one").className).toContain("is-active");
+		expect(screen.getByTestId("intelligence-provider-card-inactive").className).not.toContain("is-active");
+	});
+
+	test("Save validates active provider exists in provider list", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "stale-provider",
+				providers: [
+					{ name: "actual-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const saveBtn = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).not.toHaveBeenCalled();
+		});
+		expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		expect(screen.getByText("Selected active provider does not exist")).toBeInTheDocument();
+	});
+
+	test("Save validates all providers have a name", async () => {
+		const partialConfig = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "ok",
+				providers: [
+					{ name: "ok", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+					{ name: "", provider: "anthropic", model: "claude", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(partialConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const saveBtn = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("All providers must have a name")).toBeInTheDocument();
+	});
+
+	test("Save validates all providers have a provider type", async () => {
+		const partialConfig = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "ok",
+				providers: [
+					{ name: "ok", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+					{ name: "no-type", provider: "", model: "claude", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(partialConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const saveBtn = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("All providers must have a provider type")).toBeInTheDocument();
+	});
+
+	test("Save validates all providers have a model", async () => {
+		const partialConfig = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "ok",
+				providers: [
+					{ name: "ok", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+					{ name: "no-model", provider: "anthropic", model: "", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(partialConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+				<ErrorBanner />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const saveBtn = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-banner")).toBeInTheDocument();
+		});
+		expect(screen.getByText("All providers must have a model")).toBeInTheDocument();
+	});
+
+	test("Set active provider updates activeProvider state", async () => {
+		const configWithProviders = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "provider-a",
+				providers: [
+					{
+						name: "provider-a",
+						provider: "anthropic",
+						model: "claude-sonnet-4",
+						apiKeyConfigured: true,
+					},
+					{
+						name: "provider-b",
+						provider: "openai",
+						model: "gpt-4o",
+						apiKeyConfigured: true,
+					},
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProviders);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const setActiveBtn = screen.getByTestId("provider-set-active-provider-b");
+		fireEvent.click(setActiveBtn);
+
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("★ ACTIVE");
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("SET ACTIVE");
 	});
 });

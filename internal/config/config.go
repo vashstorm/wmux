@@ -67,8 +67,19 @@ type UIConfig struct {
 	TerminalFontWeight string `json:"terminalFontWeight"`
 }
 
+type IntelligenceProviderConfig struct {
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	APIKey   string `json:"apiKey,omitempty"`
+	BaseURL  string `json:"baseURL,omitempty"`
+}
+
 type IntelligenceConfig struct {
-	Enabled               bool   `json:"enabled"`
+	Enabled               bool                         `json:"enabled"`
+	ActiveProvider        string                       `json:"activeProvider,omitempty"`
+	Providers             []IntelligenceProviderConfig `json:"providers,omitempty"`
+	// Legacy fields kept for backward compatibility during load
 	Provider              string `json:"provider,omitempty"`
 	Model                 string `json:"model,omitempty"`
 	APIKey                string `json:"apiKey,omitempty"`
@@ -286,24 +297,56 @@ func (c Config) ValidateIntelligence() error {
 		return nil
 	}
 
-	provider := strings.TrimSpace(c.Intelligence.Provider)
+	if len(c.Intelligence.Providers) == 0 {
+		return errors.New("at least one intelligence provider is required when enabled")
+	}
+
+	activeProvider := strings.TrimSpace(c.Intelligence.ActiveProvider)
+	if activeProvider == "" {
+		return errors.New("intelligence activeProvider is required when enabled")
+	}
+
+	seenNames := make(map[string]struct{})
+	for _, p := range c.Intelligence.Providers {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			return errors.New("intelligence provider name is required")
+		}
+		if _, ok := seenNames[name]; ok {
+			return fmt.Errorf("duplicate intelligence provider name: %q", name)
+		}
+		seenNames[name] = struct{}{}
+	}
+
+	var activeConfig *IntelligenceProviderConfig
+	for i := range c.Intelligence.Providers {
+		if strings.TrimSpace(c.Intelligence.Providers[i].Name) == activeProvider {
+			activeConfig = &c.Intelligence.Providers[i]
+			break
+		}
+	}
+	if activeConfig == nil {
+		return fmt.Errorf("intelligence activeProvider %q not found in providers", activeProvider)
+	}
+
+	provider := strings.TrimSpace(activeConfig.Provider)
 	if provider == "" {
-		return errors.New("intelligence provider is required when enabled")
+		return errors.New("intelligence provider type is required for active provider")
 	}
 	if provider != "anthropic" && provider != "openai" {
 		return fmt.Errorf("intelligence provider must be anthropic or openai, got %q", provider)
 	}
 
-	if strings.TrimSpace(c.Intelligence.Model) == "" {
-		return errors.New("intelligence model is required when enabled")
+	if strings.TrimSpace(activeConfig.Model) == "" {
+		return errors.New("intelligence model is required for active provider")
 	}
 
-	apiKey := strings.TrimSpace(c.Intelligence.APIKey)
+	apiKey := strings.TrimSpace(activeConfig.APIKey)
 	if apiKey == "" {
-		return errors.New("intelligence apiKey is required when enabled")
+		return errors.New("intelligence apiKey is required for active provider")
 	}
 
-	baseURL := strings.TrimSpace(c.Intelligence.BaseURL)
+	baseURL := strings.TrimSpace(activeConfig.BaseURL)
 	if baseURL != "" {
 		parsed, err := url.Parse(baseURL)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
@@ -311,6 +354,32 @@ func (c Config) ValidateIntelligence() error {
 		}
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
 			return fmt.Errorf("intelligence baseURL must use http or https")
+		}
+	}
+
+	for _, p := range c.Intelligence.Providers {
+		pProvider := strings.TrimSpace(p.Provider)
+		if pProvider == "" {
+			return fmt.Errorf("intelligence provider type is required for provider %q", p.Name)
+		}
+		if pProvider != "anthropic" && pProvider != "openai" {
+			return fmt.Errorf("intelligence provider must be anthropic or openai for provider %q, got %q", p.Name, pProvider)
+		}
+		if strings.TrimSpace(p.Model) == "" {
+			return fmt.Errorf("intelligence model is required for provider %q", p.Name)
+		}
+		if strings.TrimSpace(p.APIKey) == "" {
+			return fmt.Errorf("intelligence apiKey is required for provider %q", p.Name)
+		}
+		pBaseURL := strings.TrimSpace(p.BaseURL)
+		if pBaseURL != "" {
+			parsed, err := url.Parse(pBaseURL)
+			if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+				return fmt.Errorf("intelligence baseURL must be a valid http or https URL for provider %q", p.Name)
+			}
+			if parsed.Scheme != "http" && parsed.Scheme != "https" {
+				return fmt.Errorf("intelligence baseURL must use http or https for provider %q", p.Name)
+			}
 		}
 	}
 
@@ -482,16 +551,47 @@ func normalizeConfig(cfg *Config) {
 	if cfg.Intelligence.CacheTTLSec == 0 {
 		cfg.Intelligence.CacheTTLSec = 300
 	}
+
+	if len(cfg.Intelligence.Providers) == 0 {
+		legacyProvider := strings.TrimSpace(cfg.Intelligence.Provider)
+		if legacyProvider != "" {
+			cfg.Intelligence.Providers = []IntelligenceProviderConfig{{
+				Name:     legacyProvider,
+				Provider: legacyProvider,
+				Model:    strings.TrimSpace(cfg.Intelligence.Model),
+				APIKey:   strings.TrimSpace(cfg.Intelligence.APIKey),
+				BaseURL:  strings.TrimSpace(cfg.Intelligence.BaseURL),
+			}}
+			if cfg.Intelligence.ActiveProvider == "" {
+				cfg.Intelligence.ActiveProvider = legacyProvider
+			}
+		}
+	}
+
+	if cfg.Intelligence.ActiveProvider == "" && len(cfg.Intelligence.Providers) == 1 {
+		cfg.Intelligence.ActiveProvider = cfg.Intelligence.Providers[0].Name
+	}
+
+	for i := range cfg.Intelligence.Providers {
+		cfg.Intelligence.Providers[i].Name = strings.TrimSpace(cfg.Intelligence.Providers[i].Name)
+		cfg.Intelligence.Providers[i].Provider = strings.TrimSpace(cfg.Intelligence.Providers[i].Provider)
+		cfg.Intelligence.Providers[i].Model = strings.TrimSpace(cfg.Intelligence.Providers[i].Model)
+		cfg.Intelligence.Providers[i].BaseURL = strings.TrimSpace(cfg.Intelligence.Providers[i].BaseURL)
+	}
 }
 
 func cloneConfig(cfg Config) Config {
 	cloned := cfg
 	if cfg.Connections == nil {
 		cloned.Connections = []ConnectionConfig{}
-		return cloned
+	} else {
+		cloned.Connections = append([]ConnectionConfig(nil), cfg.Connections...)
 	}
-
-	cloned.Connections = append([]ConnectionConfig(nil), cfg.Connections...)
+	if cfg.Intelligence.Providers == nil {
+		cloned.Intelligence.Providers = []IntelligenceProviderConfig{}
+	} else {
+		cloned.Intelligence.Providers = append([]IntelligenceProviderConfig(nil), cfg.Intelligence.Providers...)
+	}
 	return cloned
 }
 

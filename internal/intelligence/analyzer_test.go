@@ -11,10 +11,30 @@ import (
 	"github.com/panh/wmux/internal/tmux"
 )
 
+func testProviderFactory(p *fakeProvider) func(config.IntelligenceProviderConfig) (Provider, error) {
+	return func(cfg config.IntelligenceProviderConfig) (Provider, error) {
+		return p, nil
+	}
+}
+
+func testCfgWithActive() config.IntelligenceConfig {
+	return config.IntelligenceConfig{
+		Enabled:        true,
+		ActiveProvider: "test",
+		Providers: []config.IntelligenceProviderConfig{
+			{Name: "test", Provider: "openai", Model: "gpt-4", APIKey: "key"},
+		},
+		MaxBytes:              12000,
+		MinSessionIntervalSec: 60,
+		CacheTTLSec:           300,
+	}
+}
+
 func TestAnalyzerRespectsMinInterval(t *testing.T) {
 	provider := &fakeProvider{}
-	analyzer := NewAnalyzer(provider, newTestStore(t), 2, nil)
-	cfg := config.IntelligenceConfig{MaxBytes: 12000, MinSessionIntervalSec: 60, CacheTTLSec: 300}
+	analyzer := NewAnalyzer(newTestStore(t), 2, nil, testProviderFactory(provider))
+	cfg := testCfgWithActive()
+	cfg.MinSessionIntervalSec = 60
 	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "claude"}}
 
 	first, err := analyzer.AnalyzeSession(context.Background(), cfg, panes, "dev")
@@ -38,8 +58,9 @@ func TestAnalyzerRespectsMinInterval(t *testing.T) {
 
 func TestAnalyzerConcurrencyLimit(t *testing.T) {
 	provider := &fakeProvider{delay: 20 * time.Millisecond}
-	analyzer := NewAnalyzer(provider, newTestStore(t), 2, nil)
-	cfg := config.IntelligenceConfig{MaxBytes: 12000, MinSessionIntervalSec: 0, CacheTTLSec: 300}
+	analyzer := NewAnalyzer(newTestStore(t), 2, nil, testProviderFactory(provider))
+	cfg := testCfgWithActive()
+	cfg.MinSessionIntervalSec = 0
 	panes := []tmux.Pane{
 		{ID: "%1", CurrentCommand: "claude"},
 		{ID: "%2", CurrentCommand: "claude"},
@@ -60,18 +81,19 @@ func TestAnalyzerConcurrencyLimit(t *testing.T) {
 	}
 }
 
-
 func TestAnalyzerReanalyzesWhenContentChanges(t *testing.T) {
 	provider := &fakeProvider{}
 	captureCalls := 0
-	analyzer := NewAnalyzer(provider, newTestStore(t), 1, func(string) (string, error) {
+	analyzer := NewAnalyzer(newTestStore(t), 1, func(string) (string, error) {
 		captureCalls++
 		if captureCalls == 1 {
 			return "content-v1", nil
 		}
 		return "content-v2", nil
-	})
-	cfg := config.IntelligenceConfig{MaxBytes: 12000, MinSessionIntervalSec: 0, CacheTTLSec: 3600}
+	}, testProviderFactory(provider))
+	cfg := testCfgWithActive()
+	cfg.MinSessionIntervalSec = 0
+	cfg.CacheTTLSec = 3600
 	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "claude"}}
 
 	if _, err := analyzer.AnalyzeSession(context.Background(), cfg, panes, "dev"); err != nil {
@@ -87,10 +109,12 @@ func TestAnalyzerReanalyzesWhenContentChanges(t *testing.T) {
 
 func TestAnalyzerSkipsCacheWhenContentUnchanged(t *testing.T) {
 	provider := &fakeProvider{}
-	analyzer := NewAnalyzer(provider, newTestStore(t), 1, func(string) (string, error) {
+	analyzer := NewAnalyzer(newTestStore(t), 1, func(string) (string, error) {
 		return "content-v1", nil
-	})
-	cfg := config.IntelligenceConfig{MaxBytes: 12000, MinSessionIntervalSec: 0, CacheTTLSec: 3600}
+	}, testProviderFactory(provider))
+	cfg := testCfgWithActive()
+	cfg.MinSessionIntervalSec = 0
+	cfg.CacheTTLSec = 3600
 	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "claude"}}
 
 	if _, err := analyzer.AnalyzeSession(context.Background(), cfg, panes, "dev"); err != nil {
@@ -106,10 +130,11 @@ func TestAnalyzerSkipsCacheWhenContentUnchanged(t *testing.T) {
 
 func TestAnalyzerPassesCapturedContentToProvider(t *testing.T) {
 	provider := &fakeProvider{}
-	analyzer := NewAnalyzer(provider, newTestStore(t), 1, func(string) (string, error) {
+	analyzer := NewAnalyzer(newTestStore(t), 1, func(string) (string, error) {
 		return "$ git status\nOn branch main", nil
-	})
-	cfg := config.IntelligenceConfig{MaxBytes: 12000, MinSessionIntervalSec: 0, CacheTTLSec: 300}
+	}, testProviderFactory(provider))
+	cfg := testCfgWithActive()
+	cfg.MinSessionIntervalSec = 0
 	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "git"}}
 
 	_, err := analyzer.AnalyzeSession(context.Background(), cfg, panes, "dev")
@@ -121,6 +146,86 @@ func TestAnalyzerPassesCapturedContentToProvider(t *testing.T) {
 	}
 	if !strings.Contains(provider.lastInput.RawContent, "On branch main") {
 		t.Fatalf("RawContent = %q, want normalized captured content", provider.lastInput.RawContent)
+	}
+}
+
+func TestAnalyzerSwitchesActiveProvider(t *testing.T) {
+	openaiProvider := &fakeProvider{}
+	anthropicProvider := &fakeProvider{}
+
+	factory := func(cfg config.IntelligenceProviderConfig) (Provider, error) {
+		if cfg.Provider == "openai" {
+			return openaiProvider, nil
+		}
+		return anthropicProvider, nil
+	}
+
+	analyzer := NewAnalyzer(newTestStore(t), 1, nil, factory)
+	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "claude"}}
+
+	cfgOpenAI := config.IntelligenceConfig{
+		Enabled:        true,
+		ActiveProvider: "openai-main",
+		Providers: []config.IntelligenceProviderConfig{
+			{Name: "openai-main", Provider: "openai", Model: "gpt-4", APIKey: "key1"},
+			{Name: "anthropic-main", Provider: "anthropic", Model: "claude", APIKey: "key2"},
+		},
+		MaxBytes:              12000,
+		MinSessionIntervalSec: 0,
+		CacheTTLSec:           300,
+	}
+
+	if _, err := analyzer.AnalyzeSession(context.Background(), cfgOpenAI, panes, "dev"); err != nil {
+		t.Fatalf("AnalyzeSession returned error: %v", err)
+	}
+	if openaiProvider.calls != 1 {
+		t.Fatalf("openai provider calls = %d, want 1", openaiProvider.calls)
+	}
+	if anthropicProvider.calls != 0 {
+		t.Fatalf("anthropic provider calls = %d, want 0", anthropicProvider.calls)
+	}
+
+	cfgAnthropic := config.IntelligenceConfig{
+		Enabled:        true,
+		ActiveProvider: "anthropic-main",
+		Providers: []config.IntelligenceProviderConfig{
+			{Name: "openai-main", Provider: "openai", Model: "gpt-4", APIKey: "key1"},
+			{Name: "anthropic-main", Provider: "anthropic", Model: "claude", APIKey: "key2"},
+		},
+		MaxBytes:              12000,
+		MinSessionIntervalSec: 0,
+		CacheTTLSec:           300,
+	}
+
+	panes2 := []tmux.Pane{{ID: "%2", CurrentCommand: "claude"}}
+	if _, err := analyzer.AnalyzeSession(context.Background(), cfgAnthropic, panes2, "dev"); err != nil {
+		t.Fatalf("AnalyzeSession returned error: %v", err)
+	}
+	if openaiProvider.calls != 1 {
+		t.Fatalf("openai provider calls = %d, want 1", openaiProvider.calls)
+	}
+	if anthropicProvider.calls != 1 {
+		t.Fatalf("anthropic provider calls = %d, want 1", anthropicProvider.calls)
+	}
+}
+
+func TestAnalyzerReturnsErrorForMissingActiveProvider(t *testing.T) {
+	analyzer := NewAnalyzer(newTestStore(t), 1, nil, testProviderFactory(&fakeProvider{}))
+	cfg := config.IntelligenceConfig{
+		Enabled:        true,
+		ActiveProvider: "missing",
+		Providers: []config.IntelligenceProviderConfig{
+			{Name: "exists", Provider: "openai", Model: "gpt-4", APIKey: "key"},
+		},
+		MaxBytes:              12000,
+		MinSessionIntervalSec: 0,
+		CacheTTLSec:           300,
+	}
+	panes := []tmux.Pane{{ID: "%1", CurrentCommand: "claude"}}
+
+	_, err := analyzer.AnalyzeSession(context.Background(), cfg, panes, "dev")
+	if err == nil {
+		t.Fatal("expected error for missing active provider")
 	}
 }
 

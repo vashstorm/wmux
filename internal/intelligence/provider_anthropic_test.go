@@ -32,12 +32,11 @@ func TestAnthropicProviderValidResponse(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:  true,
+	cfg := config.IntelligenceProviderConfig{
 		Provider: "anthropic",
 		Model:    "claude-3-haiku-20240307",
-		APIKey:  "test-key",
-		BaseURL: ts.URL,
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
@@ -77,12 +76,11 @@ func TestAnthropicProviderTimeout(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "anthropic",
-		Model:     "claude-3-haiku-20240307",
-		APIKey:    "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "anthropic",
+		Model:    "claude-3-haiku-20240307",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
@@ -95,8 +93,8 @@ func TestAnthropicProviderTimeout(t *testing.T) {
 
 	start := time.Now()
 	_, err = provider.Analyze(ctx, intelligence.AnalyzeInput{
-		PaneID:      "test-pane",
-		RawContent:  "test",
+		PaneID:     "test-pane",
+		RawContent: "test",
 	})
 	elapsed := time.Since(start)
 
@@ -123,19 +121,18 @@ func TestAnthropicProviderRateLimited(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"error": map[string]any{
-				"type":  "rate_limit_error",
+				"type":    "rate_limit_error",
 				"message": "Rate limit exceeded",
 			},
 		})
 	}))
 	defer ts.Close()
 
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "anthropic",
-		Model:     "claude-3-haiku-20240307",
-		APIKey:    "test-key",
-		BaseURL:   ts.URL,
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "anthropic",
+		Model:    "claude-3-haiku-20240307",
+		APIKey:   "test-key",
+		BaseURL:  ts.URL,
 	}
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)
@@ -161,11 +158,10 @@ func TestAnthropicProviderRateLimited(t *testing.T) {
 }
 
 func TestAnthropicProviderMissingCreds(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "anthropic",
-		Model:     "claude-3-haiku-20240307",
-		APIKey:    "",
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "anthropic",
+		Model:    "claude-3-haiku-20240307",
+		APIKey:   "",
 	}
 
 	_, err := intelligence.NewAnthropicProvider(cfg)
@@ -182,32 +178,12 @@ func TestAnthropicProviderMissingCreds(t *testing.T) {
 	}
 }
 
-func TestAnthropicProviderDisabled(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled: false,
-	}
-
-	_, err := intelligence.NewAnthropicProvider(cfg)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	var provErr *intelligence.ProviderError
-	if !errorAsProviderError(err, &provErr) {
-		t.Fatalf("expected ProviderError, got %T", err)
-	}
-	if provErr.Category != intelligence.ErrCategoryDisabled {
-		t.Errorf("expected disabled, got %v", provErr.Category)
-	}
-}
-
 func TestAnthropicProviderName(t *testing.T) {
-	cfg := config.IntelligenceConfig{
-		Enabled:   true,
-		Provider:  "anthropic",
-		Model:     "claude-3-haiku-20240307",
-		APIKey:    "test",
-		BaseURL:   "http://localhost",
+	cfg := config.IntelligenceProviderConfig{
+		Provider: "anthropic",
+		Model:    "claude-3-haiku-20240307",
+		APIKey:   "test",
+		BaseURL:  "http://localhost",
 	}
 
 	provider, err := intelligence.NewAnthropicProvider(cfg)

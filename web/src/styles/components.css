@@ -2119,3 +2119,255 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .settings-footer .btn {
 	min-width: 60px;
 }
+
+/* Intelligence Providers */
+.intelligence-providers-header {
+	display: flex;
+	justify-content: flex-end;
+	margin-bottom: var(--spacing-md);
+}
+
+.intelligence-add-provider-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	padding: 2px 6px;
+	background-color: var(--color-accent-subtle);
+	color: var(--color-accent);
+	border: 1px solid var(--color-accent-subtle);
+	border-radius: 3px;
+	font-size: 9px;
+	font-weight: var(--font-weight-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	transition: all var(--transition-base);
+}
+
+.intelligence-add-provider-btn:hover:not(:disabled) {
+	background-color: var(--color-accent);
+	color: var(--color-background);
+	box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+}
+
+.intelligence-add-provider-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.intelligence-providers-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: var(--spacing-2xl) var(--spacing-md);
+	gap: var(--spacing-md);
+	color: var(--color-text-muted);
+	text-align: center;
+	background-color: rgba(0, 0, 0, 0.1);
+	border: 1px dashed var(--color-border);
+	border-radius: var(--radius-sm);
+}
+
+.intelligence-providers-list {
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-sm);
+}
+
+.intelligence-provider-card {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--spacing-md);
+	padding: var(--spacing-sm) var(--spacing-md);
+	background-color: var(--color-surface);
+	border: 1px solid var(--color-border-subtle);
+	border-radius: var(--radius-sm);
+	transition: all var(--transition-base);
+	position: relative;
+	overflow: hidden;
+}
+
+.intelligence-provider-card:hover {
+	background-color: var(--color-surface-hover);
+	border-color: var(--color-accent-subtle);
+}
+
+.intelligence-provider-card.is-active {
+	background-color: var(--color-accent-subtle);
+	border-color: var(--color-accent);
+	box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.05);
+}
+
+.intelligence-provider-active-indicator {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	background-color: var(--color-accent);
+	box-shadow: 0 0 8px var(--color-accent);
+}
+
+.intelligence-provider-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+
+.intelligence-provider-name {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.intelligence-provider-meta {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-sm);
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+}
+
+.intelligence-provider-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 6px;
+	border-radius: 3px;
+	font-size: 9px;
+	font-weight: var(--font-weight-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	background-color: var(--color-accent-subtle);
+	color: var(--color-accent);
+}
+
+.intelligence-provider-model {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	opacity: 0.7;
+}
+
+.intelligence-provider-key-status {
+	font-size: 12px;
+	opacity: 0.6;
+}
+
+.intelligence-provider-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-xs);
+	flex-shrink: 0;
+}
+
+.intelligence-set-active-btn {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	font-size: 7px;
+	font-weight: var(--font-weight-bold);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	transition: all var(--transition-fast);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--color-text-muted);
+	border: 1px solid transparent;
+	cursor: pointer;
+	min-width: 70px;
+}
+
+.intelligence-set-active-btn:hover:not(:disabled):not(.is-active) {
+	background: var(--color-accent-subtle);
+	color: var(--color-accent);
+	border-color: var(--color-accent-subtle);
+}
+
+.intelligence-set-active-btn.is-active {
+	background-color: var(--color-accent);
+	color: var(--color-background);
+	box-shadow: 0 0 10px rgba(0, 242, 255, 0.3);
+}
+
+.intelligence-set-active-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.intelligence-edit-btn {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	font-size: 14px;
+	transition: all var(--transition-fast);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--color-text-muted);
+	cursor: pointer;
+}
+
+.intelligence-edit-btn:hover:not(:disabled) {
+	background: var(--color-accent-subtle);
+	color: var(--color-accent);
+}
+
+.intelligence-edit-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.intelligence-delete-btn {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	font-size: 16px;
+	transition: all var(--transition-fast);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--color-text-muted);
+	cursor: pointer;
+}
+
+.intelligence-delete-btn:hover:not(:disabled) {
+	background: rgba(255, 59, 48, 0.1);
+	color: #ff3b30;
+}
+
+.intelligence-delete-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Provider Editor */
+.intelligence-provider-editor {
+	padding: var(--spacing-md);
+	background-color: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	margin-bottom: var(--spacing-lg);
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-md);
+}
+
+.intelligence-editor-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--spacing-sm);
+	padding-top: var(--spacing-sm);
+	border-top: 1px solid var(--color-border-subtle);
+}

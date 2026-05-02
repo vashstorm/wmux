@@ -14,6 +14,11 @@ func TestAnalyzeSessionIntelligenceUpdatesTargetSession(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Tmux.Path = adapterPath
 	cfg.Intelligence.MinSessionIntervalSec = 0
+	cfg.Intelligence.Enabled = true
+	cfg.Intelligence.ActiveProvider = "test"
+	cfg.Intelligence.Providers = []config.IntelligenceProviderConfig{
+		{Name: "test", Provider: "openai", Model: "gpt-4", APIKey: "key"},
+	}
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
 		Type: "local",
@@ -70,6 +75,11 @@ func TestListSessionsDoesNotInvokeIntelligenceProvider(t *testing.T) {
 
 	cfg := config.DefaultConfig()
 	cfg.Tmux.Path = adapterPath
+	cfg.Intelligence.Enabled = true
+	cfg.Intelligence.ActiveProvider = "test"
+	cfg.Intelligence.Providers = []config.IntelligenceProviderConfig{
+		{Name: "test", Provider: "openai", Model: "gpt-4", APIKey: "key"},
+	}
 	cfg.Connections = []config.ConnectionConfig{{
 		ID:   "local-1",
 		Type: "local",
@@ -85,6 +95,94 @@ func TestListSessionsDoesNotInvokeIntelligenceProvider(t *testing.T) {
 	if fake.Calls != 0 {
 		t.Fatalf("expected provider not to be called, got %d calls", fake.Calls)
 	}
+}
+
+func TestAnalyzeSessionSwitchesActiveProvider(t *testing.T) {
+	adapterPath, _ := createFakeTMUXBinary(t)
+
+	cfg := config.DefaultConfig()
+	cfg.Tmux.Path = adapterPath
+	cfg.Intelligence.MinSessionIntervalSec = 0
+	cfg.Intelligence.Enabled = true
+	cfg.Intelligence.ActiveProvider = "openai-main"
+	cfg.Intelligence.Providers = []config.IntelligenceProviderConfig{
+		{Name: "openai-main", Provider: "openai", Model: "gpt-4", APIKey: "key1"},
+		{Name: "anthropic-main", Provider: "anthropic", Model: "claude", APIKey: "key2"},
+	}
+	cfg.Connections = []config.ConnectionConfig{{
+		ID:   "local-1",
+		Type: "local",
+	}}
+
+	openaiFake := intelligence.NewFakeProvider(intelligence.FakeProviderConfig{
+		App:        intelligence.AppCodex,
+		Status:     intelligence.StatusRunning,
+		Summary:    "OpenAI analysis",
+		Confidence: 0.9,
+	})
+	anthropicFake := intelligence.NewFakeProvider(intelligence.FakeProviderConfig{
+		App:        intelligence.AppClaude,
+		Status:     intelligence.StatusWaiting,
+		Summary:    "Anthropic analysis",
+		Confidence: 0.95,
+	})
+
+	factory := func(p config.IntelligenceProviderConfig) (intelligence.Provider, error) {
+		if p.Provider == "openai" {
+			return openaiFake, nil
+		}
+		return anthropicFake, nil
+	}
+
+	srv := newTestServer(t, cfg)
+	srv.intelligenceStore = newIntelligenceStore(t)
+	srv.intelligenceAnalyzer = intelligence.NewAnalyzer(srv.intelligenceStore, cfg.Intelligence.MaxConcurrency, nil, factory)
+
+	rec := performSessionRequest(t, srv, http.MethodPost, "/api/connections/local-1/sessions/alpha/analyze", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rec.Code)
+	}
+	payload := decodeBody[analyzeResponse](t, rec.Body.Bytes())
+	if payload.Intelligence == nil {
+		t.Fatal("expected aggregate intelligence in analyze response")
+	}
+	if payload.Intelligence.App != "codex" {
+		t.Fatalf("expected openai result (codex), got %q", payload.Intelligence.App)
+	}
+	openaiCallCount := openaiFake.Calls
+	anthropicCallCount := anthropicFake.Calls
+
+	cfg.Intelligence.ActiveProvider = "anthropic-main"
+	srv2 := newTestServer(t, cfg)
+	srv2.intelligenceStore = newIntelligenceStore(t)
+	srv2.intelligenceAnalyzer = intelligence.NewAnalyzer(srv2.intelligenceStore, cfg.Intelligence.MaxConcurrency, nil, factory)
+
+	rec = performSessionRequest(t, srv2, http.MethodPost, "/api/connections/local-1/sessions/beta/analyze", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rec.Code)
+	}
+	payload = decodeBody[analyzeResponse](t, rec.Body.Bytes())
+	if payload.Intelligence == nil {
+		t.Fatal("expected aggregate intelligence in analyze response")
+	}
+	if payload.Intelligence.App != "claude" {
+		t.Fatalf("expected anthropic result (claude), got %q", payload.Intelligence.App)
+	}
+	if openaiFake.Calls != openaiCallCount {
+		t.Fatalf("openai provider calls changed from %d to %d", openaiCallCount, openaiFake.Calls)
+	}
+	if anthropicFake.Calls <= anthropicCallCount {
+		t.Fatalf("anthropic provider calls did not increase from %d", anthropicCallCount)
+	}
+}
+
+func newIntelligenceStore(t *testing.T) *intelligence.Store {
+	t.Helper()
+	store, err := intelligence.NewStore(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create intelligence store: %v", err)
+	}
+	return store
 }
 
 func TestAnalyzeSSHConnectionReturnsBadRequest(t *testing.T) {
@@ -131,6 +229,8 @@ func newTestServerWithIntelligence(t *testing.T, cfg config.Config, provider int
 
 	srv := newTestServer(t, cfg)
 	srv.intelligenceStore = store
-	srv.intelligenceAnalyzer = intelligence.NewAnalyzer(provider, store, cfg.Intelligence.MaxConcurrency, nil)
+	srv.intelligenceAnalyzer = intelligence.NewAnalyzer(store, cfg.Intelligence.MaxConcurrency, nil, func(p config.IntelligenceProviderConfig) (intelligence.Provider, error) {
+		return provider, nil
+	})
 	return srv
 }

@@ -12,37 +12,50 @@ import (
 
 // Analyzer coordinates cached pane analysis with concurrency and interval gates.
 type Analyzer struct {
-	provider       Provider
 	store          *Store
 	maxConcurrency int
 	captureFn      func(string) (string, error)
+	providerFactory func(config.IntelligenceProviderConfig) (Provider, error)
 	sem            chan struct{}
 	mu             sync.Mutex
 	lastRun        map[string]time.Time
 }
 
 // NewAnalyzer creates an Analyzer with a bounded provider-call semaphore.
-func NewAnalyzer(provider Provider, store *Store, maxConcurrency int, captureFn func(string) (string, error)) *Analyzer {
+func NewAnalyzer(store *Store, maxConcurrency int, captureFn func(string) (string, error), factory func(config.IntelligenceProviderConfig) (Provider, error)) *Analyzer {
 	if maxConcurrency <= 0 {
 		maxConcurrency = 1
 	}
+	if factory == nil {
+		factory = NewProvider
+	}
 	return &Analyzer{
-		provider:       provider,
-		store:          store,
-		maxConcurrency: maxConcurrency,
-		captureFn:      captureFn,
-		sem:            make(chan struct{}, maxConcurrency),
-		lastRun:        make(map[string]time.Time),
+		store:           store,
+		maxConcurrency:  maxConcurrency,
+		captureFn:       captureFn,
+		providerFactory: factory,
+		sem:             make(chan struct{}, maxConcurrency),
+		lastRun:         make(map[string]time.Time),
 	}
 }
 
 // AnalyzeSession runs analysis for all panes in a session.
 func (a *Analyzer) AnalyzeSession(ctx context.Context, cfg config.IntelligenceConfig, panes []tmux.Pane, sessionName string) ([]Result, error) {
-	if a == nil || a.provider == nil || a.store == nil {
+	if a == nil || a.store == nil || a.providerFactory == nil {
 		return nil, fmt.Errorf("analyzer is not configured")
 	}
 	if a.skipSession(sessionName, cfg.MinSessionIntervalSec) {
 		return nil, nil
+	}
+
+	providerCfg, err := ResolveActiveProvider(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	provider, err := a.providerFactory(providerCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	results := make([]Result, len(panes))
@@ -52,7 +65,7 @@ func (a *Analyzer) AnalyzeSession(ctx context.Context, cfg config.IntelligenceCo
 		wg.Add(1)
 		go func(index int, pane tmux.Pane) {
 			defer wg.Done()
-			result, err := a.analyzePane(ctx, cfg, pane, sessionName)
+			result, err := a.analyzePane(ctx, cfg, pane, sessionName, provider)
 			if err != nil {
 				errs[index] = err
 				return
@@ -100,7 +113,7 @@ func (a *Analyzer) recordRun(sessionName string) {
 	a.lastRun[sessionName] = time.Now()
 }
 
-func (a *Analyzer) analyzePane(ctx context.Context, cfg config.IntelligenceConfig, pane tmux.Pane, sessionName string) (Result, error) {
+func (a *Analyzer) analyzePane(ctx context.Context, cfg config.IntelligenceConfig, pane tmux.Pane, sessionName string, provider Provider) (Result, error) {
 	rawContent := ""
 	if a.captureFn != nil {
 		if captured, captureErr := a.captureFn(pane.ID); captureErr == nil {
@@ -128,14 +141,14 @@ func (a *Analyzer) analyzePane(ctx context.Context, cfg config.IntelligenceConfi
 		return Result{}, ctx.Err()
 	}
 
-	result, err := a.provider.Analyze(ctx, input)
+	result, err := provider.Analyze(ctx, input)
 	if err != nil {
 		return Result{}, err
 	}
 	result.PaneID = pane.ID
 	result.SessionName = sessionName
 	result.WindowID = input.WindowID
-	result.Source = a.provider.Name()
+	result.Source = provider.Name()
 	result.ContentHash = hash
 	result.Stale = false
 	if result.UpdatedAt.IsZero() {
