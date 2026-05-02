@@ -27,7 +27,7 @@ func TestNewManager(t *testing.T) {
 
 func TestTmuxAttachArgsUseIgnoreSize(t *testing.T) {
 	got := tmuxAttachArgs("dev")
-	want := []string{"attach-session", "-f", "ignore-size", "-t", "dev"}
+	want := []string{"attach-session", "-t", "dev"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("tmuxAttachArgs() = %#v, want %#v", got, want)
 	}

@@ -82,7 +82,7 @@ func toPTYWindowSize(size WindowSize) *pty.Winsize {
 }
 
 func tmuxAttachArgs(target string) []string {
-	return []string{"attach-session", "-f", "ignore-size", "-t", target}
+	return []string{"attach-session", "-t", target}
 }
 
 func localPTYEnv(base []string) []string {

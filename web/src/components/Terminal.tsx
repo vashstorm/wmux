@@ -78,6 +78,7 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 export function Terminal({ selectedPane }: TerminalProps) {
 	const { setError, uiSettings } = useAppState();
 	const { connectionId, session, window: windowId, pane } = selectedPane;
+	const wrapperRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -88,7 +89,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	const fitAndReadSize = useCallback((): TerminalSize | null => {
+	const fitAndSyncSize = useCallback((syncWebSocket = false): TerminalSize | null => {
 		const terminal = terminalRef.current;
 		const fitAddon = fitAddonRef.current;
 		const container = containerRef.current;
@@ -102,15 +103,29 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			fitAddon.fit();
 		}
 
-		return normalizeTerminalSize(
+		const nextSize = normalizeTerminalSize(
 			proposed?.cols ?? terminal.cols,
 			proposed?.rows ?? terminal.rows,
 		);
+
+		if (syncWebSocket && nextSize) {
+			const previousSize = lastSentSizeRef.current;
+			if (
+				!previousSize ||
+				previousSize.cols !== nextSize.cols ||
+				previousSize.rows !== nextSize.rows
+			) {
+				lastSentSizeRef.current = nextSize;
+				wsRef.current?.send({ type: "resize", cols: nextSize.cols, rows: nextSize.rows });
+			}
+		}
+
+		return nextSize;
 	}, []);
 
 	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
 		const token = sessionStorage.getItem("wmux-auth-token") ?? "";
-		const terminalSize = initialSize ?? fitAndReadSize();
+		const terminalSize = initialSize ?? fitAndSyncSize();
 		lastSentSizeRef.current = terminalSize;
 
 		setDisconnected(false);
@@ -164,7 +179,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 
 		ws.connect();
 		wsRef.current = ws;
-	}, [connectionId, fitAndReadSize, pane, session, setError, windowId]);
+	}, [connectionId, fitAndSyncSize, pane, session, setError, windowId]);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -190,7 +205,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		terminal.open(containerRef.current);
 		terminalRef.current = terminal;
 		fitAddonRef.current = fitAddon;
-		const initialSize = fitAndReadSize();
+		const initialSize = fitAndSyncSize();
 
 		terminal.focus();
 
@@ -219,17 +234,37 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			}
 			resizeFrameRef.current = window.requestAnimationFrame(() => {
 				resizeFrameRef.current = null;
-				fitAndReadSize();
+				fitAndSyncSize(true);
 			});
 		});
 
-		if (containerRef.current) {
-			resizeObserver.observe(containerRef.current);
+		if (wrapperRef.current) {
+			resizeObserver.observe(wrapperRef.current);
 		}
 
 		resizeObserverRef.current = resizeObserver;
 
 		connectWebSocket(initialSize);
+
+		const scheduleDeferredFit = () => {
+			if (resizeFrameRef.current !== null) {
+				window.cancelAnimationFrame(resizeFrameRef.current);
+			}
+			resizeFrameRef.current = window.requestAnimationFrame(() => {
+				resizeFrameRef.current = null;
+				fitAndSyncSize(true);
+			});
+		};
+
+		scheduleDeferredFit();
+		window.addEventListener("resize", scheduleDeferredFit);
+
+		const fontSet = document.fonts;
+		if (fontSet) {
+			void fontSet.ready.then(() => {
+				scheduleDeferredFit();
+			});
+		}
 
 		const themeObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
@@ -250,6 +285,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 		return () => {
 			themeObserver.disconnect();
 			resizeObserver.disconnect();
+			window.removeEventListener("resize", scheduleDeferredFit);
 			if (resizeFrameRef.current !== null) {
 				window.cancelAnimationFrame(resizeFrameRef.current);
 				resizeFrameRef.current = null;
@@ -262,7 +298,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			wsRef.current?.close();
 			wsRef.current = null;
 		};
-	}, [connectWebSocket, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
+	}, [connectWebSocket, fitAndSyncSize, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
 
 	const handleReconnect = () => {
 		wsRef.current?.close();
@@ -270,7 +306,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 	};
 
 	return (
-		<div className="terminal-wrapper" data-testid="terminal-wrapper">
+		<div ref={wrapperRef} className="terminal-wrapper" data-testid="terminal-wrapper">
 			<div
 				ref={containerRef}
 				className="terminal-container"
