@@ -1911,6 +1911,34 @@
 	color: var(--color-danger, #f85149);
 	background-color: var(--color-danger-bg, rgba(248, 81, 73, 0.15));
 }
+.app-count-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	line-height: 1.4;
+	flex-shrink: 0;
+}
+.app-count-badge.is-claude {
+	color: #d4a5ff;
+	background-color: rgba(212, 165, 255, 0.12);
+}
+.app-count-badge.is-codex {
+	color: #79c0ff;
+	background-color: rgba(121, 192, 255, 0.12);
+}
+.app-count-badge.is-opencode {
+	color: #56d364;
+	background-color: rgba(86, 211, 100, 0.12);
+}
+.app-count-badge.is-zsh {
+	color: #e3b341;
+	background-color: rgba(227, 179, 65, 0.12);
+}
 .session-intelligence-summary {
 	font-size: 11px;
 	color: var(--color-text-muted, #8b949e);

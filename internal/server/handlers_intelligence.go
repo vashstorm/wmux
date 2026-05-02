@@ -21,14 +21,15 @@ type analyzeResponse struct {
 }
 
 type sessionIntelligence struct {
-	App        string  `json:"app"`
-	Status     string  `json:"status"`
-	Summary    string  `json:"summary"`
-	Source     string  `json:"source"`
-	Confidence float64 `json:"confidence"`
-	Stale      bool    `json:"stale"`
-	Error      string  `json:"error,omitempty"`
-	UpdatedAt  string  `json:"updatedAt,omitempty"`
+	App        string         `json:"app"`
+	Status     string         `json:"status"`
+	Summary    string         `json:"summary"`
+	Source     string         `json:"source"`
+	Confidence float64        `json:"confidence"`
+	Stale      bool           `json:"stale"`
+	Error      string         `json:"error,omitempty"`
+	UpdatedAt  string         `json:"updatedAt,omitempty"`
+	AppCounts  map[string]int `json:"appCounts,omitempty"`
 }
 
 func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +143,7 @@ func buildSessionIntelligence(results []intelligence.Result, activePaneID string
 		Stale:      agg.Stale,
 		Error:      agg.Error,
 		UpdatedAt:  formatIntelligenceTime(agg.UpdatedAt),
+		AppCounts:  intelligence.CountApplications(results),
 	}
 }
 
@@ -170,6 +172,7 @@ func (s *Server) attachCachedSessionIntelligence(sessions []tmux.Session) {
 		applySessionResult(&sessions[i], agg)
 		sessions[i].IntelligencePaneCount = len(results)
 		sessions[i].IntelligenceWindowCount = countIntelligenceWindows(results)
+		sessions[i].IntelligenceAppCounts = intelligence.CountApplications(results)
 	}
 }
 

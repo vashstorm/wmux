@@ -7,16 +7,17 @@ type Session struct {
 	WindowCount             int
 	AttentionState          AttentionState
 	AttentionCount          int
-	IntelligenceApp         string  `json:"intelligenceApp,omitempty"`
-	IntelligenceStatus      string  `json:"intelligenceStatus,omitempty"`
-	IntelligenceSummary     string  `json:"intelligenceSummary,omitempty"`
-	IntelligenceSource      string  `json:"intelligenceSource,omitempty"`
-	IntelligenceConfidence  float64 `json:"intelligenceConfidence,omitempty"`
-	IntelligenceUpdatedAt   string  `json:"intelligenceUpdatedAt,omitempty"`
-	IntelligenceStale       bool    `json:"intelligenceStale,omitempty"`
-	IntelligenceError       string  `json:"intelligenceError,omitempty"`
-	IntelligenceWindowCount int     `json:"intelligenceWindowCount,omitempty"`
-	IntelligencePaneCount   int     `json:"intelligencePaneCount,omitempty"`
+	IntelligenceApp         string         `json:"intelligenceApp,omitempty"`
+	IntelligenceStatus      string         `json:"intelligenceStatus,omitempty"`
+	IntelligenceSummary     string         `json:"intelligenceSummary,omitempty"`
+	IntelligenceSource      string         `json:"intelligenceSource,omitempty"`
+	IntelligenceConfidence  float64        `json:"intelligenceConfidence,omitempty"`
+	IntelligenceUpdatedAt   string         `json:"intelligenceUpdatedAt,omitempty"`
+	IntelligenceStale       bool           `json:"intelligenceStale,omitempty"`
+	IntelligenceError       string         `json:"intelligenceError,omitempty"`
+	IntelligenceWindowCount int            `json:"intelligenceWindowCount,omitempty"`
+	IntelligencePaneCount   int            `json:"intelligencePaneCount,omitempty"`
+	IntelligenceAppCounts   map[string]int `json:"intelligenceAppCounts,omitempty"`
 }
 
 type Window struct {

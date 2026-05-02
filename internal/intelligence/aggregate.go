@@ -1,5 +1,21 @@
 package intelligence
 
+// CountApplications returns a histogram of recognized applications across pane results.
+// Unknown apps are excluded. Returns nil when no countable apps exist.
+func CountApplications(results []Result) map[string]int {
+	counts := make(map[string]int)
+	for _, result := range results {
+		if result.App == "" || result.App == AppUnknown {
+			continue
+		}
+		counts[string(result.App)]++
+	}
+	if len(counts) == 0 {
+		return nil
+	}
+	return counts
+}
+
 // AggregateSessionIntelligence returns the highest-priority pane result.
 func AggregateSessionIntelligence(results []Result, activePaneID string) Result {
 	var best Result

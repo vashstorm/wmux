@@ -25,6 +25,8 @@ const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
 	running: "Running",
 };
 
+const APP_BADGE_ORDER = ["claude", "codex", "opencode", "zsh"] as const;
+
 function isApiError(err: unknown): err is Error & { code: string; message: string } {
   return err instanceof Error && "code" in err && "message" in err;
 }
@@ -150,6 +152,7 @@ export function Sidebar() {
                   intelligenceStale: result.intelligence.stale,
                   intelligenceUpdatedAt: result.intelligence.updatedAt,
                   intelligenceError: result.intelligence.error,
+                  intelligenceAppCounts: result.intelligence.appCounts,
                 });
               }
             })
@@ -529,6 +532,15 @@ export function Sidebar() {
                                     {session.intelligenceError ? "Error" : session.intelligenceStale ? "Stale" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
                                   </span>
                                 )}
+                                {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
+                                  const count = session.intelligenceAppCounts![app];
+                                  if (typeof count !== "number" || count <= 0) return null;
+                                  return (
+                                    <span key={app} className={`app-count-badge is-${app}`}>
+                                      {app} {count}
+                                    </span>
+                                  );
+                                })}
                               </div>
                               {session.intelligenceSummary && (
                                 <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>

@@ -87,6 +87,7 @@ export interface SessionInfoData {
 	intelligenceStale?: boolean;
 	intelligenceUpdatedAt?: string;
 	intelligenceError?: string;
+	intelligenceAppCounts?: Record<string, number>;
 }
 
 export interface SessionsListResponse {
@@ -266,6 +267,7 @@ type NormalizedSession = {
 	intelligenceStale?: boolean;
 	intelligenceUpdatedAt?: string;
 	intelligenceError?: string;
+	intelligenceAppCounts?: Record<string, number>;
 };
 
 export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
@@ -302,6 +304,8 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 			intelligenceUpdatedAt?: string;
 			IntelligenceError?: string;
 			intelligenceError?: string;
+			IntelligenceAppCounts?: Record<string, number>;
+			intelligenceAppCounts?: Record<string, number>;
 		}>;
 	};
 	return {
@@ -326,6 +330,7 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 					intelligenceStale: s.intelligenceStale ?? s.IntelligenceStale,
 					intelligenceUpdatedAt: s.intelligenceUpdatedAt ?? s.IntelligenceUpdatedAt,
 					intelligenceError: s.intelligenceError ?? s.IntelligenceError,
+					intelligenceAppCounts: s.intelligenceAppCounts ?? s.IntelligenceAppCounts,
 				};
 			})
 			.filter((s) => s.name.length > 0),
@@ -439,7 +444,7 @@ export interface AnalyzeSessionResponse {
 	updated: number;
 	skipped: number;
 	errors: number;
-	intelligence?: SessionIntelligence;
+	intelligence?: SessionIntelligence & { appCounts?: Record<string, number> };
 }
 
 export async function analyzeSession(connectionId: string, session: string): Promise<AnalyzeSessionResponse> {

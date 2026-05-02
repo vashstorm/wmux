@@ -5,6 +5,57 @@ import (
 	"time"
 )
 
+func TestCountApplications(t *testing.T) {
+	t.Run("counts recognized apps excluding unknown", func(t *testing.T) {
+		got := CountApplications([]Result{
+			{PaneID: "%1", App: AppClaude},
+			{PaneID: "%2", App: AppZsh},
+			{PaneID: "%3", App: AppClaude},
+			{PaneID: "%4", App: AppUnknown},
+			{PaneID: "%5", App: AppOpenCode},
+		})
+		if got["claude"] != 2 {
+			t.Fatalf("got claude count %d, want 2", got["claude"])
+		}
+		if got["zsh"] != 1 {
+			t.Fatalf("got zsh count %d, want 1", got["zsh"])
+		}
+		if got["opencode"] != 1 {
+			t.Fatalf("got opencode count %d, want 1", got["opencode"])
+		}
+		if _, ok := got["unknown"]; ok {
+			t.Fatal("unknown should not be in counts")
+		}
+	})
+
+	t.Run("returns nil for empty input", func(t *testing.T) {
+		got := CountApplications([]Result{})
+		if got != nil {
+			t.Fatalf("got %v, want nil", got)
+		}
+	})
+
+	t.Run("returns nil when only unknown apps", func(t *testing.T) {
+		got := CountApplications([]Result{
+			{PaneID: "%1", App: AppUnknown},
+			{PaneID: "%2", App: AppUnknown},
+		})
+		if got != nil {
+			t.Fatalf("got %v, want nil", got)
+		}
+	})
+
+	t.Run("includes codex", func(t *testing.T) {
+		got := CountApplications([]Result{
+			{PaneID: "%1", App: AppCodex},
+			{PaneID: "%2", App: AppCodex},
+		})
+		if got["codex"] != 2 {
+			t.Fatalf("got codex count %d, want 2", got["codex"])
+		}
+	})
+}
+
 func TestAggregateSessionIntelligence(t *testing.T) {
 	now := time.Now()
 
