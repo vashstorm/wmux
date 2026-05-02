@@ -132,6 +132,13 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
 			response.Data[i].AttentionCount = totalCount
 			s.attachCachedSessionIntelligence(&response.Data[i], allPaneIDs)
+			if s.intelligenceAnalyzer != nil && s.intelligenceStore != nil {
+				for _, paneID := range allPaneIDs {
+					if _, inCache, _ := s.intelligenceStore.Get(paneID); !inCache {
+						s.intelligenceAnalyzer.RecordNewPane(response.Data[i].Name, paneID)
+					}
+				}
+			}
 		}
 	case "ssh":
 		client := sshclient.New(sshclient.Config{
@@ -173,6 +180,13 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 			response.Data[i].AttentionState = tmux.AggregateAttentionState(allStates)
 			response.Data[i].AttentionCount = totalCount
 			s.attachCachedSessionIntelligence(&response.Data[i], allPaneIDs)
+			if s.intelligenceAnalyzer != nil && s.intelligenceStore != nil {
+				for _, paneID := range allPaneIDs {
+					if _, inCache, _ := s.intelligenceStore.Get(paneID); !inCache {
+						s.intelligenceAnalyzer.RecordNewPane(response.Data[i].Name, paneID)
+					}
+				}
+			}
 		}
 	default:
 		s.writeError(w, http.StatusBadRequest, "bad_request", fmt.Sprintf("unsupported connection type %q", connection.Type))

@@ -12,13 +12,14 @@ import (
 
 // Analyzer coordinates cached pane analysis with concurrency and interval gates.
 type Analyzer struct {
-	store          *Store
-	maxConcurrency int
-	captureFn      func(string) (string, error)
+	store           *Store
+	maxConcurrency  int
+	captureFn       func(string) (string, error)
 	providerFactory func(config.IntelligenceProviderConfig) (Provider, error)
-	sem            chan struct{}
-	mu             sync.Mutex
-	lastRun        map[string]time.Time
+	sem             chan struct{}
+	mu              sync.Mutex
+	lastRun         map[string]time.Time
+	firstSeen       map[string]time.Time
 }
 
 // NewAnalyzer creates an Analyzer with a bounded provider-call semaphore.
@@ -36,6 +37,7 @@ func NewAnalyzer(store *Store, maxConcurrency int, captureFn func(string) (strin
 		providerFactory: factory,
 		sem:             make(chan struct{}, maxConcurrency),
 		lastRun:         make(map[string]time.Time),
+		firstSeen:       make(map[string]time.Time),
 	}
 }
 
@@ -111,6 +113,37 @@ func (a *Analyzer) ResetSessionTimer(sessionName string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.lastRun, sessionName)
+}
+
+func (a *Analyzer) BumpSessionTimer(sessionName string) {
+	a.recordRun(sessionName)
+}
+
+// RecordNewPane bumps the session timer when a pane is first discovered,
+// deferring analysis until minSessionIntervalSec has elapsed.
+func (a *Analyzer) RecordNewPane(sessionName, paneID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if _, ok := a.firstSeen[paneID]; ok {
+		return
+	}
+	a.firstSeen[paneID] = time.Now()
+	a.lastRun[sessionName] = time.Now()
+}
+
+func (a *Analyzer) PruneFirstSeen(sessionName string, keepPaneIDs []string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	keep := make(map[string]struct{}, len(keepPaneIDs))
+	for _, id := range keepPaneIDs {
+		keep[id] = struct{}{}
+	}
+	for paneID := range a.firstSeen {
+		if _, ok := keep[paneID]; !ok {
+			delete(a.firstSeen, paneID)
+		}
+	}
 }
 
 func (a *Analyzer) recordRun(sessionName string) {

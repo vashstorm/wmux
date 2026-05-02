@@ -133,6 +133,9 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 				slog.String("error", cleanupErr.Error()),
 			)
 		}
+		if s.intelligenceAnalyzer != nil {
+			s.intelligenceAnalyzer.PruneFirstSeen(sessionName, keepPaneIDs)
+		}
 	}
 
 	s.writeJSON(w, http.StatusOK, analyzeResponse{

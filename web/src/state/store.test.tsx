@@ -361,8 +361,8 @@ describe("updateSession", () => {
 				<button
 					data-testid="set-initial-sessions"
 					onClick={() => state.setSessions("conn1", [
-						{ name: "session1", attached: false },
-						{ name: "session2", attached: true },
+						{ name: "session1" },
+						{ name: "session2" },
 					])}
 				>
 					Set Initial Sessions
@@ -379,9 +379,6 @@ describe("updateSession", () => {
 				</button>
 				<span data-testid="session1-status">
 					{state.sessions["conn1"]?.find(s => s.name === "session1")?.intelligenceStatus ?? "null"}
-				</span>
-				<span data-testid="session2-attached">
-					{state.sessions["conn1"]?.find(s => s.name === "session2")?.attached ? "true" : "false"}
 				</span>
 				<span data-testid="sessions-count">
 					{(state.sessions["conn1"] ?? []).length}
@@ -403,11 +400,9 @@ describe("updateSession", () => {
 		fireEvent.click(screen.getByTestId("set-initial-sessions"));
 		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
 		expect(screen.getByTestId("session1-status").textContent).toBe("null");
-		expect(screen.getByTestId("session2-attached").textContent).toBe("true");
 
 		fireEvent.click(screen.getByTestId("update-session1"));
 		expect(screen.getByTestId("session1-status").textContent).toBe("waiting");
-		expect(screen.getByTestId("session2-attached").textContent).toBe("true");
 		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
 	});
 
@@ -418,13 +413,13 @@ describe("updateSession", () => {
 				<div>
 					<button
 						data-testid="set-conn1-sessions"
-						onClick={() => state.setSessions("conn1", [{ name: "s1", attached: false }])}
+						onClick={() => state.setSessions("conn1", [{ name: "s1" }])}
 					>
 						Set Conn1
 					</button>
 					<button
 						data-testid="set-conn2-sessions"
-						onClick={() => state.setSessions("conn2", [{ name: "s2", attached: true }])}
+						onClick={() => state.setSessions("conn2", [{ name: "s2" }])}
 					>
 						Set Conn2
 					</button>
@@ -436,9 +431,6 @@ describe("updateSession", () => {
 					</button>
 					<span data-testid="conn1-status">
 						{state.sessions["conn1"]?.[0]?.intelligenceStatus ?? "null"}
-					</span>
-					<span data-testid="conn2-attached">
-						{state.sessions["conn2"]?.[0]?.attached ? "true" : "false"}
 					</span>
 				</div>
 			);
@@ -455,6 +447,5 @@ describe("updateSession", () => {
 		fireEvent.click(screen.getByTestId("update-conn1"));
 
 		expect(screen.getByTestId("conn1-status").textContent).toBe("running");
-		expect(screen.getByTestId("conn2-attached").textContent).toBe("true");
 	});
 });

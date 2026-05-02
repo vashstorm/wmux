@@ -1491,18 +1491,19 @@
 	min-height: 18px;
 }
 
-.session-card-status-icon {
-	color: var(--color-success);
-	display: inline-flex;
-	align-items: center;
-	flex-shrink: 0;
-	filter: drop-shadow(0 0 4px var(--color-success-glow));
-}
-
 .session-card-meta-count {
 	font-size: 10px;
 	color: var(--color-text-disabled);
 	flex-shrink: 0;
+}
+
+.session-card-time {
+	font-size: 10px;
+	color: var(--color-text-muted);
+	flex-shrink: 0;
+	opacity: 0.6;
+	margin-left: auto;
+	font-weight: 500;
 }
 
 .session-card-badges {

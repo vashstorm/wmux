@@ -43,14 +43,14 @@ describe("Sidebar session loading", () => {
 				.mockResolvedValueOnce({
 					connectionId: "conn1",
 					mode: "local",
-					data: [{ name: "session1", attached: false }],
+					data: [{ name: "session1" }],
 				})
 				.mockResolvedValueOnce({
 					connectionId: "conn1",
 					mode: "local",
 					data: [
-						{ name: "session1", attached: false },
-						{ name: "session2", attached: false },
+						{ name: "session1" },
+						{ name: "session2" },
 					],
 				});
 
@@ -73,7 +73,7 @@ describe("Sidebar session loading", () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
-				data: [{ name: "session1", attached: false }],
+				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
@@ -122,7 +122,7 @@ describe("Sidebar session loading", () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
-				data: [{ name: "session1", attached: false }],
+				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
@@ -165,7 +165,7 @@ describe("Sidebar session loading", () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
-				data: [{ name: "session1", attached: false }],
+				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
@@ -200,7 +200,7 @@ describe("Sidebar session loading", () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
-				data: [{ name: "session1", attached: false }],
+				data: [{ name: "session1" }],
 			});
 
 			const apiError = new Error("connection failed") as Error & { code: string };
@@ -238,7 +238,7 @@ describe("Sidebar session loading", () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
-				data: [{ name: "session1", attached: false }],
+				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
@@ -290,7 +290,7 @@ describe("session card attention rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, attentionState: "attention", attentionCount: 1 }],
+			data: [{ name: "session1", attentionState: "attention", attentionCount: 1 }],
 		});
 
 		render(
@@ -311,7 +311,7 @@ describe("session card attention rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, attentionState: "explicit", attentionCount: 1 }],
+			data: [{ name: "session1", attentionState: "explicit", attentionCount: 1 }],
 		});
 
 		render(
@@ -332,7 +332,7 @@ describe("session card attention rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, attentionState: "attention", attentionCount: 2 }],
+			data: [{ name: "session1", attentionState: "attention", attentionCount: 2 }],
 		});
 
 		render(
@@ -363,8 +363,8 @@ describe("async analyze trigger", () => {
 			connectionId: "conn1",
 			mode: "local",
 			data: [
-				{ name: "session1", attached: false, intelligenceStale: true },
-				{ name: "session2", attached: false, intelligenceStatus: "running", intelligenceStale: false },
+				{ name: "session1", intelligenceStale: true },
+				{ name: "session2", intelligenceStatus: "running", intelligenceStale: false },
 			],
 		});
 
@@ -410,7 +410,7 @@ describe("async analyze trigger", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "ssh",
-			data: [{ name: "session1", attached: false, intelligenceStale: true }],
+			data: [{ name: "session1", intelligenceStale: true }],
 		});
 
 		render(
@@ -443,8 +443,8 @@ describe("async analyze trigger", () => {
 			connectionId: "conn1",
 			mode: "local",
 			data: [
-				{ name: "session1", attached: false, intelligenceStale: true },
-				{ name: "session2", attached: false, intelligenceStatus: "running", intelligenceStale: false },
+				{ name: "session1", intelligenceStale: true },
+				{ name: "session2", intelligenceStatus: "running", intelligenceStale: false },
 			],
 		});
 
@@ -496,7 +496,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "waiting" }],
+			data: [{ name: "session1", intelligenceStatus: "waiting" }],
 		});
 
 		render(
@@ -518,7 +518,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "dead_loop" }],
+			data: [{ name: "session1", intelligenceStatus: "dead_loop" }],
 		});
 
 		render(
@@ -540,7 +540,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "blocked" }],
+			data: [{ name: "session1", intelligenceStatus: "blocked" }],
 		});
 
 		render(
@@ -562,7 +562,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "running" }],
+			data: [{ name: "session1", intelligenceStatus: "running" }],
 		});
 
 		render(
@@ -584,7 +584,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "none" }],
+			data: [{ name: "session1", intelligenceStatus: "none" }],
 		});
 
 		render(
@@ -605,7 +605,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "waiting", intelligenceSummary: "Waiting for input" }],
+			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting for input" }],
 		});
 
 		render(
@@ -627,7 +627,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "waiting", intelligenceSummary: "Waiting", intelligenceStale: true }],
+			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting", intelligenceStale: true }],
 		});
 
 		mockAnalyzeSession.mockResolvedValue({
@@ -669,7 +669,7 @@ describe("intelligence badge and summary rendering", () => {
 		mockListSessions.mockResolvedValue({
 			connectionId: "conn1",
 			mode: "local",
-			data: [{ name: "session1", attached: false, intelligenceStatus: "none", intelligenceSummary: "Failed", intelligenceError: "API timeout" }],
+			data: [{ name: "session1", intelligenceStatus: "none", intelligenceSummary: "Failed", intelligenceError: "API timeout" }],
 		});
 
 		render(

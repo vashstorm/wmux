@@ -15,6 +15,7 @@ import {
 } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
+import { formatRelativeTime } from "../ui/time.js";
 
 const SESSION_SYNC_INTERVAL_MS = 2000;
 
@@ -516,16 +517,12 @@ export function Sidebar() {
                               data-testid={`session-open-${sname}`}
                             >
                               <div className="session-card-name-group">
-                                <div className="session-card-top">
-                                  <span className="session-card-name" title={sname}>{sname}</span>
-                                  {session.attached && (
-                                    <span className="session-card-status-icon" title="active">
-                                      <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
-                                        <circle cx="4" cy="4" r="4"/>
-                                      </svg>
-                                    </span>
-                                  )}
-                                </div>
+                                  <div className="session-card-top">
+                                    <span className="session-card-name" title={sname}>{sname}</span>
+                                    {session.intelligenceUpdatedAt && (
+                                      <span className="session-card-time">{formatRelativeTime(session.intelligenceUpdatedAt)}</span>
+                                    )}
+                                  </div>
                                 <div className="session-card-meta">
                                   {typeof session.windowCount === "number" && session.windowCount > 0 && (
                                     <span className="session-card-meta-count">
