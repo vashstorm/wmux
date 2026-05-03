@@ -14,14 +14,15 @@ import { ConfirmDialog } from "./components/ConfirmDialog.js";
 import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
+import { normalizeThemeId } from "./ui/themes.js";
 
 function UISettingsInit() {
 	const { setUISettings } = useAppState();
 
 	useEffect(() => {
 		void getConfig().then((config) => {
-			const theme = config.ui.theme || "dark";
-			const windowTheme = config.ui.windowTheme || theme;
+			const theme = normalizeThemeId(config.ui.theme);
+			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
 			const fontSize = config.ui.fontSize || 16;
 			const terminalFontSize = config.ui.terminalFontSize || 14;
 			const terminalFontWeight = config.ui.terminalFontWeight || "normal";

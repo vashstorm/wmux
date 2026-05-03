@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
+import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -7,58 +7,7 @@ import "@xterm/xterm/css/xterm.css";
 import { getErrorMessage } from "../api/errors.js";
 import { TerminalWebSocket } from "../api/websocket.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
-
-const darkTheme: ITheme = {
-	background: "#0a0e1a",
-	foreground: "#f8fafc",
-	cursor: "#f59e0b",
-	cursorAccent: "#0a0e1a",
-	selectionBackground: "rgba(245, 158, 11, 0.2)",
-	black: "#0f172a",
-	red: "#ef4444",
-	green: "#10b981",
-	yellow: "#f59e0b",
-	blue: "#8b5cf6",
-	magenta: "#a855f7",
-	cyan: "#06b6d4",
-	white: "#f8fafc",
-	brightBlack: "#334155",
-	brightRed: "#f87171",
-	brightGreen: "#34d399",
-	brightYellow: "#fbbf24",
-	brightBlue: "#a78bfa",
-	brightMagenta: "#c084fc",
-	brightCyan: "#22d3ee",
-	brightWhite: "#ffffff",
-};
-
-const lightTheme: ITheme = {
-	background: "#f1eeee",
-	foreground: "#201d1d",
-	cursor: "#007aff",
-	selectionBackground: "#e0dddd",
-	black: "#f1eeee",
-	red: "#d70015",
-	green: "#248a3d",
-	yellow: "#cc7f08",
-	blue: "#007aff",
-	magenta: "#8944ab",
-	cyan: "#0071a4",
-	white: "#201d1d",
-	brightBlack: "#9a9898",
-	brightRed: "#ff3b30",
-	brightGreen: "#30d158",
-	brightYellow: "#ff9f0a",
-	brightBlue: "#409cff",
-	brightMagenta: "#af52de",
-	brightCyan: "#5ac8fa",
-	brightWhite: "#424245",
-};
-
-function getXtermTheme(overrideTheme?: string): ITheme {
-	const theme = overrideTheme ?? document.documentElement.dataset.theme;
-	return theme === "light" ? lightTheme : darkTheme;
-}
+import { getTerminalTheme } from "../ui/themes.js";
 
 interface TerminalProps {
 	selectedPane: SelectedPane;
@@ -194,7 +143,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 			fontSize: uiSettings.terminalFontSize,
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			fontWeightBold: "bold",
-			theme: getXtermTheme(windowTheme),
+			theme: getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme),
 		});
 
 		const fitAddon = new FitAddon();
@@ -273,7 +222,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 					mutation.type === "attributes" &&
 					mutation.attributeName === "data-theme"
 				) {
-					terminal.options.theme = getXtermTheme(windowTheme);
+					terminal.options.theme = getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme);
 				}
 			}
 		});
@@ -304,7 +253,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 	useEffect(() => {
 		const terminal = terminalRef.current;
 		if (!terminal) return;
-		terminal.options.theme = getXtermTheme(windowTheme);
+		terminal.options.theme = getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme);
 	}, [windowTheme]);
 
 	const handleReconnect = () => {

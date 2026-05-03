@@ -21,10 +21,10 @@ body {
 	color: var(--color-text);
 	background-color: var(--color-background);
 	background-image:
-		radial-gradient(ellipse at 15% 30%, rgba(245, 158, 11, 0.06) 0%, transparent 55%),
-		radial-gradient(ellipse at 75% 15%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
-		radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.03) 0%, transparent 45%),
-		radial-gradient(ellipse at 90% 60%, rgba(139, 92, 246, 0.03) 0%, transparent 40%);
+		radial-gradient(ellipse at 15% 30%, var(--theme-body-glow-1) 0%, transparent 55%),
+		radial-gradient(ellipse at 75% 15%, var(--theme-body-glow-2) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 80%, var(--theme-body-glow-3) 0%, transparent 45%),
+		radial-gradient(ellipse at 90% 60%, var(--theme-body-glow-4) 0%, transparent 40%);
 	min-height: 100vh;
 	overflow: hidden;
 }
@@ -157,14 +157,6 @@ a:hover {
 	-webkit-backdrop-filter: var(--glass-blur-lg);
 	border: 1px solid var(--color-surface-elevated-border);
 	box-shadow: var(--shadow-lg);
-}
-
-/* Light theme overrides for body background */
-[data-theme="light"] body,
-body:has([data-theme="light"]) {
-	background-image:
-		radial-gradient(ellipse at 15% 30%, rgba(245, 158, 11, 0.04) 0%, transparent 55%),
-		radial-gradient(ellipse at 75% 15%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
 }
 
 /* Reduced motion */

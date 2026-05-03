@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, type CSSProperties } from "react";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
+import { THEME_OPTIONS, normalizeThemeId } from "../ui/themes.js";
 
 interface ProviderFormState extends IntelligenceProviderConfig {
 	isNew: boolean;
@@ -39,8 +40,8 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		bind: config.server.bind,
 		tmuxPath: config.tmux.path,
 		knownHostsPath: sshConnection?.knownHostsPath ?? "~/.ssh/known_hosts",
-		theme: config.ui.theme,
-		windowTheme: config.ui.windowTheme || config.ui.theme,
+		theme: normalizeThemeId(config.ui.theme),
+		windowTheme: normalizeThemeId(config.ui.windowTheme, normalizeThemeId(config.ui.theme)),
 		tokenInput: "",
 		tokenConfigured: Boolean(config.auth.tokenConfigured),
 		fontSize: config.ui.fontSize || 16,
@@ -78,7 +79,7 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [activeTab, setActiveTab] = useState<"general" | "connections" | "appearance" | "intelligence">("general");
+	const [activeTab, setActiveTab] = useState<"general" | "connections" | "theme" | "windowTheme" | "typography" | "intelligence">("general");
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -87,6 +88,44 @@ export function SettingsPanel() {
 	}, [activeTab]);
 
 	const knownHostsPlaceholder = useMemo(() => "~/.ssh/known_hosts", []);
+	const renderThemeCard = (field: "theme" | "windowTheme", value: string, themeId: string) => {
+		const theme = THEME_OPTIONS.find((option) => option.id === themeId);
+		if (!theme) {
+			return null;
+		}
+
+		const previewStyle = {
+			"--theme-preview-bg": theme.preview.background,
+			"--theme-preview-panel": theme.preview.panel,
+			"--theme-preview-accent": theme.preview.accent,
+			"--theme-preview-secondary": theme.preview.secondary,
+		} as CSSProperties;
+
+		return (
+			<button
+				key={`${field}-${theme.id}`}
+				type="button"
+				className={`theme-card ${value === theme.id ? "is-active" : ""}`}
+				onClick={() => updateField(field, theme.id)}
+				title={theme.description}
+			>
+				<div className="theme-preview" style={previewStyle}>
+					<div className="theme-preview-orb theme-preview-orb-primary" />
+					<div className="theme-preview-orb theme-preview-orb-secondary" />
+					<div className="theme-preview-panel">
+						<div className="theme-preview-bar" />
+						<div className="theme-preview-row">
+							<div className="theme-preview-chip" />
+							<div className="theme-preview-chip theme-preview-chip-muted" />
+						</div>
+						<div className="theme-preview-terminal" />
+					</div>
+				</div>
+				<span>{theme.label}</span>
+				<small>{theme.description}</small>
+			</button>
+		);
+	};
 
 	const loadConfig = async () => {
 		setIsLoading(true);
@@ -220,14 +259,16 @@ export function SettingsPanel() {
 		setIsSaving(true);
 		try {
 			const saved = await updateConfig(payload);
+			const savedTheme = normalizeThemeId(saved.ui.theme);
+			const savedWindowTheme = normalizeThemeId(saved.ui.windowTheme, savedTheme);
 			setConfig(saved);
 			setFormState(buildFormState(saved));
 			setConnections(saved.connections);
-								document.documentElement.dataset.theme = saved.ui.theme;
+								document.documentElement.dataset.theme = savedTheme;
 								applyUIFontSize(saved.ui.fontSize);
 							setUISettings({
-								theme: saved.ui.theme,
-								windowTheme: saved.ui.windowTheme,
+								theme: savedTheme,
+								windowTheme: savedWindowTheme,
 								fontSize: saved.ui.fontSize,
 								terminalFontSize: saved.ui.terminalFontSize,
 								terminalFontWeight: saved.ui.terminalFontWeight,
@@ -336,12 +377,14 @@ export function SettingsPanel() {
 
 	const handleCancel = () => {
 		if (config) {
+			const theme = normalizeThemeId(config.ui.theme);
+			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
 			setFormState(buildFormState(config));
-			document.documentElement.dataset.theme = config.ui.theme;
+			document.documentElement.dataset.theme = theme;
 			applyUIFontSize(config.ui.fontSize);
 			setUISettings({
-				theme: config.ui.theme,
-				windowTheme: config.ui.windowTheme,
+				theme,
+				windowTheme,
 				fontSize: config.ui.fontSize,
 				terminalFontSize: config.ui.terminalFontSize,
 				terminalFontWeight: config.ui.terminalFontWeight,
@@ -422,11 +465,27 @@ export function SettingsPanel() {
 								</button>
 								<button
 									type="button"
-									className={`settings-nav-item ${activeTab === "appearance" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("appearance")}
+									className={`settings-nav-item ${activeTab === "theme" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("theme")}
 								>
 									<span className="nav-icon">🎨</span>
-									<span className="nav-label">Appearance</span>
+									<span className="nav-label">Theme</span>
+								</button>
+								<button
+									type="button"
+									className={`settings-nav-item ${activeTab === "windowTheme" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("windowTheme")}
+								>
+									<span className="nav-icon">🪟</span>
+									<span className="nav-label">Window Theme</span>
+								</button>
+								<button
+									type="button"
+									className={`settings-nav-item ${activeTab === "typography" ? "is-active" : ""}`}
+									onClick={() => setActiveTab("typography")}
+								>
+									<span className="nav-icon">🔠</span>
+									<span className="nav-label">Typography</span>
 								</button>
 								<button
 									type="button"
@@ -988,59 +1047,38 @@ export function SettingsPanel() {
 									</div>
 								)}
 
-							{activeTab === "appearance" && (
+							{activeTab === "theme" && (
 								<div className="settings-tab-content">
-							<div className="settings-form-section">
-								<h4 className="settings-section-title">Theme</h4>
-								<div className="form-field">
-									<div className="theme-grid">
-										<button
-											type="button"
-											className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
-											onClick={() => updateField("theme", "dark")}
-										>
-											<div className="theme-preview" />
-											<span>Dark Tech</span>
-										</button>
-										<button
-											type="button"
-											className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
-											onClick={() => updateField("theme", "light")}
-										>
-											<div className="theme-preview" />
-											<span>Classic Light</span>
-										</button>
+									<div className="settings-form-section">
+										<h4 className="settings-section-title">Theme</h4>
+										<p className="form-help-text">Global theme for the full application shell.</p>
+										<div className="form-field">
+											<div className="theme-grid">
+												{THEME_OPTIONS.map((theme) => renderThemeCard("theme", formState.theme, theme.id))}
+											</div>
+										</div>
 									</div>
 								</div>
-							</div>
+							)}
 
-							<div className="settings-form-section">
-								<h4 className="settings-section-title">Window Theme</h4>
-								<p className="form-help-text">Theme for the window panel area (tabs and terminal canvas). Defaults to the global theme when not set.</p>
-								<div className="form-field">
-									<div className="theme-grid">
-										<button
-											type="button"
-											className={`theme-card dark ${formState.windowTheme === "dark" ? "is-active" : ""}`}
-											onClick={() => updateField("windowTheme", "dark")}
-										>
-											<div className="theme-preview" />
-											<span>Dark Tech</span>
-										</button>
-										<button
-											type="button"
-											className={`theme-card light ${formState.windowTheme === "light" ? "is-active" : ""}`}
-											onClick={() => updateField("windowTheme", "light")}
-										>
-											<div className="theme-preview" />
-											<span>Classic Light</span>
-										</button>
+							{activeTab === "windowTheme" && (
+								<div className="settings-tab-content">
+									<div className="settings-form-section">
+										<h4 className="settings-section-title">Window Theme</h4>
+										<p className="form-help-text">Theme for the window panel area (tabs and terminal canvas). Defaults to the global theme when not set.</p>
+										<div className="form-field">
+											<div className="theme-grid">
+												{THEME_OPTIONS.map((theme) => renderThemeCard("windowTheme", formState.windowTheme, theme.id))}
+											</div>
+										</div>
 									</div>
 								</div>
-							</div>
+							)}
 
-							<div className="settings-form-section">
-								<h4 className="settings-section-title">Typography</h4>
+							{activeTab === "typography" && (
+								<div className="settings-tab-content">
+									<div className="settings-form-section">
+										<h4 className="settings-section-title">Typography</h4>
 										<div className="form-field">
 											<label htmlFor="settings-font-size">UI Font Size</label>
 											<div className="font-size-control">
