@@ -1429,7 +1429,12 @@
 .session-card.is-active {
 	border-color: var(--color-accent);
 	background-color: var(--color-accent-subtle);
-	box-shadow: inset 3px 0 0 var(--color-accent);
+	box-shadow: inset 4px 0 0 var(--color-accent), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.session-card.is-active .session-card-name {
+	color: var(--color-accent);
+	text-shadow: var(--color-accent-glow);
 }
 
 .session-card.is-attention-explicit:not(.is-active) {
@@ -1440,19 +1445,13 @@
 	box-shadow: inset 3px 0 0 var(--color-attention);
 }
 
-.session-card.is-active {
-	border-color: var(--color-accent);
-	background-color: var(--color-accent-subtle);
-	box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.05);
-}
-
 .session-card-body {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
-	gap: 4px;
-	padding: 10px 12px;
+	gap: 6px;
+	padding: 12px 14px;
 	cursor: pointer;
 	text-align: left;
 	min-width: 0;
@@ -1461,21 +1460,14 @@
 .session-card-top {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	gap: var(--spacing-sm);
 	min-width: 0;
 }
 
-.session-card-name-group {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-	flex: 1;
-}
-
 .session-card-name {
 	font-size: var(--font-size-sm);
-	font-weight: var(--font-weight-semibold);
+	font-weight: var(--font-weight-bold);
 	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
@@ -1492,9 +1484,12 @@
 }
 
 .session-card-meta-count {
-	font-size: 10px;
-	color: var(--color-text-disabled);
+	font-size: 11px;
+	color: var(--color-text-muted);
 	flex-shrink: 0;
+	background: rgba(255, 255, 255, 0.05);
+	padding: 0 4px;
+	border-radius: 2px;
 }
 
 .session-card-time {
@@ -1502,7 +1497,6 @@
 	color: var(--color-text-muted);
 	flex-shrink: 0;
 	opacity: 0.6;
-	margin-left: auto;
 	font-weight: 500;
 }
 
@@ -1542,14 +1536,19 @@
 
 .session-intelligence-summary {
 	font-size: 11px;
-	color: var(--color-text-muted);
-	margin: 2px 0 0;
-	white-space: nowrap;
+	color: var(--color-text-secondary);
+	margin: 2px 0;
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	max-width: 100%;
-	opacity: 0.7;
+	opacity: 0.9;
 	font-family: var(--font-stack);
+	line-height: 1.5;
+	padding: 4px 0;
 }
 
 /* Sidebar sessions section */
@@ -1944,15 +1943,6 @@
 .app-count-badge.is-zsh {
 	color: #e3b341;
 	background-color: rgba(227, 179, 65, 0.12);
-}
-.session-intelligence-summary {
-	font-size: 11px;
-	color: var(--color-text-muted, #8b949e);
-	margin: 2px 0 0;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	max-width: 100%;
 }
 
 .pane-canvas-empty {

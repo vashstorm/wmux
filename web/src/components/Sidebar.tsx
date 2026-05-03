@@ -518,44 +518,46 @@ export function Sidebar() {
                             >
                               <div className="session-card-name-group">
                                   <div className="session-card-top">
-                                    <span className="session-card-name" title={sname}>{sname}</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+                                      <span className="session-card-name" title={sname}>{sname}</span>
+                                      {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
+                                        <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
+                                          {session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
+                                        </span>
+                                      )}
+                                    </div>
                                     {session.intelligenceUpdatedAt && (
                                       <span className="session-card-time">{formatRelativeTime(session.intelligenceUpdatedAt)}</span>
                                     )}
                                   </div>
-                                <div className="session-card-meta">
-                                  {typeof session.windowCount === "number" && session.windowCount > 0 && (
-                                    <span className="session-card-meta-count">
-                                      {session.windowCount} window{session.windowCount === 1 ? "" : "s"}
-                                    </span>
-                                  )}
-                                  {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
-                                    <span className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}>
-                                      {session.attentionCount}
-                                    </span>
-                                  )}
-                                  {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
-                                    <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
-                                      {session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
-                                    </span>
-                                  )}
-                                  {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
-                                    const count = session.intelligenceAppCounts![app];
-                                    if (typeof count !== "number" || count <= 0) return null;
-                                    return (
-                                      <span key={app} className={`app-count-badge is-${app}`}>
-                                        {app} {count}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
                                 {session.intelligenceSummary && (
                                   <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
                                     {session.intelligenceSummary}
                                   </p>
                                 )}
-                              </div>
-                            </button>
+                                  <div className="session-card-meta">
+                                    {typeof session.windowCount === "number" && session.windowCount > 0 && (
+                                      <span className="session-card-meta-count">
+                                        {session.windowCount} window{session.windowCount === 1 ? "" : "s"}
+                                      </span>
+                                    )}
+                                    {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
+                                      <span className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}>
+                                        {session.attentionCount}
+                                      </span>
+                                    )}
+                                    {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
+                                      const count = session.intelligenceAppCounts![app];
+                                      if (typeof count !== "number" || count <= 0) return null;
+                                      return (
+                                        <span key={app} className={`app-count-badge is-${app}`}>
+                                          {app} {count}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </button>
                             <div className="session-card-actions">
                               <button
                                 type="button"
