@@ -19,6 +19,7 @@ export function MainPanel() {
 		setPanes,
 		setWindows,
 		setError,
+		uiSettings,
 	} = useAppState();
 
 	const hasSelectedPane = selectedPane !== null;
@@ -211,7 +212,7 @@ export function MainPanel() {
 
 			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
 				{hasSelectedPane ? (
-					<div className="main-workspace">
+					<div className="main-workspace" data-theme={uiSettings.windowTheme || uiSettings.theme}>
 						<WindowTabs
 							windows={windowSummaries}
 							selectedWindowId={currentWindowId}
@@ -222,6 +223,7 @@ export function MainPanel() {
 							selectedPaneId={selectedPane.pane ?? null}
 							onSelectPane={handleSelectPane}
 							selectedPane={selectedPane}
+							windowTheme={uiSettings.windowTheme}
 						/>
 					</div>
 				) : (

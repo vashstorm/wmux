@@ -21,13 +21,14 @@ function UISettingsInit() {
 	useEffect(() => {
 		void getConfig().then((config) => {
 			const theme = config.ui.theme || "dark";
+			const windowTheme = config.ui.windowTheme || theme;
 			const fontSize = config.ui.fontSize || 16;
 			const terminalFontSize = config.ui.terminalFontSize || 14;
 			const terminalFontWeight = config.ui.terminalFontWeight || "normal";
 
 			document.documentElement.dataset.theme = theme;
 			applyUIFontSize(fontSize);
-			setUISettings({ theme, fontSize, terminalFontSize, terminalFontWeight });
+			setUISettings({ theme, windowTheme, fontSize, terminalFontSize, terminalFontWeight });
 		}).catch(() => undefined);
 	}, [setUISettings]);
 

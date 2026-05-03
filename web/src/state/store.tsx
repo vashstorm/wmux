@@ -104,6 +104,7 @@ function paneInfoToData(p: PaneInfo): PaneData {
 
 export interface UISettings {
 	theme: string;
+	windowTheme: string;
 	fontSize: number;
 	terminalFontSize: number;
 	terminalFontWeight: string;
@@ -188,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 	const [uiSettings, setUISettingsState] = useState<UISettings>({
 		theme: "dark",
+		windowTheme: "dark",
 		fontSize: 16,
 		terminalFontSize: 14,
 		terminalFontWeight: "normal",

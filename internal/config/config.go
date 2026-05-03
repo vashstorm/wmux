@@ -62,6 +62,7 @@ type ConnectionConfig struct {
 
 type UIConfig struct {
 	Theme              string `json:"theme"`
+	WindowTheme        string `json:"windowTheme"`
 	FontSize           int    `json:"fontSize"`
 	TerminalFontSize   int    `json:"terminalFontSize"`
 	TerminalFontWeight string `json:"terminalFontWeight"`
@@ -139,6 +140,7 @@ func DefaultConfig() Config {
 		Connections: []ConnectionConfig{},
 		UI: UIConfig{
 			Theme:              "dark",
+			WindowTheme:        "dark",
 			FontSize:           16,
 			TerminalFontSize:   14,
 			TerminalFontWeight: "normal",
@@ -520,6 +522,10 @@ func normalizeConfig(cfg *Config) {
 	}
 	if cfg.UI.TerminalFontSize > maxTerminalFontSize {
 		cfg.UI.TerminalFontSize = maxTerminalFontSize
+	}
+
+	if cfg.UI.WindowTheme == "" {
+		cfg.UI.WindowTheme = cfg.UI.Theme
 	}
 
 	if cfg.UI.TerminalFontWeight == "" {

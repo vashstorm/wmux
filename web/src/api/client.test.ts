@@ -132,14 +132,14 @@ describe("api client", () => {
 	});
 
 	test("getConfig returns config", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "dark", windowTheme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		const result = await getConfig();
 		expect(result.schemaVersion).toBe(1);
 	});
 
 	test("updateConfig PUTs payload", async () => {
-		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
-		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", windowTheme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", windowTheme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		expect(result.ui.theme).toBe("light");
 	});
 
@@ -253,7 +253,7 @@ describe("api client", () => {
 			auth: { token: "", tokenConfigured: false },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: {
 				enabled: true,
 				activeProvider: "main",
@@ -290,7 +290,7 @@ describe("api client", () => {
 			auth: { token: "", tokenConfigured: false },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 },
 		});
 		const result = await getConfig();
@@ -305,7 +305,7 @@ describe("api client", () => {
 			auth: { token: "" },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: {
 				enabled: true,
 				activeProvider: "my-provider",
@@ -324,7 +324,7 @@ describe("api client", () => {
 			auth: { token: "" },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: {
 				enabled: true,
 				activeProvider: "my-provider",
@@ -353,7 +353,7 @@ describe("api client", () => {
 			auth: { token: "" },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: { enabled: true, activeProvider: "p1", providers: [{ name: "p1", provider: "openai", model: "gpt-4", apiKeyConfigured: true }], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 },
 		});
 
@@ -363,7 +363,7 @@ describe("api client", () => {
 			auth: { token: "" },
 			tmux: { path: "tmux" },
 			connections: [],
-			ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+			ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 			intelligence: {
 				enabled: true,
 				activeProvider: "p1",

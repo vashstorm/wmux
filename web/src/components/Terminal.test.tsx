@@ -27,6 +27,7 @@ vi.mock("@xterm/xterm", () => ({
 		unicode: {
 			activeVersion: "6",
 		},
+		options: {},
 		open: mockXTermOpen,
 		write: mockXTermWrite,
 		writeln: mockXTermWriteln,
@@ -81,6 +82,7 @@ vi.mock("../state/store.js", () => ({
 		setError: mockSetError,
 		uiSettings: {
 			theme: "dark",
+			windowTheme: "dark",
 			fontSize: 16,
 			terminalFontSize: 14,
 		},

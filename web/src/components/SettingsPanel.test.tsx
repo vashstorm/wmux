@@ -39,7 +39,7 @@ const defaultConfig = {
 	auth: { token: "", tokenConfigured: false },
 	tmux: { path: "tmux" },
 	connections: [{ id: "conn1", type: "local" }],
-	ui: { theme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+	ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 	intelligence: {
 		enabled: false,
 		activeProvider: "",

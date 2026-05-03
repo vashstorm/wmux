@@ -147,6 +147,7 @@ export interface AppConfig {
 	connections: ConnectionConfig[];
 	ui: {
 		theme: string;
+		windowTheme: string;
 		fontSize: number;
 		terminalFontSize: number;
 		terminalFontWeight: string;

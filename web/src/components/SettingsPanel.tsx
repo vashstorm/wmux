@@ -15,6 +15,7 @@ interface SettingsFormState {
 	tmuxPath: string;
 	knownHostsPath: string;
 	theme: string;
+	windowTheme: string;
 	tokenInput: string;
 	tokenConfigured: boolean;
 	fontSize: number;
@@ -39,6 +40,7 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		tmuxPath: config.tmux.path,
 		knownHostsPath: sshConnection?.knownHostsPath ?? "~/.ssh/known_hosts",
 		theme: config.ui.theme,
+		windowTheme: config.ui.windowTheme || config.ui.theme,
 		tokenInput: "",
 		tokenConfigured: Boolean(config.auth.tokenConfigured),
 		fontSize: config.ui.fontSize || 16,
@@ -132,6 +134,7 @@ export function SettingsPanel() {
 		applyUIFontSize(formState.fontSize);
 		setUISettings({
 			theme: formState.theme,
+			windowTheme: formState.windowTheme,
 			fontSize: formState.fontSize,
 			terminalFontSize: formState.terminalFontSize,
 			terminalFontWeight: formState.terminalFontWeight,
@@ -195,6 +198,7 @@ export function SettingsPanel() {
 			ui: {
 				...config.ui,
 				theme: formState.theme,
+				windowTheme: formState.windowTheme,
 				fontSize: formState.fontSize,
 				terminalFontSize: formState.terminalFontSize,
 				terminalFontWeight: formState.terminalFontWeight,
@@ -223,6 +227,7 @@ export function SettingsPanel() {
 								applyUIFontSize(saved.ui.fontSize);
 							setUISettings({
 								theme: saved.ui.theme,
+								windowTheme: saved.ui.windowTheme,
 								fontSize: saved.ui.fontSize,
 								terminalFontSize: saved.ui.terminalFontSize,
 								terminalFontWeight: saved.ui.terminalFontWeight,
@@ -243,7 +248,7 @@ export function SettingsPanel() {
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
-								ui: { ...latest.ui, theme: payload.ui.theme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
+								ui: { ...latest.ui, theme: payload.ui.theme, windowTheme: payload.ui.windowTheme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
 								intelligence: {
 									...latest.intelligence,
 									enabled: payload.intelligence.enabled,
@@ -336,6 +341,7 @@ export function SettingsPanel() {
 			applyUIFontSize(config.ui.fontSize);
 			setUISettings({
 				theme: config.ui.theme,
+				windowTheme: config.ui.windowTheme,
 				fontSize: config.ui.fontSize,
 				terminalFontSize: config.ui.terminalFontSize,
 				terminalFontWeight: config.ui.terminalFontWeight,
@@ -984,32 +990,57 @@ export function SettingsPanel() {
 
 							{activeTab === "appearance" && (
 								<div className="settings-tab-content">
-									<div className="settings-form-section">
-										<h4 className="settings-section-title">Theme</h4>
-										<div className="form-field">
-											<div className="theme-grid">
-												<button
-													type="button"
-													className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
-													onClick={() => updateField("theme", "dark")}
-												>
-													<div className="theme-preview" />
-													<span>Dark Tech</span>
-												</button>
-												<button
-													type="button"
-													className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
-													onClick={() => updateField("theme", "light")}
-												>
-													<div className="theme-preview" />
-													<span>Classic Light</span>
-												</button>
-											</div>
-										</div>
+							<div className="settings-form-section">
+								<h4 className="settings-section-title">Theme</h4>
+								<div className="form-field">
+									<div className="theme-grid">
+										<button
+											type="button"
+											className={`theme-card dark ${formState.theme === "dark" ? "is-active" : ""}`}
+											onClick={() => updateField("theme", "dark")}
+										>
+											<div className="theme-preview" />
+											<span>Dark Tech</span>
+										</button>
+										<button
+											type="button"
+											className={`theme-card light ${formState.theme === "light" ? "is-active" : ""}`}
+											onClick={() => updateField("theme", "light")}
+										>
+											<div className="theme-preview" />
+											<span>Classic Light</span>
+										</button>
 									</div>
+								</div>
+							</div>
 
-									<div className="settings-form-section">
-										<h4 className="settings-section-title">Typography</h4>
+							<div className="settings-form-section">
+								<h4 className="settings-section-title">Window Theme</h4>
+								<p className="form-help-text">Theme for the window panel area (tabs and terminal canvas). Defaults to the global theme when not set.</p>
+								<div className="form-field">
+									<div className="theme-grid">
+										<button
+											type="button"
+											className={`theme-card dark ${formState.windowTheme === "dark" ? "is-active" : ""}`}
+											onClick={() => updateField("windowTheme", "dark")}
+										>
+											<div className="theme-preview" />
+											<span>Dark Tech</span>
+										</button>
+										<button
+											type="button"
+											className={`theme-card light ${formState.windowTheme === "light" ? "is-active" : ""}`}
+											onClick={() => updateField("windowTheme", "light")}
+										>
+											<div className="theme-preview" />
+											<span>Classic Light</span>
+										</button>
+									</div>
+								</div>
+							</div>
+
+							<div className="settings-form-section">
+								<h4 className="settings-section-title">Typography</h4>
 										<div className="form-field">
 											<label htmlFor="settings-font-size">UI Font Size</label>
 											<div className="font-size-control">

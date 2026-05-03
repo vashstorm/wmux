@@ -7,6 +7,7 @@ interface PaneCanvasProps {
 	selectedPaneId: string | null;
 	onSelectPane: (paneId: string) => void;
 	selectedPane: SelectedPane | null;
+	windowTheme?: string;
 }
 
 function computeBounds(panes: PaneData[]) {
@@ -37,7 +38,7 @@ function scaleToPercent(value: number, max: number): string {
 	return `${(value / max) * 100}%`;
 }
 
-export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }: PaneCanvasProps) {
+export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, windowTheme }: PaneCanvasProps) {
 	const bounds = useMemo(() => computeBounds(panes), [panes]);
 
 	if (panes.length === 0) {
@@ -56,7 +57,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane }
 			<div className="pane-canvas-stage">
 				{selectedPane && (
 					<div className="pane-canvas-terminal" data-testid="pane-canvas-terminal">
-						<Terminal selectedPane={selectedPane} />
+						<Terminal selectedPane={selectedPane} windowTheme={windowTheme} />
 					</div>
 				)}
 				{panes.map((pane) => {

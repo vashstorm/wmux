@@ -55,13 +55,14 @@ const lightTheme: ITheme = {
 	brightWhite: "#424245",
 };
 
-function getXtermTheme(): ITheme {
-	const theme = document.documentElement.dataset.theme;
+function getXtermTheme(overrideTheme?: string): ITheme {
+	const theme = overrideTheme ?? document.documentElement.dataset.theme;
 	return theme === "light" ? lightTheme : darkTheme;
 }
 
 interface TerminalProps {
 	selectedPane: SelectedPane;
+	windowTheme?: string;
 }
 
 interface TerminalSize {
@@ -75,7 +76,7 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 	return { cols, rows };
 }
 
-export function Terminal({ selectedPane }: TerminalProps) {
+export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 	const { setError, uiSettings } = useAppState();
 	const { connectionId, session, window: windowId, pane } = selectedPane;
 	const wrapperRef = useRef<HTMLDivElement>(null);
@@ -193,7 +194,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			fontSize: uiSettings.terminalFontSize,
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			fontWeightBold: "bold",
-			theme: getXtermTheme(),
+			theme: getXtermTheme(windowTheme),
 		});
 
 		const fitAddon = new FitAddon();
@@ -272,7 +273,7 @@ export function Terminal({ selectedPane }: TerminalProps) {
 					mutation.type === "attributes" &&
 					mutation.attributeName === "data-theme"
 				) {
-					terminal.options.theme = getXtermTheme();
+					terminal.options.theme = getXtermTheme(windowTheme);
 				}
 			}
 		});
@@ -299,6 +300,12 @@ export function Terminal({ selectedPane }: TerminalProps) {
 			wsRef.current = null;
 		};
 	}, [connectWebSocket, fitAndSyncSize, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
+
+	useEffect(() => {
+		const terminal = terminalRef.current;
+		if (!terminal) return;
+		terminal.options.theme = getXtermTheme(windowTheme);
+	}, [windowTheme]);
 
 	const handleReconnect = () => {
 		wsRef.current?.close();
