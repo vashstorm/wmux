@@ -11,6 +11,20 @@ const configPath = process.env.WMUX_PLAYWRIGHT_CONFIG_PATH ?? join(tempDir, "con
 const port = Number(process.env.WMUX_PLAYWRIGHT_PORT ?? 22733);
 const sessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? `wmux-playwright-${process.pid}`;
 const windowName = "playwright";
+const derivedFakeLLMPort = 38000 + (process.pid % 10000);
+
+function waitForFakeLLM(port: number) {
+	for (let attempt = 0; attempt < 100; attempt += 1) {
+		const result = spawnSync("curl", ["-sf", `http://127.0.0.1:${port}/health`], {
+			stdio: "ignore",
+		});
+		if (result.status === 0) {
+			return;
+		}
+		spawnSync("sleep", ["0.2"]);
+	}
+	throw new Error(`fake LLM server did not become ready on port ${port}`);
+}
 
 process.env.WMUX_PLAYWRIGHT_TEMP_DIR = tempDir;
 process.env.WMUX_PLAYWRIGHT_CONFIG_PATH = configPath;
@@ -19,15 +33,15 @@ process.env.WMUX_PLAYWRIGHT_SESSION = sessionName;
 process.env.WMUX_PLAYWRIGHT_WINDOW = windowName;
 
 if (shouldInitialize) {
-	const fakeLLMPort = 19876;
+	const fakeLLMPort = Number(process.env.WMUX_FAKE_LLM_PORT ?? derivedFakeLLMPort);
 	process.env.WMUX_FAKE_KEY = "playwright-fake-key";
 	process.env.WMUX_FAKE_LLM_PORT = String(fakeLLMPort);
-	const fakeLLMProc = spawn("bun", ["run", join(process.cwd(), "tests/e2e/helpers/fake-llm-server.ts")], {
+	const fakeLLMProc = spawn("bun", [join(process.cwd(), "tests/e2e/helpers/fake-llm-server.ts")], {
 		env: { ...process.env },
 		stdio: "ignore",
 		detached: false,
 	});
-	spawnSync("sleep", ["0.8"]);
+	waitForFakeLLM(fakeLLMPort);
 	process.on("exit", () => {
 		try {
 			fakeLLMProc.kill();

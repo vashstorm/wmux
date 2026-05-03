@@ -13,6 +13,25 @@ const allSessions = [
 	...extraSessions,
 ];
 
+function escapeRegExp(value: string) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function openSessionAndExpectReady(page: any, session: { name: string; marker: string }) {
+	const sessionCard = page.locator(`[data-testid="session-card-${session.name}"]`);
+	await sessionCard.getByTestId(`session-open-${session.name}`).click();
+
+	await expect(page.getByTestId("main-title")).toContainText(new RegExp(`^${escapeRegExp(session.name)} /`), {
+		timeout: 10000,
+	});
+	await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
+	await expect(page.getByTestId("terminal")).toContainText(session.marker, {
+		timeout: 10000,
+	});
+	await expect(page.locator("[data-testid='terminal-disconnected']")).toHaveCount(0);
+	await expect(page.locator("[data-testid='error-banner']")).toHaveCount(0);
+}
+
 async function createLocalConnection(request: any) {
 	const response = await request.post("/api/connections", {
 		headers: {
@@ -87,18 +106,7 @@ test.describe("random session switching", () => {
 		}
 
 		for (const session of allSessions) {
-			const sessionCard = page.locator(`[data-testid="session-card-${session.name}"]`);
-			await sessionCard.getByTestId(`session-open-${session.name}`).click();
-
-			await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
-			await expect(page.getByTestId("terminal")).toContainText(session.marker, {
-				timeout: 10000,
-			});
-			await expect(page.getByTestId("main-title")).toContainText(session.name, {
-				timeout: 5000,
-			});
-			await expect(page.locator("[data-testid='terminal-disconnected']")).toHaveCount(0);
-			await expect(page.locator("[data-testid='error-banner']")).toHaveCount(0);
+			await openSessionAndExpectReady(page, session);
 		}
 
 		const seed = 42;
@@ -118,18 +126,7 @@ test.describe("random session switching", () => {
 
 		for (const targetSession of switchLog) {
 			const session = allSessions.find((s) => s.name === targetSession)!;
-			const sessionCard = page.locator(`[data-testid="session-card-${session.name}"]`);
-			await sessionCard.getByTestId(`session-open-${session.name}`).click();
-
-			await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
-			await expect(page.getByTestId("terminal")).toContainText(session.marker, {
-				timeout: 10000,
-			});
-			await expect(page.getByTestId("main-title")).toContainText(session.name, {
-				timeout: 5000,
-			});
-			await expect(page.locator("[data-testid='terminal-disconnected']")).toHaveCount(0);
-			await expect(page.locator("[data-testid='error-banner']")).toHaveCount(0);
+			await openSessionAndExpectReady(page, session);
 		}
 
 		for (const session of allSessions) {
