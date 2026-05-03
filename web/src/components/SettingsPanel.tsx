@@ -403,7 +403,7 @@ export function SettingsPanel() {
 									className={`settings-nav-item ${activeTab === "general" ? "is-active" : ""}`}
 									onClick={() => setActiveTab("general")}
 								>
-									<span className="nav-icon">⚙</span>
+									<span className="nav-icon">🔧</span>
 									<span className="nav-label">General</span>
 								</button>
 								<button
@@ -428,7 +428,7 @@ export function SettingsPanel() {
 									onClick={() => setActiveTab("intelligence")}
 								>
 									<span className="nav-icon">✨</span>
-									<span className="nav-label">AI Intelligence</span>
+									<span className="nav-label">AI</span>
 								</button>
 							</nav>
 
