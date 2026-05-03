@@ -4,6 +4,7 @@ import { SettingsPanel } from "./SettingsPanel.js";
 import { ErrorBanner } from "./ErrorBanner.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import * as client from "../api/client.js";
+import { THEME_OPTIONS } from "../ui/themes.js";
 
 vi.mock("../api/client.js", () => ({
 	getConfig: vi.fn(),
@@ -72,11 +73,61 @@ describe("SettingsPanel intelligence section", () => {
 			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
 		});
 
-		expect(screen.getByText("AI Intelligence")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /AI/i })).toBeInTheDocument();
+	});
+
+	test("Theme and Window Theme tabs each render 10 theme options", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /🎨Theme/i }));
+
+		for (const theme of THEME_OPTIONS) {
+			expect(screen.getAllByRole("button", { name: new RegExp(theme.label, "i") })).toHaveLength(1);
+		}
+
+		fireEvent.click(screen.getByRole("button", { name: /Window Theme/i }));
+
+		for (const theme of THEME_OPTIONS) {
+			expect(screen.getAllByRole("button", { name: new RegExp(theme.label, "i") })).toHaveLength(1);
+		}
+	});
+
+	test("Typography tab renders font controls", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		expect(screen.getByTestId("settings-font-size-input")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-terminal-font-size-input")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-terminal-font-weight-input")).toBeInTheDocument();
 	});
 
 	function navigateToIntelligenceTab() {
-		const intelligenceNavButton = screen.getByRole("button", { name: /AI Intelligence/i });
+		const intelligenceNavButton = screen.getByRole("button", { name: /AI/i });
 		fireEvent.click(intelligenceNavButton);
 	}
 

@@ -148,6 +148,13 @@ describe("MainPanel", () => {
 			setWindows,
 			setPanes,
 			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
 		} as unknown as ReturnType<typeof useAppState>);
 
 		vi.mocked(listWindows).mockResolvedValue({

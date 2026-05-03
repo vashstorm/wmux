@@ -189,7 +189,7 @@ describe("Terminal", () => {
 		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 121, rows: 40 });
 	});
 
-	test("uses Unicode 11 width tables for CJK terminal output", () => {
+test("uses Unicode 11 width tables for CJK terminal output", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
@@ -200,6 +200,17 @@ describe("Terminal", () => {
 		expect(Unicode11Addon).toHaveBeenCalledTimes(1);
 		expect(mockXTermLoadAddon).toHaveBeenCalledWith(unicodeAddon);
 		expect(xtermInstance.unicode.activeVersion).toBe("11");
+	});
+
+	test("uses the mapped palette for non-default window themes", () => {
+		render(<Terminal selectedPane={mockSelectedPane} windowTheme="solarized" />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.theme).toMatchObject({
+			background: "#002b36",
+			cursor: "#b58900",
+			blue: "#268bd2",
+		});
 	});
 
 	test("writes output data to xterm when receiving output message", () => {
