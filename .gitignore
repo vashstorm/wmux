@@ -21,6 +21,7 @@ config.jsonc
 .vscode/
 .sisyphus/
 .opencode/
+.claude/
 *.swp
 *.swo
 

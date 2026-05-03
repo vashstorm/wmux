@@ -1,6 +1,9 @@
 @import './tokens.css';
 
-/* App shell layout */
+/* ---------------------------------------------------------------------------
+   App shell layout — glassmorphism dashboard foundation
+   --------------------------------------------------------------------------- */
+
 .app-shell {
 	display: flex;
 	width: 100%;
@@ -9,7 +12,10 @@
 	background-color: var(--color-background);
 }
 
-/* Sidebar */
+/* ---------------------------------------------------------------------------
+   Sidebar — glass panel with blur and depth
+   --------------------------------------------------------------------------- */
+
 .sidebar {
 	width: 320px;
 	min-width: 320px;
@@ -18,8 +24,9 @@
 	display: flex;
 	flex-direction: column;
 	background-color: var(--color-panel);
-	backdrop-filter: var(--glass-blur);
-	border-right: 1px solid var(--color-border);
+	backdrop-filter: var(--glass-blur-md);
+	-webkit-backdrop-filter: var(--glass-blur-md);
+	border-right: 1px solid var(--color-panel-border);
 	overflow: hidden;
 	transition: width var(--transition-base), transform var(--transition-base);
 	z-index: var(--z-sticky);
@@ -27,8 +34,12 @@
 
 .sidebar-header {
 	padding: var(--spacing-md) var(--spacing-lg);
-	border-bottom: 1px solid var(--color-border-subtle);
-	background: rgba(255, 255, 255, 0.02);
+	border-bottom: 1px solid var(--color-surface-border);
+	background: linear-gradient(
+		to bottom,
+		var(--color-glass-highlight),
+		transparent
+	);
 }
 
 .sidebar-header-row {
@@ -55,43 +66,43 @@
 }
 
 .sidebar-header-action {
-	width: 28px;
-	height: 28px;
+	width: 30px;
+	height: 30px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
 	background-color: var(--color-surface);
 	color: var(--color-text-muted);
-	border: 1px solid var(--color-border);
+	border: 1px solid var(--color-surface-border);
 	transition: all var(--transition-fast);
 }
 
 .sidebar-header-action:hover {
 	background-color: var(--color-surface-hover);
 	color: var(--color-accent);
-	border-color: var(--color-accent-subtle);
-	box-shadow: var(--color-accent-glow);
+	border-color: var(--color-glass-highlight-border);
+	box-shadow: var(--color-shadow-glow);
 }
 
 .sidebar-settings-button {
-	width: 28px;
-	height: 28px;
+	width: 30px;
+	height: 30px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
 	background-color: var(--color-surface);
 	color: var(--color-text-muted);
-	border: 1px solid var(--color-border);
+	border: 1px solid var(--color-surface-border);
 	transition: all var(--transition-fast);
 }
 
 .sidebar-settings-button:hover {
 	background-color: var(--color-surface-hover);
 	color: var(--color-accent);
-	border-color: var(--color-accent-subtle);
-	box-shadow: var(--color-accent-glow);
+	border-color: var(--color-glass-highlight-border);
+	box-shadow: var(--color-shadow-glow);
 }
 
 .sidebar-toolbar {
@@ -117,12 +128,15 @@
 	pointer-events: none;
 	display: flex;
 	align-items: center;
+	z-index: 1;
 }
 
 .sidebar-search {
 	width: 100%;
 	padding: 8px 12px 8px 32px;
 	background-color: var(--color-input-bg);
+	backdrop-filter: var(--glass-blur-sm);
+	-webkit-backdrop-filter: var(--glass-blur-sm);
 	border: 1px solid var(--color-input-border);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-xs);
@@ -131,24 +145,24 @@
 }
 
 .sidebar-search::placeholder {
-	color: var(--color-text-muted);
-	opacity: 0.6;
+	color: var(--color-input-placeholder);
 }
 
 .sidebar-search:hover {
 	background-color: var(--color-surface-hover);
+	border-color: var(--color-surface-border-hover);
 }
 
 .sidebar-search:focus {
 	background-color: var(--color-surface);
-	border-color: var(--color-accent);
+	border-color: var(--color-input-border-focus);
 	box-shadow: 0 0 0 2px var(--color-accent-subtle);
 	outline: none;
 }
 
 .new-connection-button {
-	width: 28px;
-	height: 28px;
+	width: 30px;
+	height: 30px;
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
@@ -156,32 +170,41 @@
 	background-color: var(--color-accent);
 	color: var(--color-background);
 	border-radius: var(--radius-sm);
-	transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+	transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
 .new-connection-button:hover {
 	background-color: var(--color-accent-hover);
 	box-shadow: var(--color-accent-glow);
+	transform: translateY(-1px);
 }
 
 .new-connection-button:active {
-	transform: translateY(1px);
+	transform: translateY(0);
 }
 
 .sidebar-content {
 	flex: 1;
 	overflow-y: auto;
 	padding: var(--spacing-sm) var(--spacing-md);
+	scrollbar-gutter: stable;
 }
 
 .sidebar-empty {
-	padding: var(--spacing-lg) var(--spacing-md);
+	padding: var(--spacing-xl) var(--spacing-md);
 	text-align: center;
 	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
+	background: var(--color-surface);
+	border: 1px dashed var(--color-surface-border);
+	border-radius: var(--radius-md);
+	margin-top: var(--spacing-md);
 }
 
-/* Main panel */
+/* ---------------------------------------------------------------------------
+   Main panel — the workspace area
+   --------------------------------------------------------------------------- */
+
 .main-panel {
 	flex: 1;
 	display: flex;
@@ -190,6 +213,7 @@
 	height: 100%;
 	overflow: hidden;
 	background-color: transparent;
+	position: relative;
 }
 
 .main-header {
@@ -200,8 +224,9 @@
 	gap: var(--spacing-md);
 	padding: 0 var(--spacing-lg);
 	background-color: var(--color-panel);
-	backdrop-filter: var(--glass-blur);
-	border-bottom: 1px solid var(--color-border);
+	backdrop-filter: var(--glass-blur-sm);
+	-webkit-backdrop-filter: var(--glass-blur-sm);
+	border-bottom: 1px solid var(--color-panel-border);
 	z-index: var(--z-sticky);
 }
 
@@ -214,20 +239,25 @@
 .main-header-select {
 	padding: var(--spacing-xs) var(--spacing-sm);
 	background-color: var(--color-surface);
-	border: 1px solid var(--color-border);
+	backdrop-filter: var(--glass-blur-sm);
+	-webkit-backdrop-filter: var(--glass-blur-sm);
+	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
 	color: var(--color-text);
 	max-width: 200px;
 	cursor: pointer;
+	transition: all var(--transition-fast);
 }
 
 .main-header-select:hover {
 	background-color: var(--color-surface-hover);
+	border-color: var(--color-surface-border-hover);
 }
 
 .main-header-select:focus {
 	border-color: var(--color-accent);
+	box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
 .main-header-title {
@@ -235,6 +265,9 @@
 	font-weight: var(--font-weight-semibold);
 	color: var(--color-text);
 	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .connection-status-badge {
@@ -242,26 +275,35 @@
 	align-items: center;
 	gap: var(--spacing-xs);
 	padding: var(--spacing-xs) var(--spacing-sm);
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-full);
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-medium);
 	text-transform: capitalize;
+	backdrop-filter: var(--glass-blur-sm);
+	-webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .connection-status-badge.is-online {
 	background-color: var(--color-success-subtle);
 	color: var(--color-success);
+	border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
 .connection-status-badge.is-offline {
 	background-color: var(--color-danger-subtle);
 	color: var(--color-danger);
+	border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
 .connection-status-badge.is-unknown {
 	background-color: var(--color-surface);
 	color: var(--color-text-muted);
+	border: 1px solid var(--color-surface-border);
 }
+
+/* ---------------------------------------------------------------------------
+   Main content area
+   --------------------------------------------------------------------------- */
 
 .main-content {
 	flex: 1;
@@ -285,6 +327,10 @@
 	padding: 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Empty state — glass card with glow
+   --------------------------------------------------------------------------- */
+
 .empty-state {
 	display: flex;
 	flex-direction: column;
@@ -293,29 +339,31 @@
 	text-align: center;
 	max-width: 400px;
 	padding: var(--spacing-2xl);
-	background: rgba(255, 255, 255, 0.02);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-sm);
-	backdrop-filter: var(--glass-blur);
+	background-color: var(--color-surface);
+	backdrop-filter: var(--glass-blur-md);
+	-webkit-backdrop-filter: var(--glass-blur-md);
+	border: 1px solid var(--color-surface-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-md);
 }
 
 .empty-state-icon {
-	width: 64px;
-	height: 64px;
+	width: 72px;
+	height: 72px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: 50%;
-	background-color: var(--color-accent-subtle);
+	border-radius: var(--radius-lg);
+	background: linear-gradient(135deg, var(--color-accent-subtle), var(--color-secondary-subtle));
 	color: var(--color-accent);
 	font-size: var(--font-size-2xl);
 	box-shadow: var(--color-accent-glow);
-	border: 1px solid var(--color-accent-subtle);
+	border: 1px solid var(--color-glass-highlight-border);
 }
 
 .empty-state-title {
 	font-family: var(--font-display);
-	font-size: var(--font-size-lg);
+	font-size: var(--font-size-xl);
 	font-weight: var(--font-weight-bold);
 	color: var(--color-accent);
 	text-transform: uppercase;
@@ -330,7 +378,10 @@
 	max-width: 280px;
 }
 
-/* Footer hint area */
+/* ---------------------------------------------------------------------------
+   Footer hint area
+   --------------------------------------------------------------------------- */
+
 .footer-hint {
 	padding: var(--spacing-sm) var(--spacing-lg);
 	border-top: 1px solid var(--color-border-subtle);
@@ -343,7 +394,10 @@
 	font-family: var(--font-stack);
 }
 
-/* Responsive */
+/* ---------------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------------- */
+
 @media (max-width: 639px) {
 	.sidebar {
 		position: fixed;
@@ -353,6 +407,7 @@
 		z-index: var(--z-sticky);
 		transform: translateX(-100%);
 		transition: transform var(--transition-base);
+		box-shadow: var(--shadow-xl);
 	}
 
 	.sidebar.is-open {
