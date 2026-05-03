@@ -520,6 +520,9 @@ export function Sidebar() {
                                   <div className="session-card-top">
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
                                       <span className="session-card-name" title={sname}>{sname}</span>
+                                      {typeof session.windowCount === "number" && session.windowCount > 0 && (
+                                        <span className="window-count-badge">{session.windowCount} w</span>
+                                      )}
                                       {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
                                         <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
                                           {session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
@@ -536,11 +539,6 @@ export function Sidebar() {
                                   </p>
                                 )}
                                   <div className="session-card-meta">
-                                    {typeof session.windowCount === "number" && session.windowCount > 0 && (
-                                      <span className="session-card-meta-count">
-                                        {session.windowCount} window{session.windowCount === 1 ? "" : "s"}
-                                      </span>
-                                    )}
                                     {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
                                       <span className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}>
                                         {session.attentionCount}
