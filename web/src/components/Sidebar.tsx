@@ -20,6 +20,7 @@ import { formatRelativeTime } from "../ui/time.js";
 const SESSION_SYNC_INTERVAL_MS = 2000;
 
 const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
+	waiting: "Waiting",
 	dead_loop: "Loop",
 	blocked: "Blocked",
 	waiting_confirm: "Confirm",
@@ -121,7 +122,9 @@ export function Sidebar() {
           const dedupeKey = `${connectionId}:${sessionName}`;
 
           // Check if intelligence is missing or stale
-          const hasIntelligence = session.intelligenceStatus !== undefined;
+          const hasIntelligence =
+            session.intelligenceStatus !== undefined &&
+            session.intelligenceStatus !== "none";
           const isStale = session.intelligenceStale === true;
 
           if (hasIntelligence && !isStale) continue;
@@ -534,7 +537,7 @@ export function Sidebar() {
                                     )}
                                   </div>
                                 {session.intelligenceSummary && (
-                                  <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
+                                  <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
                                     {session.intelligenceSummary}
                                   </p>
                                 )}
