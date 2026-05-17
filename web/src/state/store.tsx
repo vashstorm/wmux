@@ -19,6 +19,7 @@ export interface WindowSummary {
 	intelligenceStale?: boolean;
 	intelligenceUpdatedAt?: string;
 	intelligenceError?: string;
+	intelligenceAppCounts?: Record<string, number>;
 }
 
 export interface PaneData {
@@ -77,6 +78,7 @@ function windowInfoToSummary(w: WindowInfo): WindowSummary {
 		intelligenceStale: w.IntelligenceStale,
 		intelligenceUpdatedAt: w.IntelligenceUpdatedAt,
 		intelligenceError: w.IntelligenceError,
+		intelligenceAppCounts: w.IntelligenceAppCounts,
 	};
 }
 

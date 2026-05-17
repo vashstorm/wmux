@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MainPanel } from "./MainPanel.js";
 import { listPanes, listWindows } from "../api/client.js";
 import { useAppState } from "../state/store.js";
@@ -107,6 +107,16 @@ describe("MainPanel", () => {
 	const setPanes = vi.fn();
 	const setError = vi.fn();
 
+	const expectTitleSegments = (expected: {
+		session: string;
+		app: string;
+		summary: string;
+	}) => {
+		expect(screen.getByTestId("main-title-session").textContent).toBe(expected.session);
+		expect(screen.getByTestId("main-title-app").textContent).toBe(expected.app);
+		expect(screen.getByTestId("main-title-summary").textContent).toBe(expected.summary);
+	};
+
 	beforeEach(() => {
 		vi.useFakeTimers();
 		setSelectedPane.mockClear();
@@ -126,6 +136,9 @@ describe("MainPanel", () => {
 	test("syncs the selected window tab when tmux active window changes", async () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
+			},
 			windows: {
 				"conn-1:dev": {
 					windows: [windowOne, windowTwo],
@@ -200,5 +213,311 @@ describe("MainPanel", () => {
 			window: "@2",
 			pane: "%3",
 		});
+	});
+
+	test("renders title as session name, app name, and summary", () => {
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [{
+						...windowOne,
+						intelligenceApp: "copilot",
+						intelligenceSummary: "Window summary",
+					}],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+							intelligenceApp: "cursor",
+							intelligenceSummary: "Pane summary",
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expectTitleSegments({
+			session: "dev",
+			app: "cursor",
+			summary: "Pane summary",
+		});
+	});
+
+	test("updates title when selected window changes", () => {
+		const mockState = {
+			selectedPane,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [
+						{
+							...windowOne,
+							intelligenceApp: "editor-app",
+							intelligenceSummary: "Editing files",
+						},
+						{
+							...windowTwo,
+							intelligenceApp: "server-app",
+							intelligenceSummary: "Server running",
+						},
+					],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+						"@2": [{
+							id: "%3",
+							title: "node",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>;
+
+		vi.mocked(useAppState).mockImplementation(() => mockState);
+
+		const { rerender } = render(<MainPanel />);
+
+		expectTitleSegments({
+			session: "dev",
+			app: "editor-app",
+			summary: "Editing files",
+		});
+
+		(mockState as { selectedPane: SelectedPane }).selectedPane = {
+			...selectedPane,
+			window: "@2",
+			pane: "%3",
+		};
+
+		rerender(<MainPanel />);
+
+		expectTitleSegments({
+			session: "dev",
+			app: "server-app",
+			summary: "Server running",
+		});
+	});
+
+	test("switches title immediately when clicking a window tab before panes finish loading", async () => {
+		let currentSelectedPane: SelectedPane = selectedPane;
+		const pendingListPanes = new Promise<never>(() => {});
+		const setSelectedPaneState = vi.fn((nextPane: SelectedPane | null) => {
+			if (nextPane) {
+				currentSelectedPane = nextPane;
+			}
+		});
+
+		vi.mocked(listPanes).mockReturnValue(pendingListPanes);
+		vi.mocked(useAppState).mockImplementation(() => ({
+			selectedPane: currentSelectedPane,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [
+						{
+							...windowOne,
+							intelligenceApp: "editor-app",
+							intelligenceSummary: "Editing files",
+						},
+						{
+							...windowTwo,
+							intelligenceApp: "server-app",
+							intelligenceSummary: "Server running",
+						},
+					],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane: setSelectedPaneState,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		}) as unknown as ReturnType<typeof useAppState>);
+
+		const { rerender } = render(<MainPanel />);
+
+		expectTitleSegments({
+			session: "dev",
+			app: "editor-app",
+			summary: "Editing files",
+		});
+
+		fireEvent.click(screen.getByText("server"));
+
+		expect(setSelectedPaneState).toHaveBeenCalledWith({
+			connectionId: "conn-1",
+			session: "dev",
+			window: "@2",
+			pane: "%3",
+		});
+
+		rerender(<MainPanel />);
+
+		expectTitleSegments({
+			session: "dev",
+			app: "server-app",
+			summary: "Server running",
+		});
+	});
+
+	test("falls back to window name and pane title when current window has no intelligence metadata", () => {
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: {
+				connectionId: "conn-1",
+				session: "wmux",
+				window: "@2",
+				pane: "%3",
+			},
+			sessions: {
+				"conn-1": [{ name: "wmux", intelligenceApp: "opencode", intelligenceSummary: "OpenCode CLI 已启动" }],
+			},
+			windows: {
+				"conn-1:wmux": {
+					windows: [
+						windowOne,
+						{
+							...windowTwo,
+							name: "make",
+							activePaneTitle: "bun install",
+						},
+					],
+					loadedPanes: {
+						"@2": [{
+							id: "%3",
+							title: "bun install",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expectTitleSegments({
+			session: "wmux",
+			app: "opencode",
+			summary: "bun install",
+		});
+	});
+
+	test("hides app and summary segments when no data is available", () => {
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: {
+				connectionId: "conn-1",
+				session: "solo",
+			},
+			sessions: {
+				"conn-1": [{ name: "solo" }],
+			},
+			windows: {},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expect(screen.getByTestId("main-title-session").textContent).toBe("solo");
+		expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("main-title-summary")).not.toBeInTheDocument();
 	});
 });

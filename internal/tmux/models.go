@@ -38,10 +38,13 @@ type Window struct {
 	IntelligenceUpdatedAt  string  `json:"intelligenceUpdatedAt,omitempty"`
 	IntelligenceStale      bool    `json:"intelligenceStale,omitempty"`
 	IntelligenceError      string  `json:"intelligenceError,omitempty"`
+	IntelligenceAppCounts  map[string]int `json:"intelligenceAppCounts,omitempty"`
 }
 
 type Pane struct {
 	ID                     string
+	WindowID               string `json:"-"`
+	WindowName             string `json:"-"`
 	Title                  string
 	Index                  int
 	Active                 bool

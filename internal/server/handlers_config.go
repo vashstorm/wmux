@@ -28,14 +28,14 @@ type configIntelligenceProviderResponse struct {
 }
 
 type configIntelligenceResponse struct {
-	Enabled               bool                         `json:"enabled"`
-	ActiveProvider        string                       `json:"activeProvider,omitempty"`
+	Enabled               bool                                 `json:"enabled"`
+	ActiveProvider        string                               `json:"activeProvider,omitempty"`
 	Providers             []configIntelligenceProviderResponse `json:"providers,omitempty"`
-	MaxBytes              int                          `json:"maxBytes,omitempty"`
-	TimeoutSec            int                          `json:"timeoutSec,omitempty"`
-	MinSessionIntervalSec int                          `json:"minSessionIntervalSec,omitempty"`
-	MaxConcurrency        int                          `json:"maxConcurrency,omitempty"`
-	CacheTTLSec           int                          `json:"cacheTTLSec,omitempty"`
+	MaxBytes              int                                  `json:"maxBytes,omitempty"`
+	TimeoutSec            int                                  `json:"timeoutSec,omitempty"`
+	MinSessionIntervalSec int                                  `json:"minSessionIntervalSec,omitempty"`
+	MaxConcurrency        int                                  `json:"maxConcurrency,omitempty"`
+	CacheTTLSec           int                                  `json:"cacheTTLSec,omitempty"`
 }
 
 func newConfigResponse(cfg config.Config) configResponse {

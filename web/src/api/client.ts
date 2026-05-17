@@ -206,6 +206,7 @@ export interface WindowInfo {
 	IntelligenceStale?: boolean;
 	IntelligenceUpdatedAt?: string;
 	IntelligenceError?: string;
+	IntelligenceAppCounts?: Record<string, number>;
 }
 
 export interface WindowsListResponse {

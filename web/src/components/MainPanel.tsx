@@ -11,9 +11,15 @@ interface SelectWindowOptions {
 	forcePanes?: boolean;
 }
 
+interface TitleSegment {
+	key: "session" | "app" | "summary";
+	value: string;
+}
+
 export function MainPanel() {
 	const {
 		selectedPane,
+		sessions,
 		windows,
 		setSelectedPane,
 		setPanes,
@@ -29,6 +35,9 @@ export function MainPanel() {
 		: null;
 	const sessionWindowState = sessionKey ? windows[sessionKey] : null;
 	const windowSummaries = sessionWindowState?.windows ?? [];
+	const selectedSession = selectedPane
+		? (sessions[selectedPane.connectionId] ?? []).find((session) => session.name === selectedPane.session)
+		: null;
 
 	const currentWindowId = selectedPane?.window ?? null;
 	const currentPanes = currentWindowId
@@ -43,6 +52,16 @@ export function MainPanel() {
 		if (!selectedPane) return;
 
 		const loadedPanesForWindow = sessionWindowState?.loadedPanes[windowId];
+		const optimisticPaneId = loadedPanesForWindow?.find((pane) => pane.active)?.id
+			?? loadedPanesForWindow?.[0]?.id
+			?? activePaneId;
+
+		setSelectedPane({
+			connectionId: selectedPane.connectionId,
+			session: selectedPane.session,
+			window: windowId,
+			pane: optimisticPaneId,
+		});
 
 		if (options.forcePanes || !loadedPanesForWindow || loadedPanesForWindow.length === 0) {
 			try {
@@ -68,21 +87,7 @@ export function MainPanel() {
 				} else {
 					setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to load panes" });
 				}
-				// 加载失败时仍使用传入的 pane ID 更新窗口选择。
-				setSelectedPane({
-					connectionId: selectedPane.connectionId,
-					session: selectedPane.session,
-					window: windowId,
-					pane: activePaneId,
-				});
 			}
-		} else {
-			setSelectedPane({
-				connectionId: selectedPane.connectionId,
-				session: selectedPane.session,
-				window: windowId,
-				pane: activePaneId,
-			});
 		}
 	}, [selectedPane, sessionWindowState, setError, setPanes, setSelectedPane]);
 
@@ -190,23 +195,52 @@ export function MainPanel() {
 		});
 	};
 
-	const buildTitle = () => {
-		if (!hasSelectedPane || !selectedPane) return "Wmux";
+	const buildTitleSegments = (): TitleSegment[] => {
+		if (!hasSelectedPane || !selectedPane) {
+			return [];
+		}
 
 		const sessionName = selectedPane.session;
 		const windowSummary = windowSummaries.find((w) => w.id === selectedPane.window);
-		const windowName = windowSummary?.name ?? selectedPane.window ?? "-";
 		const paneData = currentPanes.find((p) => p.id === selectedPane.pane);
-		const paneTitle = paneData?.title ?? selectedPane.pane ?? "-";
+		const appName = paneData?.intelligenceApp
+			?? windowSummary?.intelligenceApp
+			?? selectedSession?.intelligenceApp
+			?? windowSummary?.name
+			?? paneData?.title;
+		const summary = paneData?.intelligenceSummary
+			?? windowSummary?.intelligenceSummary
+			?? paneData?.title
+			?? windowSummary?.activePaneTitle
+			?? selectedSession?.intelligenceSummary;
 
-		return `${sessionName} / ${windowName} / ${paneTitle}`;
+		return [
+			{ key: "session", value: sessionName },
+			{ key: "app", value: appName },
+			{ key: "summary", value: summary },
+		].filter((segment): segment is TitleSegment => Boolean(segment.value && segment.value.trim()));
 	};
+
+	const titleSegments = buildTitleSegments();
 
 	return (
 		<div className="main-panel">
 			<header className="main-header">
 				<h1 className="main-header-title" data-testid="main-title">
-					{buildTitle()}
+					{titleSegments.length > 0 ? (
+						titleSegments.map((segment) => (
+							<span
+								key={segment.key}
+								className={`main-title-segment is-${segment.key}`}
+								data-testid={`main-title-${segment.key}`}
+								title={segment.value}
+							>
+								<span className="main-title-segment-value">{segment.value}</span>
+							</span>
+						))
+					) : (
+						<span className="main-title-fallback">Wmux</span>
+					)}
 				</h1>
 			</header>
 
@@ -215,6 +249,7 @@ export function MainPanel() {
 					<div className="main-workspace" data-theme={uiSettings.windowTheme || uiSettings.theme}>
 						<WindowTabs
 							windows={windowSummaries}
+							loadedPanesByWindow={sessionWindowState?.loadedPanes}
 							selectedWindowId={currentWindowId}
 							onSelectWindow={handleSelectWindow}
 						/>

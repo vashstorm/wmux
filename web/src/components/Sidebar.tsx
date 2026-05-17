@@ -88,6 +88,41 @@ export function Sidebar() {
     }
   }, [setConnectionHealth]);
 
+  const refreshOpenSessionWorkspace = useCallback(async (connectionId: string, sessionName: string) => {
+    if (selectedPane?.connectionId !== connectionId || selectedPane.session !== sessionName) {
+      return;
+    }
+
+    try {
+      const windowsResponse = await listWindows(connectionId, sessionName);
+      const windows = windowsResponse.data ?? [];
+      setWindows(connectionId, sessionName, windows);
+
+      const targetWindowID = selectedPane.window
+        ?? windows.find((window) => window.Active)?.ID
+        ?? windows[0]?.ID;
+      if (!targetWindowID) {
+        return;
+      }
+
+      const panesResponse = await listPanes(connectionId, sessionName, targetWindowID);
+      const panes = panesResponse.data ?? [];
+      setPanes(connectionId, sessionName, targetWindowID, panes);
+
+      if (!selectedPane.window || !selectedPane.pane) {
+        const activePane = panes.find((pane) => pane.Active) ?? panes[0];
+        setSelectedPane({
+          connectionId,
+          session: sessionName,
+          window: targetWindowID,
+          pane: activePane?.ID,
+        });
+      }
+    } catch {
+      // Keep session list updates resilient; periodic sync can retry later.
+    }
+  }, [selectedPane, setPanes, setSelectedPane, setWindows]);
+
   const loadConnectionsList = useCallback(async () => {
     setLoading("connections", true);
     try {
@@ -159,6 +194,7 @@ export function Sidebar() {
                   intelligenceError: result.intelligence.error,
                   intelligenceAppCounts: result.intelligence.appCounts,
                 });
+                void refreshOpenSessionWorkspace(connectionId, sessionName);
               }
             })
             .catch(() => {
@@ -176,7 +212,7 @@ export function Sidebar() {
         }
       }
     }
-  }, [setSessions, setError, updateSession]);
+  }, [refreshOpenSessionWorkspace, setSessions, setError, updateSession]);
 
   // Initial load of connections list
   useEffect(() => {

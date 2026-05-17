@@ -80,7 +80,12 @@ func (s *Server) handleAnalyzeSession(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		for _, pane := range panes {
-			windowByPane[pane.ID] = window.Name
+			pane.WindowID = window.ID
+			pane.WindowName = window.Name
+			windowByPane[pane.ID] = window.ID
+			if windowByPane[pane.ID] == "" {
+				windowByPane[pane.ID] = window.Name
+			}
 			allPanes = append(allPanes, pane)
 		}
 	}
@@ -242,6 +247,7 @@ func (s *Server) attachCachedWindowIntelligence(sessionName string, windows []tm
 			continue
 		}
 		applyWindowResult(&windows[i], agg)
+		windows[i].IntelligenceAppCounts = intelligence.CountApplications(windowResults)
 	}
 }
 

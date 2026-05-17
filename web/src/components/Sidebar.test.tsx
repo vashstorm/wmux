@@ -490,6 +490,27 @@ describe("intelligence badge and summary rendering", () => {
 		vi.clearAllMocks();
 		mockListConnections.mockResolvedValue([{ id: "conn1", type: "local" }]);
 		mockListConnectionHealth.mockResolvedValue([]);
+		mockListWindows.mockResolvedValue({
+			connectionId: "conn1",
+			session: "session1",
+			mode: "local",
+			data: [],
+		});
+		mockListPanes.mockResolvedValue({
+			connectionId: "conn1",
+			session: "session1",
+			window: "@1",
+			mode: "local",
+			data: [],
+		});
+		mockAnalyzeSession.mockResolvedValue({
+			connectionId: "conn1",
+			session: "session1",
+			status: "ok",
+			updated: 0,
+			skipped: 0,
+			errors: 0,
+		} as Awaited<ReturnType<typeof client.analyzeSession>>);
 	});
 
 	test("session with intelligenceStatus waiting renders badge with text Waiting", async () => {

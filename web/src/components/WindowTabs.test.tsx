@@ -40,11 +40,11 @@ describe("WindowTabs", () => {
 		expect(screen.getByText("0")).toBeInTheDocument();
 		expect(screen.getByText("editor")).toBeInTheDocument();
 		expect(screen.getByText("server")).toBeInTheDocument();
-		expect(screen.getByText("bash")).toBeInTheDocument();
-		expect(screen.getByText("node")).toBeInTheDocument();
+		expect(screen.queryByText("bash")).not.toBeInTheDocument();
+		expect(screen.queryByText("node")).not.toBeInTheDocument();
 	});
 
-	test("renders pane count badges", () => {
+	test("does not render pane count badges after the app name", () => {
 		render(
 			<WindowTabs
 				windows={mockWindows}
@@ -53,8 +53,7 @@ describe("WindowTabs", () => {
 			/>,
 		);
 
-		expect(screen.getByText("2")).toBeInTheDocument();
-		expect(screen.getAllByText("1")).toHaveLength(2);
+		expect(document.querySelector(".window-tab-badge")).toBeNull();
 	});
 
 	test("highlights active tab", () => {
@@ -100,7 +99,7 @@ describe("WindowTabs", () => {
 		expect(container.firstChild).toBeNull();
 	});
 
-	test("truncates long active pane titles", () => {
+	test("uses the computed app label for the tab title attribute", () => {
 		const windowsWithLongTitle: WindowSummary[] = [
 			{
 				id: "@1",
@@ -110,6 +109,7 @@ describe("WindowTabs", () => {
 				paneCount: 1,
 				activePaneID: "%1",
 				activePaneTitle: "very-long-title-that-might-overflow",
+				intelligenceApp: "claude",
 			},
 		];
 
@@ -121,8 +121,142 @@ describe("WindowTabs", () => {
 			/>,
 		);
 
-		expect(screen.getByText("very-long-title-that-might-overflow")).toBeInTheDocument();
+		expect(screen.getByTestId("window-tab-active")).toHaveAttribute("title", "claude");
 	});
+
+	test("prefers the primary AI app over zsh in the tab name", () => {
+		const windowsWithApps: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "editor",
+				index: 0,
+				active: true,
+				paneCount: 2,
+				activePaneID: "%1",
+				activePaneTitle: "bash",
+				intelligenceApp: "claude",
+				intelligenceAppCounts: {
+					claude: 1,
+					zsh: 1,
+				},
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithApps}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByText("claude")).toBeInTheDocument();
+		expect(screen.queryByText("editor")).not.toBeInTheDocument();
+	});
+
+	test("shows AI CLI when a window contains multiple AI apps", () => {
+		const windowsWithApps: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "editor",
+				index: 0,
+				active: true,
+				paneCount: 2,
+				activePaneID: "%1",
+				activePaneTitle: "bash",
+				intelligenceApp: "claude",
+				intelligenceAppCounts: {
+					claude: 1,
+					opencode: 1,
+				},
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithApps}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByText("AI CLI")).toBeInTheDocument();
+		expect(screen.queryByText("claude")).not.toBeInTheDocument();
+	});
+
+	test("prefers loaded pane intelligence app over raw window name", () => {
+		const windowsWithRawName: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "ocx[omo]:wmux/main",
+				index: 0,
+				active: true,
+				paneCount: 1,
+				activePaneID: "%1",
+				activePaneTitle: "OpenCode",
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithRawName}
+				loadedPanesByWindow={{
+					"@1": [{
+						id: "%1",
+						title: "OpenCode",
+						index: 0,
+						active: true,
+						width: 80,
+						height: 24,
+						left: 0,
+						top: 0,
+						intelligenceApp: "opencode",
+					}],
+				}}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByText("opencode")).toBeInTheDocument();
+		expect(screen.queryByText("ocx[omo]:wmux/main")).not.toBeInTheDocument();
+		expect(screen.queryByText("OpenCode")).not.toBeInTheDocument();
+	});
+
+	test("keeps per-window labels when there is no window-level app data", () => {
+		const windowsWithRawName: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "ocx[omo]:wmux/main",
+				index: 0,
+				active: true,
+				paneCount: 1,
+				activePaneID: "%1",
+				activePaneTitle: "OpenCode",
+			},
+			{
+				id: "@2",
+				name: "make",
+				index: 1,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%2",
+				activePaneTitle: "zsh",
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithRawName}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByText("ocx[omo]:wmux/main")).toBeInTheDocument();
+		expect(screen.getByText("zsh")).toBeInTheDocument();
+	});
+
 });
 
 describe("attention rendering", () => {

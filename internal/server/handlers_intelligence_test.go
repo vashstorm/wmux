@@ -70,6 +70,63 @@ func TestAnalyzeSessionIntelligenceUpdatesTargetSession(t *testing.T) {
 	}
 }
 
+func TestAnalyzeSessionIntelligenceUpdatesTargetWindow(t *testing.T) {
+	adapterPath, _ := createFakeTMUXBinary(t)
+
+	cfg := config.DefaultConfig()
+	cfg.Tmux.Path = adapterPath
+	cfg.Intelligence.MinSessionIntervalSec = 0
+	cfg.Intelligence.Enabled = true
+	cfg.Intelligence.ActiveProvider = "test"
+	cfg.Intelligence.Providers = []config.IntelligenceProviderConfig{
+		{Name: "test", Provider: "openai", Model: "gpt-4", APIKey: "key"},
+	}
+	cfg.Connections = []config.ConnectionConfig{{
+		ID:   "local-1",
+		Type: "local",
+	}}
+
+	fake := intelligence.NewFakeProvider(intelligence.FakeProviderConfig{
+		App:        intelligence.AppOpenCode,
+		Status:     intelligence.StatusWaitingIdle,
+		Summary:    "OpenCode CLI 正在等待用户输入",
+		Confidence: 0.96,
+	})
+	srv := newTestServerWithIntelligence(t, cfg, fake)
+
+	rec := performSessionRequest(t, srv, http.MethodPost, "/api/connections/local-1/sessions/alpha/analyze", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rec.Code)
+	}
+
+	rec = performSessionRequest(t, srv, http.MethodGet, "/api/connections/local-1/sessions/alpha/windows", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected windows status code: %d", rec.Code)
+	}
+
+	windowsPayload := decodeBody[windowsListResponse](t, rec.Body.Bytes())
+	if len(windowsPayload.Data) == 0 {
+		t.Fatal("expected at least one window")
+	}
+
+	found := false
+	for _, window := range windowsPayload.Data {
+		if window.IntelligenceSummary == "OpenCode CLI 正在等待用户输入" {
+			found = true
+			if window.IntelligenceApp != "opencode" {
+				t.Fatalf("expected window app opencode, got %#v", window)
+			}
+			if window.IntelligenceAppCounts["opencode"] < 1 {
+				t.Fatalf("expected window app counts to include opencode, got %#v", window.IntelligenceAppCounts)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected one window to include intelligence summary, got %#v", windowsPayload.Data)
+	}
+}
+
 func TestListSessionsDoesNotInvokeIntelligenceProvider(t *testing.T) {
 	adapterPath, _ := createFakeTMUXBinary(t)
 

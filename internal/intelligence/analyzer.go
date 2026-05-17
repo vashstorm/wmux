@@ -169,8 +169,12 @@ func (a *Analyzer) analyzePane(ctx context.Context, cfg config.IntelligenceConfi
 	input := AnalyzeInput{
 		PaneID:         pane.ID,
 		SessionName:    sessionName,
+		WindowID:       pane.WindowID,
 		CurrentCommand: pane.CurrentCommand,
 		RawContent:     normalized,
+	}
+	if input.WindowID == "" {
+		input.WindowID = pane.WindowName
 	}
 
 	select {
