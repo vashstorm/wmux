@@ -4,6 +4,7 @@ pub mod app;
 pub mod config;
 pub mod handlers;
 pub mod http;
+pub mod logging;
 pub mod middleware;
 pub mod protocol;
 pub mod routes;

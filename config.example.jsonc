@@ -32,9 +32,14 @@
     }
   ],
 
-  "ui": {
+"ui": {
     "theme": "dark",
     "fontSize": 16,
-    "terminalFontSize": 14
+    "terminalFontSize": 14,
+    "terminalFontWeight": "normal"
+  },
+  "logs": {
+    "level": "info",
+    "path": ""
   }
 }

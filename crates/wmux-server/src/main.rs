@@ -45,7 +45,8 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    tracing_subscriber::fmt().with_target(false).init();
+    wmux_core::logging::init_tracing(&config.logs)
+        .with_context(|| "failed to initialize logging")?;
     let config_path = store.path().context("failed to resolve config path")?;
     tracing::info!(
         version = wmux_core::version(),

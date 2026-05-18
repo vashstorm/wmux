@@ -167,7 +167,8 @@ impl SessionManager {
         })
         .await??;
 
-        let session = self.register(connection_id, parsed_target.display(), pty)?;
+        let session = self.register(connection_id.clone(), parsed_target.display(), pty)?;
+        tracing::info!(connection_id = %connection_id, target = %parsed_target.display(), "terminal session attached");
         Ok(session)
     }
 
@@ -445,6 +446,7 @@ fn spawn_reader_task(
                 }
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) => {
+                    tracing::error!(%error, "terminal read error");
                     let _ = events_tx.send(ServerMessage::Error {
                         error: ErrorDetail::new(
                             "terminal_output_failed",
@@ -475,6 +477,7 @@ fn spawn_writer_task(
                     match input {
                         Some(data) if !data.is_empty() => {
                             if let Err(error) = write_pty_input(Arc::clone(&writer), data).await {
+                                tracing::error!(%error, "terminal write error");
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_write_failed", format!("failed to forward terminal input: {error}")),
                                 });
@@ -495,6 +498,7 @@ fn spawn_writer_task(
                     match control {
                         Some(SessionControl::Resize(size)) => {
                             if let Err(error) = resize_pty(Arc::clone(&master), size).await {
+                                tracing::error!(%error, "terminal resize error");
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_resize_failed", format!("failed to resize terminal: {error}")),
                                 });
@@ -528,6 +532,7 @@ fn spawn_wait_task(
     tokio::task::spawn_blocking(move || {
         let wait_result = child.wait();
         if let Err(error) = wait_result {
+            tracing::error!(session_id = %session_id, %error, "terminal session process exited unexpectedly");
             let _ = events_tx.send(ServerMessage::Error {
                 error: ErrorDetail::new(
                     "terminal_closed",

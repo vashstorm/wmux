@@ -58,6 +58,8 @@ pub struct Config {
     pub ui: UIConfig,
     #[serde(default)]
     pub intelligence: IntelligenceConfig,
+    #[serde(default)]
+    pub logs: LogsConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -128,6 +130,15 @@ pub struct IntelligenceProviderConfig {
     pub api_key: String,
     #[serde(default, rename = "baseURL", skip_serializing_if = "String::is_empty")]
     pub base_url: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogsConfig {
+    #[serde(default = "default_log_level")]
+    pub level: String,
+    #[serde(default)]
+    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,6 +214,7 @@ impl Config {
             connection.private_key_path = expand_user_path(&connection.private_key_path)?;
             connection.known_hosts_path = expand_user_path(&connection.known_hosts_path)?;
         }
+        expanded.logs.path = expand_user_path(&expanded.logs.path)?;
         Ok(expanded)
     }
 
@@ -254,6 +266,10 @@ impl Config {
             self.intelligence.cache_ttl_sec = default_cache_ttl_sec();
         }
 
+        if self.logs.level.trim().is_empty() {
+            self.logs.level = default_log_level();
+        }
+
         if self.intelligence.providers.is_empty() {
             let legacy_provider = self.intelligence.provider.trim();
             if !legacy_provider.is_empty() {
@@ -293,6 +309,7 @@ impl Default for Config {
             connections: Vec::new(),
             ui: UIConfig::default(),
             intelligence: IntelligenceConfig::default(),
+            logs: LogsConfig::default(),
         };
         config.normalize();
         config
@@ -323,6 +340,15 @@ impl Default for UIConfig {
             font_size: default_ui_font_size(),
             terminal_font_size: default_terminal_font_size(),
             terminal_font_weight: default_terminal_font_weight(),
+        }
+    }
+}
+
+impl Default for LogsConfig {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+            path: String::new(),
         }
     }
 }
@@ -743,6 +769,10 @@ fn default_cache_ttl_sec() -> u32 {
     300
 }
 
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
 fn is_zero_u16(value: &u16) -> bool {
     *value == 0
 }
@@ -776,6 +806,8 @@ mod tests {
         assert_eq!(config.intelligence.min_session_interval_sec, 60);
         assert_eq!(config.intelligence.max_concurrency, 3);
         assert_eq!(config.intelligence.cache_ttl_sec, 300);
+        assert_eq!(config.logs.level, "info");
+        assert_eq!(config.logs.path, "");
     }
 
     #[test]

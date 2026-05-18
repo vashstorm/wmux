@@ -1,5 +1,6 @@
 # Build output (Rust/Tauri/web)
 bin/
+logs/
 /wmux
 dist/
 target/

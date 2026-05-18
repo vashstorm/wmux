@@ -28,6 +28,9 @@ pub async fn websocket(
 }
 
 async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSocket) {
+    let connection_id = query.connection_id.as_deref().unwrap_or_default().trim().to_string();
+    tracing::info!(connection_id = %connection_id, session = ?query.session, "terminal websocket connecting");
+
     if send_json(&mut socket, &ServerMessage::Status { status: "connected".to_string() })
         .await
         .is_err()
@@ -35,13 +38,13 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
         return;
     }
 
-    let connection_id = query.connection_id.as_deref().unwrap_or_default().trim();
-    let connection = match find_connection(&state, connection_id).and_then(|connection| {
+    let _connection = match find_connection(&state, &connection_id).and_then(|connection| {
         require_local_connection(&connection)?;
         Ok(connection)
     }) {
         Ok(connection) => connection,
         Err(error) => {
+            tracing::warn!(connection_id = %connection_id, error = %error, "terminal connection lookup failed");
             send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
             return;
         }
@@ -50,6 +53,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
     let target = match build_terminal_target(&query) {
         Ok(target) => target,
         Err(message) => {
+            tracing::warn!(connection_id = %connection_id, %message, "terminal bad request");
             send_error_and_close(&mut socket, "bad_request", message).await;
             return;
         }
@@ -57,6 +61,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
     let size = match parse_initial_size(&query) {
         Ok(size) => size,
         Err(message) => {
+            tracing::warn!(connection_id = %connection_id, %message, "terminal bad request");
             send_error_and_close(&mut socket, "bad_request", message).await;
             return;
         }
@@ -64,6 +69,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
     let tmux_path = match current_config(&state) {
         Ok(config) => config.tmux.path,
         Err(error) => {
+            tracing::error!(connection_id = %connection_id, error = %error, "terminal config read failed");
             send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
             return;
         }
@@ -71,20 +77,21 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
 
     let session = match state
         .sessions
-        .attach_local(connection.id, tmux_path, target, size)
+        .attach_local(&connection_id, tmux_path, target, size)
         .await
     {
         Ok(session) => session,
         Err(error) => {
+            tracing::error!(connection_id = %connection_id, error = %error, "terminal attach failed");
             send_error_and_close(&mut socket, session_error_code(&error), error.to_string()).await;
             return;
         }
     };
 
-    bridge_terminal(socket, session).await;
+    bridge_terminal(socket, session, connection_id.clone()).await;
 }
 
-async fn bridge_terminal(mut socket: WebSocket, session: Session) {
+async fn bridge_terminal(mut socket: WebSocket, session: Session, connection_id: String) {
     let mut events = session.subscribe();
 
     loop {
@@ -133,6 +140,7 @@ async fn bridge_terminal(mut socket: WebSocket, session: Session) {
     }
 
     let _ = session.close().await;
+    tracing::info!(%connection_id, "terminal websocket disconnected");
     let _ = socket.send(Message::Close(None)).await;
 }
 

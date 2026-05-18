@@ -133,6 +133,7 @@ pub async fn create_session(
         .new_session(payload.name.trim())
         .await
         .map_err(session_error)?;
+    tracing::info!(connection_id = %connection.id, session = %payload.name, "session created");
     Ok((
         StatusCode::CREATED,
         Json(SessionOperationResponse {
@@ -178,6 +179,7 @@ pub async fn create_window(
         .new_window(&session, payload.name.trim())
         .await
         .map_err(session_error)?;
+    tracing::info!(connection_id = %connection.id, session = %session, window = %payload.name, "window created");
     Ok((
         StatusCode::CREATED,
         Json(WindowOperationResponse {
@@ -231,6 +233,7 @@ pub async fn rename_session(
         .rename_session(&session, payload.name.trim())
         .await
         .map_err(session_error)?;
+    tracing::info!(connection_id = %connection.id, session = %session, new_name = %payload.name, "session renamed");
     Ok(Json(OperationResponse {
         connection_id: connection.id,
         session,
@@ -263,6 +266,7 @@ pub async fn split_pane(
         .split_window(&target, payload.horizontal)
         .await
         .map_err(session_error)?;
+    tracing::info!(connection_id = %connection.id, session = %session, window = %window, pane = %pane, "pane split");
     Ok((
         StatusCode::CREATED,
         Json(PaneOperationResponse {
@@ -303,6 +307,8 @@ async fn write_session_operation(
         _ => Err(TmuxError::InvalidInput { field: "operation" }),
     }
     .map_err(session_error)?;
+
+    tracing::info!(connection_id = %connection.id, %operation, "session operation accepted");
 
     Ok(Json(OperationResponse {
         connection_id: connection.id,

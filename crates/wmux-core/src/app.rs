@@ -20,6 +20,9 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
     config.auth.token = token.clone();
     config.validate_auth().context("invalid config")?;
 
+    crate::logging::init_tracing(&config.logs)
+        .context("failed to initialize logging")?;
+
     store
         .replace_in_memory(config)
         .context("failed to prepare runtime config")?;

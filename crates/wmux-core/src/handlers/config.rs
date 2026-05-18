@@ -1,7 +1,7 @@
 use axum::extract::State;
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use wmux_core::config::{AuthConfig, Config, ConfigError, ConnectionConfig, ServerConfig, TmuxConfig, UIConfig};
+use wmux_core::config::{AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig, UIConfig};
 
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
@@ -16,6 +16,7 @@ pub struct ConfigResponse {
     connections: Vec<ConnectionConfig>,
     ui: UIConfig,
     intelligence: ConfigIntelligenceResponse,
+    logs: LogsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +83,8 @@ pub async fn update(
         return Err(store_error(error));
     }
 
+    tracing::info!("config updated");
+
     let latest = state
         .store
         .snapshot()
@@ -137,6 +140,7 @@ fn new_config_response(config: &Config) -> ConfigResponse {
             max_concurrency: sanitized.intelligence.max_concurrency,
             cache_ttl_sec: sanitized.intelligence.cache_ttl_sec,
         },
+        logs: sanitized.logs,
     }
 }
 

@@ -148,6 +148,10 @@ export interface AppConfig {
 		terminalFontWeight: string;
 	};
 	intelligence: IntelligenceConfig;
+	logs?: {
+		level: string;
+		path: string;
+	};
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {

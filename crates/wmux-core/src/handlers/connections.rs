@@ -79,6 +79,8 @@ pub async fn create(
         })
         .map_err(store_error)?;
 
+    tracing::info!(connection_id = %created.id, connection_type = %created.connection_type, "connection created");
+
     let latest = current_config(&state)?;
     latest
         .connections
@@ -135,6 +137,8 @@ pub async fn update(
         })
         .map_err(store_error)?;
 
+    tracing::info!(connection_id = %id, "connection updated");
+
     Ok(Json(payload))
 }
 
@@ -159,6 +163,8 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<String>) -> Re
             Ok(())
         })
         .map_err(store_error)?;
+
+    tracing::info!(connection_id = %id, "connection deleted");
 
     Ok(StatusCode::NO_CONTENT.into_response())
 }
