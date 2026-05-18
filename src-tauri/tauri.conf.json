@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Wmux",
+  "version": "0.1.0",
+  "identifier": "dev.tshouse.wmux",
+  "build": {
+    "beforeDevCommand": "bun run --cwd web dev",
+    "beforeBuildCommand": "bun run --cwd web build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../web/dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [],
+    "targets": ["app"],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

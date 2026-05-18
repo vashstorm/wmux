@@ -1,13 +1,8 @@
 import { ApiError, type ApiErrorResponse } from "./errors.js";
-
-const BASE_URL = "";
-
-function getAuthToken(): string | null {
-	return sessionStorage.getItem("wmux-auth-token");
-}
+import { getAuthToken, getBaseUrl } from "./runtime.js";
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
-	const url = `${BASE_URL}${path}`;
+	const url = `${getBaseUrl()}${path}`;
 	const headers = new Headers(options.headers);
 
 	headers.set("Content-Type", "application/json");
@@ -209,6 +204,18 @@ export interface WindowInfo {
 	IntelligenceAppCounts?: Record<string, number>;
 }
 
+type RawWindowInfo = Partial<WindowInfo> & {
+	id?: string;
+	name?: string;
+	index?: number;
+	active?: boolean;
+	paneCount?: number;
+	activePaneId?: string;
+	activePaneTitle?: string;
+	attentionState?: "none" | "attention" | "explicit";
+	attentionCount?: number;
+};
+
 export interface WindowsListResponse {
 	connectionId: string;
 	session: string;
@@ -237,6 +244,18 @@ export interface PaneInfo {
 	IntelligenceError?: string;
 }
 
+type RawPaneInfo = Partial<PaneInfo> & {
+	id?: string;
+	title?: string;
+	index?: number;
+	active?: boolean;
+	width?: number;
+	height?: number;
+	left?: number;
+	top?: number;
+	attentionState?: "none" | "attention" | "explicit";
+};
+
 export interface PanesListResponse {
 	connectionId: string;
 	session: string;
@@ -246,12 +265,48 @@ export interface PanesListResponse {
 	data: PaneInfo[];
 }
 
+function normalizeWindowInfo(window: RawWindowInfo): WindowInfo {
+	return {
+		ID: window.ID ?? window.id ?? "",
+		Name: window.Name ?? window.name ?? "",
+		Index: window.Index ?? window.index ?? 0,
+		Active: window.Active ?? window.active ?? false,
+		PaneCount: window.PaneCount ?? window.paneCount ?? 0,
+		ActivePaneID: window.ActivePaneID ?? window.activePaneId ?? "",
+		ActivePaneTitle: window.ActivePaneTitle ?? window.activePaneTitle ?? "",
+		AttentionState: window.AttentionState ?? window.attentionState,
+		AttentionCount: window.AttentionCount ?? window.attentionCount,
+	};
+}
+
+function normalizePaneInfo(pane: RawPaneInfo): PaneInfo {
+	return {
+		ID: pane.ID ?? pane.id ?? "",
+		Title: pane.Title ?? pane.title ?? "",
+		Index: pane.Index ?? pane.index ?? 0,
+		Active: pane.Active ?? pane.active ?? false,
+		Width: pane.Width ?? pane.width ?? 0,
+		Height: pane.Height ?? pane.height ?? 0,
+		Left: pane.Left ?? pane.left ?? 0,
+		Top: pane.Top ?? pane.top ?? 0,
+		AttentionState: pane.AttentionState ?? pane.attentionState,
+	};
+}
+
 export async function listWindows(connectionId: string, sessionName: string): Promise<WindowsListResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as WindowsListResponse;
+	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as Omit<WindowsListResponse, "data"> & { data?: RawWindowInfo[] };
+	return {
+		...response,
+		data: (response.data ?? []).map(normalizeWindowInfo),
+	};
 }
 
 export async function listPanes(connectionId: string, sessionName: string, windowId: string): Promise<PanesListResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as PanesListResponse;
+	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as Omit<PanesListResponse, "data"> & { data?: RawPaneInfo[] };
+	return {
+		...response,
+		data: (response.data ?? []).map(normalizePaneInfo),
+	};
 }
 
 type NormalizedSession = {

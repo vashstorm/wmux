@@ -32,6 +32,7 @@ describe("TerminalWebSocket", () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.unstubAllGlobals();
+		delete window.__WMUX_RUNTIME__;
 	});
 
 	function createSocket(overrides?: Partial<ConstructorParameters<typeof TerminalWebSocket>[0]>) {
@@ -58,6 +59,21 @@ describe("TerminalWebSocket", () => {
 		expect(url).toContain("pane=%251");
 		expect(url).toContain("rows=40");
 		expect(url).toContain("cols=120");
+		expect(url).toContain("token=secret");
+	});
+
+	test("constructs WebSocket URL from Tauri runtime base URL", () => {
+		window.__WMUX_RUNTIME__ = {
+			baseUrl: "http://127.0.0.1:7331",
+			token: "runtime-token",
+		};
+		const socket = createSocket();
+
+		socket.connect();
+
+		const call = vi.mocked(WebSocket).mock.calls[0]!;
+		const url = call[0] as string;
+		expect(url).toContain("ws://127.0.0.1:7331/api/terminal?");
 		expect(url).toContain("token=secret");
 	});
 

@@ -1,3 +1,5 @@
+import { getWebSocketUrl } from "./runtime.js";
+
 export type ClientMessage =
 	| { type: "input"; data: string }
 	| { type: "resize"; cols: number; rows: number }
@@ -44,8 +46,6 @@ export class TerminalWebSocket {
 		}
 
 		const { connectionId, session, window: windowId, pane, rows, cols, token } = this.options;
-		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-		const host = window.location.host;
 		const params = new URLSearchParams();
 		params.set("connectionId", connectionId);
 		params.set("session", session);
@@ -54,7 +54,7 @@ export class TerminalWebSocket {
 		if (isPositiveInteger(rows)) params.set("rows", String(rows));
 		if (isPositiveInteger(cols)) params.set("cols", String(cols));
 		params.set("token", token);
-		const url = `${protocol}//${host}/api/terminal?${params.toString()}`;
+		const url = getWebSocketUrl("/api/terminal", params);
 
 		this.ws = new WebSocket(url);
 

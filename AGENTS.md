@@ -2,11 +2,11 @@
 
 ## Project
 
-Web-based tmux management service. Go backend (HTTP + WebSocket) with React/Vite frontend.
+Web-based tmux management service. Rust backend (Axum + WebSocket), React/Vite frontend, and Tauri v2 macOS local app.
 
 ## Prerequisites
 
-- Go 1.26+
+- Rust + Cargo
 - Bun
 - tmux (for local management and E2E tests)
 
@@ -14,28 +14,30 @@ Web-based tmux management service. Go backend (HTTP + WebSocket) with React/Vite
 
 | Command | What it does |
 |---------|-------------|
-| `make` / `make build` | Installs web deps, builds frontend to `web/dist`, compiles Go binary to `bin/wmux` |
+| `make` / `make build` | Installs web deps, builds frontend to `web/dist`, compiles Rust `wmux-server`, copies it to `bin/wmux` |
 | `make run` | Builds, then runs `./bin/wmux` (reads `config.jsonc` by default) |
-| `make test` | Runs Go unit tests (`go test ./...`) |
+| `make test` | Runs Rust workspace tests (`cargo test --workspace`) |
 | `make typecheck` | Runs `tsc --noEmit` in `web/` |
 | `make e2e` | **Builds first**, then runs Playwright E2E tests |
+| `make tauri-build` | Builds the Tauri v2 macOS desktop app |
+| `make tauri-e2e` | Builds the Tauri app, starts `tauri-driver`, then runs WebdriverIO E2E tests |
 | `make clean` | Removes `bin/` and `web/dist` |
 
 Run order when verifying: `make build` → `make test` → `make typecheck` → `make e2e`.
 
 ## Architecture
 
-### Backend (`cmd/wmux/`, `internal/`)
+### Rust Backend (`crates/`)
 
-Entry: `cmd/wmux/main.go`. Reads JSONC config, starts HTTP server with graceful shutdown.
+Workspace members:
+- `crates/wmux-core` — shared Rust library for config loading/validation, tmux CLI access, terminal session management, protocol types, Axum handlers/router used by the in-process app, and Tauri backend startup helpers.
+- `crates/wmux-server` — standalone CLI/server binary. Entry: `crates/wmux-server/src/main.rs`. Reads JSONC config, validates auth, serves `web/dist`, and starts the Axum HTTP/WebSocket server with graceful shutdown.
+- `src-tauri` — Tauri v2 macOS app. Starts an in-process local backend on `127.0.0.1:0`, injects runtime base URL/token into the WebView, and serves the Vite build from `web/dist`.
 
-Packages:
-- `internal/config` — JSONC config loading, validation, thread-safe Store with optimistic concurrency (`ErrConfigModified`). Atomic writes via temp file + rename.
-- `internal/server` — HTTP routing (Go 1.22+ pattern matching), auth middleware, REST handlers, WebSocket upgrade.
-- `internal/session` — PTY session manager. Bridges WebSocket ↔ PTY with 4 goroutines (read/output/wait/write pumps). Supports local (`creack/pty`) and SSH PTY.
-- `internal/sshclient` — SSH connection with key + agent auth, known hosts verification. `Client` and `Remote` types use injectable function fields for testability.
-- `internal/tmux` — Local tmux CLI adapter. Format-string parsing, error classification. `Adapter` has injectable `execCommand`/`lookPath` for mocking.
-- `internal/protocol` — WebSocket JSON message schema and HTTP error envelope.
+Core runtime scope:
+- Local tmux terminal management only for V1.
+- SSH connections are intentionally excluded from V1.
+- Intelligence/AI analysis is intentionally excluded from V1.
 
 REST API routes (all under `/api/`, auth required except `/api/health` and static files):
 - Connections CRUD + health: `GET/POST /api/connections`, `GET/PUT/DELETE /api/connections/{id}`, health endpoints
@@ -56,16 +58,15 @@ Vite 7 + React 18 + TypeScript (strict). Entry: `web/src/main.tsx`.
 - Components: 16 `.tsx` files in `components/`. Key ones: `Sidebar`, `MainPanel`, `WindowTabs`, `PaneCanvas`, `Terminal`, `SettingsPanel`.
 - Styles: CSS files in `styles/` — `tokens.css`, `global.css`, `layout.css`, `components.css` (~1550 lines). No CSS framework.
 
-Frontend is embedded into the Go binary via `web/assets.go` (`//go:embed all:dist`).
+Frontend static files are built to `web/dist` and served directly by the Rust server/Tauri in-process backend.
 
 ## Testing
 
-### Go Tests
-- Black-box `_test` packages (never `package server`).
-- `httptest` for HTTP handler tests.
-- Injectable function fields on `tmux.Adapter` and `sshclient.Client` for mocking `exec.Command` / `ssh.Dial`.
-- Real WebSocket dial in terminal tests via `httptest.NewServer`.
-- `go test ./...` via `make test`.
+### Rust Tests
+- Run: `cargo test --workspace` or `make test`.
+- `wmux-core` covers config/protocol/tmux/session logic.
+- `wmux-server` covers Axum routes, auth, config, connections, and local terminal API behavior.
+- V1 SSH and intelligence endpoints must remain unsupported and covered as exclusions where applicable.
 
 ### Frontend Unit Tests
 - vitest 3 + jsdom + `@testing-library/react`.
@@ -85,9 +86,14 @@ Frontend is embedded into the Go binary via `web/assets.go` (`//go:embed all:dis
 - Playwright import path in tests: `../../web/node_modules/@playwright/test/index.js` (relative, not package name).
 - Run: `make e2e`.
 
+### Tauri E2E Tests
+- Requires macOS desktop dependencies, `cargo-tauri`, `tauri-driver`, Bun, and tmux.
+- `make tauri-e2e` runs `make tauri-build`, ensures `tauri-driver` is available, starts it on port 4444, then runs WebdriverIO specs from `tests/tauri/`.
+- Tauri uses an in-process Rust backend with an injected per-launch token; tests prepare local config/tmux fixtures before app launch.
+
 ## Style & Conventions
 
-- **Go**: Standard Go formatting. No build tags. Go 1.22+ `http.ServeMux` patterns with `r.PathValue()`.
+- **Rust**: Edition 2024. Prefer small modules, explicit `Result` errors, and `cargo fmt`-compatible formatting.
 - **TypeScript**: Strict mode. `noUncheckedIndexedAccess` enabled — array/record index access is `T | undefined`.
 - **Imports**: Frontend uses `.js` extensions for all imports (ESM bundler resolution). No path aliases — all relative.
 - **No linting/formatting tooling** (no ESLint, Prettier, or pre-commit hooks).
@@ -100,7 +106,7 @@ Runtime config is JSONC (`config.jsonc` by default, ignored by git). Use `-c <pa
 Key rules:
 - `server.bind` defaults to `127.0.0.1:7331`.
 - `auth.token` may be empty **only** when binding to localhost. Non-localhost requires a token.
-- SSH paths (`privateKeyPath`, `knownHostsPath`) accept `~` and are expanded at runtime.
+- V1 supports local tmux connections only. Do not document SSH or intelligence as supported runtime features.
 
 Example: `config.example.jsonc`.
 
@@ -108,5 +114,5 @@ Example: `config.example.jsonc`.
 
 - `make e2e` will fail if `./bin/wmux` is stale. Always build first.
 - E2E tests manipulate real tmux sessions. Do not run E2E while using tmux for other work.
-- Frontend must be built before Go binary compilation (assets are embedded at build time).
+- Frontend must be built before Rust server/Tauri packaging so `web/dist` exists.
 - Playwright generates artifacts in `test-results/` (ignored by git).

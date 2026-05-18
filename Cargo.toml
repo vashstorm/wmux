@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/wmux-core",
+    "crates/wmux-server",
+    "src-tauri",
+]
+resolver = "3"

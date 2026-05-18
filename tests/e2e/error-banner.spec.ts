@@ -1,5 +1,8 @@
 // @ts-nocheck
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 test.describe("error banner", () => {
 	test.beforeEach(async ({ page }) => {

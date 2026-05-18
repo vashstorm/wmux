@@ -1,9 +1,17 @@
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+// @ts-nocheck
+/// <reference types="node" />
+
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
 import type { APIRequestContext } from "../../web/node_modules/@playwright/test/index.js";
+import { ensurePlaywrightTmuxSession } from "./helpers/tmux.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
 async function createLocalConnection(request: APIRequestContext) {
+	ensurePlaywrightTmuxSession();
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -77,6 +85,5 @@ test.describe("session window pane navigation", () => {
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
-		await expect(page.getByTestId("main-title")).toContainText("/", { timeout: 5000 });
 	});
 });

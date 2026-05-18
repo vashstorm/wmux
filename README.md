@@ -1,10 +1,12 @@
 # Wmux
 
-Web-based tmux management service.
+Web-based tmux management service with a Rust backend and a Tauri macOS local app.
+
+Wmux V1 focuses on local tmux terminal management. SSH connections and intelligence/AI analysis are intentionally excluded from the V1 runtime scope.
 
 ## Prerequisites
 
-- Go 1.22+
+- Rust + Cargo
 - Bun
 - tmux for local management
 
@@ -16,7 +18,13 @@ make
 make build
 ```
 
-This builds the frontend into `web/dist` and produces the server binary at `bin/wmux`.
+This installs frontend dependencies, builds the Vite app into `web/dist`, builds the Rust `wmux-server` release binary, and copies it to `bin/wmux`.
+
+For the macOS desktop app:
+
+```bash
+make tauri-build
+```
 
 ## Run
 
@@ -47,7 +55,13 @@ make clean
 make test
 make typecheck
 make e2e
+make tauri-e2e
 ```
+
+- `make test` runs `cargo test --workspace`.
+- `make typecheck` runs the frontend TypeScript checker.
+- `make e2e` builds the Rust server and runs Playwright browser E2E tests.
+- `make tauri-e2e` builds the Tauri macOS app and runs WebdriverIO desktop E2E tests.
 
 ## Configuration
 
@@ -65,7 +79,7 @@ Config rules:
 - `server.bind` defaults to `127.0.0.1:7331`.
 - `auth.token` may be empty only when binding to localhost.
 - Non-localhost bind addresses require a non-empty auth token.
-- SSH connection `privateKeyPath` and `knownHostsPath` accept `~` and are expanded at runtime.
+- Only local tmux connections are active in V1.
 
 Minimal example:
 
@@ -117,7 +131,8 @@ API responses may return these stable error codes:
 ## Known Limitations
 
 - No Windows support
-- No SSH password authentication
+- SSH connections are excluded from V1
+- Intelligence/AI analysis is excluded from V1
 - No multi-user support
 - No terminal history persistence
 

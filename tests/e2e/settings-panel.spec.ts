@@ -1,5 +1,8 @@
 // @ts-nocheck
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 test.describe("settings panel", () => {
 	test.beforeEach(async ({ page }) => {
@@ -34,37 +37,25 @@ test.describe("settings panel", () => {
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
 	});
 
-	test("edits existing connection", async ({ page, request }) => {
+	test("rejects ssh connection as not implemented", async ({ request }) => {
 		const response = await request.post("/api/connections", {
 			headers: {
 				Authorization: "Bearer playwright-token",
 			},
 			data: {
-				type: "local",
+				type: "ssh",
+				host: "example.com",
+				user: "root",
 			},
 		});
-		expect(response.ok()).toBeTruthy();
-		const connection = await response.json();
 
-		await page.goto("/");
-
-		await page.getByTestId("open-settings-button").click();
-		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
-
-		await expect(page.getByTestId("settings-panel")).toContainText("local");
-
-		await page.locator(".connection-edit-btn").first().click();
-
-		await expect(page.getByTestId("new-connection-form")).toBeVisible();
-		await expect(page.getByTestId("computed-connection-name")).toContainText("local");
-
-		await page.getByTestId("connection-type-select").selectOption("ssh");
-		await page.getByTestId("connection-host-input").fill("example.com");
-		await page.getByTestId("connection-user-input").fill("root");
-		await page.getByTestId("save-connection").click();
-
-		await expect(page.getByTestId("settings-panel")).toContainText("example.com");
+		expect(response.status()).toBe(501);
+		expect(await response.json()).toEqual({
+			error: {
+				code: "not_implemented",
+				message: "ssh connections are not implemented",
+			},
+		});
 	});
 
 	test("deletes connection with confirm", async ({ page, request }) => {

@@ -8,7 +8,6 @@ import {
   createSession,
   killSession,
   renameSession,
-  analyzeSession,
   type SessionInfoData,
   type WindowInfo,
   type PaneInfo,
@@ -47,7 +46,6 @@ export function Sidebar() {
     setConnectionHealth,
     sessions,
     setSessions,
-    updateSession,
     setSelectedPane,
     selectedPane,
     setWindows,
@@ -60,8 +58,6 @@ export function Sidebar() {
   const [renamingSession, setRenamingSession] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const prevSelectedRef = useRef<string | null>(null);
-  const analyzeDedupeRef = useRef<Map<string, number>>(new Map());
-  const analyzeInFlightRef = useRef<Set<string>>(new Set());
 
   // Auto-select first connection on mount / when selected connection is removed
   useEffect(() => {
@@ -88,41 +84,6 @@ export function Sidebar() {
     }
   }, [setConnectionHealth]);
 
-  const refreshOpenSessionWorkspace = useCallback(async (connectionId: string, sessionName: string) => {
-    if (selectedPane?.connectionId !== connectionId || selectedPane.session !== sessionName) {
-      return;
-    }
-
-    try {
-      const windowsResponse = await listWindows(connectionId, sessionName);
-      const windows = windowsResponse.data ?? [];
-      setWindows(connectionId, sessionName, windows);
-
-      const targetWindowID = selectedPane.window
-        ?? windows.find((window) => window.Active)?.ID
-        ?? windows[0]?.ID;
-      if (!targetWindowID) {
-        return;
-      }
-
-      const panesResponse = await listPanes(connectionId, sessionName, targetWindowID);
-      const panes = panesResponse.data ?? [];
-      setPanes(connectionId, sessionName, targetWindowID, panes);
-
-      if (!selectedPane.window || !selectedPane.pane) {
-        const activePane = panes.find((pane) => pane.Active) ?? panes[0];
-        setSelectedPane({
-          connectionId,
-          session: sessionName,
-          window: targetWindowID,
-          pane: activePane?.ID,
-        });
-      }
-    } catch {
-      // Keep session list updates resilient; periodic sync can retry later.
-    }
-  }, [selectedPane, setPanes, setSelectedPane, setWindows]);
-
   const loadConnectionsList = useCallback(async () => {
     setLoading("connections", true);
     try {
@@ -144,67 +105,6 @@ export function Sidebar() {
     try {
       const response = await listSessions(connectionId);
       setSessions(connectionId, response.data ?? []);
-
-      // Trigger async analyze for local sessions with stale/missing intelligence
-      if (response.mode === "local") {
-        const now = Date.now();
-        const dedupeWindowMs = 60000; // 60 seconds
-
-        for (const session of response.data ?? []) {
-          const sessionName = session.name;
-          if (!sessionName) continue;
-
-          const dedupeKey = `${connectionId}:${sessionName}`;
-
-          // Check if intelligence is missing or stale
-          const hasIntelligence =
-            session.intelligenceStatus !== undefined &&
-            session.intelligenceStatus !== "none";
-          const isStale = session.intelligenceStale === true;
-
-          if (hasIntelligence && !isStale) continue;
-
-          // Frontend-side dedupe: skip if triggered within last 60s
-          const lastTriggered = analyzeDedupeRef.current.get(dedupeKey);
-          if (lastTriggered !== undefined && now - lastTriggered < dedupeWindowMs) {
-            continue;
-          }
-
-          // In-flight dedupe: skip if already in flight
-          if (analyzeInFlightRef.current.has(dedupeKey)) {
-            continue;
-          }
-
-          // Mark as triggered and in-flight
-          analyzeDedupeRef.current.set(dedupeKey, now);
-          analyzeInFlightRef.current.add(dedupeKey);
-
-          // Fire-and-forget analyze
-          analyzeSession(connectionId, sessionName)
-            .then((result) => {
-              if (result.intelligence) {
-                updateSession(connectionId, sessionName, {
-                  intelligenceApp: result.intelligence.app,
-                  intelligenceStatus: result.intelligence.status,
-                  intelligenceSummary: result.intelligence.summary,
-                  intelligenceSource: result.intelligence.source,
-                  intelligenceConfidence: result.intelligence.confidence,
-                  intelligenceStale: result.intelligence.stale,
-                  intelligenceUpdatedAt: result.intelligence.updatedAt,
-                  intelligenceError: result.intelligence.error,
-                  intelligenceAppCounts: result.intelligence.appCounts,
-                });
-                void refreshOpenSessionWorkspace(connectionId, sessionName);
-              }
-            })
-            .catch(() => {
-              // Silently skip on error
-            })
-            .finally(() => {
-              analyzeInFlightRef.current.delete(dedupeKey);
-            });
-        }
-      }
     } catch (err) {
       if (isApiError(err)) {
         if (err.code !== "connection_failed" && err.code !== "unknown_error") {
@@ -212,7 +112,7 @@ export function Sidebar() {
         }
       }
     }
-  }, [refreshOpenSessionWorkspace, setSessions, setError, updateSession]);
+  }, [setSessions, setError]);
 
   // Initial load of connections list
   useEffect(() => {

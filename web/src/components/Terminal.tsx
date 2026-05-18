@@ -5,6 +5,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { getErrorMessage } from "../api/errors.js";
+import { getAuthToken } from "../api/runtime.js";
 import { TerminalWebSocket } from "../api/websocket.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
 import { getTerminalTheme } from "../ui/themes.js";
@@ -74,7 +75,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 	}, []);
 
 	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
-		const token = sessionStorage.getItem("wmux-auth-token") ?? "";
+		const token = getAuthToken() ?? "";
 		const terminalSize = initialSize ?? fitAndSyncSize();
 		lastSentSizeRef.current = terminalSize;
 

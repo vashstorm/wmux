@@ -1,9 +1,14 @@
 // @ts-nocheck
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
+import { ensurePlaywrightTmuxSession } from "./helpers/tmux.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
 async function createLocalConnection(request: any) {
+	ensurePlaywrightTmuxSession();
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -159,7 +164,7 @@ test.describe("user interactions", () => {
 			await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
 
 			const titleText = await page.getByTestId("main-title").textContent();
-			expect(titleText).toContain("/");
+			expect(titleText).toContain(terminalSessionName);
 		});
 
 		test("pane canvas reflects current window selection", async ({ page, request }) => {

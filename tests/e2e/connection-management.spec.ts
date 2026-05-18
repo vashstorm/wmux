@@ -1,5 +1,9 @@
 // @ts-nocheck
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
+import { ensurePlaywrightTmuxSession } from "./helpers/tmux.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 test.describe("connection management", () => {
 	test.beforeEach(async ({ page }) => {
@@ -9,6 +13,7 @@ test.describe("connection management", () => {
 	});
 
 	test("creates connection via API and shows in sidebar", async ({ page, request }) => {
+		ensurePlaywrightTmuxSession();
 		const response = await request.post("/api/connections", {
 			headers: {
 				Authorization: "Bearer playwright-token",
@@ -26,6 +31,7 @@ test.describe("connection management", () => {
 	});
 
 	test("connection health shows online for local", async ({ page, request }) => {
+		ensurePlaywrightTmuxSession();
 		const response = await request.post("/api/connections", {
 			headers: {
 				Authorization: "Bearer playwright-token",

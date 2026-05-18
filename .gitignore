@@ -1,7 +1,11 @@
-# Build output
+# Build output (Rust/Tauri/web)
 bin/
 /wmux
 dist/
+target/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/.tauri/
 
 # Dependencies
 node_modules/

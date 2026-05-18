@@ -25,6 +25,7 @@ describe("api client", () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+		delete window.__WMUX_RUNTIME__;
 		sessionStorage.removeItem("wmux-auth-token");
 	});
 
@@ -111,6 +112,20 @@ describe("api client", () => {
 		expect(result.data[0]!.Name).toBe("editor");
 	});
 
+	test("listWindows normalizes Rust camelCase fields", async () => {
+		mockJsonResponse(200, {
+			connectionId: "1",
+			session: "dev",
+			mode: "local",
+			data: [{ id: "@1", name: "editor", index: 0, active: true, paneCount: 1, activePaneId: "%1", activePaneTitle: "shell", attentionState: "attention", attentionCount: 1 }],
+		});
+		const result = await listWindows("1", "dev");
+		expect(result.data[0]!.ID).toBe("@1");
+		expect(result.data[0]!.Active).toBe(true);
+		expect(result.data[0]!.ActivePaneID).toBe("%1");
+		expect(result.data[0]!.AttentionState).toBe("attention");
+	});
+
 	test("listPanes returns panes", async () => {
 		mockJsonResponse(200, {
 			connectionId: "1",
@@ -121,6 +136,21 @@ describe("api client", () => {
 		});
 		const result = await listPanes("1", "dev", "@1");
 		expect(result.data[0]!.Title).toBe("shell");
+	});
+
+	test("listPanes normalizes Rust camelCase fields", async () => {
+		mockJsonResponse(200, {
+			connectionId: "1",
+			session: "dev",
+			window: "@1",
+			mode: "local",
+			data: [{ id: "%1", title: "shell", index: 0, active: true, width: 80, height: 24, left: 0, top: 0, attentionState: "none" }],
+		});
+		const result = await listPanes("1", "dev", "@1");
+		expect(result.data[0]!.ID).toBe("%1");
+		expect(result.data[0]!.Active).toBe(true);
+		expect(result.data[0]!.Width).toBe(80);
+		expect(result.data[0]!.AttentionState).toBe("none");
 	});
 
 	test("createSession POSTs name", async () => {
@@ -172,6 +202,21 @@ describe("api client", () => {
 		const call = vi.mocked(fetch).mock.calls[0]!;
 		const headers = call[1]?.headers as Headers;
 		expect(headers.get("Authorization")).toBe("Bearer test-token");
+	});
+
+	test("uses Tauri runtime base URL and token when injected", async () => {
+		window.__WMUX_RUNTIME__ = {
+			baseUrl: "http://127.0.0.1:7331",
+			token: "runtime-token",
+		};
+		mockJsonResponse(200, { data: [] });
+
+		await listConnections();
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		const headers = call[1]?.headers as Headers;
+		expect(call[0]).toBe("http://127.0.0.1:7331/api/connections");
+		expect(headers.get("Authorization")).toBe("Bearer runtime-token");
 	});
 
 	test("URL encodes path parameters", async () => {

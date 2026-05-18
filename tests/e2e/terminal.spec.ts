@@ -1,9 +1,14 @@
 // @ts-nocheck
-import { expect, test } from "../../web/node_modules/@playwright/test/index.js";
+import playwrightTest from "../../web/node_modules/@playwright/test/index.js";
+import { ensurePlaywrightTmuxSession } from "./helpers/tmux.js";
+
+const test = playwrightTest;
+const { expect } = playwrightTest;
 
 const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwright";
 
 async function createLocalConnection(request: any) {
+	ensurePlaywrightTmuxSession();
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -66,5 +71,27 @@ test.describe("terminal", () => {
 		await page.locator(".pane-box").first().click({ force: true });
 
 		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
+	});
+
+	test("terminal accepts input and displays command output", async ({ page, request }) => {
+		await createLocalConnection(request);
+		await page.goto("/");
+
+		const sessionCard = page.locator(`[data-testid="session-card-${terminalSessionName}"]`);
+		await expect(sessionCard).toBeVisible();
+		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
+
+		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
+		await page.locator(".pane-box").first().click({ force: true });
+		await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
+
+		const marker = `WMUX_E2E_HELLO_${Date.now()}`;
+		await page.getByTestId("terminal").click();
+		await page.keyboard.type(`echo ${marker}`);
+		await page.keyboard.press("Enter");
+
+		await expect(page.getByTestId("terminal")).toContainText(marker, {
+			timeout: 10000,
+		});
 	});
 });
