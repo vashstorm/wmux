@@ -14,7 +14,7 @@ const DEFAULT_WINDOW_ROWS: u16 = 24;
 const DEFAULT_WINDOW_COLS: u16 = 80;
 const CHANNEL_CAPACITY: usize = 256;
 const TERMINAL_CLOSE_GRACE_MS: u64 = 200;
-const CONTROL_CLIENT_FLAGS: &str = "ignore-size,active-pane,pause-after=1";
+const CONTROL_CLIENT_FLAGS: &str = "ignore-size,active-pane";
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -157,20 +157,11 @@ impl SessionManager {
 
         let tmux_path = tmux_path.into();
         let parsed_target = AttachTarget::parse(&target.into())?;
-        let size = initial_size.normalize();
-        let mut resolved_pane = resolve_control_pane(&tmux_path, &parsed_target).await?;
-        isolate_control_window_size(&tmux_path, &mut resolved_pane).await?;
+        let _ = initial_size.normalize();
+        let resolved_pane = resolve_control_pane(&tmux_path, &parsed_target).await?;
         let initial_output = capture_pane_snapshot(&tmux_path, &resolved_pane.pane_id).await?;
         let process =
-            match spawn_control_process(&tmux_path, &parsed_target.session, size, &resolved_pane)
-                .await
-            {
-                Ok(process) => process,
-                Err(error) => {
-                    restore_window_size_option(&resolved_pane).await;
-                    return Err(error);
-                }
-            };
+            spawn_control_process(&tmux_path, &parsed_target.session, &resolved_pane).await?;
 
         let session = self.register(
             connection_id.clone(),
@@ -336,11 +327,11 @@ impl Session {
     }
 
     pub async fn resize(&self, size: WindowSize) -> Result<(), SessionError> {
-        let size = validate_window_size(size)?;
-        self.control_tx
-            .send(SessionControl::Resize(size))
-            .await
-            .map_err(|_| SessionError::SessionClosed)
+        validate_window_size(size)?;
+        if self.control_tx.is_closed() {
+            return Err(SessionError::SessionClosed);
+        }
+        Ok(())
     }
 
     pub async fn close(&self) -> Result<(), SessionError> {
@@ -374,7 +365,6 @@ impl Session {
 
 #[derive(Debug)]
 enum SessionControl {
-    Resize(WindowSize),
     Close,
 }
 
@@ -410,23 +400,12 @@ struct ControlProcessParts {
     stdout: ChildStdout,
     child_pid: Option<u32>,
     pane_id: String,
-    window_restore: Option<ControlWindowSizeRestore>,
 }
 
 #[derive(Debug, Clone)]
 struct ResolvedControlPane {
-    tmux_path: String,
-    window_id: String,
     pane_id: String,
     display_target: String,
-    original_window_size: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-struct ControlWindowSizeRestore {
-    tmux_path: String,
-    window_id: String,
-    original_window_size: String,
 }
 
 fn spawn_control_tasks(
@@ -447,7 +426,6 @@ fn spawn_control_tasks(
         process.child,
         process.stdin,
         process.pane_id,
-        process.window_restore,
         channels.input_rx,
         channels.control_rx,
         channels.events_tx,
@@ -507,7 +485,6 @@ fn spawn_control_process_task(
     mut child: Child,
     mut stdin: ChildStdin,
     pane_id: String,
-    window_restore: Option<ControlWindowSizeRestore>,
     mut input_rx: mpsc::Receiver<String>,
     mut control_rx: mpsc::Receiver<SessionControl>,
     events_tx: broadcast::Sender<ServerMessage>,
@@ -527,7 +504,6 @@ fn spawn_control_process_task(
                             ),
                         });
                     }
-                    restore_control_window_size(window_restore.as_ref()).await;
                     finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                     return;
                 }
@@ -540,7 +516,6 @@ fn spawn_control_process_task(
                                     error: ErrorDetail::new("terminal_write_failed", format!("failed to forward terminal input: {error}")),
                                 });
                                 terminate_control_process(&mut child, &mut stdin).await;
-                                restore_control_window_size(window_restore.as_ref()).await;
                                 finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                                 return;
                             }
@@ -548,7 +523,6 @@ fn spawn_control_process_task(
                         Some(_) => {}
                         None => {
                             terminate_control_process(&mut child, &mut stdin).await;
-                            restore_control_window_size(window_restore.as_ref()).await;
                             finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                             return;
                         }
@@ -556,21 +530,8 @@ fn spawn_control_process_task(
                 }
                 control = control_rx.recv() => {
                     match control {
-                        Some(SessionControl::Resize(size)) => {
-                            if let Err(error) = write_control_command(&mut stdin, build_resize_command(size).as_str()).await {
-                                tracing::error!(%error, "terminal control resize error");
-                                let _ = events_tx.send(ServerMessage::Error {
-                                    error: ErrorDetail::new("terminal_resize_failed", format!("failed to resize terminal: {error}")),
-                                });
-                                terminate_control_process(&mut child, &mut stdin).await;
-                                restore_control_window_size(window_restore.as_ref()).await;
-                                finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
-                                return;
-                            }
-                        }
                         Some(SessionControl::Close) | None => {
                             terminate_control_process(&mut child, &mut stdin).await;
-                            restore_control_window_size(window_restore.as_ref()).await;
                             finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                             return;
                         }
@@ -629,7 +590,6 @@ async fn write_control_command(stdin: &mut ChildStdin, command: &str) -> Result<
 async fn spawn_control_process(
     tmux_path: &str,
     session_target: &str,
-    size: WindowSize,
     resolved_pane: &ResolvedControlPane,
 ) -> Result<ControlProcessParts, SessionError> {
     let mut child = Command::new(tmux_path)
@@ -647,7 +607,7 @@ async fn spawn_control_process(
         .stderr(Stdio::null())
         .spawn()?;
     let child_pid = child.id();
-    let mut stdin = child
+    let stdin = child
         .stdin
         .take()
         .ok_or_else(|| SessionError::Pty("tmux control stdin unavailable".to_string()))?;
@@ -655,27 +615,12 @@ async fn spawn_control_process(
         .stdout
         .take()
         .ok_or_else(|| SessionError::Pty("tmux control stdout unavailable".to_string()))?;
-
-    write_control_command(&mut stdin, build_resize_command(size).as_str()).await?;
-    write_control_command(
-        &mut stdin,
-        format!("refresh-client -A {}:on\n", resolved_pane.pane_id).as_str(),
-    )
-    .await?;
-
     Ok(ControlProcessParts {
         child,
         stdin,
         stdout,
         child_pid,
         pane_id: resolved_pane.pane_id.clone(),
-        window_restore: resolved_pane.original_window_size.as_ref().map(|original| {
-            ControlWindowSizeRestore {
-                tmux_path: resolved_pane.tmux_path.clone(),
-                window_id: resolved_pane.window_id.clone(),
-                original_window_size: original.clone(),
-            }
-        }),
     })
 }
 
@@ -715,79 +660,9 @@ async fn resolve_control_pane(
         )));
     }
     Ok(ResolvedControlPane {
-        tmux_path: tmux_path.to_string(),
-        window_id,
         pane_id,
         display_target,
-        original_window_size: None,
     })
-}
-
-async fn isolate_control_window_size(
-    tmux_path: &str,
-    resolved_pane: &mut ResolvedControlPane,
-) -> Result<(), SessionError> {
-    let original = run_tmux_output(
-        tmux_path,
-        vec![
-            "show-options".to_string(),
-            "-wqv".to_string(),
-            "-t".to_string(),
-            resolved_pane.window_id.clone(),
-            "window-size".to_string(),
-        ],
-    )
-    .await?;
-    if original.trim() == "manual" {
-        return Ok(());
-    }
-
-    run_tmux_output(
-        tmux_path,
-        vec![
-            "set-window-option".to_string(),
-            "-t".to_string(),
-            resolved_pane.window_id.clone(),
-            "window-size".to_string(),
-            "manual".to_string(),
-        ],
-    )
-    .await?;
-    resolved_pane.original_window_size = Some(original.trim().to_string());
-    Ok(())
-}
-
-async fn restore_control_window_size(restore: Option<&ControlWindowSizeRestore>) {
-    let Some(restore) = restore else {
-        return;
-    };
-    if let Err(error) = run_tmux_output(
-        &restore.tmux_path,
-        vec![
-            "set-window-option".to_string(),
-            "-t".to_string(),
-            restore.window_id.clone(),
-            "window-size".to_string(),
-            restore.original_window_size.clone(),
-        ],
-    )
-    .await
-    {
-        tracing::debug!(window_id = %restore.window_id, %error, "failed to restore tmux window-size option");
-    }
-}
-
-async fn restore_window_size_option(resolved_pane: &ResolvedControlPane) {
-    let restore =
-        resolved_pane
-            .original_window_size
-            .as_ref()
-            .map(|original| ControlWindowSizeRestore {
-                tmux_path: resolved_pane.tmux_path.clone(),
-                window_id: resolved_pane.window_id.clone(),
-                original_window_size: original.clone(),
-            });
-    restore_control_window_size(restore.as_ref()).await;
 }
 
 async fn capture_pane_snapshot(
@@ -890,10 +765,6 @@ fn decode_control_value(value: &str) -> Result<String, SessionError> {
         index += 1;
     }
     Ok(String::from_utf8_lossy(&decoded).into_owned())
-}
-
-fn build_resize_command(size: WindowSize) -> String {
-    format!("refresh-client -C {}x{}\n", size.cols, size.rows)
 }
 
 fn build_input_commands(pane_id: &str, data: &str) -> Vec<String> {
@@ -1309,17 +1180,6 @@ mod tests {
     fn control_input_commands_quote_literal_text() {
         let commands = build_input_commands("%1", "can't stop");
         assert_eq!(commands, vec!["send-keys -l -t %1 -- 'can'\\''t stop'\n"]);
-    }
-
-    #[test]
-    fn control_resize_uses_refresh_client_size_command() {
-        assert_eq!(
-            build_resize_command(WindowSize {
-                cols: 120,
-                rows: 40
-            }),
-            "refresh-client -C 120x40\n"
-        );
     }
 
     #[tokio::test]
