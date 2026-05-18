@@ -25,7 +25,7 @@ bin/wmux: target/release/wmux-server web/dist/index.html
 	cp target/release/wmux-server bin/wmux
 
 dev: bin/wmux
-	./bin/wmux
+	exec ./bin/wmux
 
 clean:
 	rm -rf bin web/dist target src-tauri/target

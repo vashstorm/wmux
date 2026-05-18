@@ -115,6 +115,19 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
 
 async fn bridge_terminal(mut socket: WebSocket, session: Session, connection_id: String) {
     let mut events = session.subscribe();
+    if let Some(initial_output) = session.initial_output()
+        && send_json(
+            &mut socket,
+            &ServerMessage::Output {
+                data: initial_output.to_string(),
+            },
+        )
+        .await
+        .is_err()
+    {
+        let _ = session.close().await;
+        return;
+    }
 
     loop {
         tokio::select! {

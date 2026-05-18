@@ -60,10 +60,16 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| format!("failed to bind {}", config.server.bind))?;
     println!("http://{}", config.server.bind);
     let state = wmux_core::state::AppState::new(store, PathBuf::from("web/dist"), logging_handle);
+    let shutdown_state = state.clone();
     let app = wmux_core::routes::router(state);
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            tracing::info!("closing all sessions");
+            shutdown_state.sessions.shutdown().await;
+            tracing::info!("all sessions closed");
+        })
         .await
         .context("server failed")
 }
