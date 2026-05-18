@@ -1,7 +1,8 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use serde::{Deserialize, Serialize};
+use wmux_core::config::ConnectionConfig;
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
@@ -109,9 +110,8 @@ pub async fn list_sessions(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<SessionsListResponse> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
     let data = adapter.list_sessions().await.map_err(session_error)?;
     Ok(Json(SessionsListResponse {
         connection_id: connection.id,
@@ -126,9 +126,8 @@ pub async fn create_session(
     Path(id): Path<String>,
     Json(payload): Json<NamedRequest>,
 ) -> Result<(StatusCode, Json<SessionOperationResponse>), ApiError> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
     let data = adapter
         .new_session(payload.name.trim())
         .await
@@ -154,10 +153,12 @@ pub async fn list_windows(
     State(state): State<AppState>,
     Path((id, session)): Path<(String, String)>,
 ) -> ApiResult<WindowsListResponse> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
-    let data = adapter.list_windows(&session).await.map_err(session_error)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
+    let data = adapter
+        .list_windows(&session)
+        .await
+        .map_err(session_error)?;
     Ok(Json(WindowsListResponse {
         connection_id: connection.id,
         session,
@@ -172,9 +173,8 @@ pub async fn create_window(
     Path((id, session)): Path<(String, String)>,
     Json(payload): Json<NamedRequest>,
 ) -> Result<(StatusCode, Json<WindowOperationResponse>), ApiError> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
     let data = adapter
         .new_window(&session, payload.name.trim())
         .await
@@ -197,9 +197,8 @@ pub async fn list_panes(
     State(state): State<AppState>,
     Path((id, session, window)): Path<(String, String, String)>,
 ) -> ApiResult<PanesListResponse> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
     let data = adapter
         .list_panes(&session, &window)
         .await
@@ -218,7 +217,15 @@ pub async fn delete_session(
     State(state): State<AppState>,
     Path((id, session)): Path<(String, String)>,
 ) -> ApiResult<OperationResponse> {
-    write_session_operation(state, id, session, String::new(), String::new(), "delete_session").await
+    write_session_operation(
+        state,
+        id,
+        session,
+        String::new(),
+        String::new(),
+        "delete_session",
+    )
+    .await
 }
 
 pub async fn rename_session(
@@ -226,9 +233,8 @@ pub async fn rename_session(
     Path((id, session)): Path<(String, String)>,
     Json(payload): Json<NamedRequest>,
 ) -> ApiResult<OperationResponse> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
     adapter
         .rename_session(&session, payload.name.trim())
         .await
@@ -258,9 +264,8 @@ pub async fn split_pane(
     Path((id, session, window, pane)): Path<(String, String, String, String)>,
     Json(payload): Json<SplitPaneRequest>,
 ) -> Result<(StatusCode, Json<PaneOperationResponse>), ApiError> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
     let target = build_pane_target(&session, &window, &pane);
     let data = adapter
         .split_window(&target, payload.horizontal)
@@ -296,14 +301,21 @@ async fn write_session_operation(
     pane: String,
     operation: &'static str,
 ) -> ApiResult<OperationResponse> {
-    let connection = find_connection(&state, &id)?;
-    require_local_connection(&connection)?;
-    let adapter = adapter(&state)?;
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
 
     match operation {
         "delete_session" => adapter.kill_session(&session).await,
-        "delete_window" => adapter.kill_window(&build_window_target(&session, &window)).await,
-        "delete_pane" => adapter.kill_pane(&build_pane_target(&session, &window, &pane)).await,
+        "delete_window" => {
+            adapter
+                .kill_window(&build_window_target(&session, &window))
+                .await
+        }
+        "delete_pane" => {
+            adapter
+                .kill_pane(&build_pane_target(&session, &window, &pane))
+                .await
+        }
         _ => Err(TmuxError::InvalidInput { field: "operation" }),
     }
     .map_err(session_error)?;
@@ -320,6 +332,74 @@ async fn write_session_operation(
         adapter_path: adapter.path().to_string(),
         status: "accepted",
     }))
+}
+
+async fn connection_and_adapter_for_session_marker(
+    state: &AppState,
+    id: &str,
+    session_marker: Option<&str>,
+    allow_single_local_without_session_marker: bool,
+) -> Result<(ConnectionConfig, Adapter), ApiError> {
+    if let Some(connection) = find_connection_exact(state, id)? {
+        require_local_connection(&connection)?;
+        return Ok((connection, adapter(state)?));
+    }
+
+    let adapter = adapter(state)?;
+    if let Some(connection) = single_local_connection(state)? {
+        if let Some(marker) = session_marker.filter(|value| !value.trim().is_empty()) {
+            if adapter.has_session(marker).await.map_err(session_error)? {
+                tracing::info!(
+                    session = %marker,
+                    resolved_connection_id = %connection.id,
+                    "resolved local connection from tmux session name marker"
+                );
+                return Ok((connection, adapter));
+            }
+        }
+
+        if !id.trim().is_empty() && adapter.has_session(id).await.map_err(session_error)? {
+            tracing::info!(
+                session = %id,
+                resolved_connection_id = %connection.id,
+                "resolved local connection from tmux session name marker"
+            );
+            return Ok((connection, adapter));
+        }
+
+        if allow_single_local_without_session_marker {
+            tracing::info!(
+                connection_marker = %id,
+                resolved_connection_id = %connection.id,
+                "resolved unique local connection for session listing"
+            );
+            return Ok((connection, adapter));
+        }
+    }
+
+    let connection = find_connection(state, id)?;
+    require_local_connection(&connection)?;
+    Ok((connection, adapter))
+}
+
+fn find_connection_exact(state: &AppState, id: &str) -> Result<Option<ConnectionConfig>, ApiError> {
+    Ok(current_config(state)?
+        .connections
+        .into_iter()
+        .find(|connection| connection.id == id))
+}
+
+fn single_local_connection(state: &AppState) -> Result<Option<ConnectionConfig>, ApiError> {
+    let config = current_config(state)?;
+    let mut local_connections = config
+        .connections
+        .into_iter()
+        .filter(|connection| connection.connection_type.eq_ignore_ascii_case("local"));
+    let Some(connection) = local_connections.next() else {
+        return Ok(None);
+    };
+
+    Ok(local_connections.next().is_none().then_some(connection))
 }
 
 fn adapter(state: &AppState) -> Result<Adapter, ApiError> {

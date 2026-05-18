@@ -2,6 +2,7 @@ use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, nativ
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -15,6 +16,7 @@ const DEFAULT_WINDOW_COLS: u16 = 80;
 const CHANNEL_CAPACITY: usize = 256;
 const PTY_BUFFER_SIZE: usize = 4096;
 const DEFAULT_TERMINAL_TYPE: &str = "xterm-256color";
+const TERMINAL_CLOSE_GRACE_MS: u64 = 200;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -233,6 +235,7 @@ impl SessionManager {
                 closed_rx,
                 killer: Arc::clone(&killer),
                 child_pid: pty.child_pid,
+                terminal_client: pty.terminal_client.clone(),
             }
         };
 
@@ -242,6 +245,7 @@ impl SessionManager {
             .sessions
             .insert(session.id.clone(), session.clone());
 
+        let terminal_client = pty.terminal_client.clone();
         spawn_session_tasks(
             Arc::clone(&self.inner),
             session.id.clone(),
@@ -253,6 +257,7 @@ impl SessionManager {
                 closed_tx,
                 close_sent,
                 killer,
+                terminal_client,
             },
         );
 
@@ -278,6 +283,7 @@ pub struct Session {
     closed_rx: watch::Receiver<bool>,
     killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
     child_pid: Option<u32>,
+    terminal_client: Option<TerminalClient>,
 }
 
 impl Session {
@@ -318,7 +324,7 @@ impl Session {
 
     pub async fn close(&self) -> Result<(), SessionError> {
         let _ = self.control_tx.send(SessionControl::Close).await;
-        kill_child(Arc::clone(&self.killer)).await
+        close_child(Arc::clone(&self.killer), self.terminal_client.clone()).await
     }
 
     pub async fn wait_closed(&self) -> Result<(), SessionError> {
@@ -374,6 +380,7 @@ struct SessionTaskChannels {
     closed_tx: watch::Sender<bool>,
     close_sent: Arc<AtomicBool>,
     killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
+    terminal_client: Option<TerminalClient>,
 }
 
 struct PtyParts {
@@ -382,6 +389,13 @@ struct PtyParts {
     writer: Box<dyn Write + Send>,
     child: Box<dyn Child + Send + Sync>,
     child_pid: Option<u32>,
+    terminal_client: Option<TerminalClient>,
+}
+
+#[derive(Debug, Clone)]
+struct TerminalClient {
+    tmux_path: String,
+    tty_name: String,
 }
 
 fn spawn_session_tasks(
@@ -393,6 +407,7 @@ fn spawn_session_tasks(
     let master = Arc::new(Mutex::new(pty.master));
     let writer = Arc::new(Mutex::new(pty.writer));
     let pid = pty.child_pid;
+    let terminal_client = channels.terminal_client.clone();
 
     spawn_reader_task(
         pty.reader,
@@ -407,6 +422,7 @@ fn spawn_session_tasks(
         channels.events_tx.clone(),
         Arc::clone(&channels.close_sent),
         Arc::clone(&channels.killer),
+        terminal_client,
     );
     spawn_wait_task(
         manager,
@@ -469,6 +485,7 @@ fn spawn_writer_task(
     events_tx: broadcast::Sender<ServerMessage>,
     close_sent: Arc<AtomicBool>,
     killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
+    terminal_client: Option<TerminalClient>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -481,14 +498,14 @@ fn spawn_writer_task(
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_write_failed", format!("failed to forward terminal input: {error}")),
                                 });
-                                let _ = kill_child(Arc::clone(&killer)).await;
+                                let _ = close_child(Arc::clone(&killer), terminal_client.clone()).await;
                                 send_close_once(&events_tx, &close_sent);
                                 return;
                             }
                         }
                         Some(_) => {}
                         None => {
-                            let _ = kill_child(Arc::clone(&killer)).await;
+                            let _ = close_child(Arc::clone(&killer), terminal_client.clone()).await;
                             send_close_once(&events_tx, &close_sent);
                             return;
                         }
@@ -502,13 +519,13 @@ fn spawn_writer_task(
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_resize_failed", format!("failed to resize terminal: {error}")),
                                 });
-                                let _ = kill_child(Arc::clone(&killer)).await;
+                                let _ = close_child(Arc::clone(&killer), terminal_client.clone()).await;
                                 send_close_once(&events_tx, &close_sent);
                                 return;
                             }
                         }
                         Some(SessionControl::Close) | None => {
-                            let _ = kill_child(Arc::clone(&killer)).await;
+                            let _ = close_child(Arc::clone(&killer), terminal_client.clone()).await;
                             send_close_once(&events_tx, &close_sent);
                             return;
                         }
@@ -580,7 +597,34 @@ async fn resize_pty(
     .await?
 }
 
-async fn kill_child(
+async fn close_child(
+    killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
+    terminal_client: Option<TerminalClient>,
+) -> Result<(), SessionError> {
+    let mut detached = false;
+    if let Some(client) = terminal_client {
+        match detach_tmux_client(&client).await {
+            Ok(()) => {
+                detached = true;
+                tracing::debug!(tty = %client.tty_name, "tmux terminal client detached");
+            }
+            Err(error) => {
+                tracing::debug!(tty = %client.tty_name, %error, "tmux terminal client detach failed");
+            }
+        }
+    }
+
+    if detached {
+        tokio::time::sleep(std::time::Duration::from_millis(TERMINAL_CLOSE_GRACE_MS)).await;
+        if !child_handle_present(Arc::clone(&killer))? {
+            return Ok(());
+        }
+    }
+
+    kill_child_now(killer).await
+}
+
+async fn kill_child_now(
     killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
 ) -> Result<(), SessionError> {
     tokio::task::spawn_blocking(move || {
@@ -599,6 +643,40 @@ async fn kill_child(
     .await?
 }
 
+fn child_handle_present(
+    killer: Arc<Mutex<Option<Box<dyn ChildKiller + Send + Sync>>>>,
+) -> Result<bool, SessionError> {
+    let guard = killer
+        .lock()
+        .map_err(|_| SessionError::Pty("pty killer mutex poisoned".to_string()))?;
+    Ok(guard.is_some())
+}
+
+async fn detach_tmux_client(client: &TerminalClient) -> Result<(), SessionError> {
+    let output = Command::new(&client.tmux_path)
+        .args(["detach-client", "-t", client.tty_name.as_str()])
+        .env_remove("TMUX")
+        .stdin(Stdio::null())
+        .output()
+        .await?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let normalized = stderr.to_ascii_lowercase();
+    if normalized.contains("can't find client") || normalized.contains("no current client") {
+        return Ok(());
+    }
+
+    Err(SessionError::TmuxCommandFailed(if stderr.is_empty() {
+        output.status.to_string()
+    } else {
+        stderr
+    }))
+}
+
 fn send_close_once(events_tx: &broadcast::Sender<ServerMessage>, close_sent: &AtomicBool) {
     if !close_sent.swap(true, Ordering::SeqCst) {
         let _ = events_tx.send(ServerMessage::Close);
@@ -612,12 +690,14 @@ fn spawn_local_pty(
 ) -> Result<PtyParts, SessionError> {
     let pty_system = native_pty_system();
     let pair = pty_system.openpty(to_pty_size(size))?;
+    let tty_name = pair.master.tty_name().and_then(path_to_string);
     let reader = pair.master.try_clone_reader()?;
     let writer = pair.master.take_writer()?;
 
     let mut command = CommandBuilder::new(tmux_path);
     command.args(tmux_attach_args(session_target));
     command.env("TERM", DEFAULT_TERMINAL_TYPE);
+    command.env_remove("TMUX");
 
     let child = pair.slave.spawn_command(command)?;
     let child_pid = child.process_id();
@@ -628,7 +708,15 @@ fn spawn_local_pty(
         writer,
         child,
         child_pid,
+        terminal_client: tty_name.map(|tty_name| TerminalClient {
+            tmux_path: tmux_path.to_string(),
+            tty_name,
+        }),
     })
+}
+
+fn path_to_string(path: PathBuf) -> Option<String> {
+    path.into_os_string().into_string().ok()
 }
 
 async fn select_tmux_target(tmux_path: &str, target: &AttachTarget) -> Result<(), SessionError> {
@@ -984,8 +1072,14 @@ mod tests {
     #[test]
     fn session_window_size_rejects_zero_dimensions_and_normalizes_defaults() {
         assert_eq!(WindowSize::default(), WindowSize { cols: 80, rows: 24 });
-        assert!(matches!(WindowSize::new(0, 24), Err(SessionError::InvalidWindowSize)));
-        assert!(matches!(WindowSize::new(80, 0), Err(SessionError::InvalidWindowSize)));
+        assert!(matches!(
+            WindowSize::new(0, 24),
+            Err(SessionError::InvalidWindowSize)
+        ));
+        assert!(matches!(
+            WindowSize::new(80, 0),
+            Err(SessionError::InvalidWindowSize)
+        ));
         assert_eq!(
             (WindowSize { cols: 0, rows: 0 }).normalize(),
             WindowSize::default()
@@ -1082,6 +1176,36 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    #[ignore = "requires tmux"]
+    async fn terminal_repeated_disconnect_preserves_real_tmux_windows() {
+        require_tmux();
+        let session_name = unique_tmux_session("preserve-windows");
+        create_tmux_session(&session_name);
+        create_tmux_window(&session_name, "second");
+        create_tmux_window(&session_name, "third");
+        let _guard = TmuxSessionGuard(session_name.clone());
+
+        assert_eq!(tmux_window_count(&session_name), 3);
+
+        let manager = SessionManager::new();
+        for _ in 0..3 {
+            let session = manager
+                .attach_local(
+                    "conn-1",
+                    "tmux",
+                    session_name.clone(),
+                    WindowSize::default(),
+                )
+                .await
+                .unwrap();
+            session.close().await.unwrap();
+            session.wait_closed().await.unwrap();
+
+            assert_eq!(tmux_window_count(&session_name), 3);
+        }
+    }
+
     fn require_tmux() {
         let status = StdCommand::new("tmux")
             .arg("-V")
@@ -1107,6 +1231,26 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success());
+    }
+
+    fn create_tmux_window(session_name: &str, window_name: &str) {
+        let status = StdCommand::new("tmux")
+            .args(["new-window", "-d", "-t", session_name, "-n", window_name])
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+
+    fn tmux_window_count(session_name: &str) -> usize {
+        let output = StdCommand::new("tmux")
+            .args(["list-windows", "-t", session_name, "-F", "#{window_id}"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .count()
     }
 
     fn process_exists(pid: u32) -> bool {
