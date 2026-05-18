@@ -15,6 +15,7 @@ const MIN_UI_FONT_SIZE: u16 = 12;
 const MAX_UI_FONT_SIZE: u16 = 24;
 const MIN_TERMINAL_FONT_SIZE: u16 = 8;
 const MAX_TERMINAL_FONT_SIZE: u16 = 32;
+const DEFAULT_LOG_DIR: &str = "logs/";
 const VALID_TERMINAL_FONT_WEIGHTS: &[&str] = &[
     "normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900",
 ];
@@ -139,9 +140,9 @@ pub struct IntelligenceProviderConfig {
 pub struct LogsConfig {
     #[serde(default = "default_log_level")]
     pub level: String,
-    #[serde(default)]
+    #[serde(default = "default_log_path")]
     pub path: String,
-    #[serde(default)]
+    #[serde(default = "default_error_log_path")]
     pub error_path: String,
 }
 
@@ -353,8 +354,8 @@ impl Default for LogsConfig {
     fn default() -> Self {
         Self {
             level: default_log_level(),
-            path: String::new(),
-            error_path: String::new(),
+            path: default_log_path(),
+            error_path: default_error_log_path(),
         }
     }
 }
@@ -536,12 +537,17 @@ pub fn strip_jsonc_comments(input: &str) -> String {
 }
 
 /// Resolves a log file path, creating parent directories if needed.
-/// If the path denotes a directory (ends with '/' or already exists as a directory),
+/// If the path denotes a directory (ends with '/', is named logs/.logs, or already exists as a directory),
 /// joins the default_filename to create the final path.
 pub fn resolve_log_file_path(config_path: &str, default_filename: &str) -> Result<PathBuf> {
     let path = PathBuf::from(config_path);
 
-    let denotes_directory = config_path.ends_with('/') || config_path.ends_with("\\");
+    let denotes_directory = config_path.ends_with('/')
+        || config_path.ends_with('\\')
+        || matches!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("logs" | ".logs")
+        );
     let is_existing_directory = path.exists() && path.is_dir();
 
     if denotes_directory || is_existing_directory {
@@ -826,6 +832,14 @@ fn default_cache_ttl_sec() -> u32 {
 
 fn default_log_level() -> String {
     "info".to_string()
+}
+
+fn default_log_path() -> String {
+    DEFAULT_LOG_DIR.to_string()
+}
+
+fn default_error_log_path() -> String {
+    DEFAULT_LOG_DIR.to_string()
 }
 
 fn is_zero_u16(value: &u16) -> bool {
