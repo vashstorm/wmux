@@ -109,37 +109,22 @@ export function MainPanel() {
 				if (cancelled) return;
 
 				const nextWindows = windowsResponse.data ?? [];
-				const activeWindow = nextWindows.find((window) => window.Active);
 				setWindows(selectedPane.connectionId, selectedPane.session, nextWindows);
 
-				if (!activeWindow) return;
-
-				if (activeWindow.ID !== selectedPane.window) {
-					await handleSelectWindow(activeWindow.ID, activeWindow.ActivePaneID, {
-						forcePanes: true,
-					});
+				if (!selectedPane.window) return;
+				if (!nextWindows.some((window) => window.ID === selectedPane.window)) {
 					return;
 				}
 
 				const panesResponse = await listPanes(
 					selectedPane.connectionId,
 					selectedPane.session,
-					activeWindow.ID,
+					selectedPane.window,
 				);
 				if (cancelled) return;
 
 				const nextPanes = panesResponse.data ?? [];
-				setPanes(selectedPane.connectionId, selectedPane.session, activeWindow.ID, nextPanes);
-
-				const activePane = nextPanes.find((pane) => pane.Active);
-				if (activePane && activePane.ID !== selectedPane.pane) {
-					setSelectedPane({
-						connectionId: selectedPane.connectionId,
-						session: selectedPane.session,
-						window: activeWindow.ID,
-						pane: activePane.ID,
-					});
-				}
+				setPanes(selectedPane.connectionId, selectedPane.session, selectedPane.window, nextPanes);
 			} catch {
 				// 保持终端输入顺滑；显式 API 操作仍会显示错误。
 			} finally {
@@ -155,7 +140,7 @@ export function MainPanel() {
 			cancelled = true;
 			window.clearInterval(intervalId);
 		};
-	}, [handleSelectWindow, selectedPane, setPanes, setSelectedPane, setWindows]);
+	}, [selectedPane, setPanes, setWindows]);
 
 	useEffect(() => {
 		if (!selectedPane || !selectedPane.window) return;

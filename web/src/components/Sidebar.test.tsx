@@ -70,7 +70,7 @@ describe("Sidebar session loading", () => {
 			}, { timeout: 3000 });
 		}, 4000);
 
-		test("loads windows and panes, sets selectedPane with active IDs", async () => {
+		test("loads the first window and first pane without following external tmux active state", async () => {
 			mockListSessions.mockResolvedValue({
 				connectionId: "conn1",
 				mode: "local",
@@ -90,11 +90,10 @@ describe("Sidebar session loading", () => {
 			mockListPanes.mockResolvedValue({
 				connectionId: "conn1",
 				session: "session1",
-				window: "@2",
+				window: "@1",
 				mode: "local",
 				data: [
-					{ ID: "%3", Title: "vim", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 },
-					{ ID: "%4", Title: "bash", Index: 1, Active: false, Width: 80, Height: 24, Left: 0, Top: 25 },
+					{ ID: "%1", Title: "bash", Index: 0, Active: false, Width: 80, Height: 24, Left: 0, Top: 0 },
 				],
 			});
 
@@ -115,7 +114,7 @@ describe("Sidebar session loading", () => {
 			});
 
 			await waitFor(() => {
-				expect(mockListPanes).toHaveBeenCalledWith("conn1", "session1", "@2");
+				expect(mockListPanes).toHaveBeenCalledWith("conn1", "session1", "@1");
 			});
 		});
 

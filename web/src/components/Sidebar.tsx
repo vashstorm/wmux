@@ -215,26 +215,26 @@ export function Sidebar() {
         return;
       }
 
-      const activeWindow = windows.find((w) => w.Active) ?? windows[0];
-      if (!activeWindow) {
+      const initialWindow = windows[0];
+      if (!initialWindow) {
         setSelectedPane({ connectionId: connId, session: sessionName });
         return;
       }
-      const activeWindowID = activeWindow.ID;
+      const initialWindowID = initialWindow.ID;
 
-      const panesResponse = await listPanes(connId, sessionName, activeWindowID);
+      const panesResponse = await listPanes(connId, sessionName, initialWindowID);
       const panes = panesResponse.data ?? [];
 
       setWindows(connId, sessionName, windows);
-      setPanes(connId, sessionName, activeWindowID, panes);
+      setPanes(connId, sessionName, initialWindowID, panes);
 
-      const activePane = panes.find((p) => p.Active) ?? panes[0];
+      const initialPane = panes[0];
 
       setSelectedPane({
         connectionId: connId,
         session: sessionName,
-        window: activeWindowID,
-        pane: activePane?.ID,
+        window: initialWindowID,
+        pane: initialPane?.ID,
       });
     } catch (err) {
       setSelectedPane(null);

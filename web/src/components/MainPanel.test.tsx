@@ -133,7 +133,7 @@ describe("MainPanel", () => {
 		vi.clearAllMocks();
 	});
 
-	test("syncs the selected window tab when tmux active window changes", async () => {
+	test("keeps the selected window when tmux active window changes externally", async () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
 			sessions: {
@@ -190,9 +190,18 @@ describe("MainPanel", () => {
 		vi.mocked(listPanes).mockResolvedValue({
 			connectionId: "conn-1",
 			session: "dev",
-			window: "@2",
+			window: "@1",
 			mode: "local",
-			data: [activePaneThree],
+			data: [{
+				ID: "%1",
+				Title: "bash",
+				Index: 0,
+				Active: true,
+				Width: 80,
+				Height: 24,
+				Left: 0,
+				Top: 0,
+			}],
 		});
 
 		render(<MainPanel />);
@@ -205,14 +214,104 @@ describe("MainPanel", () => {
 
 		expect(listWindows).toHaveBeenCalledWith("conn-1", "dev");
 		expect(setWindows).toHaveBeenCalledWith("conn-1", "dev", expect.arrayContaining([activeWindowTwo]));
-		expect(listPanes).toHaveBeenCalledWith("conn-1", "dev", "@2");
-		expect(setPanes).toHaveBeenCalledWith("conn-1", "dev", "@2", [activePaneThree]);
-		expect(setSelectedPane).toHaveBeenCalledWith({
+		expect(listPanes).toHaveBeenCalledWith("conn-1", "dev", "@1");
+		expect(setPanes).toHaveBeenCalledWith("conn-1", "dev", "@1", [expect.objectContaining({ ID: "%1" })]);
+		expect(setSelectedPane).not.toHaveBeenCalled();
+	});
+
+	test("keeps the selected pane when tmux active pane changes externally", async () => {
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: {
+				...selectedPane,
+				pane: "%1",
+			},
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [windowOne],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: false,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		vi.mocked(listWindows).mockResolvedValue({
 			connectionId: "conn-1",
 			session: "dev",
-			window: "@2",
-			pane: "%3",
+			mode: "local",
+			data: [{
+				ID: "@1",
+				Name: "editor",
+				Index: 0,
+				Active: true,
+				PaneCount: 2,
+				ActivePaneID: "%2",
+				ActivePaneTitle: "vim",
+			}],
 		});
+		vi.mocked(listPanes).mockResolvedValue({
+			connectionId: "conn-1",
+			session: "dev",
+			window: "@1",
+			mode: "local",
+			data: [
+				{
+					ID: "%1",
+					Title: "bash",
+					Index: 0,
+					Active: false,
+					Width: 80,
+					Height: 24,
+					Left: 0,
+					Top: 0,
+				},
+				{
+					ID: "%2",
+					Title: "vim",
+					Index: 1,
+					Active: true,
+					Width: 80,
+					Height: 24,
+					Left: 80,
+					Top: 0,
+				},
+			],
+		});
+
+		render(<MainPanel />);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1000);
+		});
+
+		expect(setPanes).toHaveBeenCalledWith("conn-1", "dev", "@1", expect.arrayContaining([
+			expect.objectContaining({ ID: "%2", Active: true }),
+		]));
+		expect(setSelectedPane).not.toHaveBeenCalled();
 	});
 
 	test("renders title as session name, app name, and summary", () => {
