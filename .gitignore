@@ -30,5 +30,9 @@ config.jsonc
 *.swp
 *.swo
 
+# Tool directories
+.omo/
+.playwright-mcp/
+
 # Logs
 *.log

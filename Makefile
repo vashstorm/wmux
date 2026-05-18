@@ -21,6 +21,7 @@ target/release/wmux-server: $(RUST_SOURCES)
 
 bin/wmux: target/release/wmux-server web/dist/index.html
 	mkdir -p bin
+	rm -f bin/wmux
 	cp target/release/wmux-server bin/wmux
 
 dev: bin/wmux

@@ -8,9 +8,8 @@ use crate::state::AppState;
 
 pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinHandle<()>)> {
     let token = random_token();
-    let store = Config::load(default_config_path()).with_context(|| {
-        format!("failed to load config from {}", default_config_path())
-    })?;
+    let store = Config::load(default_config_path())
+        .with_context(|| format!("failed to load config from {}", default_config_path()))?;
     let mut config = store
         .snapshot()
         .context("failed to read config snapshot")?
@@ -20,8 +19,8 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
     config.auth.token = token.clone();
     config.validate_auth().context("invalid config")?;
 
-    crate::logging::init_tracing(&config.logs)
-        .context("failed to initialize logging")?;
+    let logging_handle =
+        crate::logging::init_tracing(&config.logs).context("failed to initialize logging")?;
 
     store
         .replace_in_memory(config)
@@ -34,7 +33,7 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
         .local_addr()
         .context("failed to read in-process server port")?
         .port();
-    let state = AppState::new(store, assets_dir);
+    let state = AppState::new(store, assets_dir, logging_handle);
     let app = crate::routes::router(state);
 
     let server_handle = tokio::spawn(async move {

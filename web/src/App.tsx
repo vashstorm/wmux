@@ -13,6 +13,7 @@ import { ErrorBanner } from "./components/ErrorBanner.js";
 import { ConfirmDialog } from "./components/ConfirmDialog.js";
 import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
+import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
 import { normalizeThemeId } from "./ui/themes.js";
 
@@ -48,6 +49,7 @@ export function App() {
 				<ConfirmDialog />
 				<NewConnectionForm />
 				<SettingsPanel />
+				<ErrorLogsPanel />
 			</div>
 		</AppProvider>
 	);

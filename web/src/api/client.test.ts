@@ -15,6 +15,8 @@ import {
 	listConnectionHealth,
 	getConnectionHealth,
 	analyzeSession,
+	fetchErrorLogs,
+	clearErrorLogs,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -482,5 +484,47 @@ describe("api client", () => {
 			expect(call[0]).toContain(encodeURIComponent("conn#1"));
 			expect(call[0]).toContain(encodeURIComponent("session#2"));
 		});
+	});
+
+	test("fetchErrorLogs returns error log lines", async () => {
+		mockJsonResponse(200, { enabled: true, path: "/tmp/wmux-error.log", lines: ["ERROR test"], truncated: false, maxLines: 1000 });
+		const result = await fetchErrorLogs();
+		expect(result.enabled).toBe(true);
+		expect(result.path).toBe("/tmp/wmux-error.log");
+		expect(result.lines).toEqual(["ERROR test"]);
+		expect(result.truncated).toBe(false);
+		expect(result.maxLines).toBe(1000);
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		expect(call[0]).toContain("/api/logs/errors");
+	});
+
+	test("clearErrorLogs sends DELETE request", async () => {
+		mockFetch(new Response(null, { status: 204 }));
+		await clearErrorLogs();
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		expect(call[1]?.method).toBe("DELETE");
+		expect(call[0]).toContain("/api/logs/errors");
+	});
+
+	test("fetchErrorLogs handles truncated response", async () => {
+		mockJsonResponse(200, { enabled: true, path: "/tmp/wmux-error.log", lines: ["line1", "line2"], truncated: true, maxLines: 1000 });
+		const result = await fetchErrorLogs();
+		expect(result.truncated).toBe(true);
+		expect(result.lines).toHaveLength(2);
+	});
+
+	test("fetchErrorLogs returns disabled state", async () => {
+		mockJsonResponse(200, { enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
+		const result = await fetchErrorLogs();
+		expect(result.enabled).toBe(false);
+		expect(result.path).toBeNull();
+		expect(result.lines).toEqual([]);
+	});
+
+	test("clearErrorLogs does not throw on 204", async () => {
+		mockFetch(new Response(null, { status: 204 }));
+		await expect(clearErrorLogs()).resolves.toBeUndefined();
 	});
 });

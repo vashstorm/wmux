@@ -45,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    wmux_core::logging::init_tracing(&config.logs)
+    let logging_handle = wmux_core::logging::init_tracing(&config.logs)
         .with_context(|| "failed to initialize logging")?;
     let config_path = store.path().context("failed to resolve config path")?;
     tracing::info!(
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {}", config.server.bind))?;
     println!("http://{}", config.server.bind);
-    let state = wmux_core::state::AppState::new(store, PathBuf::from("web/dist"));
+    let state = wmux_core::state::AppState::new(store, PathBuf::from("web/dist"), logging_handle);
     let app = wmux_core::routes::router(state);
 
     axum::serve(listener, app)

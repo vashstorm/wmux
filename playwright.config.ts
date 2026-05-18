@@ -59,6 +59,11 @@ if (shouldInitialize) {
 				ui: {
 					theme: "dark",
 				},
+				logs: {
+					level: "info",
+					path: join(tempDir, "wmux.log"),
+					errorPath: join(tempDir, "wmux-error.log"),
+				},
 			},
 			null,
 			2,

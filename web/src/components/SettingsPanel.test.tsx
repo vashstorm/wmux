@@ -1,7 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { SettingsPanel } from "./SettingsPanel.js";
 import { ErrorBanner } from "./ErrorBanner.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import * as client from "../api/client.js";
 import { THEME_OPTIONS } from "../ui/themes.js";
@@ -28,7 +30,9 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 function enableSettingsPanel() {
 	function Opener() {
 		const { setShowSettingsPanel } = useAppState();
-		setShowSettingsPanel(true);
+		useEffect(() => {
+			setShowSettingsPanel(true);
+		}, [setShowSettingsPanel]);
 		return null;
 	}
 	return <Opener />;
@@ -51,6 +55,7 @@ const defaultConfig = {
 		maxConcurrency: 3,
 		cacheTTLSec: 300,
 	},
+	logs: { level: "info", path: "", errorPath: "/tmp/wmux-error.log" },
 };
 
 describe("SettingsPanel intelligence section", () => {

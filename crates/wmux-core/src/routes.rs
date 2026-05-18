@@ -1,15 +1,18 @@
+use axum::Router;
 use axum::middleware;
 use axum::routing::{delete, get, post};
-use axum::Router;
 use tower_http::services::{ServeDir, ServeFile};
 
-use crate::handlers::{config, connections, health, sessions, terminal};
+use crate::handlers::{config, connections, health, logs, sessions, terminal};
 use crate::http::api_not_found;
 use crate::state::AppState;
 
 pub fn router(state: AppState) -> Router {
     let protected_api = Router::new()
-        .route("/connections", get(connections::list).post(connections::create))
+        .route(
+            "/connections",
+            get(connections::list).post(connections::create),
+        )
         .route("/connections/health", get(connections::list_health))
         .route(
             "/connections/{id}",
@@ -51,6 +54,10 @@ pub fn router(state: AppState) -> Router {
             delete(sessions::delete_pane),
         )
         .route("/config", get(config::get).put(config::update))
+        .route(
+            "/logs/errors",
+            get(logs::get_error_logs).delete(logs::clear_error_logs),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -82,14 +89,15 @@ pub fn router(state: AppState) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
-    use axum::http::{header, Request, StatusCode};
-    use serde_json::{json, Value};
+    use axum::body::{Body, to_bytes};
+    use axum::http::{Request, StatusCode, header};
+    use serde_json::{Value, json};
     use std::fs;
     use std::thread;
     use std::time::Duration;
     use tower::ServiceExt;
     use wmux_core::config::Config;
+    use wmux_core::logging::LoggingHandle;
 
     const TOKEN: &str = "test-token";
 
@@ -105,8 +113,45 @@ mod tests {
         )
         .expect("write config");
         let store = Config::load(&config_path).expect("load config");
-        let state = AppState::new(store, assets_dir);
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
         (router(state), dir, config_path)
+    }
+
+    fn test_app_with_error_log(
+        config: Value,
+    ) -> (
+        Router,
+        tempfile::TempDir,
+        std::path::PathBuf,
+        wmux_core::logging::ErrorLogHandle,
+    ) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+        let store = Config::load(&config_path).expect("load config");
+
+        let error_log_path = dir.path().join("wmux-error.log");
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&error_log_path)
+            .expect("open test error log");
+        let shared_file = std::sync::Arc::new(std::sync::Mutex::new(file));
+        let error_handle =
+            wmux_core::logging::ErrorLogHandle::new(shared_file.clone(), error_log_path.clone());
+        let logging_handle = wmux_core::logging::LoggingHandle {
+            error_log: Some(error_handle.clone()),
+        };
+
+        let state = AppState::new(store, assets_dir, logging_handle);
+        (router(state), dir, config_path, error_handle)
     }
 
     fn base_config() -> Value {
@@ -203,7 +248,10 @@ mod tests {
 
         assert_eq!(body["auth"]["token"], "");
         assert_eq!(body["auth"]["tokenConfigured"], true);
-        assert_eq!(body["intelligence"]["providers"][0]["apiKeyConfigured"], true);
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKeyConfigured"],
+            true
+        );
         assert!(!body.to_string().contains("secret-key"));
     }
 
@@ -213,7 +261,11 @@ mod tests {
 
         let created_response = app
             .clone()
-            .oneshot(request("POST", "/api/connections", Some(json!({ "type": "local" }))))
+            .oneshot(request(
+                "POST",
+                "/api/connections",
+                Some(json!({ "type": "local" })),
+            ))
             .await
             .expect("response");
         assert_eq!(created_response.status(), StatusCode::CREATED);
@@ -282,15 +334,26 @@ mod tests {
 
         let ssh_response = app
             .clone()
-            .oneshot(request("POST", "/api/connections", Some(json!({ "type": "ssh" }))))
+            .oneshot(request(
+                "POST",
+                "/api/connections",
+                Some(json!({ "type": "ssh" })),
+            ))
             .await
             .expect("response");
         assert_eq!(ssh_response.status(), StatusCode::NOT_IMPLEMENTED);
-        assert_eq!(json_body(ssh_response).await["error"]["code"], "not_implemented");
+        assert_eq!(
+            json_body(ssh_response).await["error"]["code"],
+            "not_implemented"
+        );
 
         let connection_response = app
             .clone()
-            .oneshot(request("POST", "/api/connections", Some(json!({ "type": "local" }))))
+            .oneshot(request(
+                "POST",
+                "/api/connections",
+                Some(json!({ "type": "local" })),
+            ))
             .await
             .expect("response");
         let connection = json_body(connection_response).await;
@@ -304,6 +367,136 @@ mod tests {
             .await
             .expect("response");
         assert_eq!(analyze_response.status(), StatusCode::NOT_IMPLEMENTED);
-        assert_eq!(json_body(analyze_response).await["error"]["code"], "not_implemented");
+        assert_eq!(
+            json_body(analyze_response).await["error"]["code"],
+            "not_implemented"
+        );
+    }
+
+    #[tokio::test]
+    async fn logs_errors_unauthorized_rejected() {
+        let (app, _dir, _config_path) = test_app(base_config());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/logs/errors")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn logs_errors_authorized_get_returns_json() {
+        let (app, _dir, _config_path) = test_app(base_config());
+        let response = app
+            .oneshot(request("GET", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        assert_eq!(body["enabled"], json!(false));
+        assert_eq!(body["path"], serde_json::Value::Null);
+        assert_eq!(body["maxLines"], json!(1000));
+        assert!(body["lines"].as_array().is_some());
+        assert_eq!(body["truncated"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn logs_errors_authorized_get_with_handle_returns_path() {
+        let (app, dir, _config_path, _error_handle) = test_app_with_error_log(base_config());
+        let response = app
+            .oneshot(request("GET", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        assert_eq!(body["enabled"], json!(true));
+        assert_eq!(
+            body["path"],
+            json!(
+                dir.path()
+                    .join("wmux-error.log")
+                    .to_string_lossy()
+                    .into_owned()
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn logs_errors_authorized_delete_returns_204() {
+        let (app, _dir, _config_path) = test_app(base_config());
+        let response = app
+            .oneshot(request("DELETE", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn logs_errors_get_truncates_at_1000_lines() {
+        let (app, _dir, _config_path, error_handle) = test_app_with_error_log(base_config());
+
+        {
+            let mut f = error_handle.file.lock().expect("lock");
+            use std::io::Write;
+            for i in 0..1010 {
+                writeln!(f, "error line {}", i).expect("write");
+            }
+            f.sync_all().expect("sync");
+        }
+
+        let response = app
+            .oneshot(request("GET", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        assert_eq!(body["maxLines"], json!(1000));
+        assert_eq!(body["truncated"], json!(true));
+        let lines = body["lines"].as_array().expect("lines array");
+        assert_eq!(lines.len(), 1000);
+        assert_eq!(lines[0], "error line 10");
+    }
+
+    #[tokio::test]
+    async fn logs_errors_delete_then_write_new_line() {
+        let (app, _dir, _config_path, error_handle) = test_app_with_error_log(base_config());
+
+        {
+            let mut f = error_handle.file.lock().expect("lock");
+            use std::io::Write;
+            writeln!(f, "old error line").expect("write");
+            f.sync_all().expect("sync");
+        }
+
+        let del_response = app
+            .clone()
+            .oneshot(request("DELETE", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(del_response.status(), StatusCode::NO_CONTENT);
+
+        {
+            let mut f = error_handle.file.lock().expect("lock");
+            use std::io::Write;
+            writeln!(f, "new error after clear").expect("write");
+            f.sync_all().expect("sync");
+        }
+
+        let response = app
+            .oneshot(request("GET", "/api/logs/errors", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        let lines = body["lines"].as_array().expect("lines array");
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "new error after clear");
+        let lines_str = serde_json::to_string(&lines).expect("serialize");
+        assert!(!lines_str.contains("old error line"));
     }
 }

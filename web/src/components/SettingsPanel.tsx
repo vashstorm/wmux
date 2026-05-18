@@ -1133,6 +1133,7 @@ export function SettingsPanel() {
 									</div>
 								</div>
 							)}
+
 								</div>
 
 								<div className="settings-footer">

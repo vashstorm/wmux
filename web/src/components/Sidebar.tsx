@@ -8,6 +8,7 @@ import {
   createSession,
   killSession,
   renameSession,
+  fetchErrorLogs,
   type SessionInfoData,
   type WindowInfo,
   type PaneInfo,
@@ -42,6 +43,9 @@ export function Sidebar() {
     setLoading,
     setError,
     setShowSettingsPanel,
+    setShowErrorLogsPanel,
+    errorLogCount,
+    setErrorLogCount,
     showConfirm,
     setConnectionHealth,
     sessions,
@@ -58,6 +62,15 @@ export function Sidebar() {
   const [renamingSession, setRenamingSession] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const prevSelectedRef = useRef<string | null>(null);
+
+  const refreshErrorLogBadge = useCallback(async () => {
+    try {
+      const response = await fetchErrorLogs();
+      setErrorLogCount(response.enabled ? response.lines.length : 0);
+    } catch {
+      setErrorLogCount(0);
+    }
+  }, [setErrorLogCount]);
 
   // Auto-select first connection on mount / when selected connection is removed
   useEffect(() => {
@@ -118,6 +131,17 @@ export function Sidebar() {
   useEffect(() => {
     loadConnectionsList();
   }, [loadConnectionsList]);
+
+  useEffect(() => {
+    void refreshErrorLogBadge();
+    const intervalId = window.setInterval(() => {
+      void refreshErrorLogBadge();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [refreshErrorLogBadge]);
 
   // Load sessions when selected connection changes
   useEffect(() => {
@@ -340,6 +364,26 @@ export function Sidebar() {
                   <path d="M12 5v14M5 12h14"/>
                 </svg>
               </button>
+            <button
+              type="button"
+              className={`sidebar-header-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
+              onClick={() => setShowErrorLogsPanel(true)}
+              data-testid="open-error-logs-button"
+              aria-label={errorLogCount > 0 ? `Error Logs (${errorLogCount})` : "Error Logs"}
+              title={errorLogCount > 0 ? `Error Logs (${errorLogCount})` : "Error Logs"}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <path d="M14 2v6h6"/>
+                <path d="M9 13h6"/>
+                <path d="M9 17h6"/>
+              </svg>
+              {errorLogCount > 0 && (
+                <span className="sidebar-error-logs-badge" data-testid="error-logs-badge">
+                  {errorLogCount > 99 ? "99+" : errorLogCount}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               className="sidebar-header-action"

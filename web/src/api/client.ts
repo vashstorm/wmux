@@ -151,7 +151,16 @@ export interface AppConfig {
 	logs?: {
 		level: string;
 		path: string;
+		errorPath: string;
 	};
+}
+
+export interface ErrorLogsResponse {
+	enabled: boolean;
+	path?: string | null;
+	lines: string[];
+	truncated: boolean;
+	maxLines: number;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -513,4 +522,14 @@ export async function analyzeSession(connectionId: string, session: string): Pro
 		method: "POST",
 		body: JSON.stringify({}),
 	})) as AnalyzeSessionResponse;
+}
+
+export async function fetchErrorLogs(): Promise<ErrorLogsResponse> {
+	return (await apiFetch("/api/logs/errors")) as ErrorLogsResponse;
+}
+
+export async function clearErrorLogs(): Promise<void> {
+	await apiFetch("/api/logs/errors", {
+		method: "DELETE",
+	});
 }

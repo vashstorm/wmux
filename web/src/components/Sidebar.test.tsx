@@ -13,6 +13,7 @@ vi.mock("../api/client.js", () => ({
 	createSession: vi.fn(),
 	killSession: vi.fn(),
 	renameSession: vi.fn(),
+	fetchErrorLogs: vi.fn(),
 }));
 
 const mockListConnections = vi.mocked(client.listConnections);
@@ -20,6 +21,7 @@ const mockListConnectionHealth = vi.mocked(client.listConnectionHealth);
 const mockListSessions = vi.mocked(client.listSessions);
 const mockListWindows = vi.mocked(client.listWindows);
 const mockListPanes = vi.mocked(client.listPanes);
+const mockFetchErrorLogs = vi.mocked(client.fetchErrorLogs);
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
 	return <AppProvider>{children}</AppProvider>;
@@ -33,6 +35,7 @@ describe("Sidebar session loading", () => {
 			{ id: "conn1", type: "local" },
 		]);
 		mockListConnectionHealth.mockResolvedValue([]);
+		mockFetchErrorLogs.mockResolvedValue({ enabled: true, path: "/tmp/wmux-error.log", lines: [], truncated: false, maxLines: 1000 });
 	});
 
 	describe("handleOpenSession happy path", () => {
@@ -549,5 +552,31 @@ describe("intelligence badge and summary rendering", () => {
 
 		const badge = document.querySelector(".intelligence-badge.is-error");
 		expect(badge).toBeInTheDocument();
+	});
+
+	test("error logs button shows badge when error entries exist", async () => {
+		mockFetchErrorLogs.mockResolvedValue({
+			enabled: true,
+			path: "/tmp/wmux-error.log",
+			lines: ["ERROR one", "ERROR two"],
+			truncated: false,
+			maxLines: 1000,
+		});
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("error-logs-badge")).toHaveTextContent("2");
+		});
+		expect(screen.getByTestId("open-error-logs-button")).toHaveAttribute("aria-label", "Error Logs (2)");
 	});
 });

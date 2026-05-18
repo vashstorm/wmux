@@ -90,6 +90,34 @@
 	box-shadow: var(--color-shadow-glow);
 }
 
+.sidebar-error-logs-button {
+	position: relative;
+}
+
+.sidebar-error-logs-button.has-badge {
+	color: var(--color-danger);
+	border-color: var(--color-banner-error-border);
+}
+
+.sidebar-error-logs-badge {
+	position: absolute;
+	top: -5px;
+	right: -5px;
+	min-width: 16px;
+	height: 16px;
+	padding: 0 4px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-full);
+	background-color: var(--color-danger);
+	color: var(--color-background);
+	border: 1px solid var(--color-panel);
+	font-size: 9px;
+	font-weight: var(--font-weight-bold);
+	line-height: 1;
+}
+
 .sidebar-settings-button {
 	width: 30px;
 	height: 30px;

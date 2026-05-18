@@ -39,6 +39,8 @@ pub enum ConfigError {
     Decode(#[from] serde_json::Error),
     #[error("store mutex poisoned")]
     LockPoisoned,
+    #[error("logs path and error path resolve to the same file")]
+    InvalidLogsConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,6 +141,8 @@ pub struct LogsConfig {
     pub level: String,
     #[serde(default)]
     pub path: String,
+    #[serde(default)]
+    pub error_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -215,6 +219,7 @@ impl Config {
             connection.known_hosts_path = expand_user_path(&connection.known_hosts_path)?;
         }
         expanded.logs.path = expand_user_path(&expanded.logs.path)?;
+        expanded.logs.error_path = expand_user_path(&expanded.logs.error_path)?;
         Ok(expanded)
     }
 
@@ -349,6 +354,7 @@ impl Default for LogsConfig {
         Self {
             level: default_log_level(),
             path: String::new(),
+            error_path: String::new(),
         }
     }
 }
@@ -464,6 +470,7 @@ pub fn parse_config(data: &str) -> Result<Config> {
     let clean = strip_jsonc_comments(data);
     let mut config: Config = serde_json::from_str(&clean)?;
     config.normalize();
+    validate_logs_config(&config.logs)?;
     Ok(config)
 }
 
@@ -526,6 +533,54 @@ pub fn strip_jsonc_comments(input: &str) -> String {
     }
 
     out
+}
+
+/// Resolves a log file path, creating parent directories if needed.
+/// If the path denotes a directory (ends with '/' or already exists as a directory),
+/// joins the default_filename to create the final path.
+pub fn resolve_log_file_path(config_path: &str, default_filename: &str) -> Result<PathBuf> {
+    let path = PathBuf::from(config_path);
+
+    let denotes_directory = config_path.ends_with('/') || config_path.ends_with("\\");
+    let is_existing_directory = path.exists() && path.is_dir();
+
+    if denotes_directory || is_existing_directory {
+        if !path.exists() {
+            std::fs::create_dir_all(&path).map_err(|source| ConfigError::Io {
+                context: "create log directory",
+                source,
+            })?;
+        }
+        Ok(path.join(default_filename))
+    } else {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
+                    context: "create log directory",
+                    source,
+                })?;
+            }
+        }
+        Ok(path)
+    }
+}
+
+/// Validates that logs.path and logs.errorPath don't resolve to the same file.
+pub fn validate_logs_config(logs: &LogsConfig) -> Result<()> {
+    if logs.path.trim().is_empty() || logs.error_path.trim().is_empty() {
+        return Ok(());
+    }
+
+    let expanded_path = expand_user_path(&logs.path)?;
+    let expanded_error_path = expand_user_path(&logs.error_path)?;
+    let resolved_path = resolve_log_file_path(&expanded_path, "wmux.log")?;
+    let resolved_error_path = resolve_log_file_path(&expanded_error_path, "wmux-error.log")?;
+
+    if resolved_path == resolved_error_path {
+        return Err(ConfigError::InvalidLogsConfig);
+    }
+
+    Ok(())
 }
 
 pub fn expand_user_path(path: &str) -> Result<String> {
@@ -808,6 +863,7 @@ mod tests {
         assert_eq!(config.intelligence.cache_ttl_sec, 300);
         assert_eq!(config.logs.level, "info");
         assert_eq!(config.logs.path, "");
+        assert_eq!(config.logs.error_path, "");
     }
 
     #[test]
@@ -953,5 +1009,69 @@ mod tests {
             expand_user_path("~/.ssh/id_ed25519").expect("expand"),
             dir.path().join(".ssh/id_ed25519").to_string_lossy()
         );
+    }
+
+    #[test]
+    fn config_logs_error_path_deserializes() {
+        let data = r#"{
+          "logs": {
+            "level": "info",
+            "path": "",
+            "errorPath": "./errors.log"
+          }
+        }"#;
+
+        let config = parse_config(data).expect("parse config");
+        assert_eq!(config.logs.level, "info");
+        assert_eq!(config.logs.path, "");
+        assert_eq!(config.logs.error_path, "./errors.log");
+    }
+
+    #[test]
+    fn config_logs_validation_rejects_same_path() {
+        let data = r#"{
+          "logs": {
+            "level": "info",
+            "path": "/var/log/wmux.log",
+            "errorPath": "/var/log/wmux.log"
+          }
+        }"#;
+
+        let err = parse_config(data).expect_err("expected validation error");
+        assert!(matches!(err, ConfigError::InvalidLogsConfig));
+    }
+
+    #[test]
+    fn config_logs_validation_accepts_different_paths() {
+        let data = r#"{
+          "logs": {
+            "level": "info",
+            "path": "/var/log/wmux.log",
+            "errorPath": "/var/log/wmux-error.log"
+          }
+        }"#;
+
+        let config = parse_config(data).expect("parse config");
+        assert_eq!(config.logs.path, "/var/log/wmux.log");
+        assert_eq!(config.logs.error_path, "/var/log/wmux-error.log");
+    }
+
+    #[test]
+    fn config_logs_validation_accepts_same_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let same_dir = dir.path().to_string_lossy().into_owned();
+
+        let data = r#"{
+          "logs": {
+            "level": "info",
+            "path": "PLACEHOLDER",
+            "errorPath": "PLACEHOLDER"
+          }
+        }"#
+        .replace("PLACEHOLDER", &format!("{}/", same_dir));
+
+        let config = parse_config(&data).expect("same directory should be allowed");
+        assert_eq!(config.logs.path, format!("{}/", same_dir));
+        assert_eq!(config.logs.error_path, format!("{}/", same_dir));
     }
 }

@@ -828,6 +828,139 @@
 }
 
 /* ==========================================================================
+   Error Logs Panel
+   ========================================================================== */
+
+.error-logs-panel-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-modal);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--color-overlay-glass);
+	backdrop-filter: var(--glass-blur-sm);
+	-webkit-backdrop-filter: var(--glass-blur-sm);
+}
+
+.error-logs-panel {
+	width: min(760px, calc(100vw - 32px));
+	height: min(560px, calc(100vh - 32px));
+	overflow: hidden;
+	background-color: var(--color-surface-elevated);
+	backdrop-filter: var(--glass-blur-xl);
+	-webkit-backdrop-filter: var(--glass-blur-xl);
+	border: 1px solid var(--color-surface-elevated-border);
+	border-radius: var(--radius-lg);
+	display: flex;
+	flex-direction: column;
+	box-shadow: var(--shadow-xl);
+}
+
+.error-logs-panel-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--spacing-sm);
+	padding: var(--spacing-md) var(--spacing-lg);
+	background: linear-gradient(
+		to bottom,
+		var(--color-glass-highlight),
+		transparent
+	);
+	border-bottom: 1px solid var(--color-panel-border);
+}
+
+.error-logs-panel-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-md);
+	padding: var(--spacing-lg);
+	background-color: var(--color-background);
+}
+
+.error-logs-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--spacing-md);
+}
+
+.error-logs-path {
+	min-width: 0;
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.error-logs-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing-xs);
+	flex-shrink: 0;
+}
+
+.error-logs-clear-button {
+	color: var(--color-danger);
+}
+
+.error-logs-empty-state {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--spacing-xl);
+	color: var(--color-text-muted);
+	text-align: center;
+	background-color: var(--color-surface);
+	border: 1px dashed var(--color-surface-border);
+	border-radius: var(--radius-md);
+}
+
+.error-logs-content-wrap {
+	min-height: 0;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-sm);
+}
+
+.error-logs-truncated {
+	margin: 0;
+	color: var(--color-text-muted);
+}
+
+.error-logs-content {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: var(--spacing-md);
+	background-color: var(--color-bg-code, #1a1a2e);
+	color: var(--color-text-code, #e0e0e0);
+	border: 1px solid var(--color-surface-border);
+	border-radius: var(--radius-sm);
+}
+
+.error-log-entry {
+	display: block;
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+	background-color: rgba(255, 255, 255, 0.03);
+	color: inherit;
+	font-size: var(--font-size-xs);
+	line-height: 1.5;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: var(--font-mono);
+}
+
+/* ==========================================================================
    Form Help Text
    ========================================================================== */
 

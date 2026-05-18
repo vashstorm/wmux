@@ -126,6 +126,8 @@ export interface AppState {
 	error: { code: string; message: string } | null;
 	showNewConnectionForm: boolean;
 	showSettingsPanel: boolean;
+	showErrorLogsPanel: boolean;
+	errorLogCount: number;
 	configConflict: ConfigConflictState | null;
 	confirmDialog: ConfirmDialogState | null;
 	selectedPane: SelectedPane | null;
@@ -159,6 +161,8 @@ interface AppContextValue extends AppState {
 	setError: (error: { code: string; message: string } | null) => void;
 	setShowNewConnectionForm: (show: boolean) => void;
 	setShowSettingsPanel: (show: boolean) => void;
+	setShowErrorLogsPanel: (show: boolean) => void;
+	setErrorLogCount: (count: number) => void;
 	setConfigConflict: (conflict: ConfigConflictState | null) => void;
 	setConfirmDialog: (dialog: ConfirmDialogState | null) => void;
 	showConfirm: (options: Omit<ConfirmDialogState, "onConfirm"> & { onConfirm: () => void }) => void;
@@ -184,6 +188,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [error, setErrorState] = useState<AppState["error"]>(null);
 	const [showNewConnectionForm, setShowNewConnectionForm] = useState(false);
 	const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+	const [showErrorLogsPanel, setShowErrorLogsPanel] = useState(false);
+	const [errorLogCount, setErrorLogCount] = useState(0);
 	const [configConflict, setConfigConflict] = useState<ConfigConflictState | null>(null);
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 	const [selectedPane, setSelectedPane] = useState<SelectedPane | null>(null);
@@ -278,6 +284,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		error,
 		showNewConnectionForm,
 		showSettingsPanel,
+		showErrorLogsPanel,
+		errorLogCount,
 		configConflict,
 		confirmDialog,
 		selectedPane,
@@ -293,6 +301,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setError,
 		setShowNewConnectionForm,
 		setShowSettingsPanel,
+		setShowErrorLogsPanel,
+		setErrorLogCount,
 		setConfigConflict,
 		setConfirmDialog,
 		showConfirm,
