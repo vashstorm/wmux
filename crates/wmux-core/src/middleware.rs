@@ -6,6 +6,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use wmux_core::protocol::ErrorResponse;
 
+use crate::http::ApiErrorLog;
 use crate::state::AppState;
 
 pub async fn auth_middleware(
@@ -27,23 +28,90 @@ pub async fn terminal_auth_middleware(
 pub async fn logging_middleware(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
+    let uri = redacted_uri(request.uri());
+    let connection_id = connection_id_from_request(request.uri(), &path).unwrap_or_default();
     let start = Instant::now();
 
     let response = next.run(request).await;
     let status = response.status();
+    let error_log = response.extensions().get::<ApiErrorLog>().cloned();
 
     if !(method == Method::GET && status.as_u16() < 400) {
         let duration_ms = start.elapsed().as_millis();
         if status.as_u16() >= 500 {
-            tracing::error!(%method, %path, %status, duration_ms, "http request");
+            tracing::error!(
+                %method,
+                %path,
+                %uri,
+                %status,
+                duration_ms,
+                connection_id = %connection_id,
+                error_code = error_log.as_ref().map(|error| error.code).unwrap_or_default(),
+                error_message = error_log.as_ref().map(|error| error.message.as_str()).unwrap_or_default(),
+                "http request failed"
+            );
+        } else if status.as_u16() >= 400 && error_log.is_some() {
+            tracing::error!(
+                %method,
+                %path,
+                %uri,
+                %status,
+                duration_ms,
+                connection_id = %connection_id,
+                error_code = error_log.as_ref().map(|error| error.code).unwrap_or_default(),
+                error_message = error_log.as_ref().map(|error| error.message.as_str()).unwrap_or_default(),
+                "http request failed"
+            );
         } else if status.as_u16() >= 400 {
-            tracing::warn!(%method, %path, %status, duration_ms, "http request");
+            tracing::warn!(%method, %path, %uri, %status, duration_ms, "http request failed");
         } else {
-            tracing::debug!(%method, %path, %status, duration_ms, "http request");
+            tracing::debug!(%method, %path, %uri, %status, duration_ms, "http request");
         }
     }
 
     response
+}
+
+fn redacted_uri(uri: &axum::http::Uri) -> String {
+    let Some(query) = uri.query() else {
+        return uri.path().to_string();
+    };
+    let query = query
+        .split('&')
+        .map(|pair| {
+            let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+            if matches!(key, "token" | "authToken" | "access_token") {
+                format!("{key}=<redacted>")
+            } else if value.is_empty() {
+                key.to_string()
+            } else {
+                format!("{key}={value}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("{}?{}", uri.path(), query)
+}
+
+fn connection_id_from_request(uri: &axum::http::Uri, path: &str) -> Option<String> {
+    connection_id_from_path(path).or_else(|| connection_id_from_query(uri.query()?))
+}
+
+fn connection_id_from_path(path: &str) -> Option<String> {
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    while let Some(segment) = segments.next() {
+        if segment == "connections" {
+            return segments.next().map(ToString::to_string);
+        }
+    }
+    None
+}
+
+fn connection_id_from_query(query: &str) -> Option<String> {
+    query.split('&').find_map(|pair| {
+        let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+        (key == "connectionId").then(|| value.to_string())
+    })
 }
 
 async fn authenticate(

@@ -1,9 +1,15 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use wmux_core::protocol::ErrorResponse;
 
 pub type ApiResult<T> = Result<Json<T>, ApiError>;
+
+#[derive(Debug, Clone)]
+pub struct ApiErrorLog {
+    pub code: &'static str,
+    pub message: String,
+}
 
 #[derive(Debug)]
 pub struct ApiError {
@@ -58,12 +64,17 @@ impl std::fmt::Display for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        tracing::error!(status = %self.status, code = self.code, message = %self.message, "http error response");
-        (
+        let log = ApiErrorLog {
+            code: self.code,
+            message: self.message.clone(),
+        };
+        let mut response = (
             self.status,
             Json(ErrorResponse::new(self.code, self.message)),
         )
-            .into_response()
+            .into_response();
+        response.extensions_mut().insert(log);
+        response
     }
 }
 

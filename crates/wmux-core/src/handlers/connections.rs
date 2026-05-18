@@ -170,11 +170,26 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<String>) -> Re
 }
 
 pub fn find_connection(state: &AppState, id: &str) -> Result<ConnectionConfig, ApiError> {
-    current_config(state)?
+    let config = current_config(state)?;
+    let available_ids = config
+        .connections
+        .iter()
+        .map(|connection| connection.id.clone())
+        .collect::<Vec<_>>();
+    config
         .connections
         .into_iter()
         .find(|connection| connection.id == id)
-        .ok_or_else(|| ApiError::not_found("connection not found"))
+        .ok_or_else(|| {
+            tracing::warn!(
+                connection_id = %id,
+                available_connection_ids = ?available_ids,
+                "connection lookup failed"
+            );
+            ApiError::not_found(format!(
+                "connection not found: id={id:?}, available_connection_ids={available_ids:?}"
+            ))
+        })
 }
 
 pub fn require_local_connection(connection: &ConnectionConfig) -> Result<(), ApiError> {
