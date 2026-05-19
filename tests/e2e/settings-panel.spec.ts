@@ -26,12 +26,13 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
+		await page.getByRole("button", { name: /Connections/i }).click();
 
-		await page.locator(".settings-new-connection-btn").first().click();
+		await page.getByRole("button", { name: /NEW/i }).first().click();
 		await expect(page.getByTestId("new-connection-form")).toBeVisible();
 
-		await page.getByTestId("connection-type-select").selectOption("local");
+		await page.getByTestId("connection-type-select").click();
+		await page.getByRole("option", { name: "Local" }).click();
 		await page.getByTestId("save-connection").click();
 
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
@@ -74,7 +75,7 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.locator(".settings-nav-item").filter({ hasText: "Connections" }).click();
+		await page.getByRole("button", { name: /Connections/i }).click();
 
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
 

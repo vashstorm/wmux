@@ -36,7 +36,7 @@ test.describe("error banner", () => {
 
 		await expect(page.getByTestId("error-banner")).toBeVisible();
 
-		await page.getByTestId("error-banner").getByLabel("Dismiss error").click();
+		await page.getByTestId("error-banner").getByLabel("Close").click();
 
 		await expect(page.getByTestId("error-banner")).not.toBeVisible();
 	});
