@@ -22,7 +22,9 @@ interface TerminalSize {
 }
 
 const TERMINAL_FIT_COLUMN_GUTTER = 2;
+const TERMINAL_FIT_ROW_GUTTER = 1;
 const MIN_TERMINAL_COLS = 2;
+const MIN_TERMINAL_ROWS = 1;
 
 function normalizeTerminalSize(cols: number | undefined, rows: number | undefined): TerminalSize | null {
 	if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
@@ -33,7 +35,7 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 function applyColumnGutter(size: TerminalSize): TerminalSize {
 	return {
 		cols: Math.max(MIN_TERMINAL_COLS, size.cols - TERMINAL_FIT_COLUMN_GUTTER),
-		rows: size.rows,
+		rows: Math.max(MIN_TERMINAL_ROWS, size.rows - TERMINAL_FIT_ROW_GUTTER),
 	};
 }
 

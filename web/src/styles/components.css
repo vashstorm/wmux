@@ -1421,7 +1421,8 @@
 	max-width: 100%;
 	min-width: 0;
 	height: 100%;
-	min-height: 100%;
+	max-height: 100%;
+	min-height: 0;
 	background-color: var(--terminal-background);
 	overflow: hidden;
 }
@@ -1429,7 +1430,9 @@
 .terminal-container .xterm .xterm-viewport {
 	width: 100%;
 	min-width: 0;
-	min-height: 100%;
+	max-width: 100%;
+	min-height: 0;
+	max-height: 100%;
 	background-color: var(--terminal-background);
 	overflow-x: hidden;
 }
@@ -2113,7 +2116,7 @@
 
 .pane-canvas-terminal {
 	position: absolute;
-	inset: 0;
+	inset: 1px;
 	display: flex;
 	min-width: 0;
 	min-height: 0;
@@ -2161,7 +2164,7 @@
 
 .pane-canvas.has-terminal .pane-box.is-active {
 	background-color: transparent;
-	border-color: var(--color-accent);
+	border: 1px solid var(--color-accent);
 	box-shadow: 0 0 24px rgba(245, 158, 11, 0.15);
 	z-index: 2;
 	backdrop-filter: none;

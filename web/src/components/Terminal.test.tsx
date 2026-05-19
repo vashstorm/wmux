@@ -168,16 +168,16 @@ describe("Terminal", () => {
 		expect(mockProposeDimensions).toHaveBeenCalled();
 		expect(mockFit).not.toHaveBeenCalled();
 		expect(callArgs.cols).toBe(118);
-		expect(callArgs.rows).toBe(40);
+		expect(callArgs.rows).toBe(39);
 	});
 
 	test("uses fitted dimensions when tmux pane is wider than the viewport", () => {
 		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
 
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockXTermResize).toHaveBeenCalledWith(118, 40);
+		expect(mockXTermResize).toHaveBeenCalledWith(118, 39);
 		expect(callArgs.cols).toBe(118);
-		expect(callArgs.rows).toBe(40);
+		expect(callArgs.rows).toBe(39);
 	});
 
 	test("redraws terminal after fitting the viewport", () => {
@@ -200,7 +200,7 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		expect(capturedOnResize).not.toBeNull();
-		capturedOnResize!({ cols: 118, rows: 40 });
+		capturedOnResize!({ cols: 118, rows: 39 });
 
 		expect(mockWsSend).not.toHaveBeenCalled();
 	});
@@ -209,10 +209,10 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		expect(capturedOnResize).not.toBeNull();
-		capturedOnResize!({ cols: 119, rows: 40 });
+		capturedOnResize!({ cols: 119, rows: 39 });
 
 		expect(mockWsSend).toHaveBeenCalledTimes(1);
-		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 40 });
+		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 39 });
 	});
 
 test("uses Unicode 11 width tables for CJK terminal output", () => {
