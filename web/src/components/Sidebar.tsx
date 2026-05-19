@@ -1,5 +1,31 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
+  Box,
+  Stack,
+  Paper,
+  List,
+  ListItemButton,
+  TextField,
+  Chip,
+  Badge,
+  IconButton,
+  Typography,
+  InputAdornment,
+  Divider,
+  Button,
+  ListItemText,
+} from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import FolderIcon from "@mui/icons-material/Folder";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import BarChartIcon from "@mui/icons-material/BarChart";
+import SettingsIcon from "@mui/icons-material/Settings";
+import DescriptionIcon from "@mui/icons-material/Description";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import {
   listConnections,
   listConnectionHealth,
   listSessions,
@@ -353,186 +379,393 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar" data-testid="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-header-row">
-          <div className="sidebar-brand">Wmux</div>
-          <div className="sidebar-header-actions">
-            <button
-              type="button"
+    <Paper
+      component="aside"
+      className="sidebar"
+      data-testid="sidebar"
+      elevation={0}
+      square
+      sx={{
+        width: 320,
+        minWidth: 320,
+        maxWidth: 320,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 0,
+        borderRight: "1px solid var(--color-panel-border)",
+        overflow: "hidden",
+        bgcolor: "var(--color-panel)",
+      }}
+    >
+      <Box
+        className="sidebar-header"
+        sx={{
+          minHeight: "var(--app-shell-header-height, 42px)",
+          display: "flex",
+          alignItems: "center",
+          px: "var(--spacing-lg)",
+          borderBottom: "1px solid var(--color-surface-border)",
+          background: "linear-gradient(to bottom, var(--color-glass-highlight), transparent)",
+        }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+          <Typography
+            className="sidebar-brand"
+            variant="subtitle1"
+            sx={{
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--font-size-md)",
+              fontWeight: "var(--font-weight-bold)",
+              color: "var(--color-accent)",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              textShadow: "var(--color-accent-glow)",
+            }}
+          >
+            Wmux
+          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+            <IconButton
               className={`sidebar-header-action${activeView === "projects" ? " is-active" : ""}`}
               onClick={() => setActiveView("projects")}
               data-testid="open-projects-button"
               aria-label="Projects"
               title="Projects"
+              size="small"
+              sx={{ width: 30, height: 30 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              </svg>
-            </button>
-            <button
-              type="button"
+              <FolderIcon fontSize="small" />
+            </IconButton>
+            <IconButton
               className={`sidebar-header-action${activeView === "session" ? " is-active" : ""}`}
               onClick={openSessionView}
               data-testid="open-session-button"
               aria-label="Session"
               title="Session"
+              size="small"
+              sx={{ width: 30, height: 30 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>
-                <path d="m7 9 3 3-3 3"/>
-                <path d="M13 15h4"/>
-              </svg>
-            </button>
-            <button
-              type="button"
+              <TerminalIcon fontSize="small" />
+            </IconButton>
+            <IconButton
               className={`sidebar-header-action${activeView === "stats" ? " is-active" : ""}`}
               onClick={() => setActiveView("stats")}
               data-testid="open-stats-button"
               aria-label="Stats"
               title="Stats"
+              size="small"
+              sx={{ width: 30, height: 30 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19V5"/>
-                <path d="M4 19h16"/>
-                <path d="M8 17v-5"/>
-                <path d="M12 17V8"/>
-                <path d="M16 17v-8"/>
-              </svg>
-            </button>
-            <button
-              type="button"
+              <BarChartIcon fontSize="small" />
+            </IconButton>
+            <IconButton
               className="sidebar-header-action"
               onClick={() => setShowSettingsPanel(true)}
               data-testid="open-settings-button"
               aria-label="Setting"
               title="Setting"
+              size="small"
+              sx={{ width: 30, height: 30 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`sidebar-header-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
-              onClick={() => setShowErrorLogsPanel(true)}
-              data-testid="open-error-logs-button"
-              aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
-              title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+              <SettingsIcon fontSize="small" />
+            </IconButton>
+            <Badge
+              badgeContent={errorLogCount > 0 ? (errorLogCount > 99 ? "99+" : errorLogCount) : undefined}
+              color="error"
+              className="error-logs-badge-wrapper"
+              data-testid="error-logs-badge"
+              sx={{
+                "& .MuiBadge-badge": {
+                  bgcolor: "var(--color-danger)",
+                  color: "var(--color-background)",
+                  border: "1px solid var(--color-panel)",
+                  fontSize: "9px",
+                  fontWeight: "var(--font-weight-bold)",
+                  minWidth: 16,
+                  height: 16,
+                },
+              }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <path d="M14 2v6h6"/>
-                <path d="M9 13h6"/>
-                <path d="M9 17h6"/>
-              </svg>
-              {errorLogCount > 0 && (
-                <span className="sidebar-error-logs-badge" data-testid="error-logs-badge">
-                  {errorLogCount > 99 ? "99+" : errorLogCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
+              <IconButton
+                className={`sidebar-header-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
+                onClick={() => setShowErrorLogsPanel(true)}
+                data-testid="open-error-logs-button"
+                aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+                title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+                size="small"
+                sx={{ width: 30, height: 30 }}
+              >
+                <DescriptionIcon fontSize="small" />
+              </IconButton>
+            </Badge>
+          </Stack>
+        </Stack>
+      </Box>
 
-      </div>
-
-      <div className="sidebar-content">
+      <Box
+        className="sidebar-content"
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          px: "var(--spacing-md)",
+          py: "var(--spacing-sm)",
+          scrollbarGutter: "stable",
+        }}
+      >
         {activeView === "projects" ? (
-          <div className="sidebar-empty-view" data-testid="projects-view" />
+          <Box className="sidebar-empty-view" data-testid="projects-view" sx={{ minHeight: 1 }} />
         ) : activeView === "stats" ? (
-          <div className="sidebar-empty-view" data-testid="stats-view" />
+          <Box className="sidebar-empty-view" data-testid="stats-view" sx={{ minHeight: 1 }} />
         ) : selectedConnectionId ? (
           <>
-            <div className="sidebar-toolbar">
-              <div className="sidebar-search-wrapper">
-                <span className="sidebar-search-icon" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M14 14L11.1 11.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  className="sidebar-search"
-                  placeholder="Search sessions"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  data-testid="session-search"
-                  aria-label="Search sessions"
-                />
-              </div>
-            </div>
+            <Box
+              className="sidebar-toolbar"
+              sx={{
+                py: "var(--spacing-sm)",
+                px: "var(--spacing-md)",
+                mx: "calc(-1 * var(--spacing-md))",
+                display: "flex",
+                alignItems: "center",
+                borderBottom: "1px solid var(--color-surface-border)",
+              }}
+            >
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search sessions"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="session-search"
+                aria-label="Search sessions"
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" sx={{ color: "var(--color-text-muted)" }} />
+                      </InputAdornment>
+                    ),
+                    className: "sidebar-search",
+                  },
+                }}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    pl: 0.5,
+                    bgcolor: "var(--color-input-bg)",
+                    borderRadius: "var(--radius-sm)",
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "var(--color-input-border)",
+                    },
+                    "&:hover .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "var(--color-surface-border-hover)",
+                    },
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: "var(--color-input-border-focus)",
+                      borderWidth: 2,
+                    },
+                    "& input": {
+                      color: "var(--color-input-text)",
+                      fontSize: "var(--font-size-xs)",
+                      py: "8px",
+                    },
+                    "& input::placeholder": {
+                      color: "var(--color-input-placeholder)",
+                    },
+                  },
+                }}
+              />
+            </Box>
 
             {showNewSessionForm && (
-              <form className="sidebar-session-form" onSubmit={handleCreateSession}>
-                <input
-                  type="text"
+              <Box
+                component="form"
+                className="sidebar-session-form"
+                onSubmit={handleCreateSession}
+                sx={{
+                  p: "var(--spacing-md)",
+                  bgcolor: "var(--color-surface)",
+                  border: "1px solid var(--color-surface-border)",
+                  borderRadius: "var(--radius-md)",
+                  my: "var(--spacing-xs)",
+                }}
+              >
+                <TextField
+                  fullWidth
+                  size="small"
                   value={newSessionName}
                   onChange={(e) => setNewSessionName(e.target.value)}
                   placeholder="Session name"
                   autoFocus
                   data-testid="new-session-name-input"
+                  sx={{
+                    mb: "var(--spacing-sm)",
+                    "& .MuiInputBase-root": {
+                      bgcolor: "var(--color-input-bg)",
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: "var(--font-size-xs)",
+                      color: "var(--color-input-text)",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "var(--color-input-border)",
+                      },
+                      "&:focus-within .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "var(--color-input-border-focus)",
+                        boxShadow: "0 0 0 2px var(--color-accent-subtle)",
+                      },
+                      "& input::placeholder": {
+                        color: "var(--color-input-placeholder)",
+                      },
+                    },
+                  }}
                 />
-                <div className="sidebar-session-form-actions">
-                  <button
+                <Stack direction="row" spacing={1} className="sidebar-session-form-actions" sx={{ justifyContent: "flex-end" }}>
+                  <Button
                     type="button"
                     className="form-button form-button-secondary"
                     onClick={() => {
                       setShowNewSessionForm(false);
                       setNewSessionName("");
                     }}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      px: 1,
+                      fontSize: "var(--font-size-xs)",
+                      borderColor: "var(--color-surface-border)",
+                      color: "var(--color-text)",
+                      "&:hover": {
+                        bgcolor: "var(--color-surface-hover)",
+                        borderColor: "var(--color-glass-highlight-border)",
+                        color: "var(--color-accent)",
+                      },
+                    }}
                   >
                     Cancel
-                  </button>
-                  <button type="submit" className="form-button form-button-primary">Create</button>
-                </div>
-              </form>
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="form-button form-button-primary"
+                    size="small"
+                    variant="contained"
+                    sx={{
+                      px: 1,
+                      fontSize: "var(--font-size-xs)",
+                      bgcolor: "var(--color-accent)",
+                      "&:hover": {
+                        bgcolor: "var(--color-accent-hover)",
+                      },
+                    }}
+                  >
+                    Create
+                  </Button>
+                </Stack>
+              </Box>
             )}
 
-            <div className="sidebar-sessions-section">
-              <div className="sidebar-sessions-header">
-                <span className="sidebar-section-label">Sessions</span>
-                <div className="sidebar-sessions-header-actions">
+            <Box className="sidebar-sessions-section" sx={{ px: "var(--spacing-sm)" }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                className="sidebar-sessions-header"
+                sx={{
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  py: "var(--spacing-xs)",
+                  px: "var(--spacing-sm)",
+                  mb: 0.5,
+                }}
+              >
+                <Typography
+                  className="sidebar-section-label"
+                  variant="caption"
+                  sx={{
+                    fontSize: "var(--font-size-xs)",
+                    fontWeight: "var(--font-weight-semibold)",
+                    color: "var(--color-text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Sessions
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                   {filteredSessions.length > 0 && (
-                    <span className="sidebar-session-count">{filteredSessions.length}</span>
+                    <Chip
+                      label={filteredSessions.length}
+                      size="small"
+                      className="sidebar-session-count"
+                      sx={{
+                        fontSize: "10px",
+                        fontWeight: "var(--font-weight-semibold)",
+                        color: "var(--color-text-disabled)",
+                        bgcolor: "var(--color-surface)",
+                        border: "1px solid var(--color-surface-border)",
+                        minHeight: 20,
+                        height: 20,
+                      }}
+                    />
                   )}
-                  <button
-                    type="button"
+                  <IconButton
                     className="sidebar-session-create-button"
                     onClick={() => setShowNewSessionForm(!showNewSessionForm)}
                     data-testid="new-session-button"
                     aria-label="New Session"
                     title="New Session"
+                    size="small"
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      bgcolor: "var(--color-surface)",
+                      border: "1px solid var(--color-surface-border)",
+                      color: "var(--color-text-muted)",
+                      "&:hover": {
+                        bgcolor: "var(--color-surface-hover)",
+                        color: "var(--color-accent)",
+                        borderColor: "var(--color-glass-highlight-border)",
+                        boxShadow: "var(--color-shadow-glow)",
+                      },
+                    }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+                    <AddIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Stack>
+              </Stack>
+
               {filteredSessions.length === 0 ? (
-                <div className="sidebar-empty-small">
+                <Box
+                  className="sidebar-empty-small"
+                  sx={{
+                    p: "var(--spacing-md) var(--spacing-sm)",
+                    textAlign: "center",
+                    color: "var(--color-text-muted)",
+                    fontSize: "var(--font-size-xs)",
+                    bgcolor: "var(--color-surface)",
+                    borderRadius: "var(--radius-sm)",
+                    mt: "var(--spacing-xs)",
+                  }}
+                >
                   {searchQuery ? "No sessions match your search" : "No sessions yet"}
-                </div>
+                </Box>
               ) : (
-                <div className="session-card-list">
+                <List className="session-card-list" disablePadding sx={{ mt: "var(--spacing-sm)" }}>
                   {filteredSessions.map((session) => {
                     const sname = session.name ?? "";
                     if (!sname) return null;
                     const isRenaming = renamingSession === sname;
 
                     return (
-                      <div
+                      <Box
                         key={sname}
                         className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}`}
                         data-testid={`session-card-${sname}`}
+                        sx={{
+                          mb: 0.75,
+                        }}
                       >
                         {isRenaming ? (
-                          <div className="session-card-rename">
-                            <input
-                              type="text"
+                          <Box className="session-card-rename" sx={{ p: "var(--spacing-sm)" }}>
+                            <TextField
+                              fullWidth
+                              size="small"
                               value={renameValue}
                               onChange={(e) => setRenameValue(e.target.value)}
                               onBlur={() => submitRename(sname)}
@@ -543,99 +776,269 @@ export function Sidebar() {
                               autoFocus
                               className="session-rename-input"
                               data-testid={`rename-session-input-${sname}`}
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  bgcolor: "var(--color-panel)",
+                                  borderRadius: "var(--radius-sm)",
+                                  fontSize: "var(--font-size-xs)",
+                                  color: "var(--color-text)",
+                                  border: "1px solid var(--color-accent)",
+                                  "& fieldset": { border: "none" },
+                                },
+                              }}
                             />
-                          </div>
+                          </Box>
                         ) : (
-                          <>
-                            <button
-                              type="button"
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              position: "relative",
+                            }}
+                          >
+                            <ListItemButton
                               className="session-card-body"
                               onClick={() => handleOpenSession(sname)}
                               data-testid={`session-open-${sname}`}
+                              sx={{
+                                flexDirection: "column",
+                                alignItems: "stretch",
+                                gap: "6px",
+                                py: "12px",
+                                px: "14px",
+                                minWidth: 0,
+                              }}
                             >
-                              <div className="session-card-name-group">
-                                  <div className="session-card-top">
-                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
-                                      <span className="session-card-name" title={sname}>{sname}</span>
-                                      {typeof session.windowCount === "number" && session.windowCount > 0 && (
-                                        <span className="window-count-badge">{session.windowCount} w</span>
-                                      )}
-                                      {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
-                                        <span className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}>
-                                          {session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {session.intelligenceUpdatedAt && (
-                                      <span className="session-card-time">{formatRelativeTime(session.intelligenceUpdatedAt)}</span>
+                              <Box className="session-card-name-group">
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    className="session-card-top"
+                                    sx={{ alignItems: "center", justifyContent: "space-between", minWidth: 0 }}
+                                  >
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{ alignItems: "center", minWidth: 0, flex: 1 }}
+                                  >
+                                    <Typography
+                                      className="session-card-name"
+                                      variant="body2"
+                                      title={sname}
+                                      sx={{
+                                        fontSize: "var(--font-size-sm)",
+                                        fontWeight: "var(--font-weight-bold)",
+                                        color: "var(--color-text)",
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        lineHeight: 1.2,
+                                      }}
+                                      noWrap
+                                    >
+                                      {sname}
+                                    </Typography>
+                                    {typeof session.windowCount === "number" && session.windowCount > 0 && (
+                                      <Chip
+                                        label={`${session.windowCount} w`}
+                                        size="small"
+                                        className="window-count-badge"
+                                        sx={{
+                                          fontSize: "10px",
+                                          fontWeight: "var(--font-weight-semibold)",
+                                          color: "var(--color-text-secondary)",
+                                          bgcolor: "var(--color-surface)",
+                                          border: "1px solid var(--color-surface-border)",
+                                          minHeight: 18,
+                                          height: 18,
+                                          minWidth: 18,
+                                        }}
+                                      />
                                     )}
-                                  </div>
+                                    {((session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) || session.intelligenceError) && (
+                                      <Chip
+                                        label={session.intelligenceError ? "Error" : INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus}
+                                        size="small"
+                                        className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}
+                                        sx={{
+                                          fontSize: "10px",
+                                          fontWeight: "var(--font-weight-semibold)",
+                                          minHeight: 18,
+                                          height: 18,
+                                        }}
+                                      />
+                                    )}
+                                  </Stack>
+                                  {session.intelligenceUpdatedAt && (
+                                    <Typography
+                                      className="session-card-time"
+                                      variant="caption"
+                                      sx={{
+                                        fontSize: "10px",
+                                        color: "var(--color-text-muted)",
+                                        flexShrink: 0,
+                                        opacity: 0.6,
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      {formatRelativeTime(session.intelligenceUpdatedAt)}
+                                    </Typography>
+                                  )}
+                                </Stack>
                                 {session.intelligenceSummary && (
-                                  <p className="session-intelligence-summary" title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}>
+                                  <Typography
+                                    component="p"
+                                    className="session-intelligence-summary"
+                                    title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}
+                                    sx={{
+                                      fontSize: "11px",
+                                      color: "var(--color-text-secondary)",
+                                      m: "2px 0",
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      maxWidth: "100%",
+                                      opacity: 0.9,
+                                      fontFamily: "var(--font-stack)",
+                                      lineHeight: 1.5,
+                                      py: "4px",
+                                    }}
+                                  >
                                     {session.intelligenceSummary}
-                                  </p>
+                                  </Typography>
                                 )}
-                                  <div className="session-card-meta">
-                                    {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
-                                      <span className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}>
-                                        {session.attentionCount}
-                                      </span>
-                                    )}
-                                    {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
-                                      const count = session.intelligenceAppCounts![app];
-                                      if (typeof count !== "number" || count <= 0) return null;
-                                      return (
-                                        <span key={app} className={`app-count-badge is-${app}`}>
-                                          {app} {count}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </button>
-                            <div className="session-card-actions">
-                              <button
-                                type="button"
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  className="session-card-meta"
+                                  sx={{
+                                    alignItems: "center",
+                                    flexWrap: "wrap",
+                                    minHeight: "18px",
+                                  }}
+                                >
+                                  {(session.attentionState === "attention" || session.attentionState === "explicit") && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
+                                    <Chip
+                                      label={session.attentionCount}
+                                      size="small"
+                                      className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}
+                                      sx={{
+                                        fontSize: "10px",
+                                        minHeight: 18,
+                                        height: 18,
+                                      }}
+                                    />
+                                  )}
+                                  {session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
+                                    const count = session.intelligenceAppCounts![app];
+                                    if (typeof count !== "number" || count <= 0) return null;
+                                    return (
+                                      <Chip
+                                        key={app}
+                                        label={`${app} ${count}`}
+                                        size="small"
+                                        className={`app-count-badge is-${app}`}
+                                        sx={{
+                                          fontSize: "10px",
+                                          minHeight: 18,
+                                          height: 18,
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </Stack>
+                              </Box>
+                            </ListItemButton>
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              className="session-card-actions"
+                              sx={{
+                                alignItems: "center",
+                                position: "absolute",
+                                right: 0,
+                                top: 0,
+                                height: "100%",
+                                px: "10px",
+                                opacity: 0,
+                                transition: "opacity var(--transition-fast)",
+                                background: "linear-gradient(to left, var(--color-panel) 80%, transparent)",
+                                ".session-card:hover &": {
+                                  opacity: 1,
+                                },
+                                ".session-card.is-active &": {
+                                  background: "linear-gradient(to left, var(--color-glass-highlight) 80%, transparent)",
+                                },
+                              }}
+                            >
+                              <IconButton
                                 className="session-action-btn"
                                 onClick={(e) => { e.stopPropagation(); handleRenameSession(sname); }}
                                 title="Rename"
                                 data-testid={`rename-session-${sname}`}
+                                size="small"
+                                sx={{
+                                  width: 24,
+                                  height: 24,
+                                  color: "var(--color-text-muted)",
+                                  "&:hover": {
+                                    bgcolor: "var(--color-surface-hover)",
+                                    color: "var(--color-text)",
+                                  },
+                                }}
                               >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                              </button>
-                              <button
-                                type="button"
+                                <EditIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                              <IconButton
                                 className="session-action-btn session-action-danger"
                                 onClick={(e) => { e.stopPropagation(); handleKillSession(sname); }}
                                 title="Kill session"
                                 data-testid={`kill-session-${sname}`}
+                                size="small"
+                                sx={{
+                                  width: 24,
+                                  height: 24,
+                                  color: "var(--color-text-muted)",
+                                  "&:hover": {
+                                    bgcolor: "var(--color-danger)",
+                                    color: "var(--color-background)",
+                                  },
+                                }}
                               >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <polyline points="3 6 5 6 21 6"/>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                </svg>
-                              </button>
-                            </div>
-                          </>
+                                <DeleteIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </Stack>
+                          </Box>
                         )}
-                      </div>
+                      </Box>
                     );
                   })}
-                </div>
+                </List>
               )}
-            </div>
+            </Box>
           </>
         ) : (
-          <div className="sidebar-empty">
+          <Box
+            className="sidebar-empty"
+            sx={{
+              p: "var(--spacing-xl) var(--spacing-md)",
+              textAlign: "center",
+              color: "var(--color-text-muted)",
+              fontSize: "var(--font-size-sm)",
+              bgcolor: "var(--color-surface)",
+              border: "1px dashed var(--color-surface-border)",
+              borderRadius: "var(--radius-md)",
+              mt: "var(--spacing-md)",
+            }}
+          >
             {connections.length === 0
               ? "No connections configured"
               : "Loading..."}
-          </div>
+          </Box>
         )}
-      </div>
-    </aside>
+      </Box>
+    </Paper>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem, FormControl, InputLabel, Typography, Box, Paper, IconButton } from "@mui/material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -139,7 +140,6 @@ export function SettingsPanel() {
 			}
 			setConnectionHealth(healthMap);
 		} catch {
-			// ignored
 		}
 	};
 
@@ -250,17 +250,17 @@ export function SettingsPanel() {
 			setConfig(saved);
 			setFormState(buildFormState(saved));
 			setConnections(saved.connections);
-								document.documentElement.dataset.theme = savedTheme;
-								applyUIFontSize(saved.ui.fontSize);
-							setUISettings({
-								theme: savedTheme,
-								windowTheme: savedWindowTheme,
-								fontSize: saved.ui.fontSize,
-								terminalFontSize: saved.ui.terminalFontSize,
-								terminalFontWeight: saved.ui.terminalFontWeight,
-							});
-								setConfigConflict(null);
-								setShowSettingsPanel(false);
+			document.documentElement.dataset.theme = savedTheme;
+			applyUIFontSize(saved.ui.fontSize);
+			setUISettings({
+				theme: savedTheme,
+				windowTheme: savedWindowTheme,
+				fontSize: saved.ui.fontSize,
+				terminalFontSize: saved.ui.terminalFontSize,
+				terminalFontWeight: saved.ui.terminalFontWeight,
+			});
+			setConfigConflict(null);
+			setShowSettingsPanel(false);
 		} catch (err: unknown) {
 			if (err instanceof ApiError && err.code === "conflict") {
 				setConfigConflict({
@@ -275,30 +275,30 @@ export function SettingsPanel() {
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
-								ui: { ...latest.ui, theme: payload.ui.theme, windowTheme: payload.ui.windowTheme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
-								intelligence: {
-									...latest.intelligence,
-									enabled: payload.intelligence.enabled,
-									activeProvider: payload.intelligence.activeProvider,
-									providers: payload.intelligence.providers,
-									maxBytes: payload.intelligence.maxBytes,
-									timeoutSec: payload.intelligence.timeoutSec,
-									minSessionIntervalSec: payload.intelligence.minSessionIntervalSec,
-									maxConcurrency: payload.intelligence.maxConcurrency,
-									cacheTTLSec: payload.intelligence.cacheTTLSec,
-								},
-									connections: latest.connections.map((connection) => {
-										if (connection.type !== "ssh") {
-											return connection;
-										}
-										const pendingConnection = payload.connections.find((item) => item.id === connection.id);
-										return {
-											...connection,
-											knownHostsPath: pendingConnection?.knownHostsPath ?? connection.knownHostsPath,
-										};
-									}),
+							ui: { ...latest.ui, theme: payload.ui.theme, windowTheme: payload.ui.windowTheme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
+							intelligence: {
+								...latest.intelligence,
+								enabled: payload.intelligence.enabled,
+								activeProvider: payload.intelligence.activeProvider,
+								providers: payload.intelligence.providers,
+								maxBytes: payload.intelligence.maxBytes,
+								timeoutSec: payload.intelligence.timeoutSec,
+								minSessionIntervalSec: payload.intelligence.minSessionIntervalSec,
+								maxConcurrency: payload.intelligence.maxConcurrency,
+								cacheTTLSec: payload.intelligence.cacheTTLSec,
+							},
+							connections: latest.connections.map((connection) => {
+								if (connection.type !== "ssh") {
+									return connection;
+								}
+								const pendingConnection = payload.connections.find((item) => item.id === connection.id);
+								return {
+									...connection,
+									knownHostsPath: pendingConnection?.knownHostsPath ?? connection.knownHostsPath,
 								};
-								await performSave(retryPayload);
+							}),
+						};
+						await performSave(retryPayload);
 					},
 				});
 				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
@@ -410,238 +410,234 @@ export function SettingsPanel() {
 		setShowNewConnectionForm(true);
 	};
 
-	return (
-		<div className="settings-panel-overlay">
-			<div className="settings-panel" data-testid="settings-panel">
-				<div className="settings-panel-header">
-					<div className="settings-panel-header-title">
-						<h3 className="form-title">Settings</h3>
-						<span className="settings-panel-subtitle">Configure your wmux workspace</span>
-					</div>
-					<button type="button" className="error-banner-dismiss" onClick={closePanel} aria-label="Close settings">
-						×
-					</button>
-				</div>
+	const navItems: { key: typeof activeTab; icon: string; label: string }[] = [
+		{ key: "general", icon: "🔧", label: "General" },
+		{ key: "connections", icon: "🌐", label: "Connections" },
+		{ key: "theme", icon: "🎨", label: "Theme" },
+		{ key: "typography", icon: "🔠", label: "Typography" },
+		{ key: "intelligence", icon: "✨", label: "AI" },
+	];
 
-				{isLoading || !formState ? (
-					<div className="settings-panel-loading">
+	return (
+		<Dialog
+			open={showSettingsPanel}
+			onClose={handleCancel}
+			maxWidth="xl"
+			fullWidth
+			fullScreen
+			data-testid="settings-panel"
+		>
+			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 3 }}>
+				<Box>
+					<Typography variant="h6" component="h3">Settings</Typography>
+					<Typography variant="body2" color="text.secondary">Configure your wmux workspace</Typography>
+				</Box>
+				<IconButton
+					onClick={closePanel}
+					aria-label="Close settings"
+					sx={{ color: "text.secondary" }}
+				>
+					×
+				</IconButton>
+			</DialogTitle>
+
+			{isLoading || !formState ? (
+				<DialogContent>
+					<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px", gap: 2 }}>
 						<div className="spinner" />
 						<span>Loading settings...</span>
-					</div>
-				) : (
-					<div className="settings-panel-body">
-						{/* Left: Sidebar Navigation */}
-						<aside className="settings-sidebar">
-							<nav className="settings-nav">
-								<button
+					</Box>
+				</DialogContent>
+			) : (
+				<Box sx={{ display: "flex", height: "calc(100vh - 130px)", overflow: "hidden" }}>
+					{/* Left: Sidebar Navigation */}
+									<Box role="complementary" sx={{ width: 200, borderRight: 1, borderColor: "divider", p: 1, display: "flex", flexDirection: "column" }}>
+						<nav>
+							{navItems.map((item) => (
+								<Button
+									key={item.key}
 									type="button"
-									className={`settings-nav-item ${activeTab === "general" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("general")}
+									fullWidth
+									variant={activeTab === item.key ? "contained" : "text"}
+									onClick={() => setActiveTab(item.key)}
+									sx={{
+										justifyContent: "flex-start",
+										px: 2,
+										py: 1,
+										mb: 0.5,
+										textTransform: "none",
+										fontSize: "0.875rem",
+									}}
 								>
-									<span className="nav-icon">🔧</span>
-									<span className="nav-label">General</span>
-								</button>
-								<button
-									type="button"
-									className={`settings-nav-item ${activeTab === "connections" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("connections")}
-								>
-									<span className="nav-icon">🌐</span>
-									<span className="nav-label">Connections</span>
-								</button>
-				<button
-					type="button"
-					className={`settings-nav-item ${activeTab === "theme" ? "is-active" : ""}`}
-					onClick={() => setActiveTab("theme")}
-				>
-					<span className="nav-icon">🎨</span>
-					<span className="nav-label">Theme</span>
-				</button>
-				<button
-					type="button"
-					className={`settings-nav-item ${activeTab === "typography" ? "is-active" : ""}`}
-					onClick={() => setActiveTab("typography")}
-				>
-					<span className="nav-icon">🔠</span>
-					<span className="nav-label">Typography</span>
-				</button>
-								<button
-									type="button"
-									className={`settings-nav-item ${activeTab === "intelligence" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("intelligence")}
-								>
-									<span className="nav-icon">✨</span>
-									<span className="nav-label">AI</span>
-								</button>
-							</nav>
+									<span className="nav-icon" style={{ marginRight: 8 }}>{item.icon}</span>
+									<span className="nav-label">{item.label}</span>
+								</Button>
+							))}
+						</nav>
 
-							<div className="settings-sidebar-footer">
-								<div className="version-info">wmux v{window.performance ? "0.1.0" : "dev"}</div>
-							</div>
-						</aside>
+						<Box sx={{ mt: "auto", p: 1 }}>
+							<Typography variant="caption" color="text.secondary">wmux v{window.performance ? "0.1.0" : "dev"}</Typography>
+						</Box>
+					</Box>
 
-						{/* Right: Content Area */}
-						<div className="settings-main">
-							<form className="settings-form" onSubmit={handleSave}>
-								<div className="settings-content-scroll" ref={scrollContainerRef}>
-									{activeTab === "general" && (
-										<div className="settings-tab-content">
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">Server Configuration</h4>
-											<div className="settings-fields-grid">
-												<div className="form-field">
-													<label htmlFor="settings-bind">Server Bind</label>
-													<input
-														id="settings-bind"
-														type="text"
-														value={formState.bind}
-														onChange={(event) => updateField("bind", event.target.value)}
-														data-testid="settings-bind-input"
-														placeholder="127.0.0.1:7331"
-													/>
-													<p className="form-help-text">IP address and port to listen on.</p>
-												</div>
+					{/* Right: Content Area */}
+					<Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+						<form className="settings-form" onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+							<Box sx={{ flex: 1, overflow: "auto", p: 3 }} ref={scrollContainerRef}>
+								{activeTab === "general" && (
+									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Server Configuration</Typography>
+											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+												<TextField
+													id="settings-bind"
+													label="Server Bind"
+													type="text"
+													value={formState.bind}
+													onChange={(event) => updateField("bind", event.target.value)}
+													data-testid="settings-bind-input"
+													placeholder="127.0.0.1:7331"
+													fullWidth
+													helperText="IP address and port to listen on."
+												/>
 
-												<div className="form-field">
-													<label htmlFor="settings-tmux-path">tmux Path</label>
-													<input
-														id="settings-tmux-path"
-														type="text"
-														value={formState.tmuxPath}
-														onChange={(event) => updateField("tmuxPath", event.target.value)}
-														data-testid="settings-tmux-path-input"
-														placeholder="tmux"
-													/>
-													<p className="form-help-text">Path to the tmux executable.</p>
-												</div>
-											</div>
-											</div>
+												<TextField
+													id="settings-tmux-path"
+													label="tmux Path"
+													type="text"
+													value={formState.tmuxPath}
+													onChange={(event) => updateField("tmuxPath", event.target.value)}
+													data-testid="settings-tmux-path-input"
+													placeholder="tmux"
+													fullWidth
+													helperText="Path to the tmux executable."
+												/>
+											</Box>
+										</Box>
 
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">Security & Auth</h4>
-												<div className="form-field">
-													<label htmlFor="settings-token">Auth Token</label>
-													<div className="password-input-wrapper">
-														<input
-															id="settings-token"
-															type="password"
-															value={formState.tokenInput}
-															onChange={(event) => updateField("tokenInput", event.target.value)}
-															placeholder={formState.tokenConfigured ? "••••••••••••••••" : "Optional on localhost"}
-															data-testid="settings-token-input"
-															autoComplete="new-password"
-														/>
-													</div>
-													<p className="form-help-text" data-testid="settings-token-status">
-														{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
-													</p>
-												</div>
-											</div>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Security & Auth</Typography>
+											<TextField
+												id="settings-token"
+												label="Auth Token"
+												type="password"
+												value={formState.tokenInput}
+												onChange={(event) => updateField("tokenInput", event.target.value)}
+												placeholder={formState.tokenConfigured ? "••••••••••••••••" : "Optional on localhost"}
+												data-testid="settings-token-input"
+												fullWidth
+												autoComplete="new-password"
+												className="password-input-wrapper"
+											/>
+											<Typography variant="caption" color="text.secondary" data-testid="settings-token-status" sx={{ display: "block", mt: 0.5 }}>
+												{formState.tokenConfigured ? "A token is configured. Enter a new value to replace it." : "No token configured yet."}
+											</Typography>
+										</Box>
 
-											<div className="settings-form-section">
-												<h4 className="settings-section-title">SSH Environment</h4>
-												<div className="form-field">
-													<label htmlFor="settings-known-hosts">known_hosts Path</label>
-													<input
-														id="settings-known-hosts"
-														type="text"
-														value={formState.knownHostsPath}
-														onChange={(event) => updateField("knownHostsPath", event.target.value)}
-														data-testid="settings-known-hosts-input"
-														placeholder="~/.ssh/known_hosts"
-													/>
-													<p className="form-help-text">Default path for host key verification.</p>
-												</div>
-											</div>
-										</div>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>SSH Environment</Typography>
+											<TextField
+												id="settings-known-hosts"
+												label="known_hosts Path"
+												type="text"
+												value={formState.knownHostsPath}
+												onChange={(event) => updateField("knownHostsPath", event.target.value)}
+												data-testid="settings-known-hosts-input"
+												placeholder="~/.ssh/known_hosts"
+												fullWidth
+												helperText="Default path for host key verification."
+											/>
+										</Box>
+									</Box>
 								)}
 
-									{activeTab === "connections" && (
-										<div className="settings-tab-content">
-											<div className="settings-connections-header">
-												<div className="settings-section-title">Managed Connections</div>
-												<button
-													type="button"
-													className="settings-new-connection-btn"
-													onClick={handleNewConnection}
-												>
-													+ NEW
-												</button>
-											</div>
-											
-											{connections.length === 0 ? (
-												<div className="settings-connections-empty">
-													<div className="empty-icon">🔌</div>
-													<p>No connections configured yet</p>
-													<button type="button" className="settings-new-connection-btn" onClick={handleNewConnection}>
-														+ NEW
-													</button>
-												</div>
-											) : (
-												<ul className="settings-connections-list">
-													{connections.map((connection) => {
-														const connHealth = connectionHealth[connection.id];
-														const statusClass =
-															connHealth?.status === "online"
-																? "is-online"
-																: connHealth?.status === "offline"
-																	? "is-offline"
-																	: "is-unknown";
-														const typeLabel = connection.type === "ssh" ? "SSH" : "Local";
-														const subtitle = connection.type === "ssh" && connection.host
-															? `${connection.user ?? ""}@${connection.host}${connection.port ? `:${connection.port}` : ""}`
-															: "System Terminal";
+								{activeTab === "connections" && (
+									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+										<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Managed Connections</Typography>
+											<Button
+												type="button"
+												variant="contained"
+												size="small"
+												onClick={handleNewConnection}
+											>
+												+ NEW
+											</Button>
+										</Box>
 
-														return (
-															<li key={connection.id} className="settings-connection-item">
-																<div className="settings-connection-info">
-																	<div
-																		className={`connection-status-dot ${statusClass}`}
-																		title={
-																			connHealth?.status === "online"
-																				? "Online"
-																				: connHealth?.status === "offline"
-																					? `Offline: ${connHealth.errorCode ?? connHealth.message ?? "unknown"}`
-																					: "Unknown"
-																		}
-																	/>
-																	<div className="settings-connection-details">
-																		<span className="settings-connection-name">{connectionDisplayName(connection)}</span>
-																		<span className="settings-connection-meta">
-																			{typeLabel} · {subtitle}
-																		</span>
-																	</div>
-																</div>
-																<div className="settings-connection-actions">
-																	<button
-																		type="button"
-																		className="connection-edit-btn"
-																		onClick={() => handleEditConnection(connection)}
-																		title="Edit connection"
-																	>
-																		✎
-																	</button>
-																	<button
-																		type="button"
-																		className="connection-delete-btn"
-																		onClick={() => handleDeleteConnection(connection)}
-																		title="Delete connection"
-																	>
-																		×
-																	</button>
-																</div>
-															</li>
-														);
-													})}
-												</ul>
-											)}
-										</div>
-									)}
+										{connections.length === 0 ? (
+											<Box sx={{ textAlign: "center", py: 4 }}>
+												<div className="empty-icon" style={{ fontSize: "48px" }}>🔌</div>
+												<Typography sx={{ my: 1 }}>No connections configured yet</Typography>
+												<Button variant="contained" size="small" onClick={handleNewConnection}>+ NEW</Button>
+											</Box>
+										) : (
+											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0 }}>
+												{connections.map((connection) => {
+													const connHealth = connectionHealth[connection.id];
+													const statusClass =
+														connHealth?.status === "online"
+															? "is-online"
+															: connHealth?.status === "offline"
+																? "is-offline"
+																: "is-unknown";
+													const typeLabel = connection.type === "ssh" ? "SSH" : "Local";
+													const subtitle = connection.type === "ssh" && connection.host
+														? `${connection.user ?? ""}@${connection.host}${connection.port ? `:${connection.port}` : ""}`
+														: "System Terminal";
+
+													return (
+														<Box key={connection.id} component="li" className="settings-connection-item" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, borderRadius: 1, bgcolor: "background.paper", boxShadow: 1 }}>
+															<Box className="settings-connection-info" sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+																<div
+																	className={`connection-status-dot ${statusClass}`}
+																	title={
+																		connHealth?.status === "online"
+																			? "Online"
+																			: connHealth?.status === "offline"
+																				? `Offline: ${connHealth.errorCode ?? connHealth.message ?? "unknown"}`
+																				: "Unknown"
+																	}
+																/>
+																<Box className="settings-connection-details">
+																	<Typography className="settings-connection-name" variant="body2" sx={{ fontWeight: 500 }}>{connectionDisplayName(connection)}</Typography>
+																	<Typography className="settings-connection-meta" variant="caption" color="text.secondary">
+																		{typeLabel} · {subtitle}
+																	</Typography>
+																</Box>
+															</Box>
+															<Box className="settings-connection-actions" sx={{ display: "flex", gap: 0.5 }}>
+																<IconButton
+																	type="button"
+																	className="connection-edit-btn"
+																	onClick={() => handleEditConnection(connection)}
+																	title="Edit connection"
+																	size="small"
+																>
+																	✎
+																</IconButton>
+																<IconButton
+																	type="button"
+																	className="connection-delete-btn"
+																	onClick={() => handleDeleteConnection(connection)}
+																	title="Delete connection"
+																	size="small"
+																>
+																	×
+																</IconButton>
+															</Box>
+														</Box>
+													);
+												})}
+											</Box>
+										)}
+									</Box>
+								)}
 
 								{activeTab === "intelligence" && (
-									<div className="settings-tab-content">
-										<div className="settings-form-section">
-											<h4 className="settings-section-title">AI Intelligence</h4>
+									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>AI Intelligence</Typography>
 											<div className="form-field form-field-toggle">
 												<label htmlFor="intelligence-enabled">Enable AI Intelligence</label>
 												<input
@@ -652,14 +648,15 @@ export function SettingsPanel() {
 													data-testid="intelligence-enabled-checkbox"
 												/>
 											</div>
-										</div>
+										</Box>
 
-										<div className="settings-form-section">
-											<h4 className="settings-section-title">Providers</h4>
-											<div className="intelligence-providers-header">
-												<button
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Providers</Typography>
+											<Box sx={{ mb: 2 }}>
+												<Button
 													type="button"
-													className="intelligence-add-provider-btn"
+													variant="contained"
+													size="small"
 													onClick={() => setFormState((current) =>
 														current ? {
 															...current,
@@ -672,7 +669,7 @@ export function SettingsPanel() {
 																apiKeyConfigured: false,
 																isNew: true,
 																apiKeyInput: "",
-															originalName: "",
+																originalName: "",
 															},
 														} : current
 													)}
@@ -680,11 +677,11 @@ export function SettingsPanel() {
 													data-testid="intelligence-add-provider-btn"
 												>
 													+ ADD PROVIDER
-												</button>
-											</div>
+												</Button>
+											</Box>
 
 											{formState.editingProvider && (
-												<div className="intelligence-provider-editor" data-testid="intelligence-provider-editor">
+												<Box className="intelligence-provider-editor" data-testid="intelligence-provider-editor" sx={{ display: "flex", flexDirection: "column", gap: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
 													<div className="form-field">
 														<label htmlFor="provider-editor-name">Name</label>
 														<input
@@ -785,19 +782,19 @@ export function SettingsPanel() {
 														/>
 														<p className="form-help-text">Optional custom endpoint for OpenAI-compatible providers.</p>
 													</div>
-													<div className="intelligence-editor-actions">
-														<button
+													<Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+														<Button
 															type="button"
-															className="btn btn-secondary"
+															variant="outlined"
 															onClick={() => setFormState((current) =>
 																current ? { ...current, editingProvider: null } : current
 															)}
 														>
 															CANCEL
-														</button>
-														<button
+														</Button>
+														<Button
 															type="button"
-															className="btn btn-primary"
+															variant="contained"
 															onClick={() => {
 																if (!formState) return;
 																const editor = formState.editingProvider;
@@ -815,10 +812,10 @@ export function SettingsPanel() {
 																	return;
 																}
 																const duplicateName = formState.intelligenceProviders.some(
-													(p) => p.name === editor.name.trim() && p.name !== (editor.isNew ? "" : editor.originalName)
+																	(p) => p.name === editor.name.trim() && p.name !== (editor.isNew ? "" : editor.originalName)
 																);
 																const existingProvider = formState.editingProvider && !formState.editingProvider.isNew
-													? formState.intelligenceProviders.find((p) => p.name === editor.originalName)
+																	? formState.intelligenceProviders.find((p) => p.name === editor.originalName)
 																	: undefined;
 																if (duplicateName && existingProvider?.name !== editor.name.trim()) {
 																	setError({ code: "bad_request", message: `Provider name "${editor.name.trim()}" already exists` });
@@ -861,29 +858,31 @@ export function SettingsPanel() {
 															data-testid="provider-editor-save-btn"
 														>
 															SAVE PROVIDER
-														</button>
-													</div>
-												</div>
+														</Button>
+													</Box>
+												</Box>
 											)}
 
 											{formState.intelligenceProviders.length === 0 && !formState.editingProvider ? (
-												<div className="intelligence-providers-empty" data-testid="intelligence-providers-empty">
-													<div className="empty-icon">🤖</div>
-													<p>No providers configured yet. Add a provider to get started.</p>
-												</div>
+												<Box className="intelligence-providers-empty" data-testid="intelligence-providers-empty" sx={{ textAlign: "center", py: 4 }}>
+													<div className="empty-icon" style={{ fontSize: "48px" }}>🤖</div>
+													<Typography>No providers configured yet. Add a provider to get started.</Typography>
+												</Box>
 											) : (
-												<ul className="intelligence-providers-list" data-testid="intelligence-providers-list">
+												<Box component="ul" className="intelligence-providers-list" data-testid="intelligence-providers-list" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 2 }}>
 													{formState.intelligenceProviders.map((provider) => {
 														const isActive = provider.name === formState.intelligenceActiveProvider;
 														return (
-															<li
+															<Box
 																key={provider.name}
+																component="li"
 																className={`intelligence-provider-card ${isActive ? "is-active" : ""}`}
 																data-testid={`intelligence-provider-card-${provider.name}`}
+																sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1, position: "relative" }}
 															>
-																<div className="intelligence-provider-info">
-																	<div className="intelligence-provider-name">{provider.name}</div>
-																	<div className="intelligence-provider-meta">
+																<Box className="intelligence-provider-info" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+																	<Typography className="intelligence-provider-name" variant="body2" sx={{ fontWeight: 500 }}>{provider.name}</Typography>
+																	<Box className="intelligence-provider-meta" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 																		<span className="intelligence-provider-badge" data-testid={`provider-type-badge-${provider.name}`}>
 																			{provider.provider}
 																		</span>
@@ -891,22 +890,24 @@ export function SettingsPanel() {
 																		{provider.apiKeyConfigured && (
 																			<span className="intelligence-provider-key-status" title="API key configured">🔑</span>
 																		)}
-																	</div>
-																</div>
-																<div className="intelligence-provider-actions">
-																	<button
+																	</Box>
+																</Box>
+																<Box className="intelligence-provider-actions" sx={{ display: "flex", gap: 0.5, mt: 1 }}>
+																	<Button
 																		type="button"
 																		className={`intelligence-set-active-btn ${isActive ? "is-active" : ""}`}
+																		size="small"
 																		onClick={() => setFormState((current) =>
 																			current ? { ...current, intelligenceActiveProvider: provider.name } : current
 																		)}
 																		disabled={!formState.intelligenceEnabled}
 																		title={isActive ? "Active provider" : "Set as active provider"}
 																		data-testid={`provider-set-active-${provider.name}`}
+																		variant={isActive ? "contained" : "outlined"}
 																	>
 																		{isActive ? "★ ACTIVE" : "SET ACTIVE"}
-																	</button>
-																	<button
+																	</Button>
+																	<IconButton
 																		type="button"
 																		className="intelligence-edit-btn"
 																		onClick={() => setFormState((current) =>
@@ -923,10 +924,11 @@ export function SettingsPanel() {
 																		disabled={!formState.intelligenceEnabled}
 																		title="Edit provider"
 																		data-testid={`provider-edit-${provider.name}`}
+																		size="small"
 																	>
 																		✎
-																	</button>
-																	<button
+																	</IconButton>
+																	<IconButton
 																		type="button"
 																		className="intelligence-delete-btn"
 																		onClick={() => {
@@ -948,23 +950,24 @@ export function SettingsPanel() {
 																		disabled={!formState.intelligenceEnabled}
 																		title="Delete provider"
 																		data-testid={`provider-delete-${provider.name}`}
+																		size="small"
 																	>
 																		×
-																	</button>
-																</div>
+																	</IconButton>
+																</Box>
 																{isActive && (
 																	<div className="intelligence-provider-active-indicator" data-testid={`provider-active-indicator-${provider.name}`} />
 																)}
-															</li>
+															</Box>
 														);
 													})}
-												</ul>
+												</Box>
 											)}
-										</div>
+										</Box>
 
-										<div className="settings-form-section">
-											<h4 className="settings-section-title">Global Settings</h4>
-											<div className="settings-fields-grid">
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Global Settings</Typography>
+											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
 												<div className="form-field">
 													<label htmlFor="intelligence-max-bytes">Max Bytes</label>
 													<input
@@ -1020,104 +1023,102 @@ export function SettingsPanel() {
 														disabled={!formState.intelligenceEnabled}
 													/>
 												</div>
-											</div>
-										</div>
-									</div>
+											</Box>
+										</Box>
+									</Box>
 								)}
 
-							{activeTab === "theme" && (
-								<div className="settings-tab-content">
-									<div className="settings-form-section">
-										<h4 className="settings-section-title">Theme</h4>
-										<p className="form-help-text">Global theme for the full application shell.</p>
-										<div className="form-field">
-											<div className="theme-grid">
-												{THEME_OPTIONS.map((theme) => renderThemeCard("theme", formState.theme, theme.id))}
-											</div>
-										</div>
-									</div>
-								</div>
-							)}
-
-							{activeTab === "typography" && (
-								<div className="settings-tab-content">
-									<div className="settings-form-section">
-										<h4 className="settings-section-title">Typography</h4>
-										<div className="form-field">
-											<label htmlFor="settings-font-size">UI Font Size</label>
-											<div className="font-size-control">
-												<input
-													id="settings-font-size"
-													type="range"
-													min={12}
-													max={24}
-													value={formState.fontSize}
-													onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
-													data-testid="settings-font-size-input"
-												/>
-												<span className="font-size-value">{formState.fontSize}px</span>
-											</div>
-										</div>
-
-										<div className="settings-fields-grid">
+								{activeTab === "theme" && (
+									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Theme</Typography>
+											<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Global theme for the full application shell.</Typography>
 											<div className="form-field">
-												<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+												<div className="theme-grid">
+													{THEME_OPTIONS.map((theme) => renderThemeCard("theme", formState.theme, theme.id))}
+												</div>
+											</div>
+										</Box>
+									</Box>
+								)}
+
+								{activeTab === "typography" && (
+									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Typography</Typography>
+											<div className="form-field">
+												<label htmlFor="settings-font-size">UI Font Size</label>
 												<div className="font-size-control">
 													<input
-														id="settings-terminal-font-size"
+														id="settings-font-size"
 														type="range"
-														min={8}
-														max={32}
-														value={formState.terminalFontSize}
-														onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
-														data-testid="settings-terminal-font-size-input"
+														min={12}
+														max={24}
+														value={formState.fontSize}
+														onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
+														data-testid="settings-font-size-input"
 													/>
-													<span className="font-size-value">{formState.terminalFontSize}px</span>
+													<span className="font-size-value">{formState.fontSize}px</span>
 												</div>
 											</div>
 
-											<div className="form-field">
-												<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
-												<select
-													id="settings-terminal-font-weight"
-													value={formState.terminalFontWeight}
-													onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
-													data-testid="settings-terminal-font-weight-input"
-													className="font-weight-select"
-												>
-													{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
-														<option key={weight} value={weight}>
-															{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
-														</option>
-													))}
-												</select>
-												<p className="form-help-text">Font weight for terminal text.</p>
-											</div>
-										</div>
-									</div>
-								</div>
-							)}
+											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
+												<div className="form-field">
+													<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
+													<div className="font-size-control">
+														<input
+															id="settings-terminal-font-size"
+															type="range"
+															min={8}
+															max={32}
+															value={formState.terminalFontSize}
+															onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
+															data-testid="settings-terminal-font-size-input"
+														/>
+														<span className="font-size-value">{formState.terminalFontSize}px</span>
+													</div>
+												</div>
 
-								</div>
+												<div className="form-field">
+													<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
+													<select
+														id="settings-terminal-font-weight"
+														value={formState.terminalFontWeight}
+														onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
+														data-testid="settings-terminal-font-weight-input"
+														className="font-weight-select"
+													>
+														{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
+															<option key={weight} value={weight}>
+																{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
+															</option>
+														))}
+													</select>
+													<p className="form-help-text">Font weight for terminal text.</p>
+												</div>
+											</Box>
+										</Box>
+									</Box>
+								)}
+							</Box>
 
-								<div className="settings-footer">
-									<div className="settings-footer-status">
-										{isSaving && <span className="saving-indicator">Saving changes...</span>}
-									</div>
-									<div className="form-actions">
-										<button type="button" className="btn btn-secondary" onClick={handleCancel}>
-											CANCEL
-										</button>
-										<button type="submit" className="btn btn-primary" disabled={isSaving || isLoading}>
-											{isSaving ? "SAVING..." : "SAVE"}
-										</button>
-									</div>
+							<Box sx={{ p: 2, borderTop: 1, borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+								<div className="settings-footer-status">
+									{isSaving && <span className="saving-indicator">Saving changes...</span>}
 								</div>
-							</form>
-						</div>
-					</div>
-				)}
-			</div>
-		</div>
+								<Box sx={{ display: "flex", gap: 1 }}>
+									<Button type="button" variant="outlined" onClick={handleCancel}>
+										CANCEL
+									</Button>
+									<Button type="submit" variant="contained" disabled={isSaving || isLoading}>
+										{isSaving ? "SAVING..." : "SAVE"}
+									</Button>
+								</Box>
+							</Box>
+						</form>
+					</Box>
+				</Box>
+			)}
+		</Dialog>
 	);
 }
