@@ -1,20 +1,14 @@
 @import './tokens.css';
 
-/* ==========================================================================
-   Connection Badge — pill indicator
-   ========================================================================== */
-
+/* --- Connection Badge --- */
 .connection-badge {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
 	padding: 2px 8px;
 	border-radius: var(--radius-full);
-	border: 1px solid var(--color-surface-border);
-	background-color: var(--color-surface);
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-medium);
-	color: var(--color-text-secondary);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -28,13 +22,9 @@
 	height: 6px;
 	border-radius: 50%;
 	flex-shrink: 0;
-	box-shadow: 0 0 8px currentColor;
 }
 
-/* ==========================================================================
-   Connection Tree (sidebar)
-   ========================================================================== */
-
+/* --- Connection Tree (sidebar) --- */
 .connection-tree {
 	list-style: none;
 	display: flex;
@@ -53,23 +43,7 @@
 	padding: var(--spacing-sm) var(--spacing-md);
 	border-radius: var(--radius-sm);
 	cursor: pointer;
-	border: 1px solid transparent;
 	transition: all var(--transition-base);
-}
-
-.connection-tree-header:hover {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-surface-border);
-}
-
-.connection-tree-header.is-active {
-	background-color: var(--color-glass-highlight);
-	border-color: var(--color-glass-highlight-border);
-}
-
-.connection-tree-header.is-active .connection-name {
-	color: var(--color-accent);
-	text-shadow: var(--color-accent-glow);
 }
 
 .connection-tree-toggle {
@@ -78,14 +52,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--color-text-muted);
 	font-size: 9px;
 	transition: color var(--transition-fast);
 	flex-shrink: 0;
-}
-
-.connection-tree-toggle:hover {
-	color: var(--color-text);
 }
 
 .connection-status-dot {
@@ -96,22 +65,7 @@
 	transition: all var(--transition-base);
 }
 
-.connection-status-dot.is-online {
-	background-color: var(--color-success);
-	box-shadow: var(--color-success-glow);
-}
-
-.connection-status-dot.is-offline {
-	background-color: var(--color-danger);
-	box-shadow: var(--color-danger-glow);
-}
-
-.connection-status-dot.is-unknown {
-	background-color: var(--color-text-disabled);
-}
-
 .connection-icon {
-	color: var(--color-text-muted);
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
@@ -120,7 +74,6 @@
 .connection-name {
 	flex: 1;
 	font-size: var(--font-size-sm);
-	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -133,21 +86,15 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 	line-height: 1;
 	opacity: 1;
-	transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+	transition: opacity var(--transition-fast);
 	flex-shrink: 0;
 }
 
 .connection-tree-header:hover .connection-edit-btn {
 	opacity: 1;
-}
-
-.connection-edit-btn:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
 }
 
 .connection-delete-btn {
@@ -157,11 +104,10 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
 	font-size: var(--font-size-lg);
 	line-height: 1;
 	opacity: 1;
-	transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+	transition: opacity var(--transition-fast);
 	flex-shrink: 0;
 }
 
@@ -169,40 +115,25 @@
 	opacity: 1;
 }
 
-.connection-delete-btn:hover {
-	background-color: var(--color-danger);
-	color: var(--color-background);
-}
-
 .connection-tree-children {
 	margin-left: var(--spacing-md);
 	padding-left: var(--spacing-sm);
-	border-left: 1px solid var(--color-border-subtle);
 }
 
-/* ==========================================================================
-   Sidebar Sub-Items
-   ========================================================================== */
-
+/* --- Sidebar Sub-Items --- */
 .sidebar-sub-empty {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	padding: var(--spacing-xs) var(--spacing-sm);
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 }
 
 .sidebar-add-btn {
 	font-size: var(--font-size-xs);
-	color: var(--color-accent);
 	padding: 2px 6px;
 	border-radius: var(--radius-sm);
 	transition: background-color var(--transition-fast);
-}
-
-.sidebar-add-btn:hover {
-	background-color: var(--color-accent-subtle);
 }
 
 .sidebar-add-item {
@@ -210,13 +141,8 @@
 	padding: 2px var(--spacing-sm);
 }
 
-/* Session form in sidebar */
 .sidebar-session-form {
 	padding: var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	margin: var(--spacing-xs) 0;
 }
@@ -224,23 +150,11 @@
 .sidebar-session-form input {
 	width: 100%;
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-input-bg);
-	border: 1px solid var(--color-input-border);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-xs);
-	color: var(--color-input-text);
 	margin-bottom: var(--spacing-sm);
 	box-sizing: border-box;
 	transition: all var(--transition-fast);
-}
-
-.sidebar-session-form input:focus {
-	border-color: var(--color-input-border-focus);
-	box-shadow: 0 0 0 2px var(--color-accent-subtle);
-}
-
-.sidebar-session-form input::placeholder {
-	color: var(--color-input-placeholder);
 }
 
 .sidebar-session-form-actions {
@@ -254,10 +168,7 @@
 	font-size: var(--font-size-xs);
 }
 
-/* ==========================================================================
-   Sidebar Session Tree
-   ========================================================================== */
-
+/* --- Sidebar Session Tree --- */
 .sidebar-session-tree {
 	list-style: none;
 	margin-top: var(--spacing-xs);
@@ -276,14 +187,9 @@
 	transition: background-color var(--transition-fast);
 }
 
-.sidebar-session-row:hover {
-	background-color: var(--color-surface);
-}
-
 .sidebar-session-label {
 	flex: 1;
 	font-size: var(--font-size-xs);
-	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -308,37 +214,22 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
 	transition: all var(--transition-fast);
-	background-color: transparent;
 }
 
 .session-action-btn:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
 	transform: scale(1.1);
-}
-
-.session-action-btn.session-action-danger:hover {
-	background-color: var(--color-danger);
-	color: var(--color-background);
 }
 
 .session-rename-input {
 	flex: 1;
 	padding: 1px 4px;
-	background-color: var(--color-panel);
-	border: 1px solid var(--color-accent);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-xs);
-	color: var(--color-text);
 }
 
-/* ==========================================================================
-   Sidebar Window Tree
-   ========================================================================== */
-
+/* --- Sidebar Window Tree --- */
 .sidebar-window-tree {
 	list-style: none;
 	margin-left: var(--spacing-md);
@@ -357,38 +248,25 @@
 	transition: background-color var(--transition-fast);
 }
 
-.sidebar-window-row:hover {
-	background-color: var(--color-surface);
-}
-
 .window-toggle {
 	width: 14px;
 	height: 14px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--color-text-muted);
 	font-size: 8px;
 	flex-shrink: 0;
-}
-
-.window-toggle:hover {
-	color: var(--color-text);
 }
 
 .sidebar-window-label {
 	flex: 1;
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-/* ==========================================================================
-   Sidebar Pane Tree
-   ========================================================================== */
-
+/* --- Sidebar Pane Tree --- */
 .sidebar-pane-tree {
 	list-style: none;
 	margin-left: var(--spacing-md);
@@ -410,28 +288,15 @@
 	text-align: left;
 }
 
-.sidebar-pane-row:hover {
-	background-color: var(--color-surface);
-}
-
 .sidebar-pane-label {
 	flex: 1;
 	font-size: var(--font-size-xs);
-	color: var(--color-text-disabled);
 }
 
 .sidebar-pane-row.is-selected {
-	background-color: var(--color-glass-highlight);
 }
 
-.sidebar-pane-row.is-selected .sidebar-pane-label {
-	color: var(--color-accent);
-}
-
-/* ==========================================================================
-   Error Banner — glass toast
-   ========================================================================== */
-
+/* --- Error Banner --- */
 .error-banner {
 	position: fixed;
 	top: var(--spacing-md);
@@ -442,12 +307,7 @@
 	align-items: center;
 	gap: var(--spacing-md);
 	padding: var(--spacing-md) var(--spacing-lg);
-	background-color: var(--color-banner-bg);
-	backdrop-filter: var(--glass-blur-lg);
-	-webkit-backdrop-filter: var(--glass-blur-lg);
-	border: 1px solid var(--color-banner-error-border);
 	border-radius: var(--radius-md);
-	box-shadow: var(--color-danger-glow), var(--shadow-lg);
 	max-width: 520px;
 }
 
@@ -463,19 +323,13 @@
 	gap: var(--spacing-md);
 	width: min(760px, calc(100vw - 32px));
 	padding: var(--spacing-md) var(--spacing-lg);
-	background-color: var(--color-banner-bg);
-	backdrop-filter: var(--glass-blur-lg);
-	-webkit-backdrop-filter: var(--glass-blur-lg);
-	border: 1px solid var(--color-banner-warning-border);
 	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-lg);
 }
 
 .config-conflict-copy {
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing-xs);
-	color: var(--color-text);
 	font-size: var(--font-size-sm);
 	line-height: var(--line-height-normal);
 }
@@ -495,32 +349,21 @@
 	gap: var(--spacing-sm);
 	padding: var(--spacing-sm);
 	margin-bottom: var(--spacing-lg);
-	background-color: var(--color-banner-warning-bg);
-	border: 1px solid var(--color-banner-warning-border);
 	border-radius: var(--radius-sm);
-	color: var(--color-text);
 	font-size: var(--font-size-sm);
 	line-height: var(--line-height-normal);
 }
 
 .inline-warning-banner strong {
-	color: var(--color-warning);
 	white-space: nowrap;
 }
 
 .inline-warning-banner-error {
-	background-color: var(--color-banner-error-bg);
-	border-color: var(--color-banner-error-border);
-}
-
-.inline-warning-banner-error strong {
-	color: var(--color-danger);
 }
 
 .error-banner-code {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-danger);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	white-space: nowrap;
@@ -528,7 +371,6 @@
 
 .error-banner-message {
 	font-size: var(--font-size-sm);
-	color: var(--color-text);
 	flex: 1;
 }
 
@@ -539,21 +381,12 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
 	font-size: var(--font-size-lg);
 	line-height: 1;
 	transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.error-banner-dismiss:hover {
-	color: var(--color-text);
-	background-color: var(--color-surface-hover);
-}
-
-/* ==========================================================================
-   Confirm Dialog — glass modal
-   ========================================================================== */
-
+/* --- Confirm Dialog --- */
 .confirm-dialog-overlay {
 	position: fixed;
 	inset: 0;
@@ -561,33 +394,23 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: var(--color-overlay-glass);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .confirm-dialog {
 	width: 100%;
 	max-width: 420px;
 	padding: var(--spacing-xl);
-	background-color: var(--color-surface-elevated);
-	backdrop-filter: var(--glass-blur-lg);
-	-webkit-backdrop-filter: var(--glass-blur-lg);
-	border: 1px solid var(--color-surface-elevated-border);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl);
 }
 
 .confirm-dialog-title {
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text);
 	margin-bottom: var(--spacing-sm);
 }
 
 .confirm-dialog-message {
 	font-size: var(--font-size-sm);
-	color: var(--color-text-muted);
 	line-height: var(--line-height-normal);
 	margin-bottom: var(--spacing-lg);
 }
@@ -600,50 +423,24 @@
 
 .confirm-dialog-cancel {
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	color: var(--color-text);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-medium);
 	transition: background-color var(--transition-fast);
-	border: 1px solid var(--color-surface-border);
-}
-
-.confirm-dialog-cancel:hover {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-surface-border-hover);
 }
 
 .confirm-dialog-confirm {
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-accent);
-	color: var(--color-background);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-medium);
-	transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.confirm-dialog-confirm:hover {
-	background-color: var(--color-accent-hover);
-	box-shadow: var(--color-accent-glow);
+	transition: background-color var(--transition-fast);
 }
 
 .confirm-dialog-confirm.is-danger {
-	background-color: var(--color-danger);
 }
 
-.confirm-dialog-confirm.is-danger:hover {
-	background-color: var(--color-danger-hover);
-	box-shadow: var(--color-danger-glow);
-}
-
-/* ==========================================================================
-   New Connection Form Overlay — glass
-   ========================================================================== */
-
+/* --- New Connection Form Overlay --- */
 .new-connection-form-overlay {
 	position: fixed;
 	inset: 0;
@@ -651,15 +448,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: var(--color-overlay-glass);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
-/* ==========================================================================
-   Settings Panel — glass overlay + sidebar layout
-   ========================================================================== */
-
+/* --- Settings Panel --- */
 .settings-panel-overlay {
 	position: fixed;
 	inset: 0;
@@ -667,23 +458,15 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: var(--color-overlay-glass);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .settings-panel {
 	width: 800px;
 	height: 600px;
 	overflow: hidden;
-	background-color: var(--color-surface-elevated);
-	backdrop-filter: var(--glass-blur-xl);
-	-webkit-backdrop-filter: var(--glass-blur-xl);
-	border: 1px solid var(--color-surface-elevated-border);
 	border-radius: var(--radius-lg);
 	display: flex;
 	flex-direction: column;
-	box-shadow: var(--shadow-xl);
 }
 
 .settings-panel-header {
@@ -692,12 +475,6 @@
 	justify-content: space-between;
 	gap: var(--spacing-sm);
 	padding: var(--spacing-md) var(--spacing-lg);
-	background: linear-gradient(
-		to bottom,
-		var(--color-glass-highlight),
-		transparent
-	);
-	border-bottom: 1px solid var(--color-panel-border);
 }
 
 .settings-panel-body {
@@ -712,8 +489,6 @@
 	min-width: 220px;
 	display: flex;
 	flex-direction: column;
-	background-color: var(--color-surface);
-	border-right: 1px solid var(--color-panel-border);
 }
 
 .settings-nav {
@@ -730,24 +505,11 @@
 	gap: var(--spacing-md);
 	padding: var(--spacing-md);
 	border-radius: var(--radius-sm);
-	color: var(--color-text-secondary);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-medium);
 	transition: all var(--transition-base);
 	text-align: left;
 	white-space: nowrap;
-	border: 1px solid transparent;
-}
-
-.settings-nav-item:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
-}
-
-.settings-nav-item.is-active {
-	background-color: var(--color-glass-highlight);
-	color: var(--color-accent);
-	border: 1px solid var(--color-glass-highlight-border);
 }
 
 .settings-nav-item .nav-icon {
@@ -759,17 +521,14 @@
 
 .settings-nav-item.is-active .nav-icon {
 	opacity: 1;
-	text-shadow: var(--color-accent-glow);
 }
 
 .settings-sidebar-footer {
 	padding: var(--spacing-md);
-	border-top: 1px solid var(--color-panel-border);
 }
 
 .version-info {
 	font-size: 10px;
-	color: var(--color-text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.1em;
 	opacity: 0.5;
@@ -780,7 +539,6 @@
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
-	background-color: var(--color-background);
 }
 
 .settings-form {
@@ -814,7 +572,6 @@
 
 .settings-panel-subtitle {
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 }
 
 .settings-panel-header .form-title {
@@ -823,14 +580,10 @@
 
 .settings-panel-loading {
 	padding: var(--spacing-md) 0;
-	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 }
 
-/* ==========================================================================
-   Error Logs Panel
-   ========================================================================== */
-
+/* --- Error Logs Panel --- */
 .error-logs-panel-overlay {
 	position: fixed;
 	inset: 0;
@@ -838,23 +591,15 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: var(--color-overlay-glass);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
 }
 
 .error-logs-panel {
 	width: min(760px, calc(100vw - 32px));
 	height: min(560px, calc(100vh - 32px));
 	overflow: hidden;
-	background-color: var(--color-surface-elevated);
-	backdrop-filter: var(--glass-blur-xl);
-	-webkit-backdrop-filter: var(--glass-blur-xl);
-	border: 1px solid var(--color-surface-elevated-border);
 	border-radius: var(--radius-lg);
 	display: flex;
 	flex-direction: column;
-	box-shadow: var(--shadow-xl);
 }
 
 .error-logs-panel-header {
@@ -863,12 +608,6 @@
 	justify-content: space-between;
 	gap: var(--spacing-sm);
 	padding: var(--spacing-md) var(--spacing-lg);
-	background: linear-gradient(
-		to bottom,
-		var(--color-glass-highlight),
-		transparent
-	);
-	border-bottom: 1px solid var(--color-panel-border);
 }
 
 .error-logs-panel-body {
@@ -878,7 +617,6 @@
 	flex-direction: column;
 	gap: var(--spacing-md);
 	padding: var(--spacing-lg);
-	background-color: var(--color-background);
 }
 
 .error-logs-toolbar {
@@ -904,7 +642,6 @@
 }
 
 .error-logs-clear-button {
-	color: var(--color-danger);
 }
 
 .error-logs-empty-state {
@@ -913,10 +650,7 @@
 	align-items: center;
 	justify-content: center;
 	padding: var(--spacing-xl);
-	color: var(--color-text-muted);
 	text-align: center;
-	background-color: var(--color-surface);
-	border: 1px dashed var(--color-surface-border);
 	border-radius: var(--radius-md);
 }
 
@@ -930,7 +664,6 @@
 
 .error-logs-truncated {
 	margin: 0;
-	color: var(--color-text-muted);
 }
 
 .error-logs-content {
@@ -941,9 +674,6 @@
 	flex-direction: column;
 	gap: 4px;
 	padding: var(--spacing-md);
-	background-color: var(--color-bg-code, #1a1a2e);
-	color: var(--color-text-code, #e0e0e0);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-sm);
 }
 
@@ -951,8 +681,6 @@
 	display: block;
 	padding: 6px 8px;
 	border-radius: var(--radius-sm);
-	background-color: rgba(255, 255, 255, 0.03);
-	color: inherit;
 	font-size: var(--font-size-xs);
 	line-height: 1.5;
 	white-space: pre-wrap;
@@ -960,32 +688,20 @@
 	font-family: var(--font-mono);
 }
 
-/* ==========================================================================
-   Form Help Text
-   ========================================================================== */
-
+/* --- Form Help Text --- */
 .form-help-text {
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 	line-height: var(--line-height-normal);
 }
 
-/* ==========================================================================
-   New Connection Form — glass card
-   ========================================================================== */
-
+/* --- New Connection Form --- */
 .new-connection-form {
 	width: 100%;
 	max-width: 480px;
 	max-height: 90vh;
 	overflow-y: auto;
 	padding: var(--spacing-xl);
-	background-color: var(--color-surface-elevated);
-	backdrop-filter: var(--glass-blur-lg);
-	-webkit-backdrop-filter: var(--glass-blur-lg);
-	border: 1px solid var(--color-surface-elevated-border);
 	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-xl), 0 0 0 1px var(--color-glass-highlight-border);
 	display: flex;
 	flex-direction: column;
 	gap: var(--spacing-lg);
@@ -995,15 +711,11 @@
 	font-family: var(--font-display);
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-accent);
 	margin-bottom: var(--spacing-lg);
 	letter-spacing: 0.05em;
 }
 
-/* ==========================================================================
-   Form Fields — glass inputs
-   ========================================================================== */
-
+/* --- Form Fields --- */
 .form-field {
 	display: flex;
 	flex-direction: column;
@@ -1013,38 +725,18 @@
 .form-field label {
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-medium);
-	color: var(--color-text-secondary);
 }
 
 .form-field input,
 .form-field select {
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-input-bg);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-input-border);
 	border-radius: var(--radius-input);
 	font-size: var(--font-size-sm);
-	color: var(--color-input-text);
 	transition: all var(--transition-base);
 	outline: none;
 }
 
-.form-field input:hover,
-.form-field select:hover {
-	border-color: var(--color-surface-border-hover);
-	background-color: var(--color-surface-hover);
-}
-
-.form-field input:focus,
-.form-field select:focus {
-	border-color: var(--color-input-border-focus);
-	background-color: var(--color-surface);
-	box-shadow: 0 0 0 2px var(--color-accent-subtle);
-}
-
 .form-field input::placeholder {
-	color: var(--color-input-placeholder);
 }
 
 .form-field select {
@@ -1057,10 +749,7 @@
 	flex-direction: column;
 }
 
-/* ==========================================================================
-   Form Actions
-   ========================================================================== */
-
+/* --- Form Actions --- */
 .form-actions {
 	display: flex;
 	justify-content: flex-end;
@@ -1085,33 +774,16 @@
 }
 
 .form-button-primary {
-	background-color: var(--color-accent);
-	color: var(--color-background);
-	box-shadow: var(--color-accent-glow);
 }
 
 .form-button-primary:hover:not(:disabled) {
-	background-color: var(--color-accent-hover);
 	transform: translateY(-1px);
-	box-shadow: 0 0 24px rgba(245, 158, 11, 0.4);
 }
 
 .form-button-secondary {
-	background-color: var(--color-surface);
-	color: var(--color-text);
-	border: 1px solid var(--color-surface-border);
 }
 
-.form-button-secondary:hover:not(:disabled) {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-glass-highlight-border);
-	color: var(--color-accent);
-}
-
-/* ==========================================================================
-   Session List (in settings / empty states)
-   ========================================================================== */
-
+/* --- Session List --- */
 .session-list {
 	width: 100%;
 	max-width: 640px;
@@ -1127,7 +799,6 @@
 .session-list-title {
 	font-size: var(--font-size-base);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text);
 }
 
 .session-list-new-btn {
@@ -1137,33 +808,20 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	background-color: var(--color-accent);
-	color: var(--color-background);
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-medium);
-	transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.session-list-new-btn:hover {
-	background-color: var(--color-accent-hover);
-	box-shadow: var(--color-accent-glow);
+	transition: background-color var(--transition-fast);
 }
 
 .session-list-empty,
 .session-list-loading {
 	padding: var(--spacing-lg);
 	text-align: center;
-	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 }
 
-/* New session inline form */
 .new-session-form {
 	padding: var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	margin-bottom: var(--spacing-md);
 }
@@ -1171,17 +829,9 @@
 .new-session-form input {
 	width: 100%;
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-input-bg);
-	border: 1px solid var(--color-input-border);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
-	color: var(--color-text);
 	margin-bottom: var(--spacing-sm);
-}
-
-.new-session-form input:focus {
-	border-color: var(--color-input-border-focus);
-	box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
 .new-session-actions {
@@ -1190,10 +840,7 @@
 	gap: var(--spacing-sm);
 }
 
-/* ==========================================================================
-   Session Tree (sidebar)
-   ========================================================================== */
-
+/* --- Session Tree --- */
 .session-tree {
 	list-style: none;
 	display: flex;
@@ -1211,23 +858,8 @@
 	align-items: center;
 	gap: var(--spacing-sm);
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-sm);
 	transition: all var(--transition-fast);
-}
-
-.session-tree-row:hover {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-surface-border-hover);
-	box-shadow: var(--shadow-sm);
-}
-
-.session-tree-row.is-active {
-	background-color: var(--color-glass-highlight);
-	border-color: var(--color-glass-highlight-border);
 }
 
 .session-tree-toggle {
@@ -1236,20 +868,14 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
 	transition: color var(--transition-fast);
 	flex-shrink: 0;
 }
 
-.session-tree-toggle:hover {
-	color: var(--color-text);
-}
-
 .session-tree-label {
 	flex: 1;
 	font-size: var(--font-size-sm);
-	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1258,11 +884,8 @@
 .session-rename-input {
 	flex: 1;
 	padding: var(--spacing-xs) var(--spacing-sm);
-	background-color: var(--color-panel);
-	border: 1px solid var(--color-accent);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
-	color: var(--color-text);
 }
 
 .session-tree-actions {
@@ -1284,25 +907,17 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
-	transition: background-color var(--transition-fast), color var(--transition-fast);
+	transition: background-color var(--transition-fast);
 }
 
 .session-action-btn:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
 }
 
 .session-action-btn.session-action-danger:hover {
-	background-color: var(--color-danger);
-	color: var(--color-background);
 }
 
-/* ==========================================================================
-   Window Tree
-   ========================================================================== */
-
+/* --- Window Tree --- */
 .window-tree {
 	list-style: none;
 	margin-left: var(--spacing-lg);
@@ -1325,20 +940,12 @@
 	transition: background-color var(--transition-fast);
 }
 
-.window-tree-row:hover {
-	background-color: var(--color-surface);
-}
-
 .window-tree-label {
 	flex: 1;
 	font-size: var(--font-size-sm);
-	color: var(--color-text-muted);
 }
 
-/* ==========================================================================
-   Pane Tree
-   ========================================================================== */
-
+/* --- Pane Tree --- */
 .pane-tree {
 	list-style: none;
 	margin-left: var(--spacing-lg);
@@ -1361,33 +968,17 @@
 	transition: background-color var(--transition-fast);
 }
 
-.pane-tree-row:hover {
-	background-color: var(--color-surface);
-}
-
 .pane-tree-label {
 	flex: 1;
 	font-size: var(--font-size-xs);
-	color: var(--color-text-disabled);
 }
 
 .pane-tree-row.is-selected {
-	background-color: var(--color-glass-highlight);
-	border-left: 2px solid var(--color-accent);
 }
 
-.pane-tree-row.is-selected .pane-tree-label {
-	color: var(--color-accent);
-	font-weight: var(--font-weight-bold);
-	text-shadow: var(--color-accent-glow);
-}
-
-/* ==========================================================================
-   Terminal — xterm wrapper
-   ========================================================================== */
-
+/* --- Terminal --- */
 .terminal-wrapper {
-	--terminal-background: var(--color-background);
+	--terminal-background: transparent;
 	position: relative;
 	display: flex;
 	flex: 1;
@@ -1397,7 +988,6 @@
 	min-width: 0;
 	min-height: 0;
 	padding: var(--spacing-sm);
-	background-color: var(--terminal-background);
 	border-radius: var(--radius-sm);
 	overflow: hidden;
 }
@@ -1410,7 +1000,6 @@
 	height: 100%;
 	min-width: 0;
 	min-height: 0;
-	background-color: var(--terminal-background);
 	overflow-x: hidden;
 	overflow-y: hidden;
 }
@@ -1423,7 +1012,6 @@
 	height: 100%;
 	max-height: 100%;
 	min-height: 0;
-	background-color: var(--terminal-background);
 	overflow: hidden;
 }
 
@@ -1433,18 +1021,15 @@
 	max-width: 100%;
 	min-height: 0;
 	max-height: 100%;
-	background-color: var(--terminal-background);
 	overflow-x: hidden;
 }
 
 .terminal-container .xterm-screen {
 	max-width: 100%;
-	background-color: var(--terminal-background);
 	overflow: visible;
 }
 
 .terminal-container .xterm-screen canvas {
-	background-color: var(--terminal-background);
 }
 
 .terminal-container .xterm .xterm-rows span.xterm-italic,
@@ -1458,9 +1043,6 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background-color: var(--color-overlay-scrim);
-	backdrop-filter: var(--glass-blur-md);
-	-webkit-backdrop-filter: var(--glass-blur-md);
 	z-index: var(--z-dropdown);
 }
 
@@ -1474,33 +1056,21 @@
 
 .terminal-disconnected-text {
 	font-size: var(--font-size-base);
-	color: var(--color-text-muted);
 }
 
 .terminal-disconnected-error {
 	font-size: var(--font-size-sm);
-	color: var(--color-danger);
 }
 
 .terminal-reconnect-btn {
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-accent);
-	color: var(--color-background);
 	border-radius: var(--radius-input);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-medium);
-	transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+	transition: background-color var(--transition-fast);
 }
 
-.terminal-reconnect-btn:hover {
-	background-color: var(--color-accent-hover);
-	box-shadow: var(--color-accent-glow);
-}
-
-/* ==========================================================================
-   Settings Section
-   ========================================================================== */
-
+/* --- Settings Section --- */
 .settings-section {
 	margin-bottom: var(--spacing-lg);
 }
@@ -1519,18 +1089,11 @@
 	justify-content: center;
 	gap: 2px;
 	padding: 2px 4px;
-	background-color: var(--color-accent);
-	color: var(--color-background);
 	border-radius: var(--radius-sm);
 	font-size: 8px;
 	font-weight: var(--font-weight-bold);
-	transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+	transition: background-color var(--transition-fast);
 	flex-shrink: 0;
-}
-
-.settings-new-connection-btn:hover {
-	background-color: var(--color-accent-hover);
-	box-shadow: var(--color-accent-glow);
 }
 
 .settings-new-connection-btn:active {
@@ -1551,12 +1114,7 @@
 	justify-content: center;
 	padding: var(--spacing-2xl) var(--spacing-md);
 	gap: var(--spacing-md);
-	color: var(--color-text-muted);
 	text-align: center;
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px dashed var(--color-surface-border);
 	border-radius: var(--radius-md);
 }
 
@@ -1567,10 +1125,6 @@
 
 .settings-footer {
 	padding: var(--spacing-md) var(--spacing-xl);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border-top: 1px solid var(--color-panel-border);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -1578,7 +1132,6 @@
 
 .saving-indicator {
 	font-size: var(--font-size-xs);
-	color: var(--color-accent);
 	animation: pulse 1.5s infinite;
 }
 
@@ -1588,10 +1141,7 @@
 	100% { opacity: 0.5; }
 }
 
-/* ==========================================================================
-   Theme Cards (Settings)
-   ========================================================================== */
-
+/* --- Theme Cards --- */
 .theme-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1604,23 +1154,12 @@
 	gap: var(--spacing-sm);
 	padding: var(--spacing-sm);
 	text-align: left;
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	transition: all var(--transition-base);
 	cursor: pointer;
 }
 
-.theme-card:hover {
-	border-color: var(--color-surface-border-hover);
-	box-shadow: var(--shadow-sm);
-}
-
 .theme-card.is-active {
-	border-color: var(--color-accent);
-	background-color: var(--color-glass-highlight);
 }
 
 .theme-preview {
@@ -1629,11 +1168,6 @@
 	padding: 14px;
 	overflow: hidden;
 	border-radius: var(--radius-sm);
-	background:
-		radial-gradient(circle at 22% 24%, color-mix(in srgb, var(--theme-preview-accent) 38%, transparent) 0%, transparent 38%),
-		radial-gradient(circle at 80% 20%, color-mix(in srgb, var(--theme-preview-secondary) 34%, transparent) 0%, transparent 34%),
-		var(--theme-preview-bg);
-	border: 1px solid var(--color-border-subtle);
 }
 
 .theme-preview-orb {
@@ -1648,13 +1182,11 @@
 .theme-preview-orb-primary {
 	top: -12px;
 	left: -12px;
-	background: color-mix(in srgb, var(--theme-preview-accent) 72%, transparent);
 }
 
 .theme-preview-orb-secondary {
 	right: -10px;
 	bottom: -14px;
-	background: color-mix(in srgb, var(--theme-preview-secondary) 72%, transparent);
 }
 
 .theme-preview-panel {
@@ -1665,17 +1197,12 @@
 	height: 100%;
 	padding: 12px;
 	border-radius: 12px;
-	background: var(--theme-preview-panel);
-	backdrop-filter: blur(10px);
-	-webkit-backdrop-filter: blur(10px);
-	border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .theme-preview-bar {
 	width: 52%;
 	height: 8px;
 	border-radius: 999px;
-	background: color-mix(in srgb, var(--theme-preview-accent) 92%, white 8%);
 }
 
 .theme-preview-row {
@@ -1687,20 +1214,14 @@
 	flex: 1;
 	height: 14px;
 	border-radius: 999px;
-	background: color-mix(in srgb, var(--theme-preview-secondary) 80%, white 20%);
 }
 
 .theme-preview-chip-muted {
-	background: rgba(255, 255, 255, 0.24);
 }
 
 .theme-preview-terminal {
 	flex: 1;
 	border-radius: 8px;
-	background:
-		linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 100%),
-		color-mix(in srgb, var(--theme-preview-bg) 58%, black 42%);
-	border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .theme-card span {
@@ -1709,19 +1230,14 @@
 }
 
 .theme-card small {
-	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
 	line-height: 1.4;
 }
 
-/* ==========================================================================
-   Sidebar Section Labels
-   ========================================================================== */
-
+/* --- Sidebar Section Labels --- */
 .sidebar-section-label {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 }
@@ -1733,20 +1249,12 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	color: var(--color-accent);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-bold);
 	transition: background-color var(--transition-fast);
 }
 
-.sidebar-section-action:hover {
-	background-color: var(--color-accent-subtle);
-}
-
-/* ==========================================================================
-   Session Card List — glass cards
-   ========================================================================== */
-
+/* --- Session Card List --- */
 .session-card-list {
 	display: flex;
 	flex-direction: column;
@@ -1758,42 +1266,22 @@
 	display: flex;
 	align-items: center;
 	border-radius: var(--radius-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	overflow: hidden;
 	transition: all var(--transition-base);
 	position: relative;
 }
 
 .session-card:hover {
-	border-color: var(--color-surface-border-hover);
-	background-color: var(--color-surface-hover);
-	box-shadow: var(--shadow-md);
 	transform: translateY(-1px);
 }
 
 .session-card.is-active {
-	border-color: var(--color-accent);
-	background-color: var(--color-glass-highlight);
-	box-shadow:
-		inset 4px 0 0 var(--color-accent),
-		var(--color-accent-glow),
-		var(--shadow-sm);
-}
-
-.session-card.is-active .session-card-name {
-	color: var(--color-accent);
-	text-shadow: var(--color-accent-glow);
 }
 
 .session-card.is-attention-explicit:not(.is-active) {
-	box-shadow: inset 3px 0 0 var(--color-attention-explicit);
 }
 
 .session-card.is-attention:not(.is-active):not(.is-attention-explicit) {
-	box-shadow: inset 3px 0 0 var(--color-attention);
 }
 
 .session-card-body {
@@ -1819,7 +1307,6 @@
 .session-card-name {
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-bold);
-	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1836,12 +1323,9 @@
 
 .session-card-meta-count {
 	font-size: 11px;
-	color: var(--color-text-muted);
 	flex-shrink: 0;
-	background: var(--color-surface);
 	padding: 0 6px;
 	border-radius: var(--radius-sm);
-	border: 1px solid var(--color-surface-border);
 }
 
 .window-count-badge {
@@ -1855,15 +1339,11 @@
 	font-size: 10px;
 	font-weight: var(--font-weight-semibold);
 	line-height: 1;
-	color: var(--color-text-secondary);
-	background-color: var(--color-surface);
-	border: 1px solid var(--color-surface-border);
 	flex-shrink: 0;
 }
 
 .session-card-time {
 	font-size: 10px;
-	color: var(--color-text-muted);
 	flex-shrink: 0;
 	opacity: 0.6;
 	font-weight: 500;
@@ -1883,7 +1363,6 @@
 	padding: 0 10px;
 	opacity: 0;
 	transition: opacity var(--transition-fast);
-	background: linear-gradient(to left, var(--color-panel) 80%, transparent);
 	height: 100%;
 	position: absolute;
 	right: 0;
@@ -1895,7 +1374,6 @@
 }
 
 .session-card.is-active .session-card-actions {
-	background: linear-gradient(to left, var(--color-glass-highlight) 80%, transparent);
 }
 
 .session-card-rename {
@@ -1903,10 +1381,8 @@
 	padding: var(--spacing-sm);
 }
 
-/* Intelligence summary on cards */
 .session-intelligence-summary {
 	font-size: 11px;
-	color: var(--color-text-secondary);
 	margin: 2px 0;
 	white-space: normal;
 	display: -webkit-box;
@@ -1921,10 +1397,7 @@
 	padding: 4px 0;
 }
 
-/* ==========================================================================
-   Sidebar Sessions Section
-   ========================================================================== */
-
+/* --- Sidebar Sessions Section --- */
 .sidebar-sessions-section {
 	padding: 0 var(--spacing-sm);
 }
@@ -1940,9 +1413,6 @@
 .sidebar-session-count {
 	font-size: 10px;
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text-disabled);
-	background-color: var(--color-surface);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-full);
 	padding: 0 6px;
 	min-width: 20px;
@@ -1964,50 +1434,30 @@
 	justify-content: center;
 	flex-shrink: 0;
 	border-radius: var(--radius-sm);
-	background-color: var(--color-surface);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
-	transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.sidebar-session-create-button:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-accent);
-	border-color: var(--color-glass-highlight-border);
-	box-shadow: var(--color-shadow-glow);
+	transition: background-color var(--transition-fast);
 }
 
 .sidebar-empty-small {
 	padding: var(--spacing-md) var(--spacing-sm);
 	text-align: center;
-	color: var(--color-text-muted);
 	font-size: var(--font-size-xs);
-	background: var(--color-surface);
 	border-radius: var(--radius-sm);
 	margin-top: var(--spacing-xs);
 }
 
-/* Sidebar session form positioning fix */
 .sidebar-sessions-section .sidebar-session-form {
 	margin: var(--spacing-xs) 0;
 }
 
 .computed-name-display {
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-surface-hover);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
-	color: var(--color-accent);
 	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.05em;
-	text-shadow: var(--color-accent-glow);
 }
 
-/* ==========================================================================
-   Main Workspace
-   ========================================================================== */
-
+/* --- Main Workspace --- */
 .main-workspace {
 	flex: 1;
 	display: flex;
@@ -2019,17 +1469,12 @@
 	align-self: stretch;
 }
 
-/* ==========================================================================
-   Window Tabs — glass pills
-   ========================================================================== */
-
+/* --- Window Tabs --- */
 .window-tabs {
 	display: flex;
 	align-items: center;
 	gap: var(--spacing-xs);
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-background);
-	border-bottom: 1px solid var(--color-border);
 	overflow-x: hidden;
 	flex-shrink: 0;
 }
@@ -2039,13 +1484,8 @@
 	align-items: center;
 	gap: var(--spacing-sm);
 	padding: var(--spacing-xs) var(--spacing-lg);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	font-size: var(--font-size-sm);
-	color: var(--color-text-muted);
 	white-space: nowrap;
 	cursor: pointer;
 	transition: all var(--transition-base);
@@ -2055,33 +1495,20 @@
 }
 
 .window-tab:hover {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
-	border-color: var(--color-surface-border-hover);
 	transform: translateY(-1px);
-	box-shadow: var(--shadow-sm);
 }
 
 .window-tab.is-active {
-	background-color: var(--color-glass-highlight);
-	border-color: var(--color-accent);
-	color: var(--color-accent);
-	box-shadow:
-		0 -2px 12px rgba(245, 158, 11, 0.12),
-		var(--shadow-sm);
-	text-shadow: var(--color-accent-glow);
 }
 
 .window-tab-index {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text-disabled);
 	min-width: 16px;
 	text-align: center;
 }
 
 .window-tab.is-active .window-tab-index {
-	color: var(--color-accent);
 }
 
 .window-tab-name {
@@ -2095,40 +1522,28 @@
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
 	padding: 1px 5px;
-	background-color: var(--color-surface);
 	border-radius: var(--radius-sm);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
 }
 
 .window-tab.is-active .window-tab-badge {
-	background-color: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border-color: transparent;
 }
 
 .window-tab-pane-title {
 	font-size: var(--font-size-xs);
-	color: var(--color-text-disabled);
 	max-width: 120px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
 .window-tab.is-active .window-tab-pane-title {
-	color: var(--color-accent-hover);
 }
 
-/* ==========================================================================
-   Pane Canvas — terminal grid overlay
-   ========================================================================== */
-
+/* --- Pane Canvas --- */
 .pane-canvas {
 	flex: 1;
 	position: relative;
 	min-width: 0;
 	min-height: 0;
-	background-color: var(--color-background);
 	overflow: hidden;
 	padding: 1px;
 }
@@ -2151,10 +1566,6 @@
 }
 
 .pane-box {
-	background-color: var(--color-panel);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-sm);
 	cursor: pointer;
 	overflow: hidden;
@@ -2166,56 +1577,38 @@
 }
 
 .pane-canvas.has-terminal .pane-box {
-	background-color: transparent;
-	border-color: transparent;
-	box-shadow: none;
 	pointer-events: none;
 	z-index: 1;
-	backdrop-filter: none;
-	-webkit-backdrop-filter: none;
 }
 
 .pane-box:hover {
-	border-color: var(--color-glass-highlight-border);
 }
 
 .pane-canvas.has-terminal .pane-box:hover {
-	border-color: transparent;
 }
 
 .pane-box.is-active {
-	border: 2px solid var(--color-accent);
-	box-shadow: 0 0 24px rgba(245, 158, 11, 0.15);
 	z-index: 1;
 }
 
 .pane-canvas.has-terminal .pane-box.is-active {
-	background-color: transparent;
-	border: 1px solid var(--color-accent);
-	box-shadow: 0 0 24px rgba(245, 158, 11, 0.15);
 	z-index: 2;
-	backdrop-filter: none;
-	-webkit-backdrop-filter: none;
 }
 
 .pane-box-label {
 	padding: var(--spacing-xs) var(--spacing-sm);
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	flex-shrink: 0;
 	align-self: flex-start;
-	border: 0;
-	background: transparent;
 	font-family: inherit;
 	cursor: pointer;
 	pointer-events: auto;
 }
 
 .pane-box.is-active .pane-box-label {
-	color: var(--color-accent);
 }
 
 .pane-box-terminal {
@@ -2225,16 +1618,11 @@
 	overflow: hidden;
 }
 
-/* ==========================================================================
-   Attention State Indicators
-   ========================================================================== */
-
+/* --- Attention State Indicators --- */
 .is-attention-explicit:not(.is-active):not(.is-selected) {
-	border-color: var(--color-attention-explicit);
 }
 
 .is-attention:not(.is-active):not(.is-selected):not(.is-attention-explicit) {
-	border-color: var(--color-attention);
 }
 
 .attention-badge {
@@ -2248,13 +1636,10 @@
 	font-size: 10px;
 	font-weight: var(--font-weight-semibold);
 	line-height: 1;
-	color: #fff;
-	background-color: var(--color-attention-explicit);
 	flex-shrink: 0;
 }
 
 .attention-badge.is-soft {
-	background-color: var(--color-attention);
 }
 
 .pane-box.is-attention-explicit,
@@ -2270,10 +1655,7 @@
 	pointer-events: none;
 }
 
-/* ==========================================================================
-   Semantic Badges
-   ========================================================================== */
-
+/* --- Semantic Badges --- */
 .semantic-badge {
 	display: inline-flex;
 	align-items: center;
@@ -2285,8 +1667,6 @@
 	font-size: 9px;
 	font-weight: var(--font-weight-semibold);
 	line-height: 1;
-	color: var(--color-semantic);
-	background-color: var(--color-semantic-bg);
 	flex-shrink: 0;
 }
 
@@ -2297,23 +1677,15 @@
 	z-index: 2;
 	pointer-events: none;
 	font-size: 10px;
-	color: var(--color-semantic);
-	background-color: var(--color-semantic-bg);
 	padding: 1px 6px;
 	border-radius: var(--radius-sm);
 	white-space: nowrap;
 	max-width: 120px;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* ==========================================================================
-   Intelligence Badges
-   ========================================================================== */
-
+/* --- Intelligence Badges --- */
 .intelligence-badge {
 	display: inline-flex;
 	align-items: center;
@@ -2327,41 +1699,25 @@
 }
 
 .intelligence-badge.is-dead_loop {
-	color: var(--color-danger);
-	background-color: var(--color-danger-subtle);
 }
 
 .intelligence-badge.is-blocked {
-	color: var(--color-warning);
-	background-color: var(--color-warning-subtle);
 }
 
 .intelligence-badge.is-waiting_confirm {
-	color: #a855f7;
-	background-color: var(--color-attention-subtle);
-	border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
 .intelligence-badge.is-waiting_idle {
-	color: var(--color-accent);
-	background-color: var(--color-accent-subtle);
 	opacity: 0.7;
 }
 
 .intelligence-badge.is-running {
-	color: var(--color-success);
-	background-color: var(--color-success-subtle);
 }
 
 .intelligence-badge.is-stale {
-	color: var(--color-text-muted);
-	background-color: var(--color-surface);
-	border: 1px solid var(--color-surface-border);
 }
 
 .intelligence-badge.is-error {
-	color: var(--color-danger);
-	background-color: var(--color-danger-subtle);
 }
 
 .app-count-badge {
@@ -2378,29 +1734,18 @@
 }
 
 .app-count-badge.is-claude {
-	color: #d4a5ff;
-	background-color: rgba(212, 165, 255, 0.10);
 }
 
 .app-count-badge.is-codex {
-	color: #79c0ff;
-	background-color: rgba(121, 192, 255, 0.10);
 }
 
 .app-count-badge.is-opencode {
-	color: #56d364;
-	background-color: rgba(86, 211, 100, 0.10);
 }
 
 .app-count-badge.is-zsh {
-	color: #e3b341;
-	background-color: rgba(227, 179, 65, 0.10);
 }
 
-/* ==========================================================================
-   Pane Canvas Empty State
-   ========================================================================== */
-
+/* --- Pane Canvas Empty State --- */
 .pane-canvas-empty {
 	flex: 1;
 	display: flex;
@@ -2410,13 +1755,9 @@
 
 .pane-canvas-empty-text {
 	font-size: var(--font-size-sm);
-	color: var(--color-text-muted);
 }
 
-/* ==========================================================================
-   Settings Form Specifics
-   ========================================================================== */
-
+/* --- Settings Form Specifics --- */
 .font-size-control {
 	display: flex;
 	align-items: center;
@@ -2426,7 +1767,6 @@
 .font-size-value {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-bold);
-	color: var(--color-accent);
 	min-width: 32px;
 	text-align: right;
 }
@@ -2435,7 +1775,6 @@ input[type="range"] {
 	-webkit-appearance: none;
 	width: 100%;
 	height: 4px;
-	background: var(--color-surface-border);
 	border-radius: 2px;
 	outline: none;
 	cursor: pointer;
@@ -2445,16 +1784,12 @@ input[type="range"]::-webkit-slider-thumb {
 	-webkit-appearance: none;
 	width: 14px;
 	height: 14px;
-	background: var(--color-accent);
 	border-radius: 50%;
-	box-shadow: 0 0 10px var(--color-accent-subtle);
 	transition: all var(--transition-fast);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
 	transform: scale(1.2);
-	background: var(--color-accent-hover);
-	box-shadow: 0 0 15px var(--color-accent-subtle);
 }
 
 .settings-panel-loading {
@@ -2462,7 +1797,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	align-items: center;
 	justify-content: center;
 	height: 200px;
-	color: var(--color-text-muted);
 	font-size: var(--font-size-sm);
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
@@ -2470,18 +1804,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .settings-form-section + .settings-form-section {
 	padding-top: var(--spacing-md);
-	border-top: 1px solid var(--color-panel-border);
 }
 
-/* ==========================================================================
-   Spinner
-   ========================================================================== */
-
+/* --- Spinner --- */
 .spinner {
 	width: 24px;
 	height: 24px;
-	border: 2px solid var(--color-surface-border);
-	border-top-color: var(--color-accent);
+	border: 2px solid;
 	border-radius: 50%;
 	animation: spin 0.8s linear infinite;
 }
@@ -2499,23 +1828,16 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	height: 300px;
 }
 
-/* ==========================================================================
-   Section Titles
-   ========================================================================== */
-
+/* --- Section Titles --- */
 .settings-main .settings-section-title {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-bold);
-	color: var(--color-accent);
 	text-transform: uppercase;
 	letter-spacing: 0.15em;
 	margin-bottom: var(--spacing-md);
 }
 
-/* ==========================================================================
-   Compact Buttons
-   ========================================================================== */
-
+/* --- Compact Buttons --- */
 .btn {
 	display: inline-flex;
 	align-items: center;
@@ -2528,18 +1850,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	letter-spacing: 0.1em;
 	transition: all var(--transition-base);
 	cursor: pointer;
-	border: 1px solid transparent;
 }
 
 .btn-primary {
-	background-color: var(--color-accent);
-	color: var(--color-background);
-	box-shadow: var(--color-accent-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
-	background-color: var(--color-accent-hover);
-	box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
 	transform: translateY(-1px);
 }
 
@@ -2550,23 +1866,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .btn-secondary {
-	background-color: var(--color-surface);
-	color: var(--color-text-secondary);
-	border-color: var(--color-surface-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-	background-color: var(--color-surface-hover);
-	color: var(--color-text);
-	border-color: var(--color-surface-border-hover);
 }
 
 .settings-new-connection-btn {
 	padding: 2px 6px;
 	font-size: 9px;
-	background-color: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border: 1px solid var(--color-glass-highlight-border);
 	border-radius: var(--radius-sm);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
@@ -2575,9 +1882,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .settings-new-connection-btn:hover {
-	background-color: var(--color-accent);
-	color: var(--color-background);
-	box-shadow: var(--color-accent-glow);
 }
 
 .connection-edit-btn, .connection-delete-btn {
@@ -2589,24 +1893,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	border-radius: var(--radius-sm);
 	font-size: 14px;
 	transition: all var(--transition-fast);
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
 }
 
 .connection-edit-btn:hover {
-	background: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border-color: var(--color-glass-highlight-border);
 }
 
 .connection-delete-btn:hover {
-	background: var(--color-danger-subtle);
-	color: var(--color-danger);
-	border-color: rgba(239, 68, 68, 0.2);
 }
 
-/* Ensure footer buttons have equal width */
 .settings-footer .form-actions {
 	display: flex;
 	gap: var(--spacing-sm);
@@ -2616,10 +1910,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	min-width: 60px;
 }
 
-/* ==========================================================================
-   Intelligence Providers
-   ========================================================================== */
-
+/* --- Intelligence Providers --- */
 .intelligence-providers-header {
 	display: flex;
 	justify-content: flex-end;
@@ -2632,9 +1923,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	justify-content: center;
 	gap: 2px;
 	padding: 2px 6px;
-	background-color: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border: 1px solid var(--color-glass-highlight-border);
 	border-radius: var(--radius-sm);
 	font-size: 9px;
 	font-weight: var(--font-weight-bold);
@@ -2644,9 +1932,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .intelligence-add-provider-btn:hover:not(:disabled) {
-	background-color: var(--color-accent);
-	color: var(--color-background);
-	box-shadow: var(--color-accent-glow);
 }
 
 .intelligence-add-provider-btn:disabled {
@@ -2661,12 +1946,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	justify-content: center;
 	padding: var(--spacing-2xl) var(--spacing-md);
 	gap: var(--spacing-md);
-	color: var(--color-text-muted);
 	text-align: center;
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px dashed var(--color-surface-border);
 	border-radius: var(--radius-md);
 }
 
@@ -2683,10 +1963,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	justify-content: space-between;
 	gap: var(--spacing-md);
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	transition: all var(--transition-base);
 	position: relative;
@@ -2694,13 +1970,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .intelligence-provider-card:hover {
-	background-color: var(--color-surface-hover);
-	border-color: var(--color-surface-border-hover);
 }
 
 .intelligence-provider-card.is-active {
-	background-color: var(--color-glass-highlight);
-	border-color: var(--color-accent);
 }
 
 .intelligence-provider-active-indicator {
@@ -2709,8 +1981,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	top: 0;
 	bottom: 0;
 	width: 3px;
-	background-color: var(--color-accent);
-	box-shadow: 0 0 8px var(--color-accent);
 }
 
 .intelligence-provider-info {
@@ -2724,7 +1994,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .intelligence-provider-name {
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-semibold);
-	color: var(--color-text);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -2735,7 +2004,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	align-items: center;
 	gap: var(--spacing-sm);
 	font-size: var(--font-size-xs);
-	color: var(--color-text-muted);
 }
 
 .intelligence-provider-badge {
@@ -2747,8 +2015,6 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	font-weight: var(--font-weight-semibold);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	background-color: var(--color-accent-subtle);
-	color: var(--color-accent);
 }
 
 .intelligence-provider-model {
@@ -2783,22 +2049,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	transition: all var(--transition-fast);
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
 	cursor: pointer;
 }
 
 .intelligence-set-active-btn:hover:not(:disabled):not(.is-active) {
-	background: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border-color: var(--color-glass-highlight-border);
 }
 
 .intelligence-set-active-btn.is-active {
-	background-color: var(--color-accent);
-	color: var(--color-background);
-	box-shadow: var(--color-accent-glow);
 }
 
 .intelligence-set-active-btn:disabled {
@@ -2815,16 +2072,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	border-radius: var(--radius-sm);
 	font-size: 14px;
 	transition: all var(--transition-fast);
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
 	cursor: pointer;
 }
 
 .intelligence-edit-btn:hover:not(:disabled) {
-	background: var(--color-accent-subtle);
-	color: var(--color-accent);
-	border-color: var(--color-glass-highlight-border);
 }
 
 .intelligence-edit-btn:disabled {
@@ -2841,16 +2092,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	border-radius: var(--radius-sm);
 	font-size: 16px;
 	transition: all var(--transition-fast);
-	background: var(--color-surface);
-	color: var(--color-text-muted);
-	border: 1px solid var(--color-surface-border);
 	cursor: pointer;
 }
 
 .intelligence-delete-btn:hover:not(:disabled) {
-	background: var(--color-danger-subtle);
-	color: var(--color-danger);
-	border-color: rgba(239, 68, 68, 0.2);
 }
 
 .intelligence-delete-btn:disabled {
@@ -2858,16 +2103,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	cursor: not-allowed;
 }
 
-/* ==========================================================================
-   Provider Editor
-   ========================================================================== */
-
+/* --- Provider Editor --- */
 .intelligence-provider-editor {
 	padding: var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 	margin-bottom: var(--spacing-lg);
 	display: flex;
@@ -2880,38 +2118,26 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	justify-content: flex-end;
 	gap: var(--spacing-sm);
 	padding-top: var(--spacing-sm);
-	border-top: 1px solid var(--color-surface-border);
 }
 
-/* ==========================================================================
-   Two-column Grid
-   ========================================================================== */
-
+/* --- Two-column Grid --- */
 .settings-fields-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
 	gap: var(--spacing-sm) var(--spacing-lg);
 }
 
-/* ==========================================================================
-   Toggle Switch — glass toggle
-   ========================================================================== */
-
+/* --- Toggle Switch --- */
 .form-field.form-field-toggle {
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--spacing-md);
 	padding: var(--spacing-sm) var(--spacing-md);
-	background-color: var(--color-surface);
-	backdrop-filter: var(--glass-blur-sm);
-	-webkit-backdrop-filter: var(--glass-blur-sm);
-	border: 1px solid var(--color-surface-border);
 	border-radius: var(--radius-md);
 }
 
 .form-field.form-field-toggle label {
-	color: var(--color-text);
 	cursor: pointer;
 	user-select: none;
 }
@@ -2925,12 +2151,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	min-height: 20px;
 	appearance: none;
 	-webkit-appearance: none;
-	background-color: var(--color-surface-hover);
-	border: 1px solid var(--color-surface-border-hover);
 	cursor: pointer;
 	position: relative;
 	flex-shrink: 0;
-	transition: background-color var(--transition-fast), border-color var(--transition-fast);
+	transition: background-color var(--transition-fast);
 	box-shadow: none;
 	outline: none;
 }
@@ -2943,33 +2167,15 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	width: 14px;
 	height: 14px;
 	border-radius: 50%;
-	background-color: var(--color-text-muted);
-	transition: transform var(--transition-fast), background-color var(--transition-fast);
-}
-
-.form-field.form-field-toggle input[type="checkbox"]:hover:not(:checked) {
-	border-color: var(--color-surface-border-hover);
-	background-color: var(--color-surface-hover);
-}
-
-.form-field.form-field-toggle input[type="checkbox"]:checked {
-	background-color: var(--color-accent);
-	border-color: var(--color-accent);
+	transition: transform var(--transition-fast);
 }
 
 .form-field.form-field-toggle input[type="checkbox"]:checked::before {
 	transform: translateX(16px);
-	background-color: var(--color-background);
 }
 
 .form-field.form-field-toggle input[type="checkbox"]:focus {
 	outline: none;
-	border-color: var(--color-accent);
-	box-shadow: 0 0 0 2px var(--color-accent-subtle);
-}
-
-.form-field.form-field-toggle input[type="checkbox"]:checked:focus {
-	background-color: var(--color-accent);
 }
 
 /* Font weight select */
