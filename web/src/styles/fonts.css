@@ -1,64 +1,72 @@
 /* ==========================================================================
-   Font-Face Declarations — CaskaydiaCove Nerd Font
+   Font-Face Declarations
    Bundled locally, served via Vite public/ directory.
    ========================================================================== */
 
 @font-face {
-	font-family: "CaskaydiaCove Nerd Font";
+	font-family: "Geist Sans";
 	src:
-		local("CaskaydiaCove Nerd Font Light"),
-		url("/fonts/CaskaydiaCoveNerdFont-Light.ttf") format("truetype");
-	font-weight: 100 400;
+		local("Geist Sans"),
+		url("/fonts/geist-sans-variable.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Geist Mono";
+	src:
+		local("Geist Mono"),
+		url("/fonts/geist-mono-variable.woff2") format("woff2");
+	font-weight: 100 900;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
-	src:
-		local("CaskaydiaCove Nerd Font"),
-		url("/fonts/CaskaydiaCoveNerdFont-Regular.ttf") format("truetype");
-	font-weight: 400 600;
+	src: url("/fonts/CaskaydiaCoveNerdFont-Light.ttf") format("truetype");
+	font-weight: 400;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
-	src:
-		local("CaskaydiaCove Nerd Font Bold"),
-		url("/fonts/CaskaydiaCoveNerdFont-Bold.ttf") format("truetype");
-	font-weight: 600 900;
+	src: url("/fonts/CaskaydiaCoveNerdFont-Regular.ttf") format("truetype");
+	font-weight: 700;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
-	src:
-		local("CaskaydiaCove Nerd Font Light Italic"),
-		url("/fonts/CaskaydiaCoveNerdFont-LightItalic.ttf") format("truetype");
-	font-weight: 100 400;
+	src: url("/fonts/CaskaydiaCoveNerdFont-Bold.ttf") format("truetype");
+	font-weight: 800 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "CaskaydiaCove Nerd Font";
+	src: url("/fonts/CaskaydiaCoveNerdFont-LightItalic.ttf") format("truetype");
+	font-weight: 400;
 	font-style: italic;
 	font-display: swap;
 }
 
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
-	src:
-		local("CaskaydiaCove Nerd Font Italic"),
-		url("/fonts/CaskaydiaCoveNerdFont-Italic.ttf") format("truetype");
-	font-weight: 400 600;
+	src: url("/fonts/CaskaydiaCoveNerdFont-Italic.ttf") format("truetype");
+	font-weight: 700;
 	font-style: italic;
 	font-display: swap;
 }
 
 @font-face {
 	font-family: "CaskaydiaCove Nerd Font";
-	src:
-		local("CaskaydiaCove Nerd Font Bold Italic"),
-		url("/fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf") format("truetype");
-	font-weight: 600 900;
+	src: url("/fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf") format("truetype");
+	font-weight: 800 900;
 	font-style: italic;
 	font-display: swap;
 }

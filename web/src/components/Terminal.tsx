@@ -211,7 +211,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			customGlyphs: false,
 			scrollback: 0,
 			fontFamily:
-				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
+				"'CaskaydiaCove Nerd Font', 'Geist Mono', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
 			fontSize: uiSettings.terminalFontSize,
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			fontWeightBold: "bold",

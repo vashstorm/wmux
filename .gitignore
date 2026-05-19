@@ -28,6 +28,9 @@ config.jsonc
 .sisyphus/
 .opencode/
 .claude/
+
+# Worktrees
+.worktrees/
 *.swp
 *.swo
 
