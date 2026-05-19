@@ -14,7 +14,7 @@ const DEFAULT_WINDOW_ROWS: u16 = 24;
 const DEFAULT_WINDOW_COLS: u16 = 80;
 const CHANNEL_CAPACITY: usize = 256;
 const TERMINAL_CLOSE_GRACE_MS: u64 = 200;
-const CONTROL_CLIENT_FLAGS: &str = "ignore-size,active-pane";
+const CONTROL_CLIENT_FLAGS: &str = "active-pane";
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -1448,12 +1448,11 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires tmux"]
-    async fn terminal_resize_does_not_change_tmux_pane_size() {
+    async fn terminal_resize_updates_tmux_pane_size() {
         require_tmux();
-        let session_name = unique_tmux_session("resize-isolated");
+        let session_name = unique_tmux_session("resize-propagates");
         create_tmux_session(&session_name);
         let _guard = TmuxSessionGuard(session_name.clone());
-        let original_size = tmux_display(&session_name, "#{pane_width}x#{pane_height}");
 
         let manager = SessionManager::new();
         let session = manager
@@ -1475,7 +1474,7 @@ mod tests {
 
         session.close().await.unwrap();
         session.wait_closed().await.unwrap();
-        assert_eq!(resized_size, original_size);
+        assert_eq!(resized_size, "120x40");
     }
 
     #[tokio::test]

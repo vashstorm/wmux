@@ -15,6 +15,8 @@ const mockXTermOnData = vi.fn();
 const mockXTermOnResize = vi.fn();
 const mockXTermFocus = vi.fn();
 const mockXTermResize = vi.fn();
+const mockXTermRefresh = vi.fn();
+const mockXTermClearTextureAtlas = vi.fn();
 const mockFit = vi.fn();
 const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
 const mockWsSend = vi.fn();
@@ -41,6 +43,8 @@ vi.mock("@xterm/xterm", () => ({
 		}),
 		focus: mockXTermFocus,
 		resize: mockXTermResize,
+		refresh: mockXTermRefresh,
+		clearTextureAtlas: mockXTermClearTextureAtlas,
 	})),
 }));
 
@@ -107,6 +111,8 @@ describe("Terminal", () => {
 		mockXTermWriteln.mockClear();
 		mockXTermFocus.mockClear();
 		mockXTermResize.mockClear();
+		mockXTermRefresh.mockClear();
+		mockXTermClearTextureAtlas.mockClear();
 		mockFit.mockClear();
 		mockProposeDimensions.mockClear();
 		mockWsSend.mockClear();
@@ -159,18 +165,26 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockFit).toHaveBeenCalled();
-		expect(callArgs.cols).toBe(120);
+		expect(mockProposeDimensions).toHaveBeenCalled();
+		expect(mockFit).not.toHaveBeenCalled();
+		expect(callArgs.cols).toBe(118);
 		expect(callArgs.rows).toBe(40);
 	});
 
-	test("uses source pane dimensions when tmux pane is wider than the fitted viewport", () => {
+	test("uses fitted dimensions when tmux pane is wider than the viewport", () => {
 		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
 
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockXTermResize).toHaveBeenCalledWith(160, 40);
-		expect(callArgs.cols).toBe(160);
+		expect(mockXTermResize).toHaveBeenCalledWith(118, 40);
+		expect(callArgs.cols).toBe(118);
 		expect(callArgs.rows).toBe(40);
+	});
+
+	test("redraws terminal after fitting the viewport", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		expect(mockXTermClearTextureAtlas).toHaveBeenCalled();
+		expect(mockXTermRefresh).toHaveBeenCalledWith(0, 23);
 	});
 
 	test("does not recreate WebSocket when pane identifiers are unchanged", () => {
@@ -186,7 +200,7 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		expect(capturedOnResize).not.toBeNull();
-		capturedOnResize!({ cols: 120, rows: 40 });
+		capturedOnResize!({ cols: 118, rows: 40 });
 
 		expect(mockWsSend).not.toHaveBeenCalled();
 	});
@@ -195,10 +209,10 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		expect(capturedOnResize).not.toBeNull();
-		capturedOnResize!({ cols: 121, rows: 40 });
+		capturedOnResize!({ cols: 119, rows: 40 });
 
 		expect(mockWsSend).toHaveBeenCalledTimes(1);
-		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 121, rows: 40 });
+		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 40 });
 	});
 
 test("uses Unicode 11 width tables for CJK terminal output", () => {

@@ -21,19 +21,30 @@ interface TerminalSize {
 	rows: number;
 }
 
+const TERMINAL_FIT_COLUMN_GUTTER = 2;
+const MIN_TERMINAL_COLS = 2;
+
 function normalizeTerminalSize(cols: number | undefined, rows: number | undefined): TerminalSize | null {
 	if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
 	if (!cols || !rows || cols <= 0 || rows <= 0) return null;
 	return { cols, rows };
 }
 
+function applyColumnGutter(size: TerminalSize): TerminalSize {
+	return {
+		cols: Math.max(MIN_TERMINAL_COLS, size.cols - TERMINAL_FIT_COLUMN_GUTTER),
+		rows: size.rows,
+	};
+}
+
 function resolveDisplaySize(fittedSize: TerminalSize | null, sourceSize: TerminalSize | null | undefined): TerminalSize | null {
 	if (!fittedSize) return sourceSize ?? null;
-	if (!sourceSize) return fittedSize;
-	return {
-		cols: Math.max(fittedSize.cols, sourceSize.cols),
-		rows: fittedSize.rows,
-	};
+	return applyColumnGutter(fittedSize);
+}
+
+function redrawTerminal(terminal: XTerm) {
+	terminal.clearTextureAtlas();
+	terminal.refresh(0, Math.max(0, terminal.rows - 1));
 }
 
 export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
@@ -46,10 +57,22 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const wsRef = useRef<TerminalWebSocket | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 	const resizeFrameRef = useRef<number | null>(null);
+	const resizeTimeoutRefs = useRef<number[]>([]);
 	const lastSentSizeRef = useRef<TerminalSize | null>(null);
 	const sourceSizeRef = useRef<TerminalSize | null>(sourceSize ?? null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+	const clearDeferredFits = useCallback(() => {
+		if (resizeFrameRef.current !== null) {
+			window.cancelAnimationFrame(resizeFrameRef.current);
+			resizeFrameRef.current = null;
+		}
+		for (const timeoutId of resizeTimeoutRefs.current) {
+			window.clearTimeout(timeoutId);
+		}
+		resizeTimeoutRefs.current = [];
+	}, []);
 
 	const fitAndSyncSize = useCallback((syncWebSocket = false): TerminalSize | null => {
 		const terminal = terminalRef.current;
@@ -58,13 +81,6 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 		if (!terminal || !fitAddon || !container) return null;
 
 		const proposed = fitAddon.proposeDimensions();
-		if (
-			proposed &&
-			(proposed.cols !== terminal.cols || proposed.rows !== terminal.rows)
-		) {
-			fitAddon.fit();
-		}
-
 		const fittedSize = normalizeTerminalSize(
 			proposed?.cols ?? terminal.cols,
 			proposed?.rows ?? terminal.rows,
@@ -76,6 +92,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 		) {
 			terminal.resize(nextSize.cols, nextSize.rows);
 		}
+		redrawTerminal(terminal);
 
 		if (syncWebSocket && nextSize) {
 			const previousSize = lastSentSizeRef.current;
@@ -91,6 +108,23 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 
 		return nextSize;
 	}, []);
+
+	const scheduleDeferredFit = useCallback(() => {
+		clearDeferredFits();
+
+		resizeFrameRef.current = window.requestAnimationFrame(() => {
+			resizeFrameRef.current = null;
+			fitAndSyncSize(true);
+		});
+
+		for (const delay of [80, 240, 500]) {
+			const timeoutId = window.setTimeout(() => {
+				resizeTimeoutRefs.current = resizeTimeoutRefs.current.filter((id) => id !== timeoutId);
+				fitAndSyncSize(true);
+			}, delay);
+			resizeTimeoutRefs.current.push(timeoutId);
+		}
+	}, [clearDeferredFits, fitAndSyncSize]);
 
 	useEffect(() => {
 		const terminal = terminalRef.current;
@@ -211,13 +245,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 		});
 
 		const resizeObserver = new ResizeObserver(() => {
-			if (resizeFrameRef.current !== null) {
-				window.cancelAnimationFrame(resizeFrameRef.current);
-			}
-			resizeFrameRef.current = window.requestAnimationFrame(() => {
-				resizeFrameRef.current = null;
-				fitAndSyncSize(true);
-			});
+			scheduleDeferredFit();
 		});
 
 		if (wrapperRef.current) {
@@ -230,16 +258,6 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 		resizeObserverRef.current = resizeObserver;
 
 		connectWebSocket(initialSize);
-
-		const scheduleDeferredFit = () => {
-			if (resizeFrameRef.current !== null) {
-				window.cancelAnimationFrame(resizeFrameRef.current);
-			}
-			resizeFrameRef.current = window.requestAnimationFrame(() => {
-				resizeFrameRef.current = null;
-				fitAndSyncSize(true);
-			});
-		};
 
 		scheduleDeferredFit();
 		window.addEventListener("resize", scheduleDeferredFit);
@@ -271,10 +289,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			themeObserver.disconnect();
 			resizeObserver.disconnect();
 			window.removeEventListener("resize", scheduleDeferredFit);
-			if (resizeFrameRef.current !== null) {
-				window.cancelAnimationFrame(resizeFrameRef.current);
-				resizeFrameRef.current = null;
-			}
+			clearDeferredFits();
 			resizeObserverRef.current = null;
 			terminal.dispose();
 			terminalRef.current = null;
@@ -283,7 +298,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			wsRef.current?.close();
 			wsRef.current = null;
 		};
-	}, [connectWebSocket, fitAndSyncSize, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
+	}, [clearDeferredFits, connectWebSocket, fitAndSyncSize, scheduleDeferredFit, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
 
 	useEffect(() => {
 		const terminal = terminalRef.current;

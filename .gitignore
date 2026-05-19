@@ -10,6 +10,7 @@ src-tauri/.tauri/
 
 # Dependencies
 node_modules/
+web/.bun-install-stamp
 
 # Test artifacts
 test-results/

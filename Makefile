@@ -12,8 +12,11 @@ WEB_SOURCES := $(shell find web/src web/index.html web/package.json web/vite.con
 
 build: bin/wmux
 
-web/dist/index.html: $(WEB_SOURCES) web/bun.lock
+web/.bun-install-stamp: web/package.json web/bun.lock
 	bun install --cwd web
+	@touch $@
+
+web/dist/index.html: $(WEB_SOURCES) web/.bun-install-stamp
 	bun run --cwd web build
 
 target/release/wmux-server: $(RUST_SOURCES)
@@ -28,7 +31,7 @@ dev: bin/wmux
 	exec ./bin/wmux
 
 clean:
-	rm -rf bin web/dist target src-tauri/target
+	rm -rf bin web/dist web/.bun-install-stamp target src-tauri/target
 
 test:
 	cargo test --workspace
