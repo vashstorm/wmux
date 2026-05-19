@@ -210,6 +210,14 @@ impl<R: CommandRunner> Adapter<R> {
             .await
     }
 
+    pub async fn capture_pane(&self, target: &str, max_bytes: u32) -> Result<String> {
+        require_value("pane target", target)?;
+        let output = self
+            .run_raw(&["capture-pane", "-p", "-e", "-J", "-t", target])
+            .await?;
+        Ok(truncate_to_bytes(output, max_bytes as usize))
+    }
+
     async fn run_args(&self, args: &[String]) -> Result<String> {
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
         self.run_raw(args.as_slice()).await
@@ -555,6 +563,17 @@ fn require_value(field: &'static str, value: &str) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+fn truncate_to_bytes(value: String, max_bytes: usize) -> String {
+    if max_bytes == 0 || value.len() <= max_bytes {
+        return value;
+    }
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    value[..end].to_string()
 }
 
 fn build_pane_target(session: &str, window: &str) -> Result<String> {

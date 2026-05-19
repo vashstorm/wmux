@@ -2,7 +2,9 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use wmux_core::config::ConnectionConfig;
+use wmux_core::intelligence::{self, ActiveProvider, SessionIntelligence};
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
@@ -40,6 +42,19 @@ pub struct PanesListResponse {
     #[serde(skip_serializing_if = "String::is_empty")]
     adapter_path: String,
     data: Vec<Pane>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzeSessionResponse {
+    connection_id: String,
+    session: String,
+    status: &'static str,
+    updated: usize,
+    skipped: usize,
+    errors: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    intelligence: Option<SessionIntelligence>,
 }
 
 #[derive(Deserialize)]
@@ -113,6 +128,8 @@ pub async fn list_sessions(
     let (connection, adapter) =
         connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
     let data = adapter.list_sessions().await.map_err(session_error)?;
+    let mut data = data;
+    enrich_sessions_with_intelligence(&state, &connection, &adapter, &mut data).await;
     Ok(Json(SessionsListResponse {
         connection_id: connection.id,
         mode: connection.connection_type,
@@ -145,8 +162,47 @@ pub async fn create_session(
     ))
 }
 
-pub async fn analyze_session() -> ApiError {
-    ApiError::not_implemented("session analysis is not implemented")
+pub async fn analyze_session(
+    State(state): State<AppState>,
+    Path((id, session)): Path<(String, String)>,
+) -> ApiResult<AnalyzeSessionResponse> {
+    let (connection, adapter) =
+        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
+    let config = current_config(&state)?;
+    let Some(provider) = intelligence::active_provider(&config) else {
+        return Err(ApiError::bad_request(
+            "AI intelligence is disabled or not configured",
+        ));
+    };
+
+    let result = analyze_session_text(
+        &adapter,
+        &provider,
+        &session,
+        config.intelligence.max_bytes,
+        Duration::from_secs(config.intelligence.timeout_sec as u64),
+    )
+    .await;
+
+    let (intelligence, errors) = match result {
+        Ok(intelligence) => (intelligence, 0),
+        Err(message) => (intelligence::error_result(Some(&provider), message), 1),
+    };
+    state.intelligence.set(
+        connection.id.as_str(),
+        session.as_str(),
+        intelligence.clone(),
+    );
+
+    Ok(Json(AnalyzeSessionResponse {
+        connection_id: connection.id,
+        session,
+        status: if errors == 0 { "ok" } else { "error" },
+        updated: 1,
+        skipped: 0,
+        errors,
+        intelligence: Some(intelligence),
+    }))
 }
 
 pub async fn list_windows(
@@ -423,4 +479,116 @@ fn build_window_target(session: &str, window: &str) -> String {
 
 fn build_pane_target(session: &str, window: &str, pane: &str) -> String {
     format!("{}.{pane}", build_window_target(session, window))
+}
+
+async fn enrich_sessions_with_intelligence(
+    state: &AppState,
+    connection: &ConnectionConfig,
+    adapter: &Adapter,
+    sessions: &mut [Session],
+) {
+    let Ok(config) = current_config(state) else {
+        return;
+    };
+    let Some(provider) = intelligence::active_provider(&config) else {
+        return;
+    };
+
+    let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
+    let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+    let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
+
+    for session in sessions {
+        if state.intelligence.should_analyze(
+            connection.id.as_str(),
+            session.name.as_str(),
+            min_interval,
+        ) {
+            let result = analyze_session_text(
+                adapter,
+                &provider,
+                session.name.as_str(),
+                config.intelligence.max_bytes,
+                timeout,
+            )
+            .await
+            .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
+            state
+                .intelligence
+                .set(connection.id.as_str(), session.name.as_str(), result);
+        }
+
+        if let Some(result) =
+            state
+                .intelligence
+                .get(connection.id.as_str(), session.name.as_str(), cache_ttl)
+        {
+            apply_session_intelligence(session, &result);
+        }
+    }
+}
+
+async fn analyze_session_text(
+    adapter: &Adapter,
+    provider: &ActiveProvider,
+    session: &str,
+    max_bytes: u32,
+    timeout: Duration,
+) -> Result<SessionIntelligence, String> {
+    let transcript = session_transcript(adapter, session, max_bytes)
+        .await
+        .map_err(|err| err.to_string())?;
+    intelligence::analyze_text(provider, transcript.as_str(), timeout).await
+}
+
+async fn session_transcript(
+    adapter: &Adapter,
+    session: &str,
+    max_bytes: u32,
+) -> Result<String, TmuxError> {
+    let windows = adapter.list_windows(session).await?;
+    let mut transcript = String::new();
+    transcript.push_str(&format!("session: {session}\n"));
+
+    let mut remaining = max_bytes as usize;
+    for window in windows {
+        if remaining == 0 {
+            break;
+        }
+        transcript.push_str(&format!(
+            "\nwindow {} {} active={}\n",
+            window.index, window.name, window.active
+        ));
+        let panes = adapter.list_panes(session, window.id.as_str()).await?;
+        for pane in panes {
+            if remaining == 0 {
+                break;
+            }
+            transcript.push_str(&format!(
+                "\npane {} title={} command={} active={}\n",
+                pane.index, pane.title, pane.current_command, pane.active
+            ));
+            let capture = adapter
+                .capture_pane(pane.id.as_str(), remaining.min(max_bytes as usize) as u32)
+                .await
+                .unwrap_or_default();
+            remaining = remaining.saturating_sub(capture.len());
+            transcript.push_str(capture.as_str());
+            transcript.push('\n');
+        }
+    }
+
+    Ok(transcript)
+}
+
+fn apply_session_intelligence(session: &mut Session, intelligence: &SessionIntelligence) {
+    session.intelligence_app = Some(intelligence.app.clone());
+    session.intelligence_status = Some(intelligence.status.clone());
+    session.intelligence_summary = Some(intelligence.summary.clone());
+    session.intelligence_source = Some(intelligence.source.clone());
+    session.intelligence_confidence = Some(intelligence.confidence);
+    session.intelligence_stale = Some(intelligence.stale);
+    session.intelligence_updated_at = Some(intelligence.updated_at.clone());
+    session.intelligence_error = intelligence.error.clone();
+    session.intelligence_app_counts = intelligence.app_counts.clone();
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -8,7 +10,7 @@ pub enum AttentionState {
     Explicit,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Session {
     pub id: String,
@@ -17,6 +19,24 @@ pub struct Session {
     pub window_count: usize,
     pub attention_state: AttentionState,
     pub attention_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_app: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_confidence: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_stale: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_updated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intelligence_app_counts: Option<HashMap<String, usize>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,6 +85,15 @@ impl Session {
             window_count,
             attention_state: AttentionState::None,
             attention_count: 0,
+            intelligence_app: None,
+            intelligence_status: None,
+            intelligence_summary: None,
+            intelligence_source: None,
+            intelligence_confidence: None,
+            intelligence_stale: None,
+            intelligence_updated_at: None,
+            intelligence_error: None,
+            intelligence_app_counts: None,
         }
     }
 }

@@ -227,6 +227,15 @@ type RawWindowInfo = Partial<WindowInfo> & {
 	activePaneTitle?: string;
 	attentionState?: "none" | "attention" | "explicit";
 	attentionCount?: number;
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
+	intelligenceAppCounts?: Record<string, number>;
 };
 
 export interface WindowsListResponse {
@@ -267,6 +276,14 @@ type RawPaneInfo = Partial<PaneInfo> & {
 	left?: number;
 	top?: number;
 	attentionState?: "none" | "attention" | "explicit";
+	intelligenceApp?: string;
+	intelligenceStatus?: string;
+	intelligenceSummary?: string;
+	intelligenceSource?: string;
+	intelligenceConfidence?: number;
+	intelligenceStale?: boolean;
+	intelligenceUpdatedAt?: string;
+	intelligenceError?: string;
 };
 
 export interface PanesListResponse {
@@ -289,6 +306,15 @@ function normalizeWindowInfo(window: RawWindowInfo): WindowInfo {
 		ActivePaneTitle: window.ActivePaneTitle ?? window.activePaneTitle ?? "",
 		AttentionState: window.AttentionState ?? window.attentionState,
 		AttentionCount: window.AttentionCount ?? window.attentionCount,
+		IntelligenceApp: window.IntelligenceApp ?? window.intelligenceApp,
+		IntelligenceStatus: window.IntelligenceStatus ?? window.intelligenceStatus,
+		IntelligenceSummary: window.IntelligenceSummary ?? window.intelligenceSummary,
+		IntelligenceSource: window.IntelligenceSource ?? window.intelligenceSource,
+		IntelligenceConfidence: window.IntelligenceConfidence ?? window.intelligenceConfidence,
+		IntelligenceStale: window.IntelligenceStale ?? window.intelligenceStale,
+		IntelligenceUpdatedAt: window.IntelligenceUpdatedAt ?? window.intelligenceUpdatedAt,
+		IntelligenceError: window.IntelligenceError ?? window.intelligenceError,
+		IntelligenceAppCounts: window.IntelligenceAppCounts ?? window.intelligenceAppCounts,
 	};
 }
 
@@ -303,6 +329,14 @@ function normalizePaneInfo(pane: RawPaneInfo): PaneInfo {
 		Left: pane.Left ?? pane.left ?? 0,
 		Top: pane.Top ?? pane.top ?? 0,
 		AttentionState: pane.AttentionState ?? pane.attentionState,
+		IntelligenceApp: pane.IntelligenceApp ?? pane.intelligenceApp,
+		IntelligenceStatus: pane.IntelligenceStatus ?? pane.intelligenceStatus,
+		IntelligenceSummary: pane.IntelligenceSummary ?? pane.intelligenceSummary,
+		IntelligenceSource: pane.IntelligenceSource ?? pane.intelligenceSource,
+		IntelligenceConfidence: pane.IntelligenceConfidence ?? pane.intelligenceConfidence,
+		IntelligenceStale: pane.IntelligenceStale ?? pane.intelligenceStale,
+		IntelligenceUpdatedAt: pane.IntelligenceUpdatedAt ?? pane.intelligenceUpdatedAt,
+		IntelligenceError: pane.IntelligenceError ?? pane.intelligenceError,
 	};
 }
 

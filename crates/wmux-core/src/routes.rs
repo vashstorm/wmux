@@ -329,7 +329,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn out_of_scope_paths_return_not_implemented() {
+    async fn ssh_paths_return_not_implemented_and_analyze_returns_result_shape() {
         let (app, _dir, _config_path) = test_app(base_config());
 
         let ssh_response = app
@@ -366,11 +366,12 @@ mod tests {
             ))
             .await
             .expect("response");
-        assert_eq!(analyze_response.status(), StatusCode::NOT_IMPLEMENTED);
-        assert_eq!(
-            json_body(analyze_response).await["error"]["code"],
-            "not_implemented"
-        );
+        assert_eq!(analyze_response.status(), StatusCode::OK);
+        let analyze_body = json_body(analyze_response).await;
+        assert_eq!(analyze_body["status"], "error");
+        assert_eq!(analyze_body["updated"], 1);
+        assert_eq!(analyze_body["errors"], 1);
+        assert_eq!(analyze_body["intelligence"]["summary"], "Analysis failed");
     }
 
     #[tokio::test]

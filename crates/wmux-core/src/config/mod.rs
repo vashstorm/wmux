@@ -876,8 +876,8 @@ mod tests {
         assert_eq!(config.intelligence.max_concurrency, 3);
         assert_eq!(config.intelligence.cache_ttl_sec, 300);
         assert_eq!(config.logs.level, "info");
-        assert_eq!(config.logs.path, "");
-        assert_eq!(config.logs.error_path, "");
+        assert_eq!(config.logs.path, "logs/");
+        assert_eq!(config.logs.error_path, "logs/");
     }
 
     #[test]
