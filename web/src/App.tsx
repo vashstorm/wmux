@@ -32,7 +32,6 @@ function UISettingsInit() {
 			const terminalFontSize = config.ui.terminalFontSize || 14;
 			const terminalFontWeight = config.ui.terminalFontWeight || "normal";
 
-			document.documentElement.dataset.theme = theme;
 			applyUIFontSize(fontSize);
 			setUISettings({ theme, windowTheme, fontSize, terminalFontSize, terminalFontWeight });
 		}).catch(() => undefined);

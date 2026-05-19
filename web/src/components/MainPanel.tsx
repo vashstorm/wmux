@@ -265,7 +265,7 @@ export function MainPanel() {
 
 			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
 				{hasSelectedPane ? (
-					<div className="main-workspace" data-theme={uiSettings.windowTheme || uiSettings.theme}>
+					<div className="main-workspace">
 						<WindowTabs
 							windows={windowSummaries}
 							loadedPanesByWindow={sessionWindowState?.loadedPanes}

@@ -276,24 +276,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			});
 		}
 
-		const themeObserver = new MutationObserver((mutations) => {
-			for (const mutation of mutations) {
-				if (
-					mutation.type === "attributes" &&
-					mutation.attributeName === "data-theme"
-				) {
-					terminal.options.theme = getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme);
-				}
-			}
-		});
-
-		themeObserver.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["data-theme"],
-		});
-
 		return () => {
-			themeObserver.disconnect();
 			resizeObserver.disconnect();
 			window.removeEventListener("resize", scheduleDeferredFit);
 			clearDeferredFits();

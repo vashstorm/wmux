@@ -4,12 +4,9 @@ import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfi
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
-import { THEME_OPTIONS, normalizeThemeId } from "../ui/themes.js";
+import { normalizeThemeId } from "../ui/themes.js";
 
-const THEME_LABELS: Record<string, string> = {
-	light: "Light",
-	dark: "Dark",
-};
+
 
 interface ProviderFormState extends IntelligenceProviderConfig {
 	isNew: boolean;
@@ -94,25 +91,6 @@ export function SettingsPanel() {
 	}, [activeTab]);
 
 	const knownHostsPlaceholder = useMemo(() => "~/.ssh/known_hosts", []);
-	const renderThemeCard = (field: "theme" | "windowTheme", value: string, themeId: string) => {
-		const theme = THEME_OPTIONS.find((option) => option.id === themeId);
-		if (!theme) {
-			return null;
-		}
-
-		const label = THEME_LABELS[themeId] ?? themeId;
-
-		return (
-			<button
-				key={`${field}-${theme.id}`}
-				type="button"
-				className={`theme-card ${value === theme.id ? "is-active" : ""}`}
-				onClick={() => updateField(field, theme.id)}
-			>
-				<span>{label}</span>
-			</button>
-		);
-	};
 
 	const loadConfig = async () => {
 		setIsLoading(true);
@@ -155,7 +133,6 @@ export function SettingsPanel() {
 		if (!formState) {
 			return;
 		}
-		document.documentElement.dataset.theme = formState.theme;
 		applyUIFontSize(formState.fontSize);
 		setUISettings({
 			theme: formState.theme,
@@ -250,7 +227,6 @@ export function SettingsPanel() {
 			setConfig(saved);
 			setFormState(buildFormState(saved));
 			setConnections(saved.connections);
-			document.documentElement.dataset.theme = savedTheme;
 			applyUIFontSize(saved.ui.fontSize);
 			setUISettings({
 				theme: savedTheme,
@@ -366,7 +342,6 @@ export function SettingsPanel() {
 			const theme = normalizeThemeId(config.ui.theme);
 			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
 			setFormState(buildFormState(config));
-			document.documentElement.dataset.theme = theme;
 			applyUIFontSize(config.ui.fontSize);
 			setUISettings({
 				theme,
@@ -1032,12 +1007,9 @@ export function SettingsPanel() {
 									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Theme</Typography>
-											<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Global theme for the full application shell.</Typography>
-											<div className="form-field">
-												<div className="theme-grid">
-													{THEME_OPTIONS.map((theme) => renderThemeCard("theme", formState.theme, theme.id))}
-												</div>
-											</div>
+											<Typography variant="body2" color="text.secondary">
+												The current theme is controlled by the top-right toggle button. Current: {formState?.theme}
+											</Typography>
 										</Box>
 									</Box>
 								)}

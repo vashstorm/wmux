@@ -86,7 +86,7 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByRole("button", { name: /AI/i })).toBeInTheDocument();
 	});
 
-	test("Theme tab renders 2 theme options (light and dark)", async () => {
+	test("Theme tab shows read-only current theme info", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -103,10 +103,8 @@ describe("SettingsPanel intelligence section", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: /🎨Theme/i }));
 
-		for (const theme of THEME_OPTIONS) {
-			const label = THEME_LABELS[theme.id] ?? theme.id;
-			expect(screen.getAllByRole("button", { name: new RegExp(label, "i") })).toHaveLength(1);
-		}
+		expect(screen.getByText(/The current theme is controlled by the top-right toggle button/i)).toBeInTheDocument();
+		expect(screen.getByText(/Current: dark/i)).toBeInTheDocument();
 	});
 
 	test("Typography tab renders font controls", async () => {
