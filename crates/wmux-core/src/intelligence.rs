@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -36,7 +36,13 @@ pub struct ActiveProvider {
 
 #[derive(Debug, Clone, Default)]
 pub struct IntelligenceStore {
-    inner: Arc<Mutex<HashMap<SessionKey, CacheEntry>>>,
+    inner: Arc<Mutex<IntelligenceState>>,
+}
+
+#[derive(Debug, Default)]
+struct IntelligenceState {
+    cache: HashMap<SessionKey, CacheEntry>,
+    in_flight: HashSet<SessionKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -59,8 +65,8 @@ impl IntelligenceStore {
         cache_ttl: Duration,
     ) -> Option<SessionIntelligence> {
         let key = SessionKey::new(connection_id, session);
-        let cache = self.inner.lock().ok()?;
-        let entry = cache.get(&key)?;
+        let state = self.inner.lock().ok()?;
+        let entry = state.cache.get(&key)?;
         let mut result = entry.result.clone();
         if entry.analyzed_at.elapsed() > cache_ttl {
             result.stale = true;
@@ -77,19 +83,49 @@ impl IntelligenceStore {
         let key = SessionKey::new(connection_id, session);
         self.inner
             .lock()
-            .map(|cache| {
-                cache
+            .map(|state| {
+                state
+                    .cache
                     .get(&key)
                     .map_or(true, |entry| entry.analyzed_at.elapsed() >= min_interval)
             })
             .unwrap_or(true)
     }
 
+    pub fn begin_analyze(
+        &self,
+        connection_id: &str,
+        session: &str,
+        min_interval: Duration,
+        max_concurrency: usize,
+    ) -> bool {
+        let key = SessionKey::new(connection_id, session);
+        let Ok(mut state) = self.inner.lock() else {
+            return false;
+        };
+
+        if state.in_flight.contains(&key) || state.in_flight.len() >= max_concurrency.max(1) {
+            return false;
+        }
+
+        if state
+            .cache
+            .get(&key)
+            .is_some_and(|entry| entry.analyzed_at.elapsed() < min_interval)
+        {
+            return false;
+        }
+
+        state.in_flight.insert(key);
+        true
+    }
+
     pub fn set(&self, connection_id: &str, session: &str, mut result: SessionIntelligence) {
         result.stale = false;
         let key = SessionKey::new(connection_id, session);
-        if let Ok(mut cache) = self.inner.lock() {
-            cache.insert(
+        if let Ok(mut state) = self.inner.lock() {
+            state.in_flight.remove(&key);
+            state.cache.insert(
                 key,
                 CacheEntry {
                     result,
@@ -351,4 +387,56 @@ fn is_valid_status(value: &str) -> bool {
             | "waiting_idle"
             | "running"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_intelligence(summary: &str) -> SessionIntelligence {
+        SessionIntelligence {
+            app: "codex".to_string(),
+            status: "running".to_string(),
+            summary: summary.to_string(),
+            source: "test/model".to_string(),
+            confidence: 0.8,
+            stale: false,
+            updated_at: now_rfc3339(),
+            error: None,
+            app_counts: None,
+        }
+    }
+
+    #[test]
+    fn begin_analyze_deduplicates_in_flight_session_and_respects_interval() {
+        let store = IntelligenceStore::default();
+        let min_interval = Duration::from_secs(60);
+
+        assert!(store.begin_analyze("conn", "dev", min_interval, 3));
+        assert!(!store.begin_analyze("conn", "dev", min_interval, 3));
+
+        store.set("conn", "dev", sample_intelligence("ready"));
+
+        assert!(!store.begin_analyze("conn", "dev", min_interval, 3));
+        assert_eq!(
+            store
+                .get("conn", "dev", Duration::from_secs(300))
+                .expect("cached intelligence")
+                .summary,
+            "ready"
+        );
+    }
+
+    #[test]
+    fn begin_analyze_limits_global_concurrency() {
+        let store = IntelligenceStore::default();
+        let min_interval = Duration::from_secs(0);
+
+        assert!(store.begin_analyze("conn", "one", min_interval, 1));
+        assert!(!store.begin_analyze("conn", "two", min_interval, 1));
+
+        store.set("conn", "one", sample_intelligence("one done"));
+
+        assert!(store.begin_analyze("conn", "two", min_interval, 1));
+    }
 }

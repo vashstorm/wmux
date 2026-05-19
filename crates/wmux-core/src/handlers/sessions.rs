@@ -127,9 +127,9 @@ pub async fn list_sessions(
 ) -> ApiResult<SessionsListResponse> {
     let (connection, adapter) =
         connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
-    let data = adapter.list_sessions().await.map_err(session_error)?;
-    let mut data = data;
-    enrich_sessions_with_intelligence(&state, &connection, &adapter, &mut data).await;
+    let mut data = adapter.list_sessions().await.map_err(session_error)?;
+    apply_cached_session_intelligence(&state, &connection, &mut data);
+    spawn_session_intelligence_refreshes(state.clone(), connection.clone(), adapter.clone(), &data);
     Ok(Json(SessionsListResponse {
         connection_id: connection.id,
         mode: connection.connection_type,
@@ -481,43 +481,21 @@ fn build_pane_target(session: &str, window: &str, pane: &str) -> String {
     format!("{}.{pane}", build_window_target(session, window))
 }
 
-async fn enrich_sessions_with_intelligence(
+fn apply_cached_session_intelligence(
     state: &AppState,
     connection: &ConnectionConfig,
-    adapter: &Adapter,
     sessions: &mut [Session],
 ) {
     let Ok(config) = current_config(state) else {
         return;
     };
-    let Some(provider) = intelligence::active_provider(&config) else {
+    if intelligence::active_provider(&config).is_none() {
         return;
-    };
+    }
 
-    let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
     let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
-    let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
 
     for session in sessions {
-        if state.intelligence.should_analyze(
-            connection.id.as_str(),
-            session.name.as_str(),
-            min_interval,
-        ) {
-            let result = analyze_session_text(
-                adapter,
-                &provider,
-                session.name.as_str(),
-                config.intelligence.max_bytes,
-                timeout,
-            )
-            .await
-            .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
-            state
-                .intelligence
-                .set(connection.id.as_str(), session.name.as_str(), result);
-        }
-
         if let Some(result) =
             state
                 .intelligence
@@ -525,6 +503,56 @@ async fn enrich_sessions_with_intelligence(
         {
             apply_session_intelligence(session, &result);
         }
+    }
+}
+
+fn spawn_session_intelligence_refreshes(
+    state: AppState,
+    connection: ConnectionConfig,
+    adapter: Adapter,
+    sessions: &[Session],
+) {
+    let Ok(config) = current_config(&state) else {
+        return;
+    };
+    let Some(provider) = intelligence::active_provider(&config) else {
+        return;
+    };
+
+    let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
+    let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
+    let max_bytes = config.intelligence.max_bytes;
+    let max_concurrency = config.intelligence.max_concurrency as usize;
+
+    for session_name in sessions.iter().map(|session| session.name.clone()) {
+        if !state.intelligence.begin_analyze(
+            connection.id.as_str(),
+            session_name.as_str(),
+            min_interval,
+            max_concurrency,
+        ) {
+            continue;
+        }
+
+        let state = state.clone();
+        let adapter = adapter.clone();
+        let provider = provider.clone();
+        let connection_id = connection.id.clone();
+
+        tokio::spawn(async move {
+            let result = analyze_session_text(
+                &adapter,
+                &provider,
+                session_name.as_str(),
+                max_bytes,
+                timeout,
+            )
+            .await
+            .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
+            state
+                .intelligence
+                .set(connection_id.as_str(), session_name.as_str(), result);
+        });
     }
 }
 
