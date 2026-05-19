@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -62,6 +62,10 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const sourceSizeRef = useRef<TerminalSize | null>(sourceSize ?? null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const terminalTheme = getTerminalTheme(windowTheme ?? uiSettings.windowTheme ?? document.documentElement.dataset.theme);
+	const terminalStyle = {
+		"--terminal-background": terminalTheme.background ?? "var(--color-background)",
+	} as CSSProperties;
 
 	const clearDeferredFits = useCallback(() => {
 		if (resizeFrameRef.current !== null) {
@@ -312,7 +316,12 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	};
 
 	return (
-		<div ref={wrapperRef} className="terminal-wrapper" data-testid="terminal-wrapper">
+		<div
+			ref={wrapperRef}
+			className="terminal-wrapper"
+			style={terminalStyle}
+			data-testid="terminal-wrapper"
+		>
 			<div
 				ref={containerRef}
 				className="terminal-container"

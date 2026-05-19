@@ -240,6 +240,12 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		});
 	});
 
+	test("applies the terminal theme background to the wrapper", () => {
+		render(<Terminal selectedPane={mockSelectedPane} windowTheme="solarized" />);
+
+		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#002b36");
+	});
+
 	test("writes output data to xterm when receiving output message", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 

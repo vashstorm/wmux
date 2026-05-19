@@ -811,7 +811,7 @@ fn terminal_snapshot_output(
     if output.is_empty() {
         return None;
     }
-    let mut snapshot = String::from("\x1b[H\x1b[2J\x1b[?7l");
+    let mut snapshot = String::from("\x1b[0m\x1b[H\x1b[2J\x1b[?7l");
     for (index, line) in output.lines().take(size.rows as usize).enumerate() {
         snapshot.push_str(&format!(
             "\x1b[{};1H{}",
@@ -1343,8 +1343,21 @@ mod tests {
         )
         .unwrap();
 
-        assert!(snapshot.starts_with("\x1b[H\x1b[2J"));
+        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
         assert!(snapshot.ends_with("\x1b[3;7H"));
+    }
+
+    #[test]
+    fn terminal_snapshot_clears_with_default_background() {
+        let snapshot = terminal_snapshot_output(
+            "\x1b[48;5;238mprompt",
+            None,
+            WindowSize { cols: 80, rows: 24 },
+        )
+        .unwrap();
+
+        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
+        assert!(snapshot.contains("\x1b[1;1H\x1b[48;5;238mprompt"));
     }
 
     #[test]
