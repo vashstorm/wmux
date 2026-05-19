@@ -19,7 +19,7 @@ import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
-import { normalizeThemeId, THEME_OPTIONS } from "./ui/themes.js";
+import { normalizeThemeId } from "./ui/themes.js";
 
 function UISettingsInit() {
 	const { setUISettings } = useAppState();
@@ -50,8 +50,7 @@ function MuiThemeShell({ children }: { children: React.ReactNode }) {
 
 function ThemeToggle() {
 	const { uiSettings, setUISettings } = useAppState();
-	const currentTheme = THEME_OPTIONS.find((t) => t.id === uiSettings.theme);
-	const isDark = currentTheme != null ? currentTheme.mode === "dark" : uiSettings.theme === "dark";
+	const isDark = uiSettings.theme === "dark";
 
 	const handleToggle = () => {
 		const newTheme = isDark ? "light" : "dark";

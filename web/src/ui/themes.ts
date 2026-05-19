@@ -2,141 +2,15 @@ import type { ITheme } from "@xterm/xterm";
 
 export interface ThemeOption {
 	id: string;
-	label: string;
-	description: string;
 	mode: "dark" | "light";
-	preview: {
-		background: string;
-		panel: string;
-		accent: string;
-		secondary: string;
-	};
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-	{
-		id: "dark",
-		label: "Dark Tech",
-		description: "默认深色，琥珀点缀",
-		mode: "dark",
-		preview: {
-			background: "#050a18",
-			panel: "rgba(11, 18, 35, 0.82)",
-			accent: "#f59e0b",
-			secondary: "#3b82f6",
-		},
-	},
-	{
-		id: "light",
-		label: "Classic Light",
-		description: "清透浅色，适合白天",
-		mode: "light",
-		preview: {
-			background: "#f0f2f5",
-			panel: "rgba(255, 255, 255, 0.9)",
-			accent: "#f59e0b",
-			secondary: "#3b82f6",
-		},
-	},
-	{
-		id: "midnight",
-		label: "Midnight Blue",
-		description: "深海蓝黑，高对比",
-		mode: "dark",
-		preview: {
-			background: "#06111f",
-			panel: "rgba(9, 20, 38, 0.82)",
-			accent: "#38bdf8",
-			secondary: "#818cf8",
-		},
-	},
-	{
-		id: "nord",
-		label: "Nord Frost",
-		description: "冷灰蓝调，克制沉稳",
-		mode: "dark",
-		preview: {
-			background: "#2b3140",
-			panel: "rgba(52, 61, 82, 0.82)",
-			accent: "#88c0d0",
-			secondary: "#a3be8c",
-		},
-	},
-	{
-		id: "forest",
-		label: "Forest Command",
-		description: "森林绿调，终端感更强",
-		mode: "dark",
-		preview: {
-			background: "#081510",
-			panel: "rgba(11, 29, 23, 0.82)",
-			accent: "#34d399",
-			secondary: "#84cc16",
-		},
-	},
-	{
-		id: "sunset",
-		label: "Sunset Ember",
-		description: "暖色暮光，强调层次",
-		mode: "dark",
-		preview: {
-			background: "#1a0d12",
-			panel: "rgba(42, 18, 27, 0.82)",
-			accent: "#fb7185",
-			secondary: "#f59e0b",
-		},
-	},
-	{
-		id: "ocean",
-		label: "Ocean Mist",
-		description: "青蓝雾感，柔和通透",
-		mode: "light",
-		preview: {
-			background: "#ecfeff",
-			panel: "rgba(255, 255, 255, 0.88)",
-			accent: "#0891b2",
-			secondary: "#2563eb",
-		},
-	},
-	{
-		id: "rose",
-		label: "Rose Quartz",
-		description: "浅玫瑰色，轻盈柔和",
-		mode: "light",
-		preview: {
-			background: "#fff1f5",
-			panel: "rgba(255, 255, 255, 0.9)",
-			accent: "#e11d48",
-			secondary: "#8b5cf6",
-		},
-	},
-	{
-		id: "graphite",
-		label: "Graphite",
-		description: "石墨灰，专业极简",
-		mode: "dark",
-		preview: {
-			background: "#111317",
-			panel: "rgba(23, 26, 33, 0.84)",
-			accent: "#94a3b8",
-			secondary: "#22c55e",
-		},
-	},
-	{
-		id: "solarized",
-		label: "Solarized",
-		description: "经典 Solarized 变体",
-		mode: "dark",
-		preview: {
-			background: "#002b36",
-			panel: "rgba(4, 43, 54, 0.84)",
-			accent: "#b58900",
-			secondary: "#268bd2",
-		},
-	},
+	{ id: "light", mode: "light" },
+	{ id: "dark", mode: "dark" },
 ];
 
-export const DEFAULT_THEME_ID = "dark";
+export const DEFAULT_THEME_ID = "light";
 
 export const TERMINAL_THEMES: Record<string, ITheme> = {
 	dark: {
@@ -184,203 +58,19 @@ export const TERMINAL_THEMES: Record<string, ITheme> = {
 		brightCyan: "#5ac8fa",
 		brightWhite: "#424245",
 	},
-	midnight: {
-		background: "#07101b",
-		foreground: "#dbeafe",
-		cursor: "#38bdf8",
-		cursorAccent: "#07101b",
-		selectionBackground: "rgba(56, 189, 248, 0.22)",
-		black: "#0f172a",
-		red: "#f87171",
-		green: "#22c55e",
-		yellow: "#fbbf24",
-		blue: "#60a5fa",
-		magenta: "#818cf8",
-		cyan: "#22d3ee",
-		white: "#e2e8f0",
-		brightBlack: "#334155",
-		brightRed: "#fca5a5",
-		brightGreen: "#4ade80",
-		brightYellow: "#fcd34d",
-		brightBlue: "#93c5fd",
-		brightMagenta: "#a5b4fc",
-		brightCyan: "#67e8f9",
-		brightWhite: "#f8fafc",
-	},
-	nord: {
-		background: "#2e3440",
-		foreground: "#eceff4",
-		cursor: "#88c0d0",
-		cursorAccent: "#2e3440",
-		selectionBackground: "rgba(136, 192, 208, 0.2)",
-		black: "#3b4252",
-		red: "#bf616a",
-		green: "#a3be8c",
-		yellow: "#ebcb8b",
-		blue: "#81a1c1",
-		magenta: "#b48ead",
-		cyan: "#88c0d0",
-		white: "#e5e9f0",
-		brightBlack: "#4c566a",
-		brightRed: "#d08770",
-		brightGreen: "#b5d19a",
-		brightYellow: "#f0d399",
-		brightBlue: "#8fb3d9",
-		brightMagenta: "#c8a1c9",
-		brightCyan: "#9ad7e5",
-		brightWhite: "#eceff4",
-	},
-	forest: {
-		background: "#091510",
-		foreground: "#ecfdf5",
-		cursor: "#34d399",
-		cursorAccent: "#091510",
-		selectionBackground: "rgba(52, 211, 153, 0.2)",
-		black: "#102018",
-		red: "#fb7185",
-		green: "#4ade80",
-		yellow: "#a3e635",
-		blue: "#2dd4bf",
-		magenta: "#10b981",
-		cyan: "#5eead4",
-		white: "#ecfdf5",
-		brightBlack: "#365314",
-		brightRed: "#fda4af",
-		brightGreen: "#86efac",
-		brightYellow: "#bef264",
-		brightBlue: "#5eead4",
-		brightMagenta: "#6ee7b7",
-		brightCyan: "#99f6e4",
-		brightWhite: "#ffffff",
-	},
-	sunset: {
-		background: "#160b10",
-		foreground: "#fff1f2",
-		cursor: "#fb7185",
-		cursorAccent: "#160b10",
-		selectionBackground: "rgba(251, 113, 133, 0.24)",
-		black: "#2a111b",
-		red: "#fb7185",
-		green: "#f97316",
-		yellow: "#f59e0b",
-		blue: "#c084fc",
-		magenta: "#e879f9",
-		cyan: "#fda4af",
-		white: "#ffe4e6",
-		brightBlack: "#4a1d2d",
-		brightRed: "#fda4af",
-		brightGreen: "#fdba74",
-		brightYellow: "#fcd34d",
-		brightBlue: "#d8b4fe",
-		brightMagenta: "#f5d0fe",
-		brightCyan: "#fecdd3",
-		brightWhite: "#fff7ed",
-	},
-	ocean: {
-		background: "#f0fdff",
-		foreground: "#123043",
-		cursor: "#0891b2",
-		cursorAccent: "#f0fdff",
-		selectionBackground: "rgba(8, 145, 178, 0.18)",
-		black: "#dff7fb",
-		red: "#db2777",
-		green: "#0f766e",
-		yellow: "#ca8a04",
-		blue: "#2563eb",
-		magenta: "#7c3aed",
-		cyan: "#0891b2",
-		white: "#1f2937",
-		brightBlack: "#94a3b8",
-		brightRed: "#ec4899",
-		brightGreen: "#14b8a6",
-		brightYellow: "#eab308",
-		brightBlue: "#3b82f6",
-		brightMagenta: "#8b5cf6",
-		brightCyan: "#06b6d4",
-		brightWhite: "#334155",
-	},
-	rose: {
-		background: "#fff4f7",
-		foreground: "#4c1d33",
-		cursor: "#e11d48",
-		cursorAccent: "#fff4f7",
-		selectionBackground: "rgba(225, 29, 72, 0.16)",
-		black: "#ffe4ec",
-		red: "#e11d48",
-		green: "#059669",
-		yellow: "#d97706",
-		blue: "#8b5cf6",
-		magenta: "#db2777",
-		cyan: "#0f766e",
-		white: "#4c1d33",
-		brightBlack: "#c4b5fd",
-		brightRed: "#f43f5e",
-		brightGreen: "#10b981",
-		brightYellow: "#f59e0b",
-		brightBlue: "#a78bfa",
-		brightMagenta: "#ec4899",
-		brightCyan: "#14b8a6",
-		brightWhite: "#6b2148",
-	},
-	graphite: {
-		background: "#121417",
-		foreground: "#f3f4f6",
-		cursor: "#94a3b8",
-		cursorAccent: "#121417",
-		selectionBackground: "rgba(148, 163, 184, 0.2)",
-		black: "#1f2937",
-		red: "#f87171",
-		green: "#22c55e",
-		yellow: "#fbbf24",
-		blue: "#60a5fa",
-		magenta: "#c084fc",
-		cyan: "#67e8f9",
-		white: "#f9fafb",
-		brightBlack: "#4b5563",
-		brightRed: "#fca5a5",
-		brightGreen: "#4ade80",
-		brightYellow: "#fcd34d",
-		brightBlue: "#93c5fd",
-		brightMagenta: "#ddd6fe",
-		brightCyan: "#a5f3fc",
-		brightWhite: "#ffffff",
-	},
-	solarized: {
-		background: "#002b36",
-		foreground: "#93a1a1",
-		cursor: "#b58900",
-		cursorAccent: "#002b36",
-		selectionBackground: "rgba(181, 137, 0, 0.2)",
-		black: "#073642",
-		red: "#dc322f",
-		green: "#859900",
-		yellow: "#b58900",
-		blue: "#268bd2",
-		magenta: "#d33682",
-		cyan: "#2aa198",
-		white: "#eee8d5",
-		brightBlack: "#586e75",
-		brightRed: "#cb4b16",
-		brightGreen: "#93a61a",
-		brightYellow: "#c7a321",
-		brightBlue: "#4f9bd8",
-		brightMagenta: "#e05c9d",
-		brightCyan: "#45b8b0",
-		brightWhite: "#fdf6e3",
-	},
 };
 
-const VALID_THEME_IDS = new Set(THEME_OPTIONS.map((theme) => theme.id));
+const VALID_THEME_IDS = new Set(["light", "dark"]);
 
-export function isThemeId(value: string | undefined | null): value is string {
-	return Boolean(value && VALID_THEME_IDS.has(value));
+export function isThemeId(value: string | undefined | null): value is "light" | "dark" {
+	return value === "light" || value === "dark";
 }
 
 export function normalizeThemeId(value: string | undefined | null, fallback = DEFAULT_THEME_ID): string {
-	if (value && VALID_THEME_IDS.has(value)) {
-		return value;
-	}
-	return VALID_THEME_IDS.has(fallback) ? fallback : DEFAULT_THEME_ID;
+	// Legacy/unknown theme IDs normalize to fallback or DEFAULT_THEME_ID
+	if (isThemeId(value)) return value;
+	if (isThemeId(fallback)) return fallback;
+	return DEFAULT_THEME_ID;
 }
 
 export function getTerminalTheme(themeId: string | undefined | null): ITheme {

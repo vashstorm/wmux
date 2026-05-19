@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState, useRef, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
 import { THEME_OPTIONS, normalizeThemeId } from "../ui/themes.js";
+
+const THEME_LABELS: Record<string, string> = {
+	light: "Light",
+	dark: "Dark",
+};
 
 interface ProviderFormState extends IntelligenceProviderConfig {
 	isNew: boolean;
@@ -94,12 +99,7 @@ export function SettingsPanel() {
 			return null;
 		}
 
-		const previewStyle = {
-			"--theme-preview-bg": theme.preview.background,
-			"--theme-preview-panel": theme.preview.panel,
-			"--theme-preview-accent": theme.preview.accent,
-			"--theme-preview-secondary": theme.preview.secondary,
-		} as CSSProperties;
+		const label = THEME_LABELS[themeId] ?? themeId;
 
 		return (
 			<button
@@ -107,22 +107,8 @@ export function SettingsPanel() {
 				type="button"
 				className={`theme-card ${value === theme.id ? "is-active" : ""}`}
 				onClick={() => updateField(field, theme.id)}
-				title={theme.description}
 			>
-				<div className="theme-preview" style={previewStyle}>
-					<div className="theme-preview-orb theme-preview-orb-primary" />
-					<div className="theme-preview-orb theme-preview-orb-secondary" />
-					<div className="theme-preview-panel">
-						<div className="theme-preview-bar" />
-						<div className="theme-preview-row">
-							<div className="theme-preview-chip" />
-							<div className="theme-preview-chip theme-preview-chip-muted" />
-						</div>
-						<div className="theme-preview-terminal" />
-					</div>
-				</div>
-				<span>{theme.label}</span>
-				<small>{theme.description}</small>
+				<span>{label}</span>
 			</button>
 		);
 	};
