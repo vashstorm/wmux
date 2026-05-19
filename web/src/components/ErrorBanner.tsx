@@ -1,3 +1,4 @@
+import { Alert, AlertTitle } from "@mui/material";
 import { useAppState } from "../state/store.js";
 
 export function ErrorBanner() {
@@ -10,18 +11,14 @@ export function ErrorBanner() {
 	if (!error) return null;
 
 	return (
-		<div className="error-banner" data-testid="error-banner" role="alert">
-			<span className="error-banner-code">{error.code}</span>
-			<span className="error-banner-message">{error.message}</span>
-			<button
-				type="button"
-				className="error-banner-dismiss"
-				onClick={() => setError(null)}
-				aria-label="Dismiss error"
-				title="Dismiss"
-			>
-				×
-			</button>
-		</div>
+		<Alert
+			severity="error"
+			onClose={() => setError(null)}
+			data-testid="error-banner"
+			sx={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", zIndex: 9999 }}
+		>
+			<AlertTitle>Error: {error.code}</AlertTitle>
+			{error.message}
+		</Alert>
 	);
 }

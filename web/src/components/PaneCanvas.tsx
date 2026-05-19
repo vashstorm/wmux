@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Box, Typography } from "@mui/material";
 import { Terminal } from "./Terminal.js";
 import type { PaneData, SelectedPane } from "../state/store.js";
 
@@ -52,26 +53,44 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 
 	if (panes.length === 0) {
 		return (
-			<div className="pane-canvas-empty" data-testid="pane-canvas-empty">
-				<p className="pane-canvas-empty-text">No panes loaded</p>
-			</div>
+			<Box className="pane-canvas-empty" data-testid="pane-canvas-empty" sx={{
+				display: "flex",
+				alignItems: "center",
+				justifyContent: "center",
+				padding: 3,
+				minHeight: 120,
+			}}>
+				<Typography className="pane-canvas-empty-text" sx={{
+					color: "text.disabled",
+					fontSize: "var(--font-size-sm)",
+				}}>
+					No panes loaded
+				</Typography>
+			</Box>
 		);
 	}
 
 	return (
-		<div
+		<Box
 			className={`pane-canvas${selectedPane ? " has-terminal" : ""}`}
 			data-testid="pane-canvas"
+			sx={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
 		>
-			<div className="pane-canvas-stage">
+			<Box className="pane-canvas-stage" sx={{ position: "relative", width: "100%", height: "100%" }}>
 				{selectedPane && (
-					<div className="pane-canvas-terminal" data-testid="pane-canvas-terminal">
+					<Box className="pane-canvas-terminal" data-testid="pane-canvas-terminal" sx={{
+						position: "absolute",
+						inset: 0,
+						zIndex: 1,
+						borderRadius: 1,
+						overflow: "hidden",
+					}}>
 						<Terminal
 							selectedPane={selectedPane}
 							windowTheme={windowTheme}
 							sourceSize={selectedPaneSourceSize}
 						/>
-					</div>
+					</Box>
 				)}
 				{panes.map((pane) => {
 					const isActive = pane.id === selectedPaneId;
@@ -83,7 +102,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 					const height = scaleToPercent(pane.height, bounds.height);
 
 					return (
-						<div
+						<Box
 							key={pane.id}
 							className={`pane-box${isActive ? " is-active" : ""}${isAttentionExplicit ? " is-attention-explicit" : ""}${isAttention && !isAttentionExplicit ? " is-attention" : ""}`}
 							data-testid={isActive ? "pane-box-active" : "pane-box"}
@@ -94,13 +113,27 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								width,
 								height,
 							}}
+							sx={{
+								border: "1px solid",
+								borderColor: isActive ? "primary.main" : "divider",
+								borderRadius: 1,
+								backgroundColor: isActive ? "action.selected" : "background.paper",
+								cursor: "pointer",
+								overflow: "hidden",
+								transition: "border-color 0.15s ease, background-color 0.15s ease",
+							}}
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
 							{(isAttention || isAttentionExplicit) && (
-								<div className="pane-box-attention-indicator">
+								<Box className="pane-box-attention-indicator" sx={{
+									position: "absolute",
+									top: 4,
+									right: 4,
+									zIndex: 2,
+								}}>
 									<span className="attention-badge" />
-								</div>
+								</Box>
 							)}
 							{!isActive && (
 								<button
@@ -114,10 +147,10 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 									{pane.title}
 								</button>
 							)}
-						</div>
+						</Box>
 					);
 				})}
-			</div>
-		</div>
+			</Box>
+		</Box>
 	);
 }

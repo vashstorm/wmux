@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
+import { Box } from "@mui/material";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -325,11 +326,12 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	};
 
 	return (
-		<div
+		<Box
 			ref={wrapperRef}
 			className="terminal-wrapper"
 			style={terminalStyle}
 			data-testid="terminal-wrapper"
+			sx={{ position: "relative", display: "flex", flex: 1, width: "100%", height: "100%", overflow: "hidden" }}
 		>
 			<div
 				ref={containerRef}
@@ -359,6 +361,6 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 					</div>
 				</div>
 			)}
-		</div>
+		</Box>
 	);
 }

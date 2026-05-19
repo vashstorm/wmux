@@ -1,4 +1,18 @@
 import { useState, useEffect } from "react";
+import {
+	Dialog,
+	DialogTitle,
+	DialogContent,
+	DialogActions,
+	TextField,
+	Select,
+	MenuItem,
+	FormControl,
+	InputLabel,
+	Button,
+	Typography,
+	Box,
+} from "@mui/material";
 import { createConnection, updateConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -23,6 +37,7 @@ export function NewConnectionForm() {
 	const [knownHostsPath, setKnownHostsPath] = useState("");
 
 	const isEditMode = editingConnection !== null;
+	const show = showNewConnectionForm || !!editingConnection;
 
 	useEffect(() => {
 		if (editingConnection) {
@@ -41,8 +56,6 @@ export function NewConnectionForm() {
 			setKnownHostsPath("");
 		}
 	}, [editingConnection]);
-
-	if (!showNewConnectionForm && !editingConnection) return null;
 
 	const handleClose = () => {
 		setShowNewConnectionForm(false);
@@ -113,113 +126,115 @@ export function NewConnectionForm() {
 	const computedName = type === "local" ? "local" : (host.trim() || "ssh");
 
 	return (
-		<div className="new-connection-form-overlay" onClick={handleClose}>
-			<form className="new-connection-form" onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} data-testid="new-connection-form">
-				<h3 className="form-title">{isEditMode ? "Edit Connection" : "New Connection"}</h3>
+		<Dialog open={show} onClose={handleClose} fullWidth maxWidth="sm" data-testid="new-connection-form">
+			<DialogTitle>{isEditMode ? "Edit Connection" : "New Connection"}</DialogTitle>
+			<DialogContent dividers>
+				<Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+					<Box sx={{ mb: 1 }}>
+						<Typography variant="body2" color="text.secondary" gutterBottom>Connection</Typography>
+						<Typography variant="body1" data-testid="computed-connection-name">{computedName}</Typography>
+					</Box>
 
-				<div className="form-field">
-					<label>Connection</label>
-					<div className="computed-name-display" data-testid="computed-connection-name">{computedName}</div>
-				</div>
+					<FormControl fullWidth size="small">
+						<InputLabel id="conn-type-label">Type</InputLabel>
+						<Select
+							labelId="conn-type-label"
+							id="conn-type"
+							value={type}
+							label="Type"
+							onChange={(e) => setType(e.target.value as "local" | "ssh")}
+							data-testid="connection-type-select"
+						>
+							<MenuItem value="local">Local</MenuItem>
+							<MenuItem value="ssh">SSH</MenuItem>
+						</Select>
+					</FormControl>
 
-				<div className="form-field">
-					<label htmlFor="conn-type">Type</label>
-					<select
-						id="conn-type"
-						value={type}
-						onChange={(e) => setType(e.target.value as "local" | "ssh")}
-						data-testid="connection-type-select"
-					>
-						<option value="local">Local</option>
-						<option value="ssh">SSH</option>
-					</select>
-				</div>
-
-				{type === "ssh" && (
-					<>
-						<div className="form-field">
-							<label htmlFor="conn-host">Host *</label>
-							<input
+					{type === "ssh" && (
+						<>
+							<TextField
 								id="conn-host"
+								label="Host *"
 								type="text"
 								value={host}
 								onChange={(e) => setHost(e.target.value)}
 								placeholder="example.com"
 								required={type === "ssh"}
+								fullWidth
+								size="small"
 								data-testid="connection-host-input"
 							/>
-						</div>
 
-						<div className="form-field">
-							<label htmlFor="conn-port">Port</label>
-							<input
+							<TextField
 								id="conn-port"
+								label="Port"
 								type="number"
 								value={port}
 								onChange={(e) => setPort(e.target.value)}
 								placeholder="22"
+								fullWidth
+								size="small"
 								data-testid="connection-port-input"
 							/>
-						</div>
 
-						<div className="form-field">
-							<label htmlFor="conn-user">User *</label>
-							<input
+							<TextField
 								id="conn-user"
+								label="User *"
 								type="text"
 								value={user}
 								onChange={(e) => setUser(e.target.value)}
 								placeholder="root"
 								required={type === "ssh"}
+								fullWidth
+								size="small"
 								data-testid="connection-user-input"
 							/>
-						</div>
 
-						<div className="form-field">
-							<label htmlFor="conn-key">Private Key Path</label>
-							<input
+							<TextField
 								id="conn-key"
+								label="Private Key Path"
 								type="text"
 								value={privateKeyPath}
 								onChange={(e) => setPrivateKeyPath(e.target.value)}
 								placeholder="~/.ssh/id_rsa"
+								fullWidth
+								size="small"
 								data-testid="connection-key-input"
 							/>
-						</div>
 
-						<div className="form-field">
-							<label htmlFor="conn-known-hosts">Known Hosts Path</label>
-							<input
+							<TextField
 								id="conn-known-hosts"
+								label="Known Hosts Path"
 								type="text"
 								value={knownHostsPath}
 								onChange={(e) => setKnownHostsPath(e.target.value)}
 								placeholder="~/.ssh/known_hosts"
+								fullWidth
+								size="small"
 								data-testid="connection-known-hosts-input"
 							/>
-						</div>
-					</>
-				)}
-
-				<div className="form-actions">
-					<button
-						type="button"
-						className="form-button form-button-secondary"
-						onClick={handleClose}
-						data-testid="cancel-connection"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						className="form-button form-button-primary"
-						data-testid="save-connection"
-						disabled={type === "ssh" && (!host.trim() || !user.trim())}
-					>
-						{isEditMode ? "Update" : "Save"}
-					</button>
-				</div>
-			</form>
-		</div>
+						</>
+					)}
+				</Box>
+			</DialogContent>
+			<DialogActions>
+				<Button
+					type="button"
+					onClick={handleClose}
+					data-testid="cancel-connection"
+				>
+					Cancel
+				</Button>
+				<Button
+					type="submit"
+					variant="contained"
+					onClick={handleSubmit}
+					data-testid="save-connection"
+					disabled={type === "ssh" && (!host.trim() || !user.trim())}
+				>
+					{isEditMode ? "Update" : "Save"}
+				</Button>
+			</DialogActions>
+		</Dialog>
 	);
 }

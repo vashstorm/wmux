@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { Box, Typography } from "@mui/material";
 import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
@@ -211,22 +212,55 @@ export function MainPanel() {
 	return (
 		<div className="main-panel">
 			<header className="main-header">
-				<h1 className="main-header-title" data-testid="main-title">
+				<Box component="h1" className="main-header-title" data-testid="main-title" sx={{
+					fontFamily: "var(--font-display)",
+					fontSize: "var(--font-size-xl)",
+					fontWeight: 700,
+					color: "text.primary",
+					letterSpacing: "0.05em",
+					display: "flex",
+					gap: 1.5,
+					alignItems: "center",
+				}}>
 					{titleSegments.length > 0 ? (
 						titleSegments.map((segment) => (
-							<span
+							<Box
 								key={segment.key}
+								component="span"
 								className={`main-title-segment is-${segment.key}`}
 								data-testid={`main-title-${segment.key}`}
 								title={segment.value}
+								sx={{
+									color: segment.key === "session" ? "primary.main" : segment.key === "app" ? "text.secondary" : "text.disabled",
+									fontWeight: segment.key === "session" ? 700 : 500,
+									 ...(segment.key === "summary" ? {
+										opacity: 0.7,
+										maxWidth: 320,
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+									} : {}),
+								}}
 							>
-								<span className="main-title-segment-value">{segment.value}</span>
-							</span>
+								<Typography
+									component="span"
+									className="main-title-segment-value"
+									sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit" }}
+								>
+									{segment.value}
+								</Typography>
+							</Box>
 						))
 					) : (
-						<span className="main-title-fallback">Wmux</span>
+						<Typography
+							component="span"
+							className="main-title-fallback"
+							sx={{ color: "text.secondary" }}
+						>
+							Wmux
+						</Typography>
 					)}
-				</h1>
+				</Box>
 			</header>
 
 			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
@@ -247,8 +281,19 @@ export function MainPanel() {
 						/>
 					</div>
 				) : (
-					<div className="empty-state" data-testid="empty-state">
-						<div className="empty-state-icon" aria-hidden="true">
+					<Box className="empty-state" data-testid="empty-state" sx={{
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "center",
+						justifyContent: "center",
+						gap: 2,
+						padding: 4,
+						minHeight: 240,
+					}}>
+						<Box className="empty-state-icon" aria-hidden="true" sx={{
+							color: "text.disabled",
+							opacity: 0.4,
+						}}>
 							<svg
 								width="24"
 								height="24"
@@ -261,12 +306,22 @@ export function MainPanel() {
 								<path d="M6 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
 								<path d="M6 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
 							</svg>
-						</div>
-						<p className="empty-state-title">Select a session</p>
-						<p className="empty-state-description">
+						</Box>
+						<Typography className="empty-state-title" sx={{
+							fontSize: "var(--font-size-lg)",
+							fontWeight: 600,
+							color: "text.primary",
+						}}>
+							Select a session
+						</Typography>
+						<Typography className="empty-state-description" sx={{
+							fontSize: "var(--font-size-sm)",
+							color: "text.secondary",
+							textAlign: "center",
+						}}>
 							Click a session card in the sidebar to open the terminal
-						</p>
-					</div>
+						</Typography>
+					</Box>
 				)}
 			</main>
 		</div>
