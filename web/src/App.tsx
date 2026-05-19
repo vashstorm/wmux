@@ -4,9 +4,13 @@ import "./styles/components.css";
 import "./styles/fonts.css";
 
 import { useEffect } from "react";
+import { ThemeProvider, CssBaseline, IconButton } from "@mui/material";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig } from "./api/client.js";
 import { applyUIFontSize } from "./ui/fontSize.js";
+import { useModeTheme } from "./ui/muiTheme.js";
 import { MainPanel } from "./components/MainPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
 import { ErrorBanner } from "./components/ErrorBanner.js";
@@ -15,7 +19,7 @@ import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
-import { normalizeThemeId } from "./ui/themes.js";
+import { normalizeThemeId, THEME_OPTIONS } from "./ui/themes.js";
 
 function UISettingsInit() {
 	const { setUISettings } = useAppState();
@@ -37,20 +41,53 @@ function UISettingsInit() {
 	return null;
 }
 
+function MuiThemeShell({ children }: { children: React.ReactNode }) {
+	const { uiSettings } = useAppState();
+	const theme = useModeTheme(uiSettings.theme);
+
+	return <ThemeProvider theme={theme}><CssBaseline />{children}</ThemeProvider>;
+}
+
+function ThemeToggle() {
+	const { uiSettings, setUISettings } = useAppState();
+	const currentTheme = THEME_OPTIONS.find((t) => t.id === uiSettings.theme);
+	const isDark = currentTheme != null ? currentTheme.mode === "dark" : uiSettings.theme === "dark";
+
+	const handleToggle = () => {
+		const newTheme = isDark ? "light" : "dark";
+		setUISettings({ ...uiSettings, theme: newTheme });
+	};
+
+	return (
+		<IconButton
+			data-testid="theme-toggle"
+			aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+			onClick={handleToggle}
+			sx={{ position: "fixed", top: 8, right: 8, zIndex: 9999 }}
+			size="small"
+		>
+			{isDark ? <LightModeIcon /> : <DarkModeIcon />}
+		</IconButton>
+	);
+}
+
 export function App() {
 	return (
 		<AppProvider>
 			<UISettingsInit />
-			<div className="app-shell" data-testid="app-shell">
-				<ConfigConflictBanner />
-				<Sidebar />
-				<MainPanel />
-				<ErrorBanner />
-				<ConfirmDialog />
-				<NewConnectionForm />
-				<SettingsPanel />
-				<ErrorLogsPanel />
-			</div>
+			<MuiThemeShell>
+				<div className="app-shell" data-testid="app-shell">
+					<ThemeToggle />
+					<ConfigConflictBanner />
+					<Sidebar />
+					<MainPanel />
+					<ErrorBanner />
+					<ConfirmDialog />
+					<NewConnectionForm />
+					<SettingsPanel />
+					<ErrorLogsPanel />
+				</div>
+			</MuiThemeShell>
 		</AppProvider>
 	);
 }
