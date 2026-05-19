@@ -462,17 +462,18 @@ fn spawn_control_reader_task(
 ) {
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout);
-        let mut line = String::new();
+        let mut line = Vec::new();
         loop {
             line.clear();
-            match reader.read_line(&mut line).await {
+            match reader.read_until(b'\n', &mut line).await {
                 Ok(0) => {
                     send_close_once(&events_tx, &close_sent);
                     return;
                 }
-                Ok(n) => {
-                    let control_line = line[..n].trim_end_matches(['\r', '\n']);
-                    match parse_control_output_line(control_line, &pane_id) {
+                Ok(_) => {
+                    let control_line_bytes = trim_control_line_bytes(&line);
+                    let control_line = String::from_utf8_lossy(control_line_bytes);
+                    match parse_control_output_line(&control_line, &pane_id) {
                         Ok(Some(data)) => {
                             let size = *current_size.lock().expect("terminal size mutex poisoned");
                             match capture_pane_snapshot(&tmux_path, &pane_id, size).await {
@@ -510,6 +511,14 @@ fn spawn_control_reader_task(
             }
         }
     });
+}
+
+fn trim_control_line_bytes(line: &[u8]) -> &[u8] {
+    let mut end = line.len();
+    while end > 0 && matches!(line[end - 1], b'\r' | b'\n') {
+        end -= 1;
+    }
+    &line[..end]
 }
 
 fn spawn_control_process_task(
@@ -1332,6 +1341,20 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(output, "hi there");
+    }
+
+    #[test]
+    fn control_output_accepts_invalid_utf8_bytes() {
+        let mut line = b"%output %1 bad".to_vec();
+        line.push(0xff);
+        line.extend_from_slice(b"byte\\012\r\n");
+
+        let control_line = String::from_utf8_lossy(trim_control_line_bytes(&line));
+        let output = parse_control_output_line(&control_line, "%1")
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(output, "bad\u{fffd}byte\n");
     }
 
     #[test]
