@@ -29,6 +29,7 @@ const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
 };
 
 const APP_BADGE_ORDER = ["claude", "codex", "opencode", "zsh"] as const;
+type SidebarView = "projects" | "session" | "stats";
 
 function isApiError(err: unknown): err is Error & { code: string; message: string } {
   return err instanceof Error && "code" in err && "message" in err;
@@ -59,6 +60,7 @@ export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [newSessionName, setNewSessionName] = useState("");
   const [showNewSessionForm, setShowNewSessionForm] = useState(false);
+  const [activeView, setActiveView] = useState<SidebarView>("session");
   const [renamingSession, setRenamingSession] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const prevSelectedRef = useRef<string | null>(null);
@@ -346,31 +348,78 @@ export function Sidebar() {
     }
   };
 
+  const openSessionView = () => {
+    setActiveView("session");
+  };
+
   return (
     <aside className="sidebar" data-testid="sidebar">
       <div className="sidebar-header">
         <div className="sidebar-header-row">
           <div className="sidebar-brand">Wmux</div>
           <div className="sidebar-header-actions">
-              <button
-                type="button"
-                className="new-connection-button"
-                onClick={() => setShowNewSessionForm(!showNewSessionForm)}
-                data-testid="new-session-button"
-                aria-label="New Session"
-                title="New Session"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14"/>
-                </svg>
-              </button>
+            <button
+              type="button"
+              className={`sidebar-header-action${activeView === "projects" ? " is-active" : ""}`}
+              onClick={() => setActiveView("projects")}
+              data-testid="open-projects-button"
+              aria-label="Projects"
+              title="Projects"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-header-action${activeView === "session" ? " is-active" : ""}`}
+              onClick={openSessionView}
+              data-testid="open-session-button"
+              aria-label="Session"
+              title="Session"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/>
+                <path d="m7 9 3 3-3 3"/>
+                <path d="M13 15h4"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-header-action${activeView === "stats" ? " is-active" : ""}`}
+              onClick={() => setActiveView("stats")}
+              data-testid="open-stats-button"
+              aria-label="Stats"
+              title="Stats"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19V5"/>
+                <path d="M4 19h16"/>
+                <path d="M8 17v-5"/>
+                <path d="M12 17V8"/>
+                <path d="M16 17v-8"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="sidebar-header-action"
+              onClick={() => setShowSettingsPanel(true)}
+              data-testid="open-settings-button"
+              aria-label="Setting"
+              title="Setting"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
             <button
               type="button"
               className={`sidebar-header-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
               onClick={() => setShowErrorLogsPanel(true)}
               data-testid="open-error-logs-button"
-              aria-label={errorLogCount > 0 ? `Error Logs (${errorLogCount})` : "Error Logs"}
-              title={errorLogCount > 0 ? `Error Logs (${errorLogCount})` : "Error Logs"}
+              aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+              title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -384,26 +433,17 @@ export function Sidebar() {
                 </span>
               )}
             </button>
-            <button
-              type="button"
-              className="sidebar-header-action"
-              onClick={() => setShowSettingsPanel(true)}
-              data-testid="open-settings-button"
-              aria-label="Settings"
-              title="Settings"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-            </button>
           </div>
         </div>
 
       </div>
 
       <div className="sidebar-content">
-        {selectedConnectionId ? (
+        {activeView === "projects" ? (
+          <div className="sidebar-empty-view" data-testid="projects-view" />
+        ) : activeView === "stats" ? (
+          <div className="sidebar-empty-view" data-testid="stats-view" />
+        ) : selectedConnectionId ? (
           <>
             <div className="sidebar-toolbar">
               <div className="sidebar-search-wrapper">
@@ -454,9 +494,23 @@ export function Sidebar() {
             <div className="sidebar-sessions-section">
               <div className="sidebar-sessions-header">
                 <span className="sidebar-section-label">Sessions</span>
-                {filteredSessions.length > 0 && (
-                  <span className="sidebar-session-count">{filteredSessions.length}</span>
-                )}
+                <div className="sidebar-sessions-header-actions">
+                  {filteredSessions.length > 0 && (
+                    <span className="sidebar-session-count">{filteredSessions.length}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="sidebar-session-create-button"
+                    onClick={() => setShowNewSessionForm(!showNewSessionForm)}
+                    data-testid="new-session-button"
+                    aria-label="New Session"
+                    title="New Session"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               {filteredSessions.length === 0 ? (
                 <div className="sidebar-empty-small">

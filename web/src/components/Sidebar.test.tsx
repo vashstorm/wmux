@@ -576,6 +576,35 @@ describe("intelligence badge and summary rendering", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("error-logs-badge")).toHaveTextContent("2");
 		});
-		expect(screen.getByTestId("open-error-logs-button")).toHaveAttribute("aria-label", "Error Logs (2)");
+		expect(screen.getByTestId("open-error-logs-button")).toHaveAttribute("aria-label", "Logs (2)");
+	});
+
+	test("sidebar header switches between placeholder projects, sessions, and stats views", async () => {
+		mockListSessions.mockResolvedValue({
+			connectionId: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		expect(screen.getByTestId("projects-view")).toBeInTheDocument();
+		expect(screen.queryByTestId("session-card-session1")).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+		expect(screen.getByTestId("stats-view")).toBeInTheDocument();
+		expect(screen.queryByTestId("session-card-session1")).not.toBeInTheDocument();
+
+		fireEvent.click(screen.getByTestId("open-session-button"));
+		expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
 	});
 });
