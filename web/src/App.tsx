@@ -3,12 +3,12 @@ import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/fonts.css";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ThemeProvider, CssBaseline, IconButton } from "@mui/material";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { AppProvider, useAppState } from "./state/store.js";
-import { getConfig } from "./api/client.js";
+import { getConfig, updateConfig } from "./api/client.js";
 import { applyUIFontSize } from "./ui/fontSize.js";
 import { useModeTheme } from "./ui/muiTheme.js";
 import { MainPanel } from "./components/MainPanel.js";
@@ -51,10 +51,23 @@ function MuiThemeShell({ children }: { children: React.ReactNode }) {
 function ThemeToggle() {
 	const { uiSettings, setUISettings } = useAppState();
 	const isDark = uiSettings.theme === "dark";
+	const updatingRef = useRef(false);
 
-	const handleToggle = () => {
+	const handleToggle = async () => {
+		if (updatingRef.current) return;
 		const newTheme = isDark ? "light" : "dark";
-		setUISettings({ ...uiSettings, theme: newTheme });
+		setUISettings({ ...uiSettings, theme: newTheme, windowTheme: newTheme });
+		updatingRef.current = true;
+		try {
+			const config = await getConfig();
+			config.ui.theme = newTheme;
+			config.ui.windowTheme = newTheme;
+			await updateConfig(config);
+		} catch (err) {
+			console.error("Failed to persist theme:", err);
+		} finally {
+			updatingRef.current = false;
+		}
 	};
 
 	return (

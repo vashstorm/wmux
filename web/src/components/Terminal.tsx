@@ -309,6 +309,13 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	useEffect(() => {
 		const terminal = terminalRef.current;
 		if (!terminal) return;
+		terminal.options.theme = getTerminalTheme(uiSettings.theme);
+		terminal.refresh(0, terminal.rows);
+	}, [uiSettings.theme]);
+
+	useEffect(() => {
+		const terminal = terminalRef.current;
+		if (!terminal) return;
 		terminal.options.theme = getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme);
 	}, [windowTheme]);
 

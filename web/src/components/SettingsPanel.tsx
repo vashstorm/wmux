@@ -84,7 +84,7 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [activeTab, setActiveTab] = useState<"general" | "connections" | "theme" | "windowTheme" | "typography" | "intelligence">("general");
+	const [activeTab, setActiveTab] = useState<"general" | "connections" | "theme" | "typography" | "intelligence">("general");
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -449,30 +449,22 @@ export function SettingsPanel() {
 									<span className="nav-icon">🌐</span>
 									<span className="nav-label">Connections</span>
 								</button>
-								<button
-									type="button"
-									className={`settings-nav-item ${activeTab === "theme" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("theme")}
-								>
-									<span className="nav-icon">🎨</span>
-									<span className="nav-label">Theme</span>
-								</button>
-								<button
-									type="button"
-									className={`settings-nav-item ${activeTab === "windowTheme" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("windowTheme")}
-								>
-									<span className="nav-icon">🪟</span>
-									<span className="nav-label">Window Theme</span>
-								</button>
-								<button
-									type="button"
-									className={`settings-nav-item ${activeTab === "typography" ? "is-active" : ""}`}
-									onClick={() => setActiveTab("typography")}
-								>
-									<span className="nav-icon">🔠</span>
-									<span className="nav-label">Typography</span>
-								</button>
+				<button
+					type="button"
+					className={`settings-nav-item ${activeTab === "theme" ? "is-active" : ""}`}
+					onClick={() => setActiveTab("theme")}
+				>
+					<span className="nav-icon">🎨</span>
+					<span className="nav-label">Theme</span>
+				</button>
+				<button
+					type="button"
+					className={`settings-nav-item ${activeTab === "typography" ? "is-active" : ""}`}
+					onClick={() => setActiveTab("typography")}
+				>
+					<span className="nav-icon">🔠</span>
+					<span className="nav-label">Typography</span>
+				</button>
 								<button
 									type="button"
 									className={`settings-nav-item ${activeTab === "intelligence" ? "is-active" : ""}`}
@@ -1041,20 +1033,6 @@ export function SettingsPanel() {
 										<div className="form-field">
 											<div className="theme-grid">
 												{THEME_OPTIONS.map((theme) => renderThemeCard("theme", formState.theme, theme.id))}
-											</div>
-										</div>
-									</div>
-								</div>
-							)}
-
-							{activeTab === "windowTheme" && (
-								<div className="settings-tab-content">
-									<div className="settings-form-section">
-										<h4 className="settings-section-title">Window Theme</h4>
-										<p className="form-help-text">Theme for the window panel area (tabs and terminal canvas). Defaults to the global theme when not set.</p>
-										<div className="form-field">
-											<div className="theme-grid">
-												{THEME_OPTIONS.map((theme) => renderThemeCard("windowTheme", formState.windowTheme, theme.id))}
 											</div>
 										</div>
 									</div>

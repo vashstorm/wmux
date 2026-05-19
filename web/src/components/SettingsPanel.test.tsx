@@ -86,7 +86,7 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByRole("button", { name: /AI/i })).toBeInTheDocument();
 	});
 
-	test("Theme and Window Theme tabs each render 2 theme options (light and dark)", async () => {
+	test("Theme tab renders 2 theme options (light and dark)", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -102,13 +102,6 @@ describe("SettingsPanel intelligence section", () => {
 		});
 
 		fireEvent.click(screen.getByRole("button", { name: /🎨Theme/i }));
-
-		for (const theme of THEME_OPTIONS) {
-			const label = THEME_LABELS[theme.id] ?? theme.id;
-			expect(screen.getAllByRole("button", { name: new RegExp(label, "i") })).toHaveLength(1);
-		}
-
-		fireEvent.click(screen.getByRole("button", { name: /Window Theme/i }));
 
 		for (const theme of THEME_OPTIONS) {
 			const label = THEME_LABELS[theme.id] ?? theme.id;
