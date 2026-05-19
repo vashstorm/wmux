@@ -14,6 +14,7 @@ const mockXTermDispose = vi.fn();
 const mockXTermOnData = vi.fn();
 const mockXTermOnResize = vi.fn();
 const mockXTermFocus = vi.fn();
+const mockXTermResize = vi.fn();
 const mockFit = vi.fn();
 const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
 const mockWsSend = vi.fn();
@@ -21,13 +22,13 @@ const mockSetError = vi.fn();
 let capturedOnResize: ((size: { cols: number; rows: number }) => void) | null = null;
 
 vi.mock("@xterm/xterm", () => ({
-	Terminal: vi.fn().mockImplementation(() => ({
+	Terminal: vi.fn().mockImplementation((options) => ({
 		cols: 80,
 		rows: 24,
 		unicode: {
 			activeVersion: "6",
 		},
-		options: {},
+		options: { fontSize: options?.fontSize },
 		open: mockXTermOpen,
 		write: mockXTermWrite,
 		writeln: mockXTermWriteln,
@@ -39,6 +40,7 @@ vi.mock("@xterm/xterm", () => ({
 			mockXTermOnResize(callback);
 		}),
 		focus: mockXTermFocus,
+		resize: mockXTermResize,
 	})),
 }));
 
@@ -104,6 +106,7 @@ describe("Terminal", () => {
 		mockXTermWrite.mockClear();
 		mockXTermWriteln.mockClear();
 		mockXTermFocus.mockClear();
+		mockXTermResize.mockClear();
 		mockFit.mockClear();
 		mockProposeDimensions.mockClear();
 		mockWsSend.mockClear();
@@ -223,11 +226,11 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		expect(mockXTermWrite).toHaveBeenCalledWith("hello world");
 	});
 
-	test("writes status message to xterm when receiving status message", () => {
+	test("does not write connection status messages into the terminal buffer", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		capturedOnMessage!({ type: "status", status: "connected" });
 
-		expect(mockXTermWriteln).toHaveBeenCalledWith("\r\n[status: connected]\r\n");
+		expect(mockXTermWriteln).not.toHaveBeenCalled();
 	});
 });

@@ -67,6 +67,12 @@ describe("useAppState", () => {
 				>
 					Set Panes
 				</button>
+				<button
+					data-testid="set-panes-external-resize"
+					onClick={() => state.setPanes("1", "session1", "@1", [{ ID: "%1", Title: "bash", Index: 0, Active: false, Width: 120, Height: 40, Left: 10, Top: 3 }, { ID: "%2", Title: "node", Index: 1, Active: true, Width: 120, Height: 40, Left: 10, Top: 44 }])}
+				>
+					Set Panes External Resize
+				</button>
 				<button data-testid="set-pane" onClick={() => state.setSelectedPane({ connectionId: "1", session: "s1", window: "w1", pane: "p1" })}>
 					Set Pane
 				</button>
@@ -127,6 +133,27 @@ describe("useAppState", () => {
 						const sessionState = state.windows["1:session1"];
 						const first = sessionState?.loadedPanes["@1"]?.[0];
 						return first ? `${first.left},${first.top}` : "null";
+					})()}
+				</span>
+				<span data-testid="pane-size">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						const first = sessionState?.loadedPanes["@1"]?.[0];
+						return first ? `${first.width}x${first.height}` : "null";
+					})()}
+				</span>
+				<span data-testid="pane-source-size">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						const first = sessionState?.loadedPanes["@1"]?.[0];
+						return first ? `${first.sourceCols}x${first.sourceRows}` : "null";
+					})()}
+				</span>
+				<span data-testid="pane-active">
+					{(() => {
+						const sessionState = state.windows["1:session1"];
+						const second = sessionState?.loadedPanes["@1"]?.[1];
+						return second?.active ? "true" : "false";
 					})()}
 				</span>
 			</div>
@@ -231,6 +258,17 @@ describe("useAppState", () => {
 		fireEvent.click(screen.getByTestId("set-panes"));
 		expect(screen.getByTestId("panes-loaded-count").textContent).toBe("1");
 		expect(screen.getByTestId("pane-geometry").textContent).toBe("0,0");
+	});
+
+	test("setPanes preserves wmux geometry when external tmux resize reports the same panes", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-windows"));
+		fireEvent.click(screen.getByTestId("set-panes"));
+		fireEvent.click(screen.getByTestId("set-panes-external-resize"));
+		expect(screen.getByTestId("pane-geometry").textContent).toBe("0,0");
+		expect(screen.getByTestId("pane-size").textContent).toBe("80x24");
+		expect(screen.getByTestId("pane-source-size").textContent).toBe("120x40");
+		expect(screen.getByTestId("pane-active").textContent).toBe("true");
 	});
 
 	test("setWindows preserves pane geometry when called again", () => {

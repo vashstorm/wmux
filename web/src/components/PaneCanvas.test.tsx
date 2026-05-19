@@ -4,7 +4,11 @@ import { PaneCanvas } from "./PaneCanvas.js";
 import type { PaneData, SelectedPane } from "../state/store.js";
 
 vi.mock("./Terminal.js", () => ({
-	Terminal: vi.fn(({ selectedPane }: { selectedPane: SelectedPane }) => (
+	Terminal: vi.fn(({
+		selectedPane,
+	}: {
+		selectedPane: SelectedPane;
+	}) => (
 		<div data-testid="mock-terminal">{selectedPane.pane}</div>
 	)),
 }));

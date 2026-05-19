@@ -74,6 +74,13 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 		return nextSize;
 	}, []);
 
+	useEffect(() => {
+		const terminal = terminalRef.current;
+		if (!terminal) return;
+		terminal.options.fontSize = uiSettings.terminalFontSize;
+		fitAndSyncSize(true);
+	}, [fitAndSyncSize, uiSettings.terminalFontSize]);
+
 	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
 		const token = getAuthToken() ?? "";
 		const terminalSize = initialSize ?? fitAndSyncSize();
@@ -97,7 +104,6 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 						break;
 					}
 					case "status": {
-						terminalRef.current?.writeln(`\r\n[status: ${message.status}]\r\n`);
 						break;
 					}
 					case "error": {
@@ -119,6 +125,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 			onOpen: () => {
 				setDisconnected(false);
 				setErrorMessage(null);
+				setError(null);
 			},
 			onClose: () => {
 				setDisconnected(true);

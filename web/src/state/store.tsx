@@ -31,6 +31,8 @@ export interface PaneData {
 	height: number;
 	left: number;
 	top: number;
+	sourceCols?: number;
+	sourceRows?: number;
 	attentionState?: "none" | "attention" | "explicit";
 	intelligenceApp?: string;
 	intelligenceStatus?: string;
@@ -92,6 +94,8 @@ function paneInfoToData(p: PaneInfo): PaneData {
 		height: p.Height,
 		left: p.Left,
 		top: p.Top,
+		sourceCols: p.Width,
+		sourceRows: p.Height,
 		attentionState: p.AttentionState,
 		intelligenceApp: p.IntelligenceApp,
 		intelligenceStatus: p.IntelligenceStatus,
@@ -102,6 +106,31 @@ function paneInfoToData(p: PaneInfo): PaneData {
 		intelligenceUpdatedAt: p.IntelligenceUpdatedAt,
 		intelligenceError: p.IntelligenceError,
 	};
+}
+
+function samePaneTopology(current: PaneData[] | undefined, next: PaneData[]) {
+	if (!current || current.length !== next.length) return false;
+	const currentIds = new Set(current.map((pane) => pane.id));
+	return next.every((pane) => currentIds.has(pane.id));
+}
+
+function preservePaneGeometry(current: PaneData[] | undefined, next: PaneData[]) {
+	if (!samePaneTopology(current, next)) {
+		return next;
+	}
+
+	const currentById = new Map(current!.map((pane) => [pane.id, pane]));
+	return next.map((pane) => {
+		const existing = currentById.get(pane.id);
+		if (!existing) return pane;
+		return {
+			...pane,
+			width: existing.width,
+			height: existing.height,
+			left: existing.left,
+			top: existing.top,
+		};
+	});
 }
 
 export interface UISettings {
@@ -239,13 +268,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		const key = `${connectionId}:${session}`;
 		setWindowsState((prev) => {
 			const existing = prev[key];
+			const nextPanes = newPanes.map(paneInfoToData);
 			return {
 				...prev,
 				[key]: {
 					windows: existing?.windows ?? [],
 					loadedPanes: {
 						...(existing?.loadedPanes ?? {}),
-						[windowId]: newPanes.map(paneInfoToData),
+						[windowId]: preservePaneGeometry(existing?.loadedPanes[windowId], nextPanes),
 					},
 					panesLoaded: true,
 				},

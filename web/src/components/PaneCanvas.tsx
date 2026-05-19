@@ -57,7 +57,10 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 			<div className="pane-canvas-stage">
 				{selectedPane && (
 					<div className="pane-canvas-terminal" data-testid="pane-canvas-terminal">
-						<Terminal selectedPane={selectedPane} windowTheme={windowTheme} />
+						<Terminal
+							selectedPane={selectedPane}
+							windowTheme={windowTheme}
+						/>
 					</div>
 				)}
 				{panes.map((pane) => {
