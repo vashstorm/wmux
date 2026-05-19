@@ -1409,23 +1409,26 @@
 	height: 100%;
 	min-width: 0;
 	min-height: 0;
-	overflow: hidden;
+	overflow-x: auto;
+	overflow-y: hidden;
 }
 
 .terminal-container .xterm {
 	flex: 1;
-	width: 100%;
+	width: max-content;
+	min-width: 100%;
 	height: 100%;
-	overflow: hidden;
+	min-height: 100%;
+	overflow: visible;
 }
 
 .terminal-container .xterm-viewport {
-	width: 100%;
-	height: 100%;
+	min-width: 100%;
+	min-height: 100%;
 }
 
 .terminal-container .xterm-screen {
-	overflow: hidden;
+	overflow: visible;
 }
 
 .terminal-container .xterm .xterm-rows span.xterm-italic,

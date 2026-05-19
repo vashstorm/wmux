@@ -13,6 +13,7 @@ import { getTerminalTheme } from "../ui/themes.js";
 interface TerminalProps {
 	selectedPane: SelectedPane;
 	windowTheme?: string;
+	sourceSize?: TerminalSize | null;
 }
 
 interface TerminalSize {
@@ -26,7 +27,16 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 	return { cols, rows };
 }
 
-export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
+function resolveDisplaySize(fittedSize: TerminalSize | null, sourceSize: TerminalSize | null | undefined): TerminalSize | null {
+	if (!fittedSize) return sourceSize ?? null;
+	if (!sourceSize) return fittedSize;
+	return {
+		cols: Math.max(fittedSize.cols, sourceSize.cols),
+		rows: fittedSize.rows,
+	};
+}
+
+export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
 	const { setError, uiSettings } = useAppState();
 	const { connectionId, session, window: windowId, pane } = selectedPane;
 	const wrapperRef = useRef<HTMLDivElement>(null);
@@ -37,6 +47,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 	const resizeFrameRef = useRef<number | null>(null);
 	const lastSentSizeRef = useRef<TerminalSize | null>(null);
+	const sourceSizeRef = useRef<TerminalSize | null>(sourceSize ?? null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -54,10 +65,17 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 			fitAddon.fit();
 		}
 
-		const nextSize = normalizeTerminalSize(
+		const fittedSize = normalizeTerminalSize(
 			proposed?.cols ?? terminal.cols,
 			proposed?.rows ?? terminal.rows,
 		);
+		const nextSize = resolveDisplaySize(fittedSize, sourceSizeRef.current);
+		if (
+			nextSize &&
+			(nextSize.cols !== terminal.cols || nextSize.rows !== terminal.rows)
+		) {
+			terminal.resize(nextSize.cols, nextSize.rows);
+		}
 
 		if (syncWebSocket && nextSize) {
 			const previousSize = lastSentSizeRef.current;
@@ -80,6 +98,11 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 		terminal.options.fontSize = uiSettings.terminalFontSize;
 		fitAndSyncSize(true);
 	}, [fitAndSyncSize, uiSettings.terminalFontSize]);
+
+	useEffect(() => {
+		sourceSizeRef.current = sourceSize ?? null;
+		fitAndSyncSize(true);
+	}, [fitAndSyncSize, sourceSize]);
 
 	const connectWebSocket = useCallback((initialSize?: TerminalSize | null) => {
 		const token = getAuthToken() ?? "";
@@ -146,6 +169,7 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 			allowProposedApi: true,
 			cursorBlink: true,
 			customGlyphs: false,
+			scrollback: 0,
 			fontFamily:
 				"'CaskaydiaCove Nerd Font', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
 			fontSize: uiSettings.terminalFontSize,
@@ -198,6 +222,9 @@ export function Terminal({ selectedPane, windowTheme }: TerminalProps) {
 
 		if (wrapperRef.current) {
 			resizeObserver.observe(wrapperRef.current);
+		}
+		if (containerRef.current) {
+			resizeObserver.observe(containerRef.current);
 		}
 
 		resizeObserverRef.current = resizeObserver;

@@ -164,6 +164,15 @@ describe("Terminal", () => {
 		expect(callArgs.rows).toBe(40);
 	});
 
+	test("uses source pane dimensions when tmux pane is wider than the fitted viewport", () => {
+		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
+
+		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
+		expect(mockXTermResize).toHaveBeenCalledWith(160, 40);
+		expect(callArgs.cols).toBe(160);
+		expect(callArgs.rows).toBe(40);
+	});
+
 	test("does not recreate WebSocket when pane identifiers are unchanged", () => {
 		const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />);
 
@@ -200,6 +209,7 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		const unicodeAddon = vi.mocked(Unicode11Addon).mock.results[0]!.value;
 
 		expect(xtermOptions.allowProposedApi).toBe(true);
+		expect(xtermOptions.scrollback).toBe(0);
 		expect(Unicode11Addon).toHaveBeenCalledTimes(1);
 		expect(mockXTermLoadAddon).toHaveBeenCalledWith(unicodeAddon);
 		expect(xtermInstance.unicode.activeVersion).toBe("11");

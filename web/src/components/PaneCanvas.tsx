@@ -40,6 +40,15 @@ function scaleToPercent(value: number, max: number): string {
 
 export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, windowTheme }: PaneCanvasProps) {
 	const bounds = useMemo(() => computeBounds(panes), [panes]);
+	const selectedPaneData = selectedPane?.pane
+		? panes.find((pane) => pane.id === selectedPane.pane)
+		: null;
+	const selectedPaneSourceSize = useMemo(() => {
+		if (!selectedPaneData || selectedPaneData.width <= 0 || selectedPaneData.height <= 0) {
+			return null;
+		}
+		return { cols: selectedPaneData.width, rows: selectedPaneData.height };
+	}, [selectedPaneData]);
 
 	if (panes.length === 0) {
 		return (
@@ -60,6 +69,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 						<Terminal
 							selectedPane={selectedPane}
 							windowTheme={windowTheme}
+							sourceSize={selectedPaneSourceSize}
 						/>
 					</div>
 				)}
