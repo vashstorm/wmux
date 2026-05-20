@@ -234,16 +234,16 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.theme).toMatchObject({
-			background: "#f1eeee",
-			cursor: "#007aff",
-			blue: "#007aff",
+			background: "#f5f7fb",
+			cursor: "#4f6bed",
+			blue: "#4f6bed",
 		});
 	});
 
 	test("applies the terminal theme background to the wrapper", () => {
 		render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />);
 
-		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#f1eeee");
+		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#f5f7fb");
 	});
 
 	test("writes output data to xterm when receiving output message", () => {

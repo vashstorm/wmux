@@ -1,8 +1,9 @@
-import { Stack, IconButton, Typography, Box } from "@mui/material";
+import { Stack, Typography, Box } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import { alpha } from "@mui/material/styles";
+import { SidebarIconButton } from "./SidebarIconButton.js";
 
 type SidebarView = "projects" | "session" | "stats";
 
@@ -47,57 +48,51 @@ export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) 
 
 				{/* Nav view tabs */}
 				<Stack direction="row" sx={{ alignItems: "center", gap: 0.25 }}>
-					<IconButton
-						className={`sidebar-header-action${activeView === "projects" ? " is-active" : ""}`}
+					<SidebarIconButton
+						className="sidebar-header-action"
+						icon={FolderIcon}
+						active={activeView === "projects"}
 						onClick={() => onViewChange("projects")}
 						data-testid="open-projects-button"
 						aria-label="Projects"
+						aria-pressed={activeView === "projects"}
 						title="Projects"
-						size="small"
 						sx={{
-							width: 28, height: 28,
-							borderRadius: "var(--radius-sm)",
 							color: activeView === "projects" ? "primary.main" : "text.secondary",
 							bgcolor: activeView === "projects" ? (theme) => alpha(theme.palette.primary.main, 0.1) : "transparent",
 							"&:hover": { color: "primary.main", bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1) },
 						}}
-					>
-						<FolderIcon sx={{ fontSize: 16 }} />
-					</IconButton>
-					<IconButton
-						className={`sidebar-header-action${activeView === "session" ? " is-active" : ""}`}
+					/>
+					<SidebarIconButton
+						className="sidebar-header-action"
+						icon={TerminalIcon}
+						active={activeView === "session"}
 						onClick={() => onViewChange("session")}
 						data-testid="open-session-button"
 						aria-label="Session"
+						aria-pressed={activeView === "session"}
 						title="Session"
-						size="small"
 						sx={{
-							width: 28, height: 28,
-							borderRadius: "var(--radius-sm)",
 							color: activeView === "session" ? "primary.main" : "text.secondary",
 							bgcolor: activeView === "session" ? (theme) => alpha(theme.palette.primary.main, 0.1) : "transparent",
 							"&:hover": { color: "primary.main", bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1) },
 						}}
-					>
-						<TerminalIcon sx={{ fontSize: 16 }} />
-					</IconButton>
-					<IconButton
-						className={`sidebar-header-action${activeView === "stats" ? " is-active" : ""}`}
+					/>
+					<SidebarIconButton
+						className="sidebar-header-action"
+						icon={BarChartIcon}
+						active={activeView === "stats"}
 						onClick={() => onViewChange("stats")}
 						data-testid="open-stats-button"
 						aria-label="Stats"
+						aria-pressed={activeView === "stats"}
 						title="Stats"
-						size="small"
 						sx={{
-							width: 28, height: 28,
-							borderRadius: "var(--radius-sm)",
 							color: activeView === "stats" ? "primary.main" : "text.secondary",
 							bgcolor: activeView === "stats" ? (theme) => alpha(theme.palette.primary.main, 0.1) : "transparent",
 							"&:hover": { color: "primary.main", bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1) },
 						}}
-					>
-						<BarChartIcon sx={{ fontSize: 16 }} />
-					</IconButton>
+					/>
 				</Stack>
 			</Stack>
 		</Box>

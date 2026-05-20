@@ -54,12 +54,46 @@
 }
 
 .sidebar-header-action {
-	width: 30px;
-	height: 30px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.sidebar-icon-button {
+	--sidebar-icon-button-size: var(--sidebar-icon-size-nav);
+	--sidebar-icon-glyph-size: var(--sidebar-icon-glyph-nav);
+	width: var(--sidebar-icon-button-size);
+	height: var(--sidebar-icon-button-size);
+	min-width: var(--sidebar-icon-button-size);
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
 	border-radius: var(--radius-sm);
+	line-height: 1;
+}
+
+.sidebar-icon-button-nav {
+	--sidebar-icon-button-size: var(--sidebar-icon-size-nav);
+	--sidebar-icon-glyph-size: var(--sidebar-icon-glyph-nav);
+}
+
+.sidebar-icon-button-row {
+	--sidebar-icon-button-size: var(--sidebar-icon-size-row);
+	--sidebar-icon-glyph-size: var(--sidebar-icon-glyph-row);
+}
+
+.sidebar-icon-button-compact {
+	--sidebar-icon-button-size: var(--sidebar-icon-size-compact);
+	--sidebar-icon-glyph-size: var(--sidebar-icon-glyph-compact);
+}
+
+.sidebar-icon {
+	width: var(--sidebar-icon-glyph-size);
+	height: var(--sidebar-icon-glyph-size);
+	font-size: var(--sidebar-icon-glyph-size);
+	flex-shrink: 0;
 }
 
 .sidebar-error-logs-button {
@@ -84,12 +118,9 @@
 }
 
 .sidebar-settings-button {
-	width: 30px;
-	height: 30px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: var(--radius-sm);
 }
 
 .sidebar-toolbar {
@@ -125,13 +156,10 @@
 }
 
 .new-connection-button {
-	width: 30px;
-	height: 30px;
 	flex-shrink: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border-radius: var(--radius-sm);
 }
 
 .sidebar-content {

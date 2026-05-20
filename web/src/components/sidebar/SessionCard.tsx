@@ -3,7 +3,6 @@ import {
 	Box,
 	Stack,
 	Chip,
-	IconButton,
 	Typography,
 	TextField,
 	ListItemButton,
@@ -12,6 +11,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { alpha } from "@mui/material/styles";
 import type { SessionInfoData } from "../../api/client.js";
+import { SidebarIconButton } from "./SidebarIconButton.js";
 
 const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
 	waiting: "Waiting",
@@ -311,36 +311,33 @@ const handleSubmitRename = async () => {
 							},
 						}}
 					>
-						<IconButton
+						<SidebarIconButton
 							className="session-action-btn"
+							icon={EditIcon}
+							variant="row"
 							onClick={(e) => { e.stopPropagation(); handleStartRename(); }}
+							aria-label={`Rename ${sname}`}
 							title="Rename"
 							data-testid={`rename-session-${sname}`}
-							size="small"
 							sx={{
-								width: 24,
-								height: 24,
 								color: "text.secondary",
 								"&:hover": { bgcolor: "action.hover", color: "text.primary" },
 							}}
-						>
-							<EditIcon sx={{ fontSize: 14 }} />
-						</IconButton>
-						<IconButton
+						/>
+						<SidebarIconButton
 							className="session-action-btn session-action-danger"
+							icon={DeleteIcon}
+							variant="row"
+							danger
 							onClick={(e) => { e.stopPropagation(); onKill(sname); }}
+							aria-label={`Kill ${sname}`}
 							title="Kill session"
 							data-testid={`kill-session-${sname}`}
-							size="small"
 							sx={{
-								width: 24,
-								height: 24,
 								color: "text.secondary",
 								"&:hover": { bgcolor: "error.main", color: "common.white" },
 							}}
-						>
-							<DeleteIcon sx={{ fontSize: 14 }} />
-						</IconButton>
+						/>
 					</Stack>
 				</Box>
 			)}

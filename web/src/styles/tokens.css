@@ -64,6 +64,14 @@
   --z-modal: 300;
   --z-toast: 400;
   --z-confirm: 500;
+
+  /* --- Sidebar icon controls --- */
+  --sidebar-icon-size-nav: 28px;
+  --sidebar-icon-size-row: 24px;
+  --sidebar-icon-size-compact: 22px;
+  --sidebar-icon-glyph-nav: 16px;
+  --sidebar-icon-glyph-row: 14px;
+  --sidebar-icon-glyph-compact: 14px;
 }
 
 /* ============================================================
@@ -72,19 +80,19 @@
 :root,
 [data-mui-color-scheme="light"] {
   /* Background layers */
-  --color-background: #f8f9fc;
+  --color-background: #f7f8fb;
   --color-panel: #ffffff;
   --color-panel-border: rgba(0, 0, 0, 0.08);
-  --color-surface: #f1f4f9;
-  --color-surface-hover: #e8ecf3;
+  --color-surface: #f3f5f8;
+  --color-surface-hover: #e9edf2;
   --color-surface-border: rgba(0, 0, 0, 0.09);
-  --color-surface-border-hover: rgba(99, 102, 241, 0.3);
+  --color-surface-border-hover: rgba(71, 85, 105, 0.24);
 
-  /* Accent (indigo) */
-  --color-accent: #6366f1;
-  --color-accent-hover: #4f46e5;
-  --color-accent-subtle: rgba(99, 102, 241, 0.1);
-  --color-accent-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+  /* Accent (neutral blue) */
+  --color-accent: #4f6bed;
+  --color-accent-hover: #3d57d6;
+  --color-accent-subtle: rgba(79, 107, 237, 0.08);
+  --color-accent-glow: 0 0 18px rgba(79, 107, 237, 0.16);
 
   /* Text */
   --color-text: #0f172a;
@@ -93,12 +101,12 @@
 
   /* Glass / highlight */
   --color-glass-highlight: rgba(255, 255, 255, 0.8);
-  --color-glass-highlight-border: rgba(99, 102, 241, 0.25);
+  --color-glass-highlight-border: rgba(79, 107, 237, 0.18);
 
   /* Inputs */
   --color-input-bg: #ffffff;
   --color-input-border: rgba(0, 0, 0, 0.15);
-  --color-input-border-focus: #6366f1;
+  --color-input-border-focus: #4f6bed;
   --color-input-text: #0f172a;
   --color-input-placeholder: #94a3b8;
 
@@ -115,14 +123,14 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-  --color-shadow-glow: 0 0 12px rgba(99, 102, 241, 0.25);
+  --color-shadow-glow: 0 0 12px rgba(79, 107, 237, 0.18);
 
   /* Session card */
   --color-session-card-bg: #ffffff;
   --color-session-card-border: rgba(0, 0, 0, 0.07);
-  --color-session-card-hover: #f8f9fc;
-  --color-session-card-selected: rgba(99, 102, 241, 0.08);
-  --color-session-card-selected-border: rgba(99, 102, 241, 0.35);
+  --color-session-card-hover: #f7f8fb;
+  --color-session-card-selected: rgba(79, 107, 237, 0.06);
+  --color-session-card-selected-border: rgba(79, 107, 237, 0.24);
 }
 
 /* ============================================================
@@ -131,18 +139,18 @@
 [data-mui-color-scheme="dark"] {
   /* Background layers */
   --color-background: #0d1117;
-  --color-panel: #161b22;
+  --color-panel: #141a22;
   --color-panel-border: rgba(255, 255, 255, 0.07);
-  --color-surface: #1c2230;
-  --color-surface-hover: #232d3f;
+  --color-surface: #1a202b;
+  --color-surface-hover: #212836;
   --color-surface-border: rgba(255, 255, 255, 0.07);
-  --color-surface-border-hover: rgba(124, 58, 237, 0.35);
+  --color-surface-border-hover: rgba(100, 116, 139, 0.28);
 
-  /* Accent (violet) */
-  --color-accent: #7c3aed;
-  --color-accent-hover: #6d28d9;
-  --color-accent-subtle: rgba(124, 58, 237, 0.15);
-  --color-accent-glow: 0 0 24px rgba(124, 58, 237, 0.3);
+  /* Accent (neutral blue) */
+  --color-accent: #6b82f5;
+  --color-accent-hover: #5870ea;
+  --color-accent-subtle: rgba(107, 130, 245, 0.14);
+  --color-accent-glow: 0 0 20px rgba(107, 130, 245, 0.22);
 
   /* Text */
   --color-text: #f1f5f9;
@@ -151,12 +159,12 @@
 
   /* Glass / highlight */
   --color-glass-highlight: rgba(255, 255, 255, 0.04);
-  --color-glass-highlight-border: rgba(124, 58, 237, 0.3);
+  --color-glass-highlight-border: rgba(107, 130, 245, 0.22);
 
   /* Inputs */
-  --color-input-bg: #1c2230;
+  --color-input-bg: #1a202b;
   --color-input-border: rgba(255, 255, 255, 0.1);
-  --color-input-border-focus: #7c3aed;
+  --color-input-border-focus: #6b82f5;
   --color-input-text: #f1f5f9;
   --color-input-placeholder: #475569;
 
@@ -173,12 +181,12 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0, 0, 0, 0.3);
-  --color-shadow-glow: 0 0 12px rgba(124, 58, 237, 0.35);
+  --color-shadow-glow: 0 0 12px rgba(107, 130, 245, 0.26);
 
   /* Session card */
-  --color-session-card-bg: #1c2230;
+  --color-session-card-bg: #1a202b;
   --color-session-card-border: rgba(255, 255, 255, 0.06);
-  --color-session-card-hover: #232d3f;
-  --color-session-card-selected: rgba(124, 58, 237, 0.12);
-  --color-session-card-selected-border: rgba(124, 58, 237, 0.4);
+  --color-session-card-hover: #212836;
+  --color-session-card-selected: rgba(107, 130, 245, 0.1);
+  --color-session-card-selected-border: rgba(107, 130, 245, 0.28);
 }

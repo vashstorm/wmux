@@ -62,14 +62,14 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 					transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
 				},
 				contained: {
-					"&:hover": { transform: "translateY(-1px)", boxShadow: palette.primary.main + "44 0 4px 12px" },
+					"&:hover": { transform: "translateY(-1px)", boxShadow: `${palette.primary.main}33 0 4px 12px` },
 					"&:active": { transform: "translateY(0)" },
 				},
 				outlined: {
 					"&:hover": {
 						backgroundColor: isDark
-							? "rgba(124,58,237,0.08)"
-							: "rgba(99,102,241,0.06)",
+							? "rgba(107,130,245,0.08)"
+							: "rgba(79,107,237,0.06)",
 					},
 				},
 			},
@@ -115,7 +115,7 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 						borderRadius: 8,
 						transition: "box-shadow 150ms ease",
 						"&.Mui-focused": {
-							boxShadow: `0 0 0 3px ${palette.primary.main}28`,
+							boxShadow: `0 0 0 3px ${palette.primary.main}24`,
 						},
 					},
 				},
@@ -162,11 +162,11 @@ export function createAppTheme(mode: ThemeMode): Theme {
 	const isDark = mode === "dark";
 
 	// Define palette first so we can use it in component overrides
-	const primaryMain = isDark ? "#7c3aed" : "#6366f1";
-	const primaryLight = isDark ? "#a78bfa" : "#818cf8";
-	const primaryDark = isDark ? "#5b21b6" : "#4f46e5";
+	const primaryMain = isDark ? "#6b82f5" : "#4f6bed";
+	const primaryLight = isDark ? "#9aa8fb" : "#7c8ff7";
+	const primaryDark = isDark ? "#5568df" : "#3d57d6";
 
-	const backgroundDefault = isDark ? "#0d1117" : "#f8f9fc";
+	const backgroundDefault = isDark ? "#0d1117" : "#f7f8fb";
 	const backgroundPaper = isDark ? "#161b22" : "#ffffff";
 
 	const base = createTheme({
@@ -203,10 +203,10 @@ export function createAppTheme(mode: ThemeMode): Theme {
 				secondary: isDark ? "#94a3b8" : "#475569",
 				disabled: isDark ? "#475569" : "#94a3b8",
 			},
-			divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+			divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(15, 23, 42, 0.08)",
 			action: {
-				hover: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-				selected: isDark ? "rgba(124,58,237,0.16)" : "rgba(99,102,241,0.1)",
+				hover: isDark ? "rgba(255,255,255,0.05)" : "rgba(15, 23, 42, 0.04)",
+				selected: isDark ? "rgba(107,130,245,0.16)" : "rgba(79,107,237,0.08)",
 				disabled: isDark ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.26)",
 				disabledBackground: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
 			},

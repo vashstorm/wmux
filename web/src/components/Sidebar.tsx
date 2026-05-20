@@ -5,7 +5,6 @@ import {
 	Paper,
 	List,
 	Chip,
-	IconButton,
 	Typography,
 	Collapse,
 } from "@mui/material";
@@ -28,6 +27,7 @@ import { SessionSearch } from "./sidebar/SessionSearch.js";
 import { NewSessionForm } from "./sidebar/NewSessionForm.js";
 import { SidebarFooter } from "./sidebar/SidebarFooter.js";
 import { SessionCard } from "./sidebar/SessionCard.js";
+import { SidebarIconButton } from "./sidebar/SidebarIconButton.js";
 
 const SESSION_SYNC_INTERVAL_MS = 2000;
 
@@ -405,16 +405,16 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 											}}
 										/>
 									)}
-									<IconButton
+									<SidebarIconButton
 										className="sidebar-session-create-button"
+										icon={AddIcon}
+										variant="compact"
 										onClick={() => setShowNewSessionForm(!showNewSessionForm)}
 										data-testid="new-session-button"
 										aria-label="New Session"
+										aria-expanded={showNewSessionForm}
 										title="New Session"
-										size="small"
 										sx={{
-											width: 22,
-											height: 22,
 											bgcolor: "background.default",
 											border: "1px solid",
 											borderColor: "divider",
@@ -425,9 +425,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 												borderColor: (theme) => `rgba(${theme.palette.primary.main}, 0.3)`,
 											},
 										}}
-									>
-										<AddIcon sx={{ fontSize: 14 }} />
-									</IconButton>
+									/>
 								</Stack>
 							</Stack>
 

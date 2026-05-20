@@ -1,7 +1,8 @@
-import { Badge, IconButton, Box } from "@mui/material";
+import { Badge, Box } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { alpha } from "@mui/material/styles";
+import { SidebarIconButton } from "./SidebarIconButton.js";
 
 interface SidebarFooterProps {
   errorLogCount: number;
@@ -32,16 +33,14 @@ export function SidebarFooter({
           `linear-gradient(to top, ${alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.8)}, transparent)`,
       }}
     >
-      <IconButton
+      <SidebarIconButton
+        icon={SettingsIcon}
         onClick={onOpenSettings}
         data-testid="open-settings-button"
         aria-label="Settings"
         title="Settings"
-        size="small"
-        sx={{ width: 28, height: 28, color: "text.secondary", "&:hover": { color: "primary.main" } }}
-      >
-        <SettingsIcon sx={{ fontSize: 16 }} />
-      </IconButton>
+        sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+      />
       <Badge
         badgeContent={errorLogCount > 0 ? (errorLogCount > 99 ? "99+" : errorLogCount) : undefined}
         color="error"
@@ -58,17 +57,15 @@ export function SidebarFooter({
           },
         }}
       >
-        <IconButton
+        <SidebarIconButton
           className={`sidebar-footer-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
+          icon={DescriptionIcon}
           onClick={onOpenErrorLogs}
           data-testid="open-error-logs-button"
           aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
           title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
-          size="small"
-          sx={{ width: 28, height: 28, color: "text.secondary", "&:hover": { color: "primary.main" } }}
-        >
-          <DescriptionIcon sx={{ fontSize: 16 }} />
-        </IconButton>
+          sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+        />
       </Badge>
       {themeToggle}
     </Box>

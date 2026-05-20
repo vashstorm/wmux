@@ -607,4 +607,38 @@ describe("intelligence badge and summary rendering", () => {
 		fireEvent.click(screen.getByTestId("open-session-button"));
 		expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
 	});
+
+	test("sidebar icon controls use consistent sizing classes", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		for (const testId of ["open-projects-button", "open-session-button", "open-stats-button", "open-settings-button", "open-error-logs-button"]) {
+			const button = screen.getByTestId(testId);
+			expect(button).toHaveClass("sidebar-icon-button", "sidebar-icon-button-nav");
+			expect(button.querySelector(".sidebar-icon")).toBeInTheDocument();
+		}
+
+		const newSessionButton = screen.getByTestId("new-session-button");
+		expect(newSessionButton).toHaveClass("sidebar-icon-button", "sidebar-icon-button-compact");
+		expect(newSessionButton.querySelector(".sidebar-icon")).toBeInTheDocument();
+
+		for (const testId of ["rename-session-session1", "kill-session-session1"]) {
+			const button = screen.getByTestId(testId);
+			expect(button).toHaveClass("sidebar-icon-button", "sidebar-icon-button-row");
+			expect(button.querySelector(".sidebar-icon")).toBeInTheDocument();
+		}
+	});
 });
