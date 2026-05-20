@@ -1,4 +1,4 @@
-import { Box, Tabs, Tab, keyframes } from "@mui/material";
+import { Box, Tabs, Tab, Stack, Typography, Chip, keyframes } from "@mui/material";
 import type { PaneData, WindowSummary } from "../state/store.js";
 
 interface WindowTabsProps {
@@ -95,54 +95,72 @@ export function WindowTabs({
 		return null;
 	}
 
-	const selectedIndex = windows.findIndex((w) => w.id === selectedWindowId);
+	const tabValue = selectedWindowId && windows.some((window) => window.id === selectedWindowId)
+		? selectedWindowId
+		: false;
 
-	const handleTabChange = (_event: React.SyntheticEvent, newValue: number | boolean) => {
-		if (typeof newValue === "number") {
-			const w = windows[newValue];
-			if (w) {
-				onSelectWindow(w.id, w.activePaneID);
-			}
+	const handleTabChange = (_event: React.SyntheticEvent, newValue: string | false) => {
+		if (typeof newValue !== "string") {
+			return;
+		}
+
+		const w = windows.find((window) => window.id === newValue);
+		if (w) {
+			onSelectWindow(w.id, w.activePaneID);
 		}
 	};
 
 	const tabSxBase = {
-		minHeight: 36,
-		height: 36,
+		minHeight: 34,
+		height: 34,
 		padding: "0 12px",
 		textTransform: "none" as const,
-		borderRadius: 2,
+		borderRadius: "var(--radius-sm)",
 		gap: 1,
 		flexDirection: "row" as const,
+		flexShrink: 0,
+		minWidth: "auto",
+		overflow: "hidden",
 	};
 
 	return (
 		<Box className="window-tabs" data-testid="window-tabs" sx={{
 			display: "flex",
 			alignItems: "center",
-			gap: 1,
+			gap: 1.25,
 			paddingX: 2,
-			paddingY: 1,
+			paddingTop: 1.25,
+			paddingBottom: 1,
 			backgroundColor: "background.default",
 			borderBottom: "1px solid",
 			borderColor: "divider",
-			overflowX: "hidden",
+			overflowX: "auto",
 			flexShrink: 0,
 		}}>
 			<Tabs
-				value={selectedIndex >= 0 ? selectedIndex : false}
+				variant="scrollable"
+				scrollButtons={false}
+				value={tabValue}
 				onChange={handleTabChange}
 				sx={{
 					minHeight: "unset",
+					width: "100%",
+					overflow: "hidden",
+					"& .MuiTabs-scroller": {
+						overflow: "auto hidden !important",
+						paddingTop: 0.5,
+						paddingBottom: 0.5,
+					},
 					"& .MuiTabs-indicator": {
 						display: "none",
 					},
 					"& .MuiTabs-flexContainer": {
-						gap: 1,
+						gap: 1.75,
+						alignItems: "center",
 					},
 				}}
 			>
-				{windows.map((window) => {
+				{windows.map((window, index) => {
 					const isActive = window.id === selectedWindowId;
 					const isAttentionExplicit = window.attentionState === "explicit";
 					const isAttention = window.attentionState === "attention";
@@ -164,80 +182,85 @@ export function WindowTabs({
 					return (
 						<Tab
 							key={window.id}
+							value={window.id}
 							data-testid={isActive ? "window-tab-active" : "window-tab"}
 							className={tabClasses}
 							title={displayName}
 							disableRipple
-								sx={{
-									...tabSxBase,
-									position: "relative",
-									backgroundColor: isActive ? "action.selected" : "background.paper",
-									border: "1px solid",
-									borderColor: isActive ? "primary.main" : "divider",
-									color: isActive ? "primary.main" : "text.secondary",
-									fontWeight: isActive ? 600 : 500,
-									boxShadow: isActive
-										? (theme) => `0 0 0 1px ${theme.palette.primary.main}33, ${theme.palette.mode === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"}`
-										: "none",
-									transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-									"&:hover": {
-										backgroundColor: "action.hover",
-										borderColor: isActive ? "primary.main" : "action.hover",
-									},
-									"&::before": isActive
-										? {
-															content: "\"\"",
-												position: "absolute",
-												left: 0,
-												top: "20%",
-												bottom: "20%",
-												width: "3px",
-												borderRadius: "0 4px 4px 0",
-												backgroundColor: "primary.main",
-											}
-										: {},
-								}}
+							disableFocusRipple
+							sx={{
+								...tabSxBase,
+								position: "relative",
+								maxWidth: isActive ? 280 : 180,
+								marginRight: index === windows.length - 1 ? 0 : 1,
+								backgroundColor: isActive ? "action.selected" : "background.paper",
+								border: "1px solid",
+								borderColor: isActive ? "primary.main" : "divider",
+								color: isActive ? "primary.main" : "text.secondary",
+								fontWeight: isActive ? 600 : 500,
+								boxShadow: isActive
+									? (theme) => `0 0 0 1px ${theme.palette.primary.main}33, ${theme.palette.mode === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"}`
+									: "none",
+								transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+								"&:hover": {
+									backgroundColor: isActive ? "action.selected" : "action.hover",
+									borderColor: isActive ? "primary.main" : "primary.light",
+								},
+								"&::before": isActive
+									? {
+											content: "\"\"",
+											position: "absolute",
+											left: 0,
+											top: "18%",
+											bottom: "18%",
+											width: "3px",
+											borderRadius: "0 6px 6px 0",
+											backgroundColor: "primary.main",
+										}
+									: {},
+							}}
 							label={
-								<Box sx={{ display: "flex", alignItems: "center", gap: 1 }} data-testid={`window-tab-content-${window.id}`}>
-									<Box
-										component="span"
+								<Stack
+									direction="row"
+									spacing={0.75}
+									data-testid={`window-tab-content-${window.id}`}
+									sx={{ alignItems: "center", minWidth: 0, maxWidth: "100%" }}
+								>
+									<Chip
+										label={window.index}
+										size="small"
 										className="window-tab-index"
 										sx={{
-											fontSize: "var(--font-size-xs)",
-											fontWeight: 600,
-											color: isActive ? "primary.main" : "text.disabled",
-											minWidth: 16,
-											textAlign: "center",
+											height: 20,
+											minWidth: 20,
+											maxWidth: 20,
+											fontSize: "0.68rem",
+											fontWeight: 700,
+											lineHeight: 1,
+											borderRadius: "999px",
+											backgroundColor: isActive ? "primary.main" : "action.hover",
+											color: isActive ? "primary.contrastText" : "text.secondary",
+											"& .MuiChip-label": {
+												paddingLeft: "5px",
+												paddingRight: "5px",
+											},
 										}}
-									>
-										{window.index}
-									</Box>
-									<Box
+									/>
+									<Typography
 										component="span"
 										className="window-tab-name"
+										variant="body2"
 										sx={{
 											fontWeight: 500,
 											overflow: "hidden",
 											textOverflow: "ellipsis",
 											whiteSpace: "nowrap",
+											minWidth: 0,
+											flex: "1 1 auto",
 										}}
 									>
 										{displayName}
-										{isActive && window.activePaneTitle && (
-											<Box
-												component="span"
-												className="window-tab-pane-title"
-												sx={{
-													fontSize: "var(--font-size-xs)",
-													color: "text.disabled",
-													opacity: 0.6,
-													marginLeft: 0.75,
-												}}
-											>
-												&middot; {window.activePaneTitle}
-											</Box>
-										)}
-									</Box>
+									</Typography>
 									{hasAttentionBadge && (
 										<Box
 											component="span"
@@ -262,7 +285,7 @@ export function WindowTabs({
 											{window.attentionCount}
 										</Box>
 									)}
-								</Box>
+								</Stack>
 							}
 						/>
 					);

@@ -42,6 +42,7 @@ describe("WindowTabs", () => {
 		expect(screen.getByText("server")).toBeInTheDocument();
 		expect(screen.queryByText("bash")).not.toBeInTheDocument();
 		expect(screen.queryByText("node")).not.toBeInTheDocument();
+		expect(screen.queryByText(/·/)).not.toBeInTheDocument();
 	});
 
 	test("does not render pane count badges after the app name", () => {
@@ -68,6 +69,19 @@ describe("WindowTabs", () => {
 		const activeTab = screen.getByTestId("window-tab-active");
 		expect(activeTab).toHaveClass("is-active");
 		expect(activeTab).toHaveTextContent("editor");
+	});
+
+	test("does not render active pane title in the tab label", () => {
+		render(
+			<WindowTabs
+				windows={mockWindows}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.queryByText("bash")).not.toBeInTheDocument();
+		expect(screen.queryByText("node")).not.toBeInTheDocument();
 	});
 
 	test("clicking a tab fires onSelectWindow with window ID and active pane ID", () => {
