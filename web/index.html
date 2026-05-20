@@ -3,8 +3,26 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="color-scheme" content="light dark" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<title>Wmux</title>
+		<style>
+			html,
+			body,
+			#root {
+				min-height: 100vh;
+				margin: 0;
+				background-color: #f8f9fc;
+			}
+
+			@media (prefers-color-scheme: dark) {
+				html,
+				body,
+				#root {
+					background-color: #0d1117;
+				}
+			}
+		</style>
 	</head>
 	<body>
 		<div id="root"></div>

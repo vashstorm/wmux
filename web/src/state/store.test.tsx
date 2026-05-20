@@ -1,9 +1,66 @@
-import { describe, test, expect } from "vitest";
+import { beforeEach, describe, test, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { useState, useCallback } from "react";
-import { AppProvider, useAppState, useSelectedConnection, type SessionWindowState } from "./store.js";
+import { AppProvider, UI_SETTINGS_STORAGE_KEY, useAppState, useSelectedConnection, type SessionWindowState } from "./store.js";
+
+beforeEach(() => {
+	localStorage.removeItem(UI_SETTINGS_STORAGE_KEY);
+});
 
 describe("AppProvider", () => {
+	test("initializes UI settings from the last saved theme", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({ theme: "light", windowTheme: "light" }));
+
+		function ThemeProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="theme">{uiSettings.theme}:{uiSettings.windowTheme}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ThemeProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("theme").textContent).toBe("light:light");
+	});
+
+	test("persists UI settings updates for the next refresh", () => {
+		function ThemeWriter() {
+			const { setUISettings } = useAppState();
+			return (
+				<button
+					data-testid="set-theme"
+					onClick={() => setUISettings({
+						theme: "light",
+						windowTheme: "light",
+						fontSize: 17,
+						terminalFontSize: 15,
+						terminalFontWeight: "bold",
+					})}
+				>
+					Set Theme
+				</button>
+			);
+		}
+
+		render(
+			<AppProvider>
+				<ThemeWriter />
+			</AppProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("set-theme"));
+
+		expect(JSON.parse(localStorage.getItem(UI_SETTINGS_STORAGE_KEY) ?? "{}")).toEqual({
+			theme: "light",
+			windowTheme: "light",
+			fontSize: 17,
+			terminalFontSize: 15,
+			terminalFontWeight: "bold",
+		});
+	});
+
 	test("renders children", () => {
 		render(
 			<AppProvider>

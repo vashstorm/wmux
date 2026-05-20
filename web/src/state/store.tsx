@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo } from "../api/client.js";
+import { normalizeThemeId } from "../ui/themes.js";
 
 export interface WindowSummary {
 	id: string;
@@ -141,6 +142,49 @@ export interface UISettings {
 	terminalFontWeight: string;
 }
 
+export const UI_SETTINGS_STORAGE_KEY = "wmux-ui-settings";
+
+const DEFAULT_UI_SETTINGS: UISettings = {
+	theme: "dark",
+	windowTheme: "dark",
+	fontSize: 16,
+	terminalFontSize: 14,
+	terminalFontWeight: "normal",
+};
+
+function readInitialUISettings(): UISettings {
+	if (typeof window === "undefined") return DEFAULT_UI_SETTINGS;
+
+	try {
+		const raw = window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY);
+		if (!raw) return DEFAULT_UI_SETTINGS;
+
+		const parsed = JSON.parse(raw) as Partial<UISettings>;
+		const theme = normalizeThemeId(parsed.theme, DEFAULT_UI_SETTINGS.theme);
+		const windowTheme = normalizeThemeId(parsed.windowTheme, theme);
+
+		return {
+			theme,
+			windowTheme,
+			fontSize: parsed.fontSize || DEFAULT_UI_SETTINGS.fontSize,
+			terminalFontSize: parsed.terminalFontSize || DEFAULT_UI_SETTINGS.terminalFontSize,
+			terminalFontWeight: parsed.terminalFontWeight || DEFAULT_UI_SETTINGS.terminalFontWeight,
+		};
+	} catch {
+		return DEFAULT_UI_SETTINGS;
+	}
+}
+
+function persistUISettings(settings: UISettings) {
+	if (typeof window === "undefined") return;
+
+	try {
+		window.localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+	} catch {
+		// localStorage can be unavailable in privacy-restricted contexts.
+	}
+}
+
 export interface AppState {
 	connections: ConnectionConfig[];
 	selectedTargetName: string | null;
@@ -224,13 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [selectedPane, setSelectedPane] = useState<SelectedPane | null>(null);
 	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
-	const [uiSettings, setUISettingsState] = useState<UISettings>({
-		theme: "dark",
-		windowTheme: "dark",
-		fontSize: 16,
-		terminalFontSize: 14,
-		terminalFontWeight: "normal",
-	});
+	const [uiSettings, setUISettingsState] = useState<UISettings>(readInitialUISettings);
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {
 		setConnectionsState(newConnections);
@@ -302,6 +340,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	const setUISettings = useCallback((settings: UISettings) => {
+		persistUISettings(settings);
 		setUISettingsState(settings);
 	}, []);
 
