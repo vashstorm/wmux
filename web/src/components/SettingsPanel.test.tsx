@@ -230,7 +230,7 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByTestId("settings-terminal-font-weight-input").closest(".MuiFormControl-root")).not.toBeNull();
 	});
 
-	test("Settings panel exposes clearer navigation, page context, and typography preview", async () => {
+	test("Settings panel exposes cleaner navigation without duplicate section title", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
 
@@ -246,12 +246,13 @@ describe("SettingsPanel intelligence section", () => {
 		});
 
 		expect(screen.getByTestId("settings-nav")).toHaveAttribute("aria-label", "Settings sections");
-		expect(screen.getByTestId("settings-active-section-title")).toHaveTextContent("General");
-		expect(screen.getByTestId("settings-active-section-description")).toHaveTextContent("Server, authentication, and local environment defaults.");
+		expect(screen.queryByText("Configure your wmux workspace")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("settings-active-section-title")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("settings-active-section-description")).not.toBeInTheDocument();
 
 		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
 
-		expect(screen.getByTestId("settings-active-section-title")).toHaveTextContent("Typography");
+		expect(screen.queryByTestId("settings-active-section-title")).not.toBeInTheDocument();
 		expect(screen.getByTestId("settings-typography-preview")).toHaveTextContent("wmux terminal preview");
 	});
 
@@ -520,6 +521,9 @@ describe("SettingsPanel intelligence section", () => {
 		await waitFor(() => {
 			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
 		});
+		expect(screen.getByTestId("intelligence-provider-card-my-provider")).toContainElement(
+			screen.getByTestId("intelligence-provider-editor"),
+		);
 
 		const nameInput = screen.getByTestId("provider-editor-name-input") as HTMLInputElement;
 		expect(nameInput.value).toBe("my-provider");
@@ -615,13 +619,15 @@ describe("SettingsPanel intelligence section", () => {
 
 		navigateToIntelligenceTab();
 
-		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("★ ACTIVE");
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveAccessibleName("Active provider");
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("");
 
 		const deleteBtn = screen.getByTestId("provider-delete-provider-a");
 		fireEvent.click(deleteBtn);
 
 		expect(screen.queryByText("provider-a")).not.toBeInTheDocument();
-		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("★ ACTIVE");
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveAccessibleName("Active provider");
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("");
 	});
 
 	test("Duplicate provider name in editor shows error", async () => {
@@ -1395,7 +1401,9 @@ describe("SettingsPanel intelligence section", () => {
 		const setActiveBtn = screen.getByTestId("provider-set-active-provider-b");
 		fireEvent.click(setActiveBtn);
 
-		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("★ ACTIVE");
-		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("SET ACTIVE");
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveAccessibleName("Active provider");
+		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("");
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveAccessibleName("Set provider-a as active provider");
+		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("");
 	});
 });

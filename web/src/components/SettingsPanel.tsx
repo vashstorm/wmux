@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
-import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, TextFields as TextFieldsIcon } from "@mui/icons-material";
+import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon } from "@mui/icons-material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -43,31 +43,26 @@ type SettingsTabKey = "general" | "connections" | "typography" | "intelligence";
 const SETTINGS_SECTIONS: Array<{
 	key: SettingsTabKey;
 	label: string;
-	description: string;
 	icon: typeof SettingsOutlinedIcon;
 }> = [
 	{
 		key: "general",
 		label: "General",
-		description: "Server, authentication, and local environment defaults.",
 		icon: SettingsOutlinedIcon,
 	},
 	{
 		key: "connections",
 		label: "Connections",
-		description: "Manage local and SSH connection entries.",
 		icon: LanIcon,
 	},
 	{
 		key: "typography",
 		label: "Typography",
-		description: "Tune interface and terminal text rendering.",
 		icon: TextFieldsIcon,
 	},
 	{
 		key: "intelligence",
 		label: "AI",
-		description: "Configure provider credentials and analysis limits.",
 		icon: PsychologyIcon,
 	},
 ];
@@ -421,7 +416,208 @@ export function SettingsPanel() {
 		setShowNewConnectionForm(true);
 	};
 
-	const activeSection = SETTINGS_SECTIONS.find((section) => section.key === activeTab) ?? SETTINGS_SECTIONS[0]!;
+	const renderProviderEditor = (editor: ProviderFormState) => {
+		return (
+			<Box className="intelligence-provider-editor" data-testid="intelligence-provider-editor" sx={{ display: "flex", flexDirection: "column", gap: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
+				<TextField
+					id="provider-editor-name"
+					label="Name"
+					type="text"
+					value={editor.name}
+					onChange={(event) => setFormState((current) =>
+						current && current.editingProvider
+							? {
+								...current,
+								editingProvider: { ...current.editingProvider, name: event.target.value },
+							}
+							: current
+					)}
+					placeholder="my-anthropic"
+					fullWidth
+					slotProps={{
+						htmlInput: {
+							"data-testid": "provider-editor-name-input",
+						},
+					}}
+				/>
+				<FormControl fullWidth>
+					<InputLabel htmlFor="provider-editor-type">Provider Type</InputLabel>
+					<Select
+						native
+						id="provider-editor-type"
+						label="Provider Type"
+						value={editor.provider}
+						onChange={(event) => setFormState((current) =>
+							current && current.editingProvider
+								? {
+									...current,
+									editingProvider: { ...current.editingProvider, provider: event.target.value },
+								}
+								: current
+						)}
+						inputProps={{
+							id: "provider-editor-type",
+							"data-testid": "provider-editor-type-select",
+						}}
+					>
+						<option value="anthropic">anthropic</option>
+						<option value="openai">openai</option>
+					</Select>
+				</FormControl>
+				<TextField
+					id="provider-editor-model"
+					label="Model"
+					type="text"
+					value={editor.model}
+					onChange={(event) => setFormState((current) =>
+						current && current.editingProvider
+							? {
+								...current,
+								editingProvider: { ...current.editingProvider, model: event.target.value },
+							}
+							: current
+					)}
+					placeholder="claude-sonnet-4-20250514"
+					fullWidth
+					slotProps={{
+						htmlInput: {
+							"data-testid": "provider-editor-model-input",
+						},
+					}}
+				/>
+				<TextField
+					id="provider-editor-api-key"
+					label="API Key"
+					type="password"
+					value={editor.apiKeyInput}
+					onChange={(event) => setFormState((current) =>
+						current && current.editingProvider
+							? {
+								...current,
+								editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
+							}
+							: current
+					)}
+					placeholder={editor.apiKeyConfigured && !editor.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
+					autoComplete="new-password"
+					fullWidth
+					helperText={
+						editor.apiKeyConfigured && !editor.isNew
+							? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
+							: "API key is required for new providers."
+					}
+					slotProps={{
+						htmlInput: {
+							"data-testid": "provider-editor-api-key-input",
+						},
+					}}
+				/>
+				<TextField
+					id="provider-editor-base-url"
+					label="Base URL"
+					type="text"
+					value={editor.baseURL ?? ""}
+					onChange={(event) => setFormState((current) =>
+						current && current.editingProvider
+							? {
+								...current,
+								editingProvider: { ...current.editingProvider, baseURL: event.target.value },
+							}
+							: current
+					)}
+					placeholder="https://api.openrouter.ai/v1"
+					fullWidth
+					helperText="Optional custom endpoint for OpenAI-compatible providers."
+					slotProps={{
+						htmlInput: {
+							"data-testid": "provider-editor-base-url-input",
+						},
+					}}
+				/>
+				<Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+					<Button
+						type="button"
+						variant="outlined"
+						onClick={() => setFormState((current) =>
+							current ? { ...current, editingProvider: null } : current
+						)}
+					>
+						CANCEL
+					</Button>
+					<Button
+						type="button"
+						variant="contained"
+						onClick={() => {
+							if (!formState) return;
+							const editor = formState.editingProvider;
+							if (!editor) return;
+							if (!editor.name.trim()) {
+								setError({ code: "bad_request", message: "Provider name is required" });
+								return;
+							}
+							if (!editor.model.trim()) {
+								setError({ code: "bad_request", message: "Provider model is required" });
+								return;
+							}
+							if (editor.isNew && !editor.apiKeyInput.trim()) {
+								setError({ code: "bad_request", message: "API key is required for new providers" });
+								return;
+							}
+							const duplicateName = formState.intelligenceProviders.some(
+								(p) => p.name === editor.name.trim() && p.name !== (editor.isNew ? "" : editor.originalName)
+							);
+							const existingProvider = formState.editingProvider && !formState.editingProvider.isNew
+								? formState.intelligenceProviders.find((p) => p.name === editor.originalName)
+								: undefined;
+							if (duplicateName && existingProvider?.name !== editor.name.trim()) {
+								setError({ code: "bad_request", message: `Provider name "${editor.name.trim()}" already exists` });
+								return;
+							}
+
+							const updatedProvider: IntelligenceProviderConfig = {
+								name: editor.name.trim(),
+								provider: editor.provider,
+								model: editor.model.trim(),
+								baseURL: editor.baseURL?.trim() || undefined,
+								apiKeyConfigured: editor.apiKeyConfigured || (editor.apiKeyInput.trim().length > 0),
+							};
+							if (editor.apiKeyInput.trim()) {
+								updatedProvider.apiKey = editor.apiKeyInput.trim();
+							}
+
+							setFormState((current) => {
+								if (!current || !current.editingProvider) return current;
+								const isNew = current.editingProvider.isNew;
+								const existingIndex = current.intelligenceProviders.findIndex(
+									(p) => p.name === (isNew ? current.editingProvider?.name : current.editingProvider?.originalName) && !isNew
+								);
+								let providers: IntelligenceProviderConfig[];
+								if (isNew) {
+									providers = [...current.intelligenceProviders, updatedProvider];
+								} else if (existingIndex >= 0) {
+									providers = [...current.intelligenceProviders];
+									providers[existingIndex] = updatedProvider;
+								} else {
+									providers = current.intelligenceProviders;
+								}
+								return {
+									...current,
+									intelligenceProviders: providers,
+									intelligenceActiveProvider: current.intelligenceActiveProvider === current.editingProvider.originalName
+										? updatedProvider.name
+										: current.intelligenceActiveProvider,
+									editingProvider: null,
+								};
+							});
+						}}
+						data-testid="provider-editor-save-btn"
+					>
+						SAVE PROVIDER
+					</Button>
+				</Box>
+			</Box>
+		);
+	};
 
 	return (
 		<Dialog
@@ -434,7 +630,6 @@ export function SettingsPanel() {
 			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 3 }}>
 				<Box>
 					<Typography variant="h6" component="h3">Settings</Typography>
-					<Typography variant="body2" color="text.secondary">Configure your wmux workspace</Typography>
 				</Box>
 				<IconButton
 					onClick={closePanel}
@@ -512,14 +707,6 @@ export function SettingsPanel() {
 					<Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 						<form className="settings-form" onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
 							<Box sx={{ flex: 1, overflow: "auto", px: 3, py: 2.5 }} ref={scrollContainerRef}>
-								<Box sx={{ mb: 3 }}>
-									<Typography data-testid="settings-active-section-title" variant="h6" sx={{ fontSize: "1rem", fontWeight: 700 }}>
-										{activeSection.label}
-									</Typography>
-									<Typography data-testid="settings-active-section-description" variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-										{activeSection.description}
-									</Typography>
-								</Box>
 								{activeTab === "general" && (
 									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
@@ -744,203 +931,7 @@ export function SettingsPanel() {
 												</Button>
 											</Box>
 
-											{formState.editingProvider && (
-												<Box className="intelligence-provider-editor" data-testid="intelligence-provider-editor" sx={{ display: "flex", flexDirection: "column", gap: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-													<TextField
-														id="provider-editor-name"
-														label="Name"
-														type="text"
-														value={formState.editingProvider.name}
-														onChange={(event) => setFormState((current) =>
-															current && current.editingProvider
-																? {
-																	...current,
-																	editingProvider: { ...current.editingProvider, name: event.target.value },
-																}
-																: current
-														)}
-														placeholder="my-anthropic"
-														fullWidth
-														slotProps={{
-															htmlInput: {
-																"data-testid": "provider-editor-name-input",
-															},
-														}}
-													/>
-													<FormControl fullWidth>
-														<InputLabel htmlFor="provider-editor-type">Provider Type</InputLabel>
-														<Select
-															native
-															id="provider-editor-type"
-															label="Provider Type"
-															value={formState.editingProvider.provider}
-															onChange={(event) => setFormState((current) =>
-																current && current.editingProvider
-																	? {
-																		...current,
-																		editingProvider: { ...current.editingProvider, provider: event.target.value },
-																	}
-																	: current
-															)}
-															inputProps={{
-																id: "provider-editor-type",
-																"data-testid": "provider-editor-type-select",
-															}}
-														>
-															<option value="anthropic">anthropic</option>
-															<option value="openai">openai</option>
-														</Select>
-													</FormControl>
-													<TextField
-														id="provider-editor-model"
-														label="Model"
-														type="text"
-														value={formState.editingProvider.model}
-														onChange={(event) => setFormState((current) =>
-															current && current.editingProvider
-																? {
-																	...current,
-																	editingProvider: { ...current.editingProvider, model: event.target.value },
-																}
-																: current
-														)}
-														placeholder="claude-sonnet-4-20250514"
-														fullWidth
-														slotProps={{
-															htmlInput: {
-																"data-testid": "provider-editor-model-input",
-															},
-														}}
-													/>
-													<TextField
-														id="provider-editor-api-key"
-														label="API Key"
-														type="password"
-														value={formState.editingProvider.apiKeyInput}
-														onChange={(event) => setFormState((current) =>
-															current && current.editingProvider
-																? {
-																	...current,
-																	editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
-																}
-																: current
-														)}
-														placeholder={formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
-														autoComplete="new-password"
-														fullWidth
-														helperText={
-															formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew
-																? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
-																: "API key is required for new providers."
-														}
-														slotProps={{
-															htmlInput: {
-																"data-testid": "provider-editor-api-key-input",
-															},
-														}}
-													/>
-													<TextField
-														id="provider-editor-base-url"
-														label="Base URL"
-														type="text"
-														value={formState.editingProvider.baseURL ?? ""}
-														onChange={(event) => setFormState((current) =>
-															current && current.editingProvider
-																? {
-																	...current,
-																	editingProvider: { ...current.editingProvider, baseURL: event.target.value },
-																}
-																: current
-														)}
-														placeholder="https://api.openrouter.ai/v1"
-														fullWidth
-														helperText="Optional custom endpoint for OpenAI-compatible providers."
-														slotProps={{
-															htmlInput: {
-																"data-testid": "provider-editor-base-url-input",
-															},
-														}}
-													/>
-													<Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-														<Button
-															type="button"
-															variant="outlined"
-															onClick={() => setFormState((current) =>
-																current ? { ...current, editingProvider: null } : current
-															)}
-														>
-															CANCEL
-														</Button>
-														<Button
-															type="button"
-															variant="contained"
-															onClick={() => {
-																if (!formState) return;
-																const editor = formState.editingProvider;
-																if (!editor) return;
-																if (!editor.name.trim()) {
-																	setError({ code: "bad_request", message: "Provider name is required" });
-																	return;
-																}
-																if (!editor.model.trim()) {
-																	setError({ code: "bad_request", message: "Provider model is required" });
-																	return;
-																}
-																if (editor.isNew && !editor.apiKeyInput.trim()) {
-																	setError({ code: "bad_request", message: "API key is required for new providers" });
-																	return;
-																}
-																const duplicateName = formState.intelligenceProviders.some(
-																	(p) => p.name === editor.name.trim() && p.name !== (editor.isNew ? "" : editor.originalName)
-																);
-																const existingProvider = formState.editingProvider && !formState.editingProvider.isNew
-																	? formState.intelligenceProviders.find((p) => p.name === editor.originalName)
-																	: undefined;
-																if (duplicateName && existingProvider?.name !== editor.name.trim()) {
-																	setError({ code: "bad_request", message: `Provider name "${editor.name.trim()}" already exists` });
-																	return;
-																}
-
-																const updatedProvider: IntelligenceProviderConfig = {
-																	name: editor.name.trim(),
-																	provider: editor.provider,
-																	model: editor.model.trim(),
-																	baseURL: editor.baseURL?.trim() || undefined,
-																	apiKeyConfigured: editor.apiKeyConfigured || (editor.apiKeyInput.trim().length > 0),
-																};
-																if (editor.apiKeyInput.trim()) {
-																	updatedProvider.apiKey = editor.apiKeyInput.trim();
-																}
-
-																setFormState((current) => {
-																	if (!current || !current.editingProvider) return current;
-																	const isNew = current.editingProvider.isNew;
-																	const existingIndex = current.intelligenceProviders.findIndex(
-																		(p) => p.name === (isNew ? current.editingProvider?.name : current.editingProvider?.originalName) && !isNew
-																	);
-																	let providers: IntelligenceProviderConfig[];
-																	if (isNew) {
-																		providers = [...current.intelligenceProviders, updatedProvider];
-																	} else if (existingIndex >= 0) {
-																		providers = [...current.intelligenceProviders];
-																		providers[existingIndex] = updatedProvider;
-																	} else {
-																		providers = current.intelligenceProviders;
-																	}
-																	return {
-																		...current,
-																		intelligenceProviders: providers,
-																		editingProvider: null,
-																	};
-																});
-															}}
-															data-testid="provider-editor-save-btn"
-														>
-															SAVE PROVIDER
-														</Button>
-													</Box>
-												</Box>
-											)}
+											{formState.editingProvider?.isNew && renderProviderEditor(formState.editingProvider)}
 
 											{formState.intelligenceProviders.length === 0 && !formState.editingProvider ? (
 												<Box className="intelligence-providers-empty" data-testid="intelligence-providers-empty" sx={{ textAlign: "center", py: 4 }}>
@@ -951,6 +942,7 @@ export function SettingsPanel() {
 												<Box component="ul" className="intelligence-providers-list" data-testid="intelligence-providers-list" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 2 }}>
 													{formState.intelligenceProviders.map((provider) => {
 														const isActive = provider.name === formState.intelligenceActiveProvider;
+														const isEditing = formState.editingProvider?.originalName === provider.name && !formState.editingProvider.isNew;
 														return (
 															<Box
 																key={provider.name}
@@ -959,7 +951,8 @@ export function SettingsPanel() {
 																data-testid={`intelligence-provider-card-${provider.name}`}
 																sx={{
 																	display: "flex",
-																	alignItems: "center",
+																	flexDirection: "column",
+																	alignItems: "stretch",
 																	justifyContent: "space-between",
 																	gap: 2,
 																	p: 1.5,
@@ -970,97 +963,104 @@ export function SettingsPanel() {
 																	bgcolor: isActive ? "action.selected" : "background.paper",
 																}}
 															>
-																<Box className="intelligence-provider-info" sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }}>
-																	<Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
-																		<Typography className="intelligence-provider-name" variant="body2" sx={{ fontWeight: 700 }} noWrap>{provider.name}</Typography>
-																		{isActive && <Chip label="Active" size="small" color="primary" />}
-																	</Stack>
-																	<Box className="intelligence-provider-meta" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-																		<Chip
-																			className="intelligence-provider-badge"
-																			data-testid={`provider-type-badge-${provider.name}`}
-																			label={provider.provider}
-																			size="small"
-																			variant="outlined"
-																		/>
-																		<Typography className="intelligence-provider-model" component="span" variant="caption" color="text.secondary">{provider.model}</Typography>
-																		{provider.apiKeyConfigured && (
-																			<KeyIcon className="intelligence-provider-key-status" titleAccess="API key configured" fontSize="small" color="action" />
-																		)}
+																<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+																	<Box className="intelligence-provider-info" sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }}>
+																		<Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+																			<Typography className="intelligence-provider-name" variant="body2" sx={{ fontWeight: 700 }} noWrap>{provider.name}</Typography>
+																			{isActive && <Chip label="Active" size="small" color="primary" />}
+																		</Stack>
+																		<Box className="intelligence-provider-meta" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+																			<Chip
+																				className="intelligence-provider-badge"
+																				data-testid={`provider-type-badge-${provider.name}`}
+																				label={provider.provider}
+																				size="small"
+																				variant="outlined"
+																			/>
+																			<Typography className="intelligence-provider-model" component="span" variant="caption" color="text.secondary">{provider.model}</Typography>
+																			{provider.apiKeyConfigured && (
+																				<KeyIcon className="intelligence-provider-key-status" titleAccess="API key configured" fontSize="small" color="action" />
+																			)}
+																		</Box>
+																	</Box>
+																	<Box className="intelligence-provider-actions" sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
+																		<Tooltip title={isActive ? "Active provider" : "Set as active provider"}>
+																			<span>
+																				<IconButton
+																					type="button"
+																					className={`intelligence-set-active-btn ${isActive ? "is-active" : ""}`}
+																					onClick={() => setFormState((current) =>
+																						current ? { ...current, intelligenceActiveProvider: provider.name } : current
+																					)}
+																					disabled={!formState.intelligenceEnabled}
+																					aria-label={isActive ? "Active provider" : `Set ${provider.name} as active provider`}
+																					data-testid={`provider-set-active-${provider.name}`}
+																					size="small"
+																					color={isActive ? "primary" : "default"}
+																				>
+																					<StarIcon fontSize="small" />
+																				</IconButton>
+																			</span>
+																		</Tooltip>
+																		<Tooltip title="Edit provider">
+																			<span>
+																				<IconButton
+																					type="button"
+																					className="intelligence-edit-btn"
+																					onClick={() => setFormState((current) =>
+																						current ? {
+																							...current,
+																							editingProvider: {
+																								...provider,
+																								isNew: false,
+																								apiKeyInput: "",
+																								originalName: provider.name,
+																							},
+																						} : current
+																					)}
+																					disabled={!formState.intelligenceEnabled}
+																					aria-label="Edit provider"
+																					data-testid={`provider-edit-${provider.name}`}
+																					size="small"
+																				>
+																					<EditIcon fontSize="small" />
+																				</IconButton>
+																			</span>
+																		</Tooltip>
+																		<Tooltip title="Delete provider">
+																			<span>
+																				<IconButton
+																					type="button"
+																					className="intelligence-delete-btn"
+																					onClick={() => {
+																						setFormState((current) => {
+																							if (!current) return current;
+																							const providers = current.intelligenceProviders.filter(
+																								(p) => p.name !== provider.name
+																							);
+																							const activeProvider = current.intelligenceActiveProvider === provider.name
+																								? (providers[0]?.name ?? "")
+																								: current.intelligenceActiveProvider;
+																							return {
+																								...current,
+																								intelligenceProviders: providers,
+																								intelligenceActiveProvider: activeProvider,
+																							};
+																						});
+																					}}
+																					disabled={!formState.intelligenceEnabled}
+																					aria-label="Delete provider"
+																					data-testid={`provider-delete-${provider.name}`}
+																					size="small"
+																					color="error"
+																				>
+																					<DeleteIcon fontSize="small" />
+																				</IconButton>
+																			</span>
+																		</Tooltip>
 																	</Box>
 																</Box>
-																<Box className="intelligence-provider-actions" sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
-																	<Button
-																		type="button"
-																		className={`intelligence-set-active-btn ${isActive ? "is-active" : ""}`}
-																		size="small"
-																		onClick={() => setFormState((current) =>
-																			current ? { ...current, intelligenceActiveProvider: provider.name } : current
-																		)}
-																		disabled={!formState.intelligenceEnabled}
-																		title={isActive ? "Active provider" : "Set as active provider"}
-																		data-testid={`provider-set-active-${provider.name}`}
-																		variant={isActive ? "contained" : "outlined"}
-																	>
-																		{isActive ? "★ ACTIVE" : "SET ACTIVE"}
-																	</Button>
-																	<Tooltip title="Edit provider">
-																		<span>
-																			<IconButton
-																				type="button"
-																				className="intelligence-edit-btn"
-																				onClick={() => setFormState((current) =>
-																					current ? {
-																						...current,
-																						editingProvider: {
-																							...provider,
-																							isNew: false,
-																							apiKeyInput: "",
-																							originalName: provider.name,
-																						},
-																					} : current
-																				)}
-																				disabled={!formState.intelligenceEnabled}
-																				aria-label="Edit provider"
-																				data-testid={`provider-edit-${provider.name}`}
-																				size="small"
-																			>
-																				<EditIcon fontSize="small" />
-																			</IconButton>
-																		</span>
-																	</Tooltip>
-																	<Tooltip title="Delete provider">
-																		<span>
-																			<IconButton
-																				type="button"
-																				className="intelligence-delete-btn"
-																				onClick={() => {
-																					setFormState((current) => {
-																						if (!current) return current;
-																						const providers = current.intelligenceProviders.filter(
-																							(p) => p.name !== provider.name
-																						);
-																						const activeProvider = current.intelligenceActiveProvider === provider.name
-																							? (providers[0]?.name ?? "")
-																							: current.intelligenceActiveProvider;
-																						return {
-																							...current,
-																							intelligenceProviders: providers,
-																							intelligenceActiveProvider: activeProvider,
-																						};
-																					});
-																				}}
-																				disabled={!formState.intelligenceEnabled}
-																				aria-label="Delete provider"
-																				data-testid={`provider-delete-${provider.name}`}
-																				size="small"
-																				color="error"
-																			>
-																				<DeleteIcon fontSize="small" />
-																			</IconButton>
-																		</span>
-																	</Tooltip>
-																</Box>
+																{isEditing && formState.editingProvider && renderProviderEditor(formState.editingProvider)}
 																{isActive && (
 																	<div className="intelligence-provider-active-indicator" data-testid={`provider-active-indicator-${provider.name}`} />
 																)}
