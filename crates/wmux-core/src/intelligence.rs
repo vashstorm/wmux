@@ -391,8 +391,50 @@ struct ModelIntelligence {
     status: String,
     #[serde(default)]
     summary: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_confidence")]
     confidence: Option<f32>,
+}
+
+fn deserialize_confidence<'de, D>(deserializer: D) -> Result<Option<f32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{Error, Visitor};
+    use std::fmt;
+
+    struct ConfidenceVisitor;
+
+    impl<'de> Visitor<'de> for ConfidenceVisitor {
+        type Value = Option<f32>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a float or a string like 'high', 'medium', 'low'")
+        }
+
+        fn visit_f64<E: Error>(self, value: f64) -> Result<Self::Value, E> {
+            Ok(Some(value as f32))
+        }
+
+        fn visit_i64<E: Error>(self, value: i64) -> Result<Self::Value, E> {
+            Ok(Some(value as i64 as f32))
+        }
+
+        fn visit_u64<E: Error>(self, value: u64) -> Result<Self::Value, E> {
+            Ok(Some(value as u64 as f32))
+        }
+
+        fn visit_str<E: Error>(self, value: &str) -> Result<Self::Value, E> {
+            let v = match value.trim().to_ascii_lowercase().as_str() {
+                "high" | "very_high" => 1.0,
+                "medium" | "med" => 0.5,
+                "low" | "very_low" => 0.0,
+                s => s.parse::<f32>().map_err(Error::custom)?,
+            };
+            Ok(Some(v))
+        }
+    }
+
+    deserializer.deserialize_any(ConfidenceVisitor)
 }
 
 impl ModelIntelligence {
@@ -501,5 +543,59 @@ mod tests {
         store.set("conn", "one", sample_intelligence("one done"));
 
         assert!(store.begin_analyze("conn", "two", min_interval, 1));
+    }
+
+    #[test]
+    fn deserialize_confidence_accepts_numeric_and_string_values() {
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":0.9}"#)
+                .expect("numeric confidence should parse");
+        assert!((parsed.confidence.unwrap() - 0.9).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":1}"#)
+                .expect("integer confidence should parse");
+        assert!((parsed.confidence.unwrap() - 1.0).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"opencode","status":"waiting_idle","summary":"done","confidence":"high"}"#)
+                .expect("string 'high' confidence should parse");
+        assert!((parsed.confidence.unwrap() - 1.0).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"medium"}"#)
+                .expect("string 'medium' confidence should parse");
+        assert!((parsed.confidence.unwrap() - 0.5).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"low"}"#)
+                .expect("string 'low' confidence should parse");
+        assert!((parsed.confidence.unwrap() - 0.0).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test"}"#)
+                .expect("missing confidence should parse");
+        assert_eq!(parsed.confidence, None);
+    }
+
+    #[test]
+    fn deserialize_confidence_string_maps_into_intelligence_correctly() {
+        let provider = ActiveProvider {
+            name: "test".to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            api_key: "key".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+        };
+
+        let parsed: ModelIntelligence =
+            serde_json::from_str(r#"{"application":"opencode","status":"waiting_idle","summary":"修改完成，全部92个测试通过。","confidence":"high"}"#)
+                .expect("deepseek response should parse");
+
+        let intelligence = parsed.into_intelligence(&provider).expect("should convert");
+        assert_eq!(intelligence.app, "opencode");
+        assert_eq!(intelligence.status, "waiting_idle");
+        assert_eq!(intelligence.summary, "修改完成，全部92个测试通过。");
+        assert!((intelligence.confidence - 1.0).abs() < f32::EPSILON);
     }
 }
