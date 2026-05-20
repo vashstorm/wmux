@@ -672,11 +672,13 @@ async fn analyze_session_text(
         let target = target_name.to_string();
         let sess = session_name.to_string();
         let is_error = result.is_err();
-        let error_msg = result.as_ref().err().cloned();
+        let error_msg = result.as_ref().err().map(|e| e.message.clone());
         let window_number = active_window.map(|w| w as i64);
-        let response_json = result.as_ref().ok().and_then(|r| {
-            serde_json::to_string(&r.intelligence).ok()
-        });
+        let response_json = result
+            .as_ref()
+            .ok()
+            .and_then(|r| r.raw_response.clone())
+            .or_else(|| result.as_ref().err().and_then(|e| e.raw_response.clone()));
         let prompt_tokens = result.as_ref().ok().and_then(|r| r.prompt_tokens);
         let completion_tokens = result.as_ref().ok().and_then(|r| r.completion_tokens);
         let total_tokens = result.as_ref().ok().and_then(|r| r.total_tokens);
@@ -705,7 +707,7 @@ async fn analyze_session_text(
         });
     }
 
-    result.map(|r| r.intelligence)
+    result.map(|r| r.intelligence).map_err(|e| e.message)
 }
 
 async fn session_transcript(

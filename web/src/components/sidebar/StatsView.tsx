@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { Box, Typography, IconButton, List, ListItem, Chip, Stack } from "@mui/material";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Box, Typography, IconButton, List, ListItem, Chip, Stack, Switch, FormControlLabel } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { listAiStats } from "../../api/client.js";
 import type { AiUsageEvent, AiUsageSummary } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 import { useAppState } from "../../state/store.js";
+
+const DEFAULT_REFRESH_INTERVAL_MS = 30000;
 
 function getAiSummary(responseJson: string | null | undefined): string | undefined {
 	if (!responseJson) return undefined;
@@ -22,6 +24,9 @@ export function StatsView() {
 	const [summary, setSummary] = useState<AiUsageSummary | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [autoRefresh, setAutoRefresh] = useState(true);
+	const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+	const intervalRef = useRef<number | null>(null);
 
 	const loadStats = useCallback(async () => {
 		setLoading(true);
@@ -30,6 +35,7 @@ export function StatsView() {
 			const response = await listAiStats({ limit: 50 });
 			setEvents(response.data);
 			setSummary(response.summary);
+			setLastRefreshedAt(new Date());
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "Failed to load stats");
 		} finally {
@@ -37,23 +43,71 @@ export function StatsView() {
 		}
 	}, []);
 
-	useEffect(() => { loadStats(); }, [loadStats]);
+	const resetInterval = useCallback(() => {
+		if (intervalRef.current) {
+			window.clearInterval(intervalRef.current);
+			intervalRef.current = null;
+		}
+		if (autoRefresh) {
+			intervalRef.current = window.setInterval(() => {
+				void loadStats();
+			}, DEFAULT_REFRESH_INTERVAL_MS);
+		}
+	}, [autoRefresh, loadStats]);
+
+	useEffect(() => {
+		void loadStats();
+	}, [loadStats]);
+
+	useEffect(() => {
+		resetInterval();
+		return () => {
+			if (intervalRef.current) {
+				window.clearInterval(intervalRef.current);
+				intervalRef.current = null;
+			}
+		};
+	}, [resetInterval]);
+
+	const handleManualRefresh = useCallback(() => {
+		void loadStats();
+		resetInterval();
+	}, [loadStats, resetInterval]);
 
 	return (
 		<Box data-testid="stats-view" sx={{ minHeight: 1 }}>
-			<Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+			<Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
 				<Typography variant="subtitle2" sx={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)" }}>
 					AI Usage Stats
 				</Typography>
-				<IconButton size="small" onClick={loadStats} data-testid="stats-refresh-button" aria-label="Refresh stats" disabled={loading}>
-					<RefreshIcon fontSize="small" />
-				</IconButton>
+				<Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+					<FormControlLabel
+						control={
+							<Switch
+								size="small"
+								checked={autoRefresh}
+								onChange={(e) => setAutoRefresh(e.target.checked)}
+								data-testid="stats-auto-refresh-switch"
+							/>
+						}
+						label="Auto"
+						sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: "var(--font-size-xs)" } }}
+					/>
+					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-refresh-button" aria-label="Refresh stats" disabled={loading}>
+						<RefreshIcon fontSize="small" />
+					</IconButton>
+				</Stack>
 			</Stack>
+			{lastRefreshedAt && (
+				<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", mb: 1, display: "block" }} data-testid="stats-last-refreshed">
+					Last updated: {lastRefreshedAt.toLocaleTimeString()}
+				</Typography>
+			)}
 
 			{error && (
 				<Box data-testid="stats-error" sx={{ mb: 1, p: 1, bgcolor: "error.main", color: "error.contrastText", borderRadius: "var(--radius-sm)", fontSize: "var(--font-size-xs)" }}>
 					<Typography variant="caption">{error}</Typography>
-					<IconButton size="small" onClick={loadStats} data-testid="stats-retry-button" sx={{ color: "inherit", ml: 0.5 }} aria-label="Retry">
+					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-retry-button" sx={{ color: "inherit", ml: 0.5 }} aria-label="Retry">
 						<RefreshIcon fontSize="small" />
 					</IconButton>
 				</Box>

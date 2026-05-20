@@ -784,8 +784,10 @@ describe("Projects view", () => {
 	});
 });
 
-describe("Stats view", () => {
+	describe("Stats view", () => {
 	beforeEach(() => {
+		vi.useRealTimers();
+		vi.clearAllMocks();
 		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
@@ -837,6 +839,103 @@ describe("Stats view", () => {
 		fireEvent.click(screen.getByTestId("stats-retry-button"));
 		await waitFor(() => {
 			expect(screen.getByTestId("stats-empty")).toBeInTheDocument();
+		});
+	});
+
+	test("auto-refreshes stats every 30 seconds by default", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		mockListAiStats.mockClear();
+		vi.advanceTimersByTime(30000);
+
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		vi.useRealTimers();
+	});
+
+	test("manual refresh resets the auto-refresh interval", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		vi.advanceTimersByTime(15000);
+		mockListAiStats.mockClear();
+
+		fireEvent.click(screen.getByTestId("stats-refresh-button"));
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		mockListAiStats.mockClear();
+		vi.advanceTimersByTime(15000);
+		expect(mockListAiStats).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(15000);
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		vi.useRealTimers();
+	});
+
+	test("disabling auto-refresh stops the interval", async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+
+		await waitFor(() => {
+			expect(mockListAiStats).toHaveBeenCalledTimes(1);
+		});
+
+		const autoRefreshSwitch = screen.getByTestId("stats-auto-refresh-switch").querySelector("input");
+		expect(autoRefreshSwitch).not.toBeNull();
+		fireEvent.click(autoRefreshSwitch!);
+
+		mockListAiStats.mockClear();
+		vi.advanceTimersByTime(30000);
+		expect(mockListAiStats).not.toHaveBeenCalled();
+
+		vi.useRealTimers();
+	});
+
+	test("shows last refreshed time after loading", async () => {
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+
+		await waitFor(() => {
+			expect(screen.getByTestId("stats-last-refreshed")).toBeInTheDocument();
 		});
 	});
 });

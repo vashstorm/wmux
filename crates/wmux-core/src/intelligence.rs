@@ -179,21 +179,34 @@ pub struct AnalysisResult {
     pub prompt_tokens: Option<i64>,
     pub completion_tokens: Option<i64>,
     pub total_tokens: Option<i64>,
+    pub raw_response: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AiProviderError {
+    pub message: String,
+    pub raw_response: Option<String>,
 }
 
 pub async fn analyze_text(
     provider: &ActiveProvider,
     text: &str,
     timeout: Duration,
-) -> Result<AnalysisResult, String> {
+) -> Result<AnalysisResult, AiProviderError> {
     if provider.model.trim().is_empty() {
-        return Err("AI provider model is empty".to_string());
+        return Err(AiProviderError {
+            message: "AI provider model is empty".to_string(),
+            raw_response: None,
+        });
     }
 
     let client = reqwest::Client::builder()
         .timeout(timeout)
         .build()
-        .map_err(|err| format!("create AI client: {err}"))?;
+        .map_err(|err| AiProviderError {
+            message: format!("create AI client: {err}"),
+            raw_response: None,
+        })?;
     let response = client
         .post(chat_completions_url(provider.base_url.as_str()))
         .bearer_auth(provider.api_key.as_str())
@@ -214,26 +227,52 @@ pub async fn analyze_text(
         }))
         .send()
         .await
-        .map_err(|err| format!("call AI provider: {err}"))?;
+        .map_err(|err| AiProviderError {
+            message: format!("call AI provider: {err}"),
+            raw_response: None,
+        })?;
 
-    if !response.status().is_success() {
-        return Err(format!("AI provider returned HTTP {}", response.status()));
+    let status = response.status();
+    if !status.is_success() {
+        let raw_response = response.text().await.ok();
+        return Err(AiProviderError {
+            message: format!("AI provider returned HTTP {}", status),
+            raw_response,
+        });
     }
 
-    let completion: ChatCompletionResponse = response
-        .json()
+    let body = response
+        .text()
         .await
-        .map_err(|err| format!("decode AI provider response: {err}"))?;
+        .map_err(|err| AiProviderError {
+            message: format!("read AI provider response: {err}"),
+            raw_response: None,
+        })?;
+
+    let completion: ChatCompletionResponse = serde_json::from_str(&body)
+        .map_err(|err| AiProviderError {
+            message: format!("decode AI provider response: {err}"),
+            raw_response: Some(body.clone()),
+        })?;
     let content = completion
         .choices
         .first()
         .map(|choice| choice.message.content.trim())
         .filter(|content| !content.is_empty())
-        .ok_or_else(|| "AI provider response did not include content".to_string())?;
+        .ok_or_else(|| AiProviderError {
+            message: "AI provider response did not include content".to_string(),
+            raw_response: Some(body.clone()),
+        })?;
 
     let parsed: ModelIntelligence = serde_json::from_str(strip_json_fence(content))
-        .map_err(|err| format!("decode AI intelligence JSON: {err}"))?;
-    let intelligence = parsed.into_intelligence(provider)?;
+        .map_err(|err| AiProviderError {
+            message: format!("decode AI intelligence JSON: {err}"),
+            raw_response: Some(body.clone()),
+        })?;
+    let intelligence = parsed.into_intelligence(provider).map_err(|message| AiProviderError {
+        message,
+        raw_response: Some(body.clone()),
+    })?;
 
     let usage = completion.usage.unwrap_or_default();
     Ok(AnalysisResult {
@@ -241,6 +280,7 @@ pub async fn analyze_text(
         prompt_tokens: usage.prompt_tokens,
         completion_tokens: usage.completion_tokens,
         total_tokens: usage.total_tokens,
+        raw_response: Some(body),
     })
 }
 
