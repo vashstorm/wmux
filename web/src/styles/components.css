@@ -978,6 +978,7 @@
 	padding: var(--spacing-sm);
 	border-radius: var(--radius-sm);
 	overflow: hidden;
+	background-color: var(--terminal-background);
 }
 
 .terminal-container {
@@ -990,6 +991,7 @@
 	min-height: 0;
 	overflow-x: hidden;
 	overflow-y: hidden;
+	background-color: var(--terminal-background);
 }
 
 .terminal-container .xterm {
@@ -1001,6 +1003,7 @@
 	max-height: 100%;
 	min-height: 0;
 	overflow: hidden;
+	background-color: var(--terminal-background);
 }
 
 .terminal-container .xterm .xterm-viewport {

@@ -132,6 +132,21 @@ describe("PaneCanvas", () => {
 		expect(terminals[0]).toHaveTextContent("%1");
 	});
 
+	test("keeps pane overlay backgrounds transparent while terminal is mounted", () => {
+		render(
+			<PaneCanvas
+				panes={mockPanes}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		const boxes = screen.getAllByTestId(/pane-box/);
+		expect(boxes[0]!.style.backgroundColor).toBe("transparent");
+		expect(boxes[1]!.style.backgroundColor).toBe("transparent");
+	});
+
 	test("does not render Terminal when selectedPane is null", () => {
 		render(
 			<PaneCanvas

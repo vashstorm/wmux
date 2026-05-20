@@ -112,6 +112,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								top,
 								width,
 								height,
+								backgroundColor: selectedPane ? "transparent" : undefined,
 							}}
 								sx={{
 									border: "1.5px solid",

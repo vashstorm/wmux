@@ -68,6 +68,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const terminalTheme = getTerminalTheme(windowTheme ?? uiSettings.windowTheme ?? document.documentElement.dataset.theme);
 	const terminalStyle = {
 		"--terminal-background": terminalTheme.background ?? "var(--color-background)",
+		backgroundColor: terminalTheme.background ?? "var(--color-background)",
 	} as CSSProperties;
 
 	const clearDeferredFits = useCallback(() => {
