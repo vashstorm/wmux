@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { alpha } from "@mui/material/styles";
 import type { SessionInfoData } from "../../api/client.js";
 import { SidebarIconButton } from "./SidebarIconButton.js";
 
@@ -53,7 +52,7 @@ export function SessionCard({
 		setRenameValue(sname);
 	};
 
-const handleSubmitRename = async () => {
+	const handleSubmitRename = async () => {
 		const newName = renameValue.trim();
 		if (!newName || newName === sname) {
 			setIsRenaming(false);
@@ -133,7 +132,7 @@ const handleSubmitRename = async () => {
 					/>
 				</Box>
 			) : (
-				<Box sx={{ display: "flex", alignItems: "center", position: "relative" }}>
+				<Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
 					<ListItemButton
 						className="session-card-body"
 						onClick={() => onOpen(sname)}
@@ -142,8 +141,8 @@ const handleSubmitRename = async () => {
 						sx={{
 							flexDirection: "column",
 							alignItems: "stretch",
-							gap: "6px",
-							py: "12px",
+							gap: "4px",
+							py: "8px",
 							px: "14px",
 							minWidth: 0,
 							borderRadius: "var(--radius-md)",
@@ -167,7 +166,7 @@ const handleSubmitRename = async () => {
 										variant="body2"
 										title={sname}
 										sx={{
-											fontSize: "var(--font-size-sm)",
+											fontSize: "14px",
 											fontWeight: "var(--font-weight-bold)",
 											color: "text.primary",
 											whiteSpace: "nowrap",
@@ -179,87 +178,78 @@ const handleSubmitRename = async () => {
 									>
 										{sname}
 									</Typography>
-									{typeof session.windowCount === "number" && session.windowCount > 0 && (
-										<Chip
-											label={`${session.windowCount} w`}
-											size="small"
-											className="window-count-badge"
-											sx={{
-												fontSize: "10px",
-												fontWeight: "var(--font-weight-semibold)",
-												color: "text.secondary",
-												bgcolor: "action.hover",
-												border: "1px solid",
-												borderColor: "divider",
-												minHeight: 18,
-												height: 18,
-												minWidth: 18,
-											}}
-										/>
-									)}
-									{hasIntelligence && (
-										<Chip
-											label={
-												session.intelligenceError
-													? "Error"
-													: INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus
-											}
-											size="small"
-											className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}
-											sx={{
-												fontSize: "10px",
-												fontWeight: "var(--font-weight-semibold)",
-												minHeight: 18,
-												height: 18,
-											}}
-										/>
-									)}
 								</Stack>
-								{session.intelligenceUpdatedAt && (
-									<Typography
-										className="session-card-time"
-										variant="caption"
+								<Stack
+									className="session-card-action-column"
+									sx={{ alignItems: "flex-end", flexShrink: 0, ml: "auto" }}
+								>
+									{session.intelligenceUpdatedAt && (
+										<Typography
+											className="session-card-time"
+											variant="caption"
+											sx={{
+												fontSize: "10px",
+												color: "text.secondary",
+												ml: "auto",
+												textAlign: "right",
+												flexShrink: 0,
+												opacity: 0.65,
+												fontWeight: 500,
+												lineHeight: "18px",
+												transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+												".session-card:hover &": { opacity: 0 },
+											}}
+										>
+											{formatRelativeTime(session.intelligenceUpdatedAt)}
+										</Typography>
+									)}
+									<Stack
+										direction="row"
+										spacing={0.5}
+										className="session-card-actions"
 										sx={{
-											fontSize: "10px",
-											color: "text.secondary",
-											flexShrink: 0,
-											opacity: 0.6,
-											fontWeight: 500,
+											alignItems: "center",
+											position: "absolute",
+											opacity: 0,
+											transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+											".session-card:hover &": { opacity: 1 },
 										}}
 									>
-										{formatRelativeTime(session.intelligenceUpdatedAt)}
-									</Typography>
-								)}
+										<SidebarIconButton
+											className="session-action-btn"
+											icon={EditIcon}
+											variant="row"
+											onClick={(e) => { e.stopPropagation(); handleStartRename(); }}
+											aria-label={`Rename ${sname}`}
+											title="Rename"
+											data-testid={`rename-session-${sname}`}
+											sx={{
+												color: "text.secondary",
+												"&:hover": { bgcolor: "action.hover", color: "text.primary" },
+											}}
+										/>
+										<SidebarIconButton
+											className="session-action-btn session-action-danger"
+											icon={DeleteIcon}
+											variant="row"
+											danger
+											onClick={(e) => { e.stopPropagation(); onKill(sname); }}
+											aria-label={`Kill ${sname}`}
+											title="Kill session"
+											data-testid={`kill-session-${sname}`}
+											sx={{
+												color: "text.secondary",
+												"&:hover": { bgcolor: "error.main", color: "common.white" },
+											}}
+										/>
+									</Stack>
+								</Stack>
 							</Stack>
-							{session.intelligenceSummary && (
-								<Typography
-									component="p"
-									className="session-intelligence-summary"
-									title={`${session.intelligenceSummary}${session.intelligenceError ? " [error]" : ""}${session.intelligenceStale ? " [stale]" : ""}${session.intelligenceSource ? ` via ${session.intelligenceSource}` : ""}`}
-									sx={{
-										fontSize: "11px",
-										color: "text.secondary",
-										m: "2px 0",
-										display: "-webkit-box",
-										WebkitLineClamp: 2,
-										WebkitBoxOrient: "vertical",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										maxWidth: "100%",
-										opacity: 0.9,
-										fontFamily: "var(--font-stack)",
-										lineHeight: 1.5,
-										py: "4px",
-									}}
-								>
-									{session.intelligenceSummary}
-								</Typography>
-							)}
 							<Stack
 								direction="row"
 								spacing={1}
 								className="session-card-meta"
-								sx={{ alignItems: "center", flexWrap: "wrap", minHeight: "18px" }}
+								sx={{ alignItems: "center", flexWrap: "wrap", justifyContent: "flex-start", minHeight: "18px" }}
 							>
 								{hasAttention && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
 									<Chip
@@ -267,6 +257,37 @@ const handleSubmitRename = async () => {
 										size="small"
 										className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}
 										sx={{ fontSize: "10px", minHeight: 18, height: 18 }}
+									/>
+								)}
+								{typeof session.windowCount === "number" && session.windowCount > 0 && (
+									<Chip
+										label={`${session.windowCount} w`}
+										size="small"
+										className="window-count-badge"
+										sx={{
+											fontSize: "10px",
+											fontWeight: "var(--font-weight-semibold)",
+											minHeight: 18,
+											height: 18,
+											minWidth: 18,
+										}}
+									/>
+								)}
+								{hasIntelligence && (
+									<Chip
+										label={
+											session.intelligenceError
+												? "Error"
+												: INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus
+										}
+										size="small"
+										className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}
+										sx={{
+											fontSize: "10px",
+											fontWeight: "var(--font-weight-semibold)",
+											minHeight: 18,
+											height: 18,
+										}}
 									/>
 								)}
 								{session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
@@ -285,60 +306,6 @@ const handleSubmitRename = async () => {
 							</Stack>
 						</Box>
 					</ListItemButton>
-					<Stack
-						direction="row"
-						spacing={0.5}
-						className="session-card-actions"
-						sx={{
-							alignItems: "center",
-							position: "absolute",
-							right: 0,
-							top: 0,
-							height: "100%",
-							px: "10px",
-							opacity: 0,
-							transform: "translateX(4px)",
-							transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-							background: (theme) =>
-								`linear-gradient(to left, ${alpha(theme.palette.background.paper, 0.9)} 70%, transparent)`,
-							".session-card:hover &": {
-								opacity: 1,
-								transform: "translateX(0)",
-							},
-							".session-card.is-selected &": {
-								background: (theme) =>
-									`linear-gradient(to left, ${alpha(theme.palette.primary.main, 0.08)} 70%, transparent)`,
-							},
-						}}
-					>
-						<SidebarIconButton
-							className="session-action-btn"
-							icon={EditIcon}
-							variant="row"
-							onClick={(e) => { e.stopPropagation(); handleStartRename(); }}
-							aria-label={`Rename ${sname}`}
-							title="Rename"
-							data-testid={`rename-session-${sname}`}
-							sx={{
-								color: "text.secondary",
-								"&:hover": { bgcolor: "action.hover", color: "text.primary" },
-							}}
-						/>
-						<SidebarIconButton
-							className="session-action-btn session-action-danger"
-							icon={DeleteIcon}
-							variant="row"
-							danger
-							onClick={(e) => { e.stopPropagation(); onKill(sname); }}
-							aria-label={`Kill ${sname}`}
-							title="Kill session"
-							data-testid={`kill-session-${sname}`}
-							sx={{
-								color: "text.secondary",
-								"&:hover": { bgcolor: "error.main", color: "common.white" },
-							}}
-						/>
-					</Stack>
 				</Box>
 			)}
 		</Box>

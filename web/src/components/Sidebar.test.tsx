@@ -349,6 +349,103 @@ describe("session card attention rendering", () => {
 		expect(badge).toBeInTheDocument();
 		expect(badge?.textContent).toBe("2");
 	});
+
+	test("session card keeps action buttons in the right aligned top row", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1", windowCount: 3 }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const cardBodyShell = screen.getByTestId("session-open-session1").parentElement;
+		const actions = document.querySelector(".session-card-actions");
+		const actionsColumn = document.querySelector(".session-card-action-column");
+
+		expect(cardBodyShell).toHaveStyle({ width: "100%" });
+		expect(actions).toHaveStyle({ position: "absolute" });
+		expect(actionsColumn).toHaveStyle({ marginLeft: "auto" });
+	});
+
+	test("session card keeps window count and status in a separate bottom metadata row", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{
+				name: "session1",
+				windowCount: 3,
+				intelligenceStatus: "waiting",
+				intelligenceAppCounts: { opencode: 2, claude: 1 },
+			}],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const topRow = document.querySelector(".session-card-top");
+		const meta = document.querySelector(".session-card-meta");
+		const windowBadge = document.querySelector(".window-count-badge");
+		const statusBadge = document.querySelector(".intelligence-badge.is-waiting");
+		const opencodeBadge = document.querySelector(".app-count-badge.is-opencode");
+		const claudeBadge = document.querySelector(".app-count-badge.is-claude");
+
+		expect(meta).toContainElement(windowBadge as HTMLElement);
+		expect(meta).toContainElement(statusBadge as HTMLElement);
+		expect(meta).toContainElement(opencodeBadge as HTMLElement);
+		expect(meta).toContainElement(claudeBadge as HTMLElement);
+		expect(topRow).not.toContainElement(windowBadge as HTMLElement);
+		expect(topRow).not.toContainElement(statusBadge as HTMLElement);
+		expect(meta).toHaveStyle({ justifyContent: "flex-start" });
+		expect(windowBadge).toHaveClass("window-count-badge");
+		expect(statusBadge).toHaveClass("intelligence-badge", "is-waiting");
+		expect(opencodeBadge).toHaveClass("app-count-badge", "is-opencode");
+		expect(claudeBadge).toHaveClass("app-count-badge", "is-claude");
+	});
+
+	test("session card shows updated time on the session name row", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1", intelligenceStatus: "running", intelligenceUpdatedAt: new Date().toISOString() }],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const time = document.querySelector(".session-card-time");
+		const topRow = document.querySelector(".session-card-top");
+		const actionsColumn = document.querySelector(".session-card-action-column");
+		const meta = document.querySelector(".session-card-meta");
+
+		expect(time).toBeInTheDocument();
+		expect(topRow).toContainElement(time as HTMLElement);
+		expect(actionsColumn).toContainElement(time as HTMLElement);
+		expect(meta).not.toContainElement(time as HTMLElement);
+		expect(time).toHaveStyle({ marginLeft: "auto", textAlign: "right" });
+	});
 });
 
 describe("intelligence badge and summary rendering", () => {
@@ -480,7 +577,7 @@ describe("intelligence badge and summary rendering", () => {
 		expect(badge).not.toBeInTheDocument();
 	});
 
-	test("session with intelligenceSummary renders one-line summary text in the card", async () => {
+	test("session with intelligenceSummary does not render summary text in the card", async () => {
 		mockListSessions.mockResolvedValue({
 			targetName: "conn1",
 			mode: "local",
@@ -498,35 +595,11 @@ describe("intelligence badge and summary rendering", () => {
 		});
 
 		const summary = document.querySelector(".session-intelligence-summary");
-		expect(summary).toBeInTheDocument();
-		expect(summary?.textContent).toBe("Waiting for input");
+		expect(summary).not.toBeInTheDocument();
+		expect(screen.queryByText("Waiting for input")).not.toBeInTheDocument();
 	});
 
-	test("session with intelligenceStale true has title that includes stale", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting", intelligenceStale: true }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		await waitFor(() => {
-			const summary = document.querySelector(".session-intelligence-summary");
-			expect(summary).toBeInTheDocument();
-			expect(summary?.getAttribute("title")).toContain("stale");
-		});
-	});
-
-	test("session with intelligenceError has error indicator in title not raw error text", async () => {
+	test("session with intelligenceError shows error badge without raw summary text", async () => {
 		mockListSessions.mockResolvedValue({
 			targetName: "conn1",
 			mode: "local",
@@ -544,10 +617,9 @@ describe("intelligence badge and summary rendering", () => {
 		});
 
 		const summary = document.querySelector(".session-intelligence-summary");
-		expect(summary).toBeInTheDocument();
-		const title = summary?.getAttribute("title") ?? "";
-		expect(title).toContain("[error]");
-		expect(title).not.toContain("API timeout");
+		expect(summary).not.toBeInTheDocument();
+		expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+		expect(screen.queryByText("API timeout")).not.toBeInTheDocument();
 
 		const badge = document.querySelector(".intelligence-badge.is-error");
 		expect(badge).toBeInTheDocument();
