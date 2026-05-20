@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
@@ -43,6 +44,8 @@ pub struct IntelligenceStore {
 struct IntelligenceState {
     cache: HashMap<SessionKey, CacheEntry>,
     in_flight: HashSet<SessionKey>,
+    window_cache: HashMap<WindowKey, WindowIntelligenceEntry>,
+    window_in_flight: HashSet<WindowKey>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -55,6 +58,31 @@ struct SessionKey {
 struct CacheEntry {
     result: SessionIntelligence,
     analyzed_at: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WindowKey {
+    target_name: String,
+    session_name: String,
+    window_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct WindowIntelligenceEntry {
+    result: SessionIntelligence,
+    content_hash: String,
+    command_class: CommandClass,
+    command_basename: String,
+    pane_signature: String,
+    analyzed_at: Instant,
+}
+
+#[derive(Debug, Clone)]
+pub enum WindowCacheDecision {
+    Proceed,
+    SkipUnchanged(SessionIntelligence),
+    SkipBlocked(SessionIntelligence),
+    InFlight,
 }
 
 impl IntelligenceStore {
@@ -134,6 +162,117 @@ impl IntelligenceStore {
             );
         }
     }
+
+    pub fn get_window(
+        &self,
+        target_name: &str,
+        session_name: &str,
+        window_id: &str,
+        cache_ttl: Duration,
+    ) -> Option<(SessionIntelligence, String, CommandClass, String, String)> {
+        let key = WindowKey::new(target_name, session_name, window_id);
+        let state = self.inner.lock().ok()?;
+        let entry = state.window_cache.get(&key)?;
+        let mut result = entry.result.clone();
+        if entry.analyzed_at.elapsed() > cache_ttl {
+            result.stale = true;
+        }
+        Some((
+            result,
+            entry.content_hash.clone(),
+            entry.command_class,
+            entry.command_basename.clone(),
+            entry.pane_signature.clone(),
+        ))
+    }
+
+    pub fn begin_analyze_window(
+        &self,
+        target_name: &str,
+        session_name: &str,
+        window_id: &str,
+        content_hash: &str,
+        command_class: CommandClass,
+        command_basename: &str,
+        pane_signature: &str,
+        min_interval: Duration,
+        max_concurrency: usize,
+    ) -> WindowCacheDecision {
+        let key = WindowKey::new(target_name, session_name, window_id);
+
+        let Ok(mut state) = self.inner.lock() else {
+            return WindowCacheDecision::InFlight;
+        };
+
+        if state.window_in_flight.contains(&key) {
+            return WindowCacheDecision::InFlight;
+        }
+
+        if let Some(entry) = state.window_cache.get(&key) {
+            let all_match = entry.content_hash == content_hash
+                && entry.command_class == command_class
+                && entry.command_basename == command_basename
+                && entry.pane_signature == pane_signature;
+
+            if all_match {
+                if command_class == CommandClass::AiCli && entry.result.status == "running" {
+                    let mut blocked = entry.result.clone();
+                    blocked.status = "blocked".to_string();
+                    blocked.stale = false;
+                    blocked.updated_at = now_rfc3339();
+                    return WindowCacheDecision::SkipBlocked(blocked);
+                }
+                return WindowCacheDecision::SkipUnchanged(entry.result.clone());
+            }
+
+            if entry.analyzed_at.elapsed() < min_interval {
+                let mut stale_result = entry.result.clone();
+                stale_result.stale = true;
+                return WindowCacheDecision::SkipUnchanged(stale_result);
+            }
+        }
+
+        if state.window_in_flight.len() >= max_concurrency.max(1) {
+            if let Some(entry) = state.window_cache.get(&key) {
+                let mut stale_result = entry.result.clone();
+                stale_result.stale = true;
+                return WindowCacheDecision::SkipUnchanged(stale_result);
+            }
+            return WindowCacheDecision::InFlight;
+        }
+
+        state.window_in_flight.insert(key);
+        WindowCacheDecision::Proceed
+    }
+
+    pub fn set_window(
+        &self,
+        target_name: &str,
+        session_name: &str,
+        window_id: &str,
+        mut result: SessionIntelligence,
+        content_hash: &str,
+        command_class: CommandClass,
+        command_basename: &str,
+        pane_signature: &str,
+    ) {
+        result.stale = false;
+        let key = WindowKey::new(target_name, session_name, window_id);
+        if let Ok(mut state) = self.inner.lock() {
+            state.window_in_flight.remove(&key);
+            state.window_cache.insert(
+                key,
+                WindowIntelligenceEntry {
+                    result,
+                    content_hash: content_hash.to_string(),
+                    command_class,
+                    command_basename: command_basename.to_string(),
+                    pane_signature: pane_signature.to_string(),
+                    analyzed_at: Instant::now(),
+                },
+            );
+        }
+    }
 }
 
 impl SessionKey {
@@ -141,6 +280,16 @@ impl SessionKey {
         Self {
             target_name: target_name.to_string(),
             session: session.to_string(),
+        }
+    }
+}
+
+impl WindowKey {
+    pub fn new(target_name: &str, session_name: &str, window_id: &str) -> Self {
+        Self {
+            target_name: target_name.to_string(),
+            session_name: session_name.to_string(),
+            window_id: window_id.to_string(),
         }
     }
 }
@@ -333,7 +482,7 @@ fn chat_completions_url(base_url: &str) -> String {
     }
 }
 
-fn now_rfc3339() -> String {
+pub fn now_rfc3339() -> String {
     OffsetDateTime::now_utc()
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
@@ -351,7 +500,7 @@ fn strip_json_fence(content: &str) -> &str {
 }
 
 impl ActiveProvider {
-    fn source(&self) -> String {
+    pub fn source(&self) -> String {
         if self.name.trim().is_empty() {
             format!("{}/{}", self.provider, self.model)
         } else {
@@ -494,6 +643,207 @@ fn is_valid_status(value: &str) -> bool {
     )
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandClass {
+    AiCli,
+    NonAi,
+    Unknown,
+}
+
+pub fn classify_command(command: &str) -> CommandClass {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return CommandClass::Unknown;
+    }
+
+    let basename = trimmed.rfind('/').map_or(trimmed, |pos| &trimmed[pos + 1..]);
+    if basename.is_empty() {
+        return CommandClass::Unknown;
+    }
+
+    let lower = basename.to_ascii_lowercase();
+
+    match lower.as_str() {
+        "opencode" | "claude" | "codex" => CommandClass::AiCli,
+        "sh" | "bash" | "zsh" | "fish" | "make" | "python" | "python3" | "ruby" | "node"
+        | "npm" | "bun" | "cargo" | "go" | "rustc" | "grep" | "awk" | "sed" | "cat"
+        | "ls" | "vim" | "nvim" => CommandClass::NonAi,
+        _ => CommandClass::Unknown,
+    }
+}
+
+pub fn compute_pane_signature(panes: &[(String, usize, String)]) -> String {
+    if panes.is_empty() {
+        return String::new();
+    }
+
+    let mut sorted: Vec<_> = panes.to_vec();
+    sorted.sort_by_key(|(_, idx, _)| *idx);
+
+    sorted
+        .iter()
+        .map(|(pane_id, pane_index, cmd_basename)| format!("{pane_id}:{pane_index}:{cmd_basename}"))
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
+pub fn normalize_window_transcript(text: &str) -> String {
+    let mut kept_lines: Vec<String> = Vec::new();
+
+    for line in text.lines() {
+        let trimmed = line.trim_end();
+        if is_status_bar_line(trimmed) {
+            continue;
+        }
+        if !trimmed.is_empty() {
+            kept_lines.push(trimmed.to_string());
+        }
+    }
+
+    kept_lines.join("\n").trim().to_string()
+}
+
+fn is_status_bar_line(line: &str) -> bool {
+    has_clock_pattern(line) && has_status_keyword(line)
+}
+
+fn has_clock_pattern(line: &str) -> bool {
+    match_clock_time(line) || match_iso_date(line)
+}
+
+fn match_clock_time(line: &str) -> bool {
+    let chars: Vec<char> = line.chars().collect();
+    let n = chars.len();
+
+    for i in 0..n {
+        if chars[i].is_ascii_digit() {
+            let mut pos = i;
+            let mut hour_digits = 0;
+            while pos < n && chars[pos].is_ascii_digit() && hour_digits < 2 {
+                hour_digits += 1;
+                pos += 1;
+            }
+
+            if hour_digits >= 1 && hour_digits <= 2 && pos < n && chars[pos] == ':' {
+                pos += 1;
+                let mut minute_digits = 0;
+                while pos < n && chars[pos].is_ascii_digit() && minute_digits < 2 {
+                    minute_digits += 1;
+                    pos += 1;
+                }
+
+                if minute_digits == 2 {
+                    if pos < n && chars[pos] == ':' {
+                        pos += 1;
+                        let mut second_digits = 0;
+                        while pos < n && chars[pos].is_ascii_digit() && second_digits < 2 {
+                            second_digits += 1;
+                            pos += 1;
+                        }
+                        if second_digits == 2 {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn match_iso_date(line: &str) -> bool {
+    let chars: Vec<char> = line.chars().collect();
+    let n = chars.len();
+
+    for i in 0..n {
+        if chars[i].is_ascii_digit() {
+            let mut pos = i;
+            let mut year_digits = 0;
+            while pos < n && chars[pos].is_ascii_digit() && year_digits < 4 {
+                year_digits += 1;
+                pos += 1;
+            }
+
+            if year_digits == 4 && pos < n && chars[pos] == '-' {
+                pos += 1;
+                let mut month_digits = 0;
+                while pos < n && chars[pos].is_ascii_digit() && month_digits < 2 {
+                    month_digits += 1;
+                    pos += 1;
+                }
+
+                if month_digits == 2 && pos < n && chars[pos] == '-' {
+                    pos += 1;
+                    let mut day_digits = 0;
+                    while pos < n && chars[pos].is_ascii_digit() && day_digits < 2 {
+                        day_digits += 1;
+                        pos += 1;
+                    }
+                    if day_digits == 2 {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn has_status_keyword(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+
+    let keywords = ["battery", "bat", "wifi", "cpu", "mem"];
+    for kw in keywords {
+        if lower.contains(kw) {
+            return true;
+        }
+    }
+
+    let symbols = ['%', '🔋', '│', '─', '═', '▓', '▌', '▐'];
+    for sym in symbols {
+        if line.contains(sym) {
+            return true;
+        }
+    }
+
+    false
+}
+
+pub fn hash_window_content(normalized: &str) -> String {
+    let trimmed = normalized.trim();
+    let mut hasher = Sha256::new();
+    hasher.update(trimmed.as_bytes());
+    let result = hasher.finalize();
+    hex_encode(result.as_slice())
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        hex.push_str(&format!("{:02x}", byte));
+    }
+    hex
+}
+
+pub fn hash_window_panes(panes: &[(usize, &str)]) -> String {
+    if panes.is_empty() {
+        return hash_window_content("");
+    }
+
+    let mut sorted_panes: Vec<(usize, &str)> = panes.to_vec();
+    sorted_panes.sort_by_key(|(idx, _)| *idx);
+
+    let parts: Vec<String> = sorted_panes
+        .iter()
+        .map(|(_, transcript)| normalize_window_transcript(transcript))
+        .collect();
+
+    let combined = parts.join("\n---pane-separator---\n");
+    hash_window_content(&combined)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -597,5 +947,915 @@ mod tests {
         assert_eq!(intelligence.status, "waiting_idle");
         assert_eq!(intelligence.summary, "修改完成，全部92个测试通过。");
         assert!((intelligence.confidence - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn classify_command_ai_cli_variants() {
+        assert_eq!(classify_command("claude"), CommandClass::AiCli);
+        assert_eq!(classify_command("codex"), CommandClass::AiCli);
+        assert_eq!(classify_command("opencode"), CommandClass::AiCli);
+        assert_eq!(
+            classify_command("/opt/homebrew/bin/codex"),
+            CommandClass::AiCli
+        );
+        assert_eq!(
+            classify_command("/usr/local/bin/claude"),
+            CommandClass::AiCli
+        );
+    }
+
+    #[test]
+    fn classify_command_non_ai_variants() {
+        assert_eq!(classify_command("sh"), CommandClass::NonAi);
+        assert_eq!(classify_command("bash"), CommandClass::NonAi);
+        assert_eq!(classify_command("zsh"), CommandClass::NonAi);
+        assert_eq!(classify_command("make"), CommandClass::NonAi);
+        assert_eq!(classify_command("python3"), CommandClass::NonAi);
+    }
+
+    #[test]
+    fn classify_command_unknown_variants() {
+        assert_eq!(classify_command(""), CommandClass::Unknown);
+        assert_eq!(classify_command("htop"), CommandClass::Unknown);
+        assert_eq!(classify_command("tmux"), CommandClass::Unknown);
+    }
+
+    #[test]
+    fn normalize_removes_status_bar_line_with_clock_and_battery() {
+        let input = "14:35 🔋 85% │ cpu 12%\n$ ls -la\nexit code 0\n";
+        let normalized = normalize_window_transcript(input);
+        assert!(!normalized.contains("14:35"));
+        assert!(!normalized.contains("85%"));
+        assert!(normalized.contains("$ ls -la"));
+        assert!(normalized.contains("exit code 0"));
+    }
+
+    #[test]
+    fn normalize_preserves_lines_with_numbers_but_no_status_keywords() {
+        let input = "exit code 1\n3 tests passed\nerror: line 42\n";
+        let normalized = normalize_window_transcript(input);
+        assert!(normalized.contains("exit code 1"));
+        assert!(normalized.contains("3 tests passed"));
+        assert!(normalized.contains("error: line 42"));
+    }
+
+    #[test]
+    fn normalize_preserves_command_output_with_timestamp_like_text() {
+        let input = "log entry: 2024-01-15 started process\nbuild finished at 09:30\n";
+        let normalized = normalize_window_transcript(input);
+        assert!(normalized.contains("2024-01-15"));
+        assert!(normalized.contains("09:30"));
+    }
+
+    #[test]
+    fn normalize_removes_iso_date_with_battery_indicator() {
+        let input = "2024-01-15 🔋 battery low\n$ pwd\n/home/user\n";
+        let normalized = normalize_window_transcript(input);
+        assert!(!normalized.contains("2024-01-15"));
+        assert!(!normalized.contains("battery"));
+        assert!(normalized.contains("$ pwd"));
+        assert!(normalized.contains("/home/user"));
+    }
+
+    #[test]
+    fn normalize_trims_trailing_whitespace_from_each_line() {
+        let input = "line one   \nline two\t\t\nline three\n";
+        let normalized = normalize_window_transcript(input);
+        assert_eq!(normalized, "line one\nline two\nline three");
+    }
+
+    #[test]
+    fn normalize_empty_input_returns_empty_string() {
+        let normalized = normalize_window_transcript("");
+        assert_eq!(normalized, "");
+        let normalized_whitespace = normalize_window_transcript("   \n\t\n  ");
+        assert_eq!(normalized_whitespace, "");
+    }
+
+    #[test]
+    fn hash_empty_content_is_deterministic_sha256() {
+        let hash = hash_window_content("");
+        assert_eq!(
+            hash,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn hash_whitespace_only_returns_deterministic_sha256() {
+        let hash = hash_window_content("   \n\t\n  ");
+        assert_eq!(
+            hash,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn transcripts_differing_only_by_status_line_have_same_hash() {
+        let t1 = "14:35 🔋 85% │ wifi on\n$ npm test\n3 tests passed\n";
+        let t2 = "15:42 🔋 72% │ cpu 8%\n$ npm test\n3 tests passed\n";
+        let h1 = hash_window_content(&normalize_window_transcript(t1));
+        let h2 = hash_window_content(&normalize_window_transcript(t2));
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn transcripts_with_different_command_output_have_different_hashes() {
+        let t1 = "$ npm test\n3 tests passed\n";
+        let t2 = "$ npm test\n0 tests passed\n";
+        let h1 = hash_window_content(&normalize_window_transcript(t1));
+        let h2 = hash_window_content(&normalize_window_transcript(t2));
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn hash_window_panes_sorts_by_pane_index() {
+        let panes: [(usize, &str); 3] = [
+            (2, "pane two output"),
+            (0, "pane zero output"),
+            (1, "pane one output"),
+        ];
+        let hash = hash_window_panes(&panes);
+        let sorted_panes: [(usize, &str); 3] = [
+            (0, "pane zero output"),
+            (1, "pane one output"),
+            (2, "pane two output"),
+        ];
+        let sorted_hash = hash_window_panes(&sorted_panes);
+        assert_eq!(hash, sorted_hash);
+    }
+
+    #[test]
+    fn hash_window_panes_separator_between_panes() {
+        let panes: [(usize, &str); 2] = [(0, "first pane"), (1, "second pane")];
+        let normalized = format!(
+            "{}\n---pane-separator---\n{}",
+            normalize_window_transcript("first pane"),
+            normalize_window_transcript("second pane")
+        );
+        let expected_hash = hash_window_content(&normalized);
+        let actual_hash = hash_window_panes(&panes);
+        assert_eq!(expected_hash, actual_hash);
+    }
+
+    #[test]
+    fn hash_window_panes_empty_panes_returns_empty_hash() {
+        let panes: [(usize, &str); 0] = [];
+        let hash = hash_window_panes(&panes);
+        assert_eq!(
+            hash,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    // ============================================================================
+    // Window-level cache tests (Task 3)
+    // ============================================================================
+
+    fn sample_window_intelligence(status: &str) -> SessionIntelligence {
+        SessionIntelligence {
+            app: "claude".to_string(),
+            status: status.to_string(),
+            summary: "window analysis".to_string(),
+            source: "test/model".to_string(),
+            confidence: 0.9,
+            stale: false,
+            updated_at: now_rfc3339(),
+            error: None,
+            app_counts: None,
+        }
+    }
+
+    #[test]
+    fn window_cache_two_different_windows_in_same_session_have_independent_entries() {
+        let store = IntelligenceStore::default();
+        let ttl = Duration::from_secs(300);
+        let hash1 = "hash-alpha";
+        let hash2 = "hash-beta";
+        let sig1 = "pane0:0:claude";
+        let sig2 = "pane1:0:codex";
+
+        // Set window 0
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash1,
+            CommandClass::AiCli,
+            "claude",
+            sig1,
+        );
+
+        // Set window 1
+        store.set_window(
+            "conn", "dev", "1",
+            sample_window_intelligence("waiting"),
+            hash2,
+            CommandClass::AiCli,
+            "codex",
+            sig2,
+        );
+
+        // Retrieve independently
+        let w0 = store.get_window("conn", "dev", "0", ttl).expect("window 0 cached");
+        assert_eq!(w0.0.status, "running");
+        assert_eq!(w0.1, hash1);
+
+        let w1 = store.get_window("conn", "dev", "1", ttl).expect("window 1 cached");
+        assert_eq!(w1.0.status, "waiting");
+        assert_eq!(w1.1, hash2);
+
+        // Window 2 not cached
+        assert!(store.get_window("conn", "dev", "2", ttl).is_none());
+    }
+
+    #[test]
+    fn window_cache_same_window_same_all_params_returns_skip_unchanged() {
+        let store = IntelligenceStore::default();
+        let hash = "stable-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+        let max_concurrency = 5;
+
+        // Initial set
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting_idle"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Same params → SkipUnchanged
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            max_concurrency,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                assert_eq!(result.status, "waiting_idle");
+                assert!(!result.stale);
+            }
+            _ => panic!("expected SkipUnchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_ai_cli_running_with_same_params_returns_skip_blocked() {
+        let store = IntelligenceStore::default();
+        let hash = "stable-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        // Set with "running" status
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Same params + AiCli + running → SkipBlocked
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipBlocked(result) => {
+                assert_eq!(result.status, "blocked");
+                assert!(!result.stale);
+            }
+            _ => panic!("expected SkipBlocked for AiCli+running, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_non_ai_with_running_still_returns_skip_unchanged() {
+        let store = IntelligenceStore::default();
+        let hash = "stable-hash";
+        let sig = "pane0:0:zsh";
+        let min_interval = Duration::from_secs(0);
+
+        // Set with "running" status + NonAi
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+        );
+
+        // NonAi + running → SkipUnchanged (NOT SkipBlocked)
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                assert_eq!(result.status, "running");
+            }
+            _ => panic!("expected SkipUnchanged for NonAi+running, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_changed_hash_returns_proceed_when_interval_passed() {
+        let store = IntelligenceStore::default();
+        let old_hash = "old-hash";
+        let new_hash = "new-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        // Set with old hash
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            old_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Changed hash → Proceed
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            new_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::Proceed => {}
+            _ => panic!("expected Proceed for changed hash, got {:?}", decision),
+        }
+
+        // Verify in-flight tracking
+        let decision2 = store.begin_analyze_window(
+            "conn", "dev", "0",
+            new_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+        match decision2 {
+            WindowCacheDecision::InFlight => {}
+            _ => panic!("expected InFlight for second call, got {:?}", decision2),
+        }
+    }
+
+    #[test]
+    fn window_cache_changed_command_class_returns_proceed() {
+        let store = IntelligenceStore::default();
+        let hash = "same-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        // Set with AiCli
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Changed class → Proceed (even if hash same)
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::NonAi, // Changed!
+            "zsh",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::Proceed => {}
+            _ => panic!("expected Proceed for changed class, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_changed_pane_signature_returns_proceed() {
+        let store = IntelligenceStore::default();
+        let hash = "same-hash";
+        let old_sig = "pane0:0:claude";
+        let new_sig = "pane1:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        // Set with old sig
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            old_sig,
+        );
+
+        // Changed sig → Proceed
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            new_sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::Proceed => {}
+            _ => panic!("expected Proceed for changed sig, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_window_id_reuse_different_sig_no_skip_blocked_from_old() {
+        let store = IntelligenceStore::default();
+        let hash = "stable-hash";
+        let old_sig = "pane0:0:claude";
+        let new_sig = "pane99:0:claude"; // Different pane topology
+        let min_interval = Duration::from_secs(0);
+
+        // Set window 0 with running + AiCli
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            old_sig,
+        );
+
+        // Same hash but different sig → Proceed (NOT SkipBlocked from old entry)
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            new_sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::Proceed => {}
+            WindowCacheDecision::SkipBlocked(_) => {
+                panic!("SkipBlocked should NOT happen with different pane_signature");
+            }
+            _ => panic!("expected Proceed, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn window_cache_in_flight_dedup_same_window_twice_second_returns_in_flight() {
+        let store = IntelligenceStore::default();
+        let hash = "new-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        // Window not in cache → first call Proceed
+        let decision1 = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+        match decision1 {
+            WindowCacheDecision::Proceed => {}
+            _ => panic!("expected Proceed for first call, got {:?}", decision1),
+        }
+
+        // Second call → InFlight
+        let decision2 = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+        match decision2 {
+            WindowCacheDecision::InFlight => {}
+            _ => panic!("expected InFlight for second call, got {:?}", decision2),
+        }
+    }
+
+    #[test]
+    fn window_cache_max_concurrency_limit_blocks_proceed() {
+        let store = IntelligenceStore::default();
+        let hash = "new-hash";
+        let min_interval = Duration::from_secs(0);
+
+        // Fill up concurrency limit (max = 2)
+        let d1 = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            "sig0",
+            min_interval,
+            2,
+        );
+        assert!(matches!(d1, WindowCacheDecision::Proceed));
+
+        let d2 = store.begin_analyze_window(
+            "conn", "dev", "1",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            "sig1",
+            min_interval,
+            2,
+        );
+        assert!(matches!(d2, WindowCacheDecision::Proceed));
+
+        // Third window blocked by concurrency
+        let d3 = store.begin_analyze_window(
+            "conn", "dev", "2",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            "sig2",
+            min_interval,
+            2,
+        );
+        match d3 {
+            WindowCacheDecision::SkipUnchanged(_) => {
+                // Expected: no cached entry, but concurrency blocked
+                // Returns SkipUnchanged with None result logic (in implementation we return stale cached)
+                // Since window 2 not cached, we should NOT get SkipUnchanged
+                panic!("window 2 not cached, should not return SkipUnchanged");
+            }
+            WindowCacheDecision::Proceed => {
+                panic!("max concurrency = 2, third window should be blocked");
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn window_cache_stale_ttl_marks_result_stale_without_breaking() {
+        let store = IntelligenceStore::default();
+        let hash = "stable-hash";
+        let sig = "pane0:0:claude";
+
+        // Set window
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Very short TTL → stale
+        let ttl_zero = Duration::from_secs(0);
+        let result = store.get_window("conn", "dev", "0", ttl_zero).expect("cached");
+        assert!(result.0.stale);
+        assert_eq!(result.0.status, "waiting");
+    }
+
+    #[test]
+    fn compute_pane_signature_sorts_by_pane_index() {
+        let panes: [(String, usize, String); 3] = [
+            ("pane2".to_string(), 2, "codex".to_string()),
+            ("pane0".to_string(), 0, "claude".to_string()),
+            ("pane1".to_string(), 1, "zsh".to_string()),
+        ];
+
+        let sig = compute_pane_signature(&panes);
+        // Sorted by index: 0, 1, 2
+        assert_eq!(sig, "pane0:0:claude|pane1:1:zsh|pane2:2:codex");
+    }
+
+    #[test]
+    fn compute_pane_signature_empty_panes_returns_empty_string() {
+        let panes: [(String, usize, String); 0] = [];
+        let sig = compute_pane_signature(&panes);
+        assert_eq!(sig, "");
+    }
+
+    #[test]
+    fn window_cache_min_interval_blocks_proceed_when_too_soon() {
+        let store = IntelligenceStore::default();
+        let old_hash = "old-hash";
+        let new_hash = "new-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(60); // 60 seconds
+
+        // Set window with old hash
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            old_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        // Changed hash but min_interval not passed → SkipUnchanged (stale cached result)
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            new_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                // Returns stale cached result because interval too short
+                assert!(result.stale);
+                assert_eq!(result.status, "waiting");
+            }
+            WindowCacheDecision::Proceed => {
+                panic!("min_interval not passed, should NOT proceed");
+            }
+            _ => panic!("expected SkipUnchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_window_cache_non_ai_unchanged_skip() {
+        let store = IntelligenceStore::default();
+        let hash = "abc123";
+        let sig = "pane0:0:zsh";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                assert_eq!(result.status, "running");
+            }
+            _ => panic!("expected SkipUnchanged for NonAi+unchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_window_cache_aicli_running_unchanged_blocked() {
+        let store = IntelligenceStore::default();
+        let hash = "abc123";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipBlocked(result) => {
+                assert_eq!(result.status, "blocked");
+                assert!(!result.stale);
+            }
+            _ => panic!("expected SkipBlocked for AiCli+running+unchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_window_cache_aicli_not_running_unchanged() {
+        let store = IntelligenceStore::default();
+        let hash = "abc123";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                assert_eq!(result.status, "waiting");
+                assert_ne!(result.status, "blocked");
+            }
+            _ => panic!("expected SkipUnchanged for AiCli+not-running+unchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_window_cache_unknown_running_unchanged() {
+        let store = IntelligenceStore::default();
+        let hash = "abc123";
+        let sig = "pane0:0:unknown";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::Unknown,
+            "unknown",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::Unknown,
+            "unknown",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::SkipUnchanged(result) => {
+                assert_eq!(result.status, "running");
+            }
+            _ => panic!("expected SkipUnchanged for Unknown+running+unchanged, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_window_cache_changed_hash_proceeds() {
+        let store = IntelligenceStore::default();
+        let old_hash = "hash1";
+        let new_hash = "hash2";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("waiting"),
+            old_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            new_hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        match decision {
+            WindowCacheDecision::Proceed => {}
+            _ => panic!("expected Proceed for changed hash, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_skip_unchanged_nonai_means_no_provider_call() {
+        // Proves that a NonAi window with unchanged content maps to
+        // SkipUnchanged, and the sessions.rs pattern for provider_called
+        // evaluates to false (no AI provider is invoked).
+        let store = IntelligenceStore::default();
+        let hash = "nonai-hash";
+        let sig = "pane0:0:zsh";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::NonAi,
+            "zsh",
+            sig,
+            min_interval,
+            5,
+        );
+
+        assert!(matches!(decision, WindowCacheDecision::SkipUnchanged(_)));
+
+        let provider_called = matches!(decision, WindowCacheDecision::Proceed);
+        assert!(!provider_called, "SkipUnchanged must set provider_called to false");
+    }
+
+    #[test]
+    fn test_skip_blocked_aicli_running_means_no_provider_call() {
+        // Proves that an AiCli window with unchanged content and running status
+        // maps to SkipBlocked, the sessions.rs pattern for provider_called
+        // evaluates to false, and the cached intelligence status is "blocked".
+        let store = IntelligenceStore::default();
+        let hash = "running-aicli-hash";
+        let sig = "pane0:0:claude";
+        let min_interval = Duration::from_secs(0);
+
+        store.set_window(
+            "conn", "dev", "0",
+            sample_window_intelligence("running"),
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+        );
+
+        let decision = store.begin_analyze_window(
+            "conn", "dev", "0",
+            hash,
+            CommandClass::AiCli,
+            "claude",
+            sig,
+            min_interval,
+            5,
+        );
+
+        let provider_called = matches!(decision, WindowCacheDecision::Proceed);
+        assert!(!provider_called, "SkipBlocked must set provider_called to false");
+
+        match decision {
+            WindowCacheDecision::SkipBlocked(cached_intel) => {
+                assert_eq!(cached_intel.status, "blocked");
+                assert!(!cached_intel.stale);
+            }
+            _ => panic!("expected SkipBlocked, got {:?}", decision),
+        }
     }
 }

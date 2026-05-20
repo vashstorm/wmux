@@ -4,7 +4,10 @@ use axum::http::request::Parts;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use wmux_core::intelligence::{self, ActiveProvider, SessionIntelligence};
+use wmux_core::intelligence::{
+    self, ActiveProvider, CommandClass, IntelligenceStore, SessionIntelligence,
+    WindowCacheDecision,
+};
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
@@ -286,34 +289,49 @@ pub async fn analyze_session(
         ));
     };
 
-    let result = analyze_session_text(
-        &target.adapter,
-        &provider,
-        &session,
-        config.intelligence.max_bytes,
-        Duration::from_secs(config.intelligence.timeout_sec as u64),
-        state.storage.as_ref(),
-        target.name.as_str(),
-        session.as_str(),
-    )
-    .await;
+    let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
+    let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
+    let max_bytes = config.intelligence.max_bytes;
+    let max_concurrency = config.intelligence.max_concurrency as usize;
 
-    let (intelligence, errors) = match result {
-        Ok(intelligence) => (intelligence, 0),
-        Err(message) => (intelligence::error_result(Some(&provider), message), 1),
-    };
+    let windows = target.adapter.list_windows(&session).await.map_err(session_error)?;
+
+    let mut window_results: Vec<WindowAnalysisResult> = Vec::new();
+    for window in &windows {
+        let result = analyze_single_window(
+            &target.adapter,
+            &provider,
+            &session,
+            window,
+            max_bytes,
+            timeout,
+            state.storage.as_ref(),
+            &target.name,
+            &state.intelligence,
+            min_interval,
+            max_concurrency,
+        )
+        .await;
+        window_results.push(result);
+    }
+
+    let aggregated = aggregate_window_results(&window_results, &provider);
     state
         .intelligence
-        .set(target.name.as_str(), session.as_str(), intelligence.clone());
+        .set(&target.name, &session, aggregated.clone());
+
+    let updated = window_results.iter().filter(|r| r.provider_called).count();
+    let skipped = window_results.iter().filter(|r| !r.provider_called && !r.is_error).count();
+    let errors = window_results.iter().filter(|r| r.is_error).count();
 
     Ok(Json(AnalyzeSessionResponse {
         target_name: target.name,
         session,
         status: if errors == 0 { "ok" } else { "error" },
-        updated: 1,
-        skipped: 0,
+        updated,
+        skipped,
         errors,
-        intelligence: Some(intelligence),
+        intelligence: Some(aggregated),
     }))
 }
 
@@ -623,25 +641,46 @@ fn spawn_session_intelligence_refreshes(
         let adapter = adapter.clone();
         let provider = provider.clone();
         let target_name = target_name.clone();
-        let cache_session_name = session_name.clone();
+        let session_name_clone = session_name.clone();
 
         tokio::spawn(async move {
-            let result = analyze_session_text(
-                &adapter,
-                &provider,
-                session_name.as_str(),
-                max_bytes,
-                timeout,
-                state.storage.as_ref(),
-                target_name.as_str(),
-                cache_session_name.as_str(),
-            )
-            .await
-            .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
+            let windows = adapter.list_windows(&session_name_clone).await;
 
+            let window_results: Vec<WindowAnalysisResult> = match windows {
+                Ok(windows) => {
+                    let mut results = Vec::new();
+                    for window in windows {
+                        let result = analyze_single_window(
+                            &adapter,
+                            &provider,
+                            &session_name_clone,
+                            &window,
+                            max_bytes,
+                            timeout,
+                            state.storage.as_ref(),
+                            &target_name,
+                            &state.intelligence,
+                            min_interval,
+                            max_concurrency,
+                        )
+                        .await;
+                        results.push(result);
+                    }
+                    results
+                }
+                Err(err) => {
+                    vec![WindowAnalysisResult {
+                        intelligence: intelligence::error_result(Some(&provider), err.to_string()),
+                        provider_called: false,
+                        is_error: true,
+                    }]
+                }
+            };
+
+            let aggregated = aggregate_window_results(&window_results, &provider);
             state
                 .intelligence
-                .set(target_name.as_str(), cache_session_name.as_str(), result);
+                .set(&target_name, &session_name_clone, aggregated);
         });
     }
 }
@@ -761,4 +800,387 @@ fn apply_session_intelligence(session: &mut Session, intelligence: &SessionIntel
     session.intelligence_updated_at = Some(intelligence.updated_at.clone());
     session.intelligence_error = intelligence.error.clone();
     session.intelligence_app_counts = intelligence.app_counts.clone();
+}
+
+/// Result of analyzing a single window, including whether the provider was actually called.
+#[derive(Debug)]
+struct WindowAnalysisResult {
+    intelligence: SessionIntelligence,
+    provider_called: bool,
+    is_error: bool,
+}
+
+/// Analyzes a single window and returns intelligence with cache decision info.
+async fn analyze_single_window(
+    adapter: &Adapter,
+    provider: &ActiveProvider,
+    session_name: &str,
+    window: &Window,
+    max_bytes: u32,
+    timeout: Duration,
+    pool: Option<&sqlx::SqlitePool>,
+    target_name: &str,
+    intelligence_store: &IntelligenceStore,
+    min_interval: Duration,
+    max_concurrency: usize,
+) -> WindowAnalysisResult {
+    let panes = match adapter.list_panes(session_name, window.id.as_str()).await {
+        Ok(panes) => panes,
+        Err(err) => {
+            return WindowAnalysisResult {
+                intelligence: intelligence::error_result(Some(provider), err.to_string()),
+                provider_called: false,
+                is_error: true,
+            };
+        }
+    };
+
+    if panes.is_empty() {
+        return WindowAnalysisResult {
+            intelligence: intelligence::error_result(Some(provider), "no panes in window"),
+            provider_called: false,
+            is_error: true,
+        };
+    }
+
+    let pane_signature_data: Vec<(String, usize, String)> = panes
+        .iter()
+        .map(|pane| {
+            let basename = classify_command_basename(&pane.current_command);
+            (pane.id.clone(), pane.index, basename)
+        })
+        .collect();
+    let pane_signature = intelligence::compute_pane_signature(&pane_signature_data);
+
+    let active_pane = panes.iter().find(|p| p.active).or_else(|| panes.first());
+    let command_class = active_pane
+        .map(|p| intelligence::classify_command(&p.current_command))
+        .unwrap_or(CommandClass::Unknown);
+    let command_basename = active_pane
+        .map(|p| classify_command_basename(&p.current_command))
+        .unwrap_or_default();
+
+    let mut pane_contents: Vec<(usize, String)> = Vec::new();
+    for pane in &panes {
+        let remaining = max_bytes as usize;
+        if let Ok(content) = adapter
+            .capture_pane(pane.id.as_str(), remaining.min(max_bytes as usize) as u32)
+            .await
+        {
+            pane_contents.push((pane.index, content));
+        }
+    }
+
+    let content_hash_data: Vec<(usize, &str)> = pane_contents
+        .iter()
+        .map(|(idx, content)| (*idx, content.as_str()))
+        .collect();
+    let content_hash = intelligence::hash_window_panes(&content_hash_data);
+
+    let decision = intelligence_store.begin_analyze_window(
+        target_name,
+        session_name,
+        window.id.as_str(),
+        &content_hash,
+        command_class,
+        &command_basename,
+        &pane_signature,
+        min_interval,
+        max_concurrency,
+    );
+
+    match decision {
+        WindowCacheDecision::Proceed => {
+            let transcript = build_window_transcript(session_name, window, &panes, &pane_contents);
+
+            let start = std::time::Instant::now();
+            let result = intelligence::analyze_text(provider, transcript.as_str(), timeout).await;
+            let elapsed_ms = start.elapsed().as_millis() as i64;
+
+            let (intelligence, is_error) = match &result {
+                Ok(analysis) => (analysis.intelligence.clone(), false),
+                Err(err) => (intelligence::error_result(Some(provider), err.message.clone()), true),
+            };
+
+            if let Some(pool) = pool {
+                record_ai_usage_event(
+                    pool,
+                    provider,
+                    target_name,
+                    session_name,
+                    window.index as i64,
+                    elapsed_ms,
+                    &result,
+                );
+            }
+
+            intelligence_store.set_window(
+                target_name,
+                session_name,
+                window.id.as_str(),
+                intelligence.clone(),
+                &content_hash,
+                command_class,
+                &command_basename,
+                &pane_signature,
+            );
+
+            WindowAnalysisResult {
+                intelligence,
+                provider_called: true,
+                is_error,
+            }
+        }
+        WindowCacheDecision::SkipUnchanged(cached) | WindowCacheDecision::SkipBlocked(cached) => {
+            WindowAnalysisResult {
+                intelligence: cached,
+                provider_called: false,
+                is_error: false,
+            }
+        }
+        WindowCacheDecision::InFlight => {
+            WindowAnalysisResult {
+                intelligence: SessionIntelligence {
+                    app: "unknown".to_string(),
+                    status: "none".to_string(),
+                    summary: "Analysis in progress".to_string(),
+                    source: provider.source(),
+                    confidence: 0.0,
+                    stale: true,
+                    updated_at: intelligence::now_rfc3339(),
+                    error: None,
+                    app_counts: None,
+                },
+                provider_called: false,
+                is_error: false,
+            }
+        }
+    }
+}
+
+/// Extracts the basename from a command string (last '/' segment, lowercased).
+fn classify_command_basename(command: &str) -> String {
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let basename = trimmed.rfind('/').map_or(trimmed, |pos| &trimmed[pos + 1..]);
+    basename.to_ascii_lowercase()
+}
+
+/// Builds a transcript string for a single window.
+fn build_window_transcript(
+    session_name: &str,
+    window: &Window,
+    panes: &[Pane],
+    pane_contents: &[(usize, String)],
+) -> String {
+    let mut transcript = String::new();
+    transcript.push_str(&format!("session: {session_name}\n"));
+    transcript.push_str(&format!(
+        "\nwindow {} {} active={}\n",
+        window.index, window.name, window.active
+    ));
+
+    for pane in panes {
+        transcript.push_str(&format!(
+            "\npane {} title={} command={} active={}\n",
+            pane.index, pane.title, pane.current_command, pane.active
+        ));
+        if let Some((_, content)) = pane_contents.iter().find(|(idx, _)| *idx == pane.index) {
+            transcript.push_str(content);
+            transcript.push('\n');
+        }
+    }
+
+    transcript
+}
+
+/// Records an AI usage event to the database.
+fn record_ai_usage_event(
+    pool: &sqlx::SqlitePool,
+    provider: &ActiveProvider,
+    target_name: &str,
+    session_name: &str,
+    window_number: i64,
+    elapsed_ms: i64,
+    result: &Result<intelligence::AnalysisResult, intelligence::AiProviderError>,
+) {
+    let pool = pool.clone();
+    let provider_name = provider.provider.clone();
+    let model_name = provider.model.clone();
+    let target = target_name.to_string();
+    let sess = session_name.to_string();
+    let is_error = result.is_err();
+    let error_msg = result.as_ref().err().map(|e| e.message.clone());
+    let response_json = result
+        .as_ref()
+        .ok()
+        .and_then(|r| r.raw_response.clone())
+        .or_else(|| result.as_ref().err().and_then(|e| e.raw_response.clone()));
+    let prompt_tokens = result.as_ref().ok().and_then(|r| r.prompt_tokens);
+    let completion_tokens = result.as_ref().ok().and_then(|r| r.completion_tokens);
+    let total_tokens = result.as_ref().ok().and_then(|r| r.total_tokens);
+
+    tokio::spawn(async move {
+        let repo = wmux_core::storage::AiUsageRepository::new(pool);
+        let event = wmux_core::storage::models::NewAiUsageEvent {
+            project_id: None,
+            provider: provider_name,
+            model: model_name,
+            target_name: target,
+            session_name: sess,
+            status: if is_error { "error".to_string() } else { "success".to_string() },
+            duration_ms: elapsed_ms,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+            estimated_cost: None,
+            error_message: error_msg,
+            window_number: Some(window_number),
+            response_json,
+        };
+        if let Err(err) = repo.insert(&event).await {
+            tracing::error!(raw_error = %err, "failed to record AI usage event");
+        }
+    });
+}
+
+/// Aggregates window-level intelligence results into a session-level result.
+fn aggregate_window_results(
+    results: &[WindowAnalysisResult],
+    provider: &ActiveProvider,
+) -> SessionIntelligence {
+    if results.is_empty() {
+        return intelligence::error_result(Some(provider), "no windows analyzed");
+    }
+
+    fn status_priority(status: &str) -> u8 {
+        match status {
+            "blocked" => 7,
+            "dead_loop" => 6,
+            "waiting_confirm" => 5,
+            "waiting" => 4,
+            "running" => 3,
+            "waiting_idle" => 2,
+            "none" => 1,
+            _ => 0,
+        }
+    }
+
+    let highest = results
+        .iter()
+        .max_by_key(|r| status_priority(&r.intelligence.status))
+        .expect("results is non-empty");
+
+    let mut app_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for result in results {
+        if let Some(counts) = &result.intelligence.app_counts {
+            for (app, count) in counts {
+                *app_counts.entry(app.clone()).or_insert(0) += *count;
+            }
+        }
+    }
+
+    let max_confidence = results
+        .iter()
+        .fold(0.0_f32, |acc, r| acc.max(r.intelligence.confidence));
+
+    let any_stale = results.iter().any(|r| r.intelligence.stale);
+
+    let error = results
+        .iter()
+        .find_map(|r| r.intelligence.error.clone());
+
+    SessionIntelligence {
+        app: highest.intelligence.app.clone(),
+        status: highest.intelligence.status.clone(),
+        summary: highest.intelligence.summary.clone(),
+        source: provider.source(),
+        confidence: max_confidence,
+        stale: any_stale,
+        updated_at: intelligence::now_rfc3339(),
+        error,
+        app_counts: if app_counts.is_empty() {
+            None
+        } else {
+            Some(app_counts)
+        },
+    }
+}
+
+#[cfg(test)]
+mod aggregate_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn make_provider() -> ActiveProvider {
+        ActiveProvider {
+            name: "test".to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            api_key: "key".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+        }
+    }
+
+    fn make_result(
+        status: &str,
+        app_counts: Option<HashMap<String, usize>>,
+    ) -> WindowAnalysisResult {
+        WindowAnalysisResult {
+            intelligence: SessionIntelligence {
+                app: "test".to_string(),
+                status: status.to_string(),
+                summary: "test".to_string(),
+                source: "test".to_string(),
+                confidence: 0.5,
+                stale: false,
+                updated_at: intelligence::now_rfc3339(),
+                error: None,
+                app_counts,
+            },
+            provider_called: false,
+            is_error: false,
+        }
+    }
+
+    #[test]
+    fn test_aggregate_status_priority() {
+        let provider = make_provider();
+
+        let results = vec![
+            make_result("none", None),
+            make_result("running", None),
+            make_result("blocked", None),
+            make_result("waiting", None),
+        ];
+
+        let aggregated = aggregate_window_results(&results, &provider);
+        assert_eq!(aggregated.status, "blocked");
+    }
+
+    #[test]
+    fn test_aggregate_app_counts_sum() {
+        let provider = make_provider();
+
+        let mut counts1 = HashMap::new();
+        counts1.insert("vim".to_string(), 2);
+        counts1.insert("git".to_string(), 1);
+
+        let mut counts2 = HashMap::new();
+        counts2.insert("vim".to_string(), 3);
+        counts2.insert("cargo".to_string(), 1);
+
+        let results = vec![
+            make_result("running", Some(counts1)),
+            make_result("waiting", Some(counts2)),
+        ];
+
+        let aggregated = aggregate_window_results(&results, &provider);
+        let app_counts = aggregated.app_counts.expect("app_counts should be present");
+        assert_eq!(app_counts.get("vim"), Some(&5));
+        assert_eq!(app_counts.get("git"), Some(&1));
+        assert_eq!(app_counts.get("cargo"), Some(&1));
+    }
 }
