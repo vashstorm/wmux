@@ -43,7 +43,8 @@
     "path": "",
     "errorPath": ""
   },
-  "storage": {
-    "path": "data/wmux.db"
+"storage": {
+    // Directory path for the SQLite database. Relative paths resolve against the project directory.
+    "path": "data"
   }
 }

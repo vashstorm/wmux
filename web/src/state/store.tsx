@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
 
 export interface WindowSummary {
@@ -204,6 +204,7 @@ export interface AppState {
 	configConflict: ConfigConflictState | null;
 	confirmDialog: ConfirmDialogState | null;
 	selectedPane: SelectedPane | null;
+	selectedAiEvent: AiUsageEvent | null;
 	connectionHealth: Record<string, ConnectionHealth>;
 	editingConnection: ConnectionConfig | null;
 	uiSettings: UISettings;
@@ -240,6 +241,7 @@ interface AppContextValue extends AppState {
 	setConfirmDialog: (dialog: ConfirmDialogState | null) => void;
 	showConfirm: (options: Omit<ConfirmDialogState, "onConfirm"> & { onConfirm: () => void }) => void;
 	setSelectedPane: (pane: SelectedPane | null) => void;
+	setSelectedAiEvent: (event: AiUsageEvent | null) => void;
 	setConnectionHealth: (health: Record<string, ConnectionHealth>) => void;
 	setEditingConnection: (connection: ConnectionConfig | null) => void;
 	setUISettings: (settings: UISettings) => void;
@@ -266,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [configConflict, setConfigConflict] = useState<ConfigConflictState | null>(null);
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 	const [selectedPane, setSelectedPane] = useState<SelectedPane | null>(null);
+	const [selectedAiEvent, setSelectedAiEvent] = useState<AiUsageEvent | null>(null);
 	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 	const [uiSettings, setUISettingsState] = useState<UISettings>(readInitialUISettings);
@@ -358,6 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		configConflict,
 		confirmDialog,
 		selectedPane,
+		selectedAiEvent,
 		connectionHealth,
 		editingConnection,
 		setConnections,
@@ -376,6 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setConfirmDialog,
 		showConfirm,
 		setSelectedPane,
+		setSelectedAiEvent,
 		setConnectionHealth,
 		setEditingConnection,
 		uiSettings,

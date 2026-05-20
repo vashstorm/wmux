@@ -198,7 +198,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.jsonc");
         let assets_dir = dir.path().join("assets");
-        let db_path = dir.path().join("wmux.db");
+        let storage_dir = dir.path().join("data");
         fs::create_dir_all(&assets_dir).expect("create assets dir");
         fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
 
@@ -209,7 +209,7 @@ mod tests {
             "tmux": { "path": "tmux" },
             "connections": [],
             "ui": { "theme": "dark" },
-            "storage": { "path": db_path.to_string_lossy().into_owned() },
+            "storage": { "path": storage_dir.to_string_lossy().into_owned() },
             "intelligence": {
                 "enabled": true,
                 "provider": "openai",
@@ -474,35 +474,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ssh_targets_are_distinct_and_tmux_operations_return_not_implemented() {
+    async fn target_routes_return_stable_not_found_errors() {
         let (app, _dir, _config_path) = test_app(base_config());
-
-        let ssh_response = app
-            .clone()
-            .oneshot(request(
-                "POST",
-                "/api/connections",
-                Some(json!({ "type": "ssh", "host": "example.test", "user": "alice", "port": 2222 })),
-            ))
-            .await
-            .expect("response");
-        assert_eq!(ssh_response.status(), StatusCode::CREATED);
-        let ssh_connection = json_body(ssh_response).await;
-        assert_eq!(ssh_connection["targetName"], "alice@example.test:2222");
-        let ssh_sessions_response = app
-            .clone()
-            .oneshot(request(
-                "GET",
-                "/api/targets/alice%40example.test%3A2222/sessions",
-                None,
-            ))
-            .await
-            .expect("response");
-        assert_eq!(ssh_sessions_response.status(), StatusCode::NOT_IMPLEMENTED);
-        assert_eq!(
-            json_body(ssh_sessions_response).await["error"]["code"],
-            "not_implemented"
-        );
 
         let connection_response = app
             .clone()

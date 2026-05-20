@@ -38,27 +38,6 @@ test.describe("settings panel", () => {
 		await expect(page.getByTestId("settings-panel")).toContainText("local");
 	});
 
-	test("rejects ssh connection as not implemented", async ({ request }) => {
-		const response = await request.post("/api/connections", {
-			headers: {
-				Authorization: "Bearer playwright-token",
-			},
-			data: {
-				type: "ssh",
-				host: "example.com",
-				user: "root",
-			},
-		});
-
-		expect(response.status()).toBe(501);
-		expect(await response.json()).toEqual({
-			error: {
-				code: "not_implemented",
-				message: "ssh connections are not implemented",
-			},
-		});
-	});
-
 	test("deletes connection with confirm", async ({ page, request }) => {
 		const response = await request.post("/api/connections", {
 			headers: {

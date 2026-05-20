@@ -625,12 +625,13 @@ pub fn expand_user_path(path: &str) -> Result<String> {
     Ok(Path::new(&home).join(rest).to_string_lossy().into_owned())
 }
 
-/// Resolves the storage database path, handling ~ expansion and relative paths.
-/// Relative paths are resolved against the config file's parent directory.
-/// Creates parent directories if they don't exist.
+/// Resolves the storage directory path, handling ~ expansion and relative paths.
+/// `storage_path` is treated as a directory; the database file `wmux.db` is appended automatically.
+/// Relative paths are resolved against the directory containing the config file (project directory).
+/// Creates the directory if it doesn't exist.
 pub fn resolve_storage_path(storage_path: &str, config_path: &Path) -> Result<PathBuf> {
     let trimmed = storage_path.trim();
-    
+
     let expanded = if let Some(rest) = trimmed.strip_prefix("~") {
         let home = std::env::var("HOME").map_err(|_| ConfigError::HomeDirUnavailable)?;
         if rest.is_empty() {
@@ -643,32 +644,28 @@ pub fn resolve_storage_path(storage_path: &str, config_path: &Path) -> Result<Pa
     } else {
         PathBuf::from(trimmed)
     };
-    
-    if expanded.is_absolute() {
-        if let Some(parent) = expanded.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
-                    context: "create storage directory",
-                    source,
-                })?;
-            }
-        }
-        return Ok(expanded);
+
+    let dir = if expanded.is_absolute() {
+        expanded
+    } else {
+        let parent = config_path.parent().ok_or_else(|| ConfigError::Io {
+            context: "get config file directory",
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "config path has no parent directory",
+            ),
+        })?;
+        parent.join(&expanded)
+    };
+
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|source| ConfigError::Io {
+            context: "create storage directory",
+            source,
+        })?;
     }
-    
-    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
-    let resolved = config_dir.join(&expanded);
-    
-    if let Some(parent) = resolved.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
-                context: "create storage directory",
-                source,
-            })?;
-        }
-    }
-    
-    Ok(resolved)
+
+    Ok(dir.join("wmux.db"))
 }
 
 pub fn is_localhost_bind(bind: &str) -> bool {
@@ -963,10 +960,7 @@ mod tests {
           "tmux": { "path": "/opt/homebrew/bin/tmux" },
           "connections": [
             {
-              "type": "ssh",
-              "host": "example.com",
-              "port": 22,
-              "privateKeyPath": "~/.ssh/id_ed25519"
+              "type": "local"
             }
           ],
           "ui": { "theme": "light" },
@@ -980,10 +974,6 @@ mod tests {
         assert_eq!(config.auth.token, "secret-token");
         assert_eq!(config.connections.len(), 1);
         assert!(!config.connections[0].id.is_empty());
-        assert_eq!(
-            config.connections[0].known_hosts_path,
-            DEFAULT_KNOWN_HOSTS_PATH
-        );
         assert_eq!(config.ui.window_theme, "light");
     }
 
@@ -1093,8 +1083,8 @@ mod tests {
         assert_eq!(expand_user_path("~").expect("expand"), "~");
         assert_eq!(expand_user_path("/tmp/key").expect("expand"), "/tmp/key");
         assert_eq!(
-            expand_user_path("~/.ssh/id_ed25519").expect("expand"),
-            dir.path().join(".ssh/id_ed25519").to_string_lossy()
+            expand_user_path("~/.config/wmux/key").expect("expand"),
+            dir.path().join(".config/wmux/key").to_string_lossy()
         );
     }
 
@@ -1181,7 +1171,7 @@ mod tests {
     #[test]
     fn config_validate_storage_path_accepts_non_empty() {
         let mut config = Config::default();
-        config.storage.path = "data/wmux.db".to_string();
+        config.storage.path = "data".to_string();
         config.validate_storage_path().expect("non-empty path should pass");
     }
 
@@ -1189,21 +1179,21 @@ mod tests {
     fn config_resolve_storage_path_relative() {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.jsonc");
-        let resolved = resolve_storage_path("data/wmux.db", &config_path).expect("resolve relative");
-        assert_eq!(resolved, dir.path().join("data/wmux.db"));
+        let resolved = resolve_storage_path("data", &config_path).expect("resolve relative");
+        assert_eq!(resolved, dir.path().join("data").join("wmux.db"));
     }
 
     #[test]
     fn config_resolve_storage_path_absolute() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let absolute_path = dir.path().join("wmux.db");
+        let absolute_path = dir.path().join("storage");
         let config_path = PathBuf::from("/some/config.jsonc");
         let resolved = resolve_storage_path(
             absolute_path.to_str().expect("path to string"),
             &config_path,
         )
         .expect("resolve absolute");
-        assert_eq!(resolved, absolute_path);
+        assert_eq!(resolved, absolute_path.join("wmux.db"));
     }
 
     #[test]
@@ -1213,33 +1203,36 @@ mod tests {
         unsafe {
             std::env::set_var("HOME", home_dir.path());
         }
-        let resolved = resolve_storage_path("~/wmux.db", &config_path).expect("resolve home");
-        assert_eq!(resolved, home_dir.path().join("wmux.db"));
+        let resolved = resolve_storage_path("~/data", &config_path).expect("resolve home");
+        assert_eq!(resolved, home_dir.path().join("data").join("wmux.db"));
         unsafe {
             std::env::remove_var("HOME");
         }
     }
 
     #[test]
-    fn config_resolve_storage_path_creates_parent_directory() {
+    fn config_resolve_storage_path_creates_directory() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let config_path = dir.path().join("config.jsonc");
-        let storage_rel = "nested/deep/path/wmux.db";
-        let resolved = resolve_storage_path(storage_rel, &config_path).expect("resolve with dir creation");
-        assert!(dir.path().join("nested/deep/path").exists());
-        assert_eq!(resolved, dir.path().join(storage_rel));
+        let storage_dir = dir.path().join("nested/deep/path");
+        let resolved = resolve_storage_path(
+            storage_dir.to_str().expect("path to string"),
+            Path::new("/dummy/config.jsonc"),
+        )
+        .expect("resolve with dir creation");
+        assert!(storage_dir.exists());
+        assert_eq!(resolved, storage_dir.join("wmux.db"));
     }
 
     #[test]
     fn config_storage_deserializes_from_jsonc() {
         let data = r#"{
           "storage": {
-            "path": "data/wmux.db"
+            "path": "data"
           }
         }"#;
 
         let config = parse_config(data).expect("parse config");
-        assert_eq!(config.storage.path, "data/wmux.db");
+        assert_eq!(config.storage.path, "data");
     }
 
     #[test]

@@ -55,6 +55,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 		setSessions,
 		setSelectedPane,
 		selectedPane,
+		setSelectedAiEvent,
 		setWindows,
 		setPanes,
 	} = useAppState();
@@ -204,6 +205,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 	const handleOpenSession = async (sessionName: string) => {
 		if (!selectedTargetName) return;
 		const targetName = selectedTargetName;
+		setSelectedAiEvent(null);
 
 		try {
 			const windowsResponse = await listWindows(targetName, sessionName);

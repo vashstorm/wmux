@@ -3,6 +3,7 @@ import { Box, Typography } from "@mui/material";
 import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
+import { AiEventDetail } from "./AiEventDetail.js";
 import { listPanes, listWindows } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 
@@ -20,6 +21,8 @@ interface TitleSegment {
 export function MainPanel() {
 	const {
 		selectedPane,
+		selectedAiEvent,
+		setSelectedAiEvent,
 		sessions,
 		windows,
 		setSelectedPane,
@@ -264,7 +267,9 @@ export function MainPanel() {
 			</header>
 
 			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
-				{hasSelectedPane ? (
+				{selectedAiEvent ? (
+					<AiEventDetail event={selectedAiEvent} onClose={() => setSelectedAiEvent(null)} />
+				) : hasSelectedPane ? (
 					<div className="main-workspace">
 						<WindowTabs
 							windows={windowSummaries}

@@ -64,13 +64,13 @@ describe("api client", () => {
 	});
 
 	test("createConnection POSTs payload", async () => {
-		mockJsonResponse(201, { targetName: "2", type: "ssh" });
-		const result = await createConnection({ type: "ssh" });
-		expect(result.type).toBe("ssh");
+		mockJsonResponse(201, { targetName: "2", type: "local" });
+		const result = await createConnection({ type: "local" });
+		expect(result.type).toBe("local");
 
 		const call = vi.mocked(fetch).mock.calls[0]!;
 		expect(call[1]?.method).toBe("POST");
-		expect(JSON.parse(call[1]?.body as string)).toEqual({ type: "ssh" });
+		expect(JSON.parse(call[1]?.body as string)).toEqual({ type: "local" });
 	});
 
 	test("getConnection fetches by id", async () => {
