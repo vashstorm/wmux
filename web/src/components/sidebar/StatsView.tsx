@@ -6,6 +6,16 @@ import type { AiUsageEvent, AiUsageSummary } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 import { useAppState } from "../../state/store.js";
 
+function getAiSummary(responseJson: string | null | undefined): string | undefined {
+	if (!responseJson) return undefined;
+	try {
+		const parsed = JSON.parse(responseJson);
+		return parsed.summary;
+	} catch {
+		return undefined;
+	}
+}
+
 export function StatsView() {
 	const { selectedAiEvent, setSelectedAiEvent } = useAppState();
 	const [events, setEvents] = useState<AiUsageEvent[]>([]);
@@ -91,24 +101,45 @@ export function StatsView() {
 										flexShrink: 0,
 									}}
 								/>
+							<Typography
+								variant="body2"
+								sx={{
+									fontSize: "var(--font-size-xs)",
+									fontWeight: "var(--font-weight-medium)",
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									minWidth: 0,
+									flex: 1,
+								}}
+								title={`${event.provider}/${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
+							>
+								{event.provider}/{event.model}
+							</Typography>
+							{event.windowNumber != null && (
+								<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", flexShrink: 0 }}>
+									W{event.windowNumber}
+								</Typography>
+							)}
+							{getAiSummary(event.responseJson) && (
 								<Typography
-									variant="body2"
+									variant="caption"
 									sx={{
-										fontSize: "var(--font-size-xs)",
-										fontWeight: "var(--font-weight-medium)",
-										whiteSpace: "nowrap",
+										fontSize: "10px",
+										flexShrink: 1,
+										minWidth: 0,
 										overflow: "hidden",
 										textOverflow: "ellipsis",
-										minWidth: 0,
-										flex: 1,
+										color: "text.secondary",
+										ml: 0.5,
 									}}
-									title={`${event.provider}/${event.model}`}
 								>
-									{event.provider}/{event.model}
+									{getAiSummary(event.responseJson)}
 								</Typography>
-								<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", flexShrink: 0 }}>
-									{event.durationMs}ms
-								</Typography>
+							)}
+							<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", flexShrink: 0 }}>
+								{event.durationMs}ms
+							</Typography>
 								{event.totalTokens != null && (
 									<Typography variant="caption" color="text.disabled" sx={{ fontSize: "10px", flexShrink: 0 }}>
 										{event.totalTokens}t

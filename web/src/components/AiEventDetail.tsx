@@ -114,6 +114,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					<DetailRow label="Target" value={event.targetName || "—"} />
 					<DetailRow label="Session" value={event.sessionName || "—"} />
 					{event.projectId && <DetailRow label="Project" value={event.projectId} mono />}
+					<DetailRow label="Window" value={event.windowNumber != null ? event.windowNumber.toString() : "—"} />
 				</Box>
 
 				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
@@ -133,6 +134,19 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 						</Typography>
 						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 							<DetailRow label="Estimated" value={`$${event.estimatedCost.toFixed(4)}`} />
+						</Box>
+					</>
+				)}
+
+				{event.responseJson && (
+					<>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+							AI Response
+						</Typography>
+						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
+							<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+								{event.responseJson}
+							</Typography>
 						</Box>
 					</>
 				)}

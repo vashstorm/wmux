@@ -24,7 +24,7 @@ impl AiUsageRepository {
         let now = now_utc();
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&id)
         .bind(&event.project_id)
@@ -39,6 +39,8 @@ impl AiUsageRepository {
         .bind(event.total_tokens)
         .bind(event.estimated_cost)
         .bind(&event.error_message)
+        .bind(event.window_number)
+        .bind(&event.response_json)
         .bind(&now)
         .execute(&self.pool)
         .await?;
@@ -48,7 +50,7 @@ impl AiUsageRepository {
 
     async fn get_by_id(&self, id: &str) -> Result<AiUsageEvent, sqlx::Error> {
         sqlx::query_as::<_, AiUsageEvent>(
-            "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at FROM ai_usage_events WHERE id = ?"
+            "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE id = ?"
         )
         .bind(id)
         .fetch_one(&self.pool)
@@ -64,7 +66,7 @@ impl AiUsageRepository {
 
         if let Some(pid) = project_id {
             sqlx::query_as::<_, AiUsageEvent>(
-                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at FROM ai_usage_events WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
+                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
             )
             .bind(pid)
             .bind(clamped_limit)
@@ -72,7 +74,7 @@ impl AiUsageRepository {
             .await
         } else {
             sqlx::query_as::<_, AiUsageEvent>(
-                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at FROM ai_usage_events ORDER BY created_at DESC LIMIT ?"
+                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events ORDER BY created_at DESC LIMIT ?"
             )
             .bind(clamped_limit)
             .fetch_all(&self.pool)
@@ -161,6 +163,8 @@ mod tests {
             total_tokens: Some(80),
             estimated_cost: Some(0.01),
             error_message: None,
+            window_number: Some(1),
+            response_json: Some("{\"app\":\"codex\",\"status\":\"running\"}".to_string()),
         };
 
         let event2 = NewAiUsageEvent {
@@ -176,6 +180,8 @@ mod tests {
             total_tokens: Some(40),
             estimated_cost: Some(0.005),
             error_message: Some("rate limit".to_string()),
+            window_number: None,
+            response_json: None,
         };
 
         let inserted1 = repo.insert(&event1).await.expect("insert event1");
@@ -199,7 +205,7 @@ mod tests {
         let cutoff = "2024-01-15T00:00:00Z";
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("old-id")
         .bind(None::<String>)
@@ -214,13 +220,15 @@ mod tests {
         .bind(None::<i64>)
         .bind(None::<f64>)
         .bind(None::<String>)
+        .bind(None::<i64>)
+        .bind(None::<String>)
         .bind("2024-01-01T00:00:00Z")
         .execute(&repo.pool)
         .await
         .expect("insert old event");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("boundary-id")
         .bind(None::<String>)
@@ -235,13 +243,15 @@ mod tests {
         .bind(None::<i64>)
         .bind(None::<f64>)
         .bind(None::<String>)
+        .bind(None::<i64>)
+        .bind(None::<String>)
         .bind("2024-01-15T00:00:00Z")
         .execute(&repo.pool)
         .await
         .expect("insert boundary event");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("new-id")
         .bind(None::<String>)
@@ -255,6 +265,8 @@ mod tests {
         .bind(None::<i64>)
         .bind(None::<i64>)
         .bind(None::<f64>)
+        .bind(None::<String>)
+        .bind(None::<i64>)
         .bind(None::<String>)
         .bind("2024-01-20T00:00:00Z")
         .execute(&repo.pool)
@@ -291,6 +303,8 @@ mod tests {
             total_tokens: Some(80),
             estimated_cost: Some(0.01),
             error_message: None,
+            window_number: None,
+            response_json: None,
         };
 
         let error_event = NewAiUsageEvent {
@@ -306,6 +320,8 @@ mod tests {
             total_tokens: Some(20),
             estimated_cost: Some(0.002),
             error_message: Some("timeout".to_string()),
+            window_number: None,
+            response_json: None,
         };
 
         repo.insert(&success_event).await.expect("insert success");
@@ -354,7 +370,7 @@ mod tests {
         .expect("insert project B");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("event-1")
         .bind("project-A")
@@ -369,13 +385,15 @@ mod tests {
         .bind(None::<i64>)
         .bind(None::<f64>)
         .bind(None::<String>)
+        .bind(None::<i64>)
+        .bind(None::<String>)
         .bind("2024-01-01T00:00:00Z")
         .execute(&repo.pool)
         .await
         .expect("insert event 1");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("event-2")
         .bind("project-B")
@@ -389,6 +407,8 @@ mod tests {
         .bind(None::<i64>)
         .bind(None::<i64>)
         .bind(None::<f64>)
+        .bind(None::<String>)
+        .bind(None::<i64>)
         .bind(None::<String>)
         .bind("2024-01-02T00:00:00Z")
         .execute(&repo.pool)
@@ -414,7 +434,7 @@ mod tests {
 
         for i in 0..205 {
             sqlx::query(
-                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             )
             .bind(format!("event-{}", i))
             .bind(None::<String>)
@@ -428,6 +448,8 @@ mod tests {
             .bind(None::<i64>)
             .bind(None::<i64>)
             .bind(None::<f64>)
+            .bind(None::<String>)
+            .bind(None::<i64>)
             .bind(None::<String>)
             .bind(format!("2024-01-{:02}T00:00:00Z", i % 28 + 1))
             .execute(&repo.pool)
@@ -474,7 +496,7 @@ mod tests {
         .expect("insert project B");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("event-1")
         .bind("project-A")
@@ -489,13 +511,15 @@ mod tests {
         .bind(80)
         .bind(0.01)
         .bind(None::<String>)
+        .bind(None::<i64>)
+        .bind(None::<String>)
         .bind("2024-01-01T00:00:00Z")
         .execute(&repo.pool)
         .await
         .expect("insert event 1");
 
         sqlx::query(
-            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind("event-2")
         .bind("project-B")
@@ -509,6 +533,8 @@ mod tests {
         .bind(40)
         .bind(100)
         .bind(0.02)
+        .bind(None::<String>)
+        .bind(None::<i64>)
         .bind(None::<String>)
         .bind("2024-01-02T00:00:00Z")
         .execute(&repo.pool)

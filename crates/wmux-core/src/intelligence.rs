@@ -174,11 +174,18 @@ pub fn active_provider(config: &Config) -> Option<ActiveProvider> {
     })
 }
 
+pub struct AnalysisResult {
+    pub intelligence: SessionIntelligence,
+    pub prompt_tokens: Option<i64>,
+    pub completion_tokens: Option<i64>,
+    pub total_tokens: Option<i64>,
+}
+
 pub async fn analyze_text(
     provider: &ActiveProvider,
     text: &str,
     timeout: Duration,
-) -> Result<SessionIntelligence, String> {
+) -> Result<AnalysisResult, String> {
     if provider.model.trim().is_empty() {
         return Err("AI provider model is empty".to_string());
     }
@@ -226,7 +233,15 @@ pub async fn analyze_text(
 
     let parsed: ModelIntelligence = serde_json::from_str(strip_json_fence(content))
         .map_err(|err| format!("decode AI intelligence JSON: {err}"))?;
-    parsed.into_intelligence(provider)
+    let intelligence = parsed.into_intelligence(provider)?;
+
+    let usage = completion.usage.unwrap_or_default();
+    Ok(AnalysisResult {
+        intelligence,
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        total_tokens: usage.total_tokens,
+    })
 }
 
 pub fn error_result(
@@ -305,9 +320,17 @@ impl ActiveProvider {
     }
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct ChatUsage {
+    prompt_tokens: Option<i64>,
+    completion_tokens: Option<i64>,
+    total_tokens: Option<i64>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ChatCompletionResponse {
     choices: Vec<ChatChoice>,
+    usage: Option<ChatUsage>,
 }
 
 #[derive(Debug, Deserialize)]

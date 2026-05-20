@@ -58,6 +58,8 @@ pub struct AiUsageEvent {
     pub total_tokens: Option<i64>,
     pub estimated_cost: Option<f64>,
     pub error_message: Option<String>,
+    pub window_number: Option<i64>,
+    pub response_json: Option<String>,
     pub created_at: String,
 }
 
@@ -96,4 +98,6 @@ pub struct NewAiUsageEvent {
     pub total_tokens: Option<i64>,
     pub estimated_cost: Option<f64>,
     pub error_message: Option<String>,
+    pub window_number: Option<i64>,
+    pub response_json: Option<String>,
 }

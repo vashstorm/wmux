@@ -209,6 +209,8 @@ export interface AiUsageEvent {
 	totalTokens?: number | null;
 	estimatedCost?: number | null;
 	errorMessage?: string | null;
+	windowNumber?: number | null;
+	responseJson?: string | null;
 	createdAt: string;
 }
 

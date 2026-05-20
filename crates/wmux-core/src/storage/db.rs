@@ -48,6 +48,8 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
             total_tokens INTEGER,
             estimated_cost REAL,
             error_message TEXT,
+            window_number INTEGER,
+            response_json TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
         );
@@ -59,6 +61,26 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
     .execute(&mut *tx)
     .await
     .context("failed to execute migration SQL")?;
+
+    let columns: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM pragma_table_info('ai_usage_events')"
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .context("check ai_usage_events columns")?;
+
+    if !columns.contains(&"window_number".to_string()) {
+        sqlx::query("ALTER TABLE ai_usage_events ADD COLUMN window_number INTEGER")
+            .execute(&mut *tx)
+            .await
+            .context("add window_number column")?;
+    }
+    if !columns.contains(&"response_json".to_string()) {
+        sqlx::query("ALTER TABLE ai_usage_events ADD COLUMN response_json TEXT")
+            .execute(&mut *tx)
+            .await
+            .context("add response_json column")?;
+    }
 
     tx.commit().await.context("failed to commit migration")?;
 
@@ -131,7 +153,7 @@ mod tests {
         .await
         .expect("get ai_usage_events columns");
 
-        assert_eq!(events_columns.len(), 14);
+        assert_eq!(events_columns.len(), 16);
         assert_eq!(events_columns[0].0, "id");
         assert_eq!(events_columns[0].1, "TEXT");
         assert_eq!(events_columns[1].0, "project_id");
@@ -158,7 +180,11 @@ mod tests {
         assert_eq!(events_columns[11].1, "REAL");
         assert_eq!(events_columns[12].0, "error_message");
         assert_eq!(events_columns[12].1, "TEXT");
-        assert_eq!(events_columns[13].0, "created_at");
-        assert_eq!(events_columns[13].1, "TEXT");
+        assert_eq!(events_columns[13].0, "window_number");
+        assert_eq!(events_columns[13].1, "INTEGER");
+        assert_eq!(events_columns[14].0, "response_json");
+        assert_eq!(events_columns[14].1, "TEXT");
+        assert_eq!(events_columns[15].0, "created_at");
+        assert_eq!(events_columns[15].1, "TEXT");
     }
 }

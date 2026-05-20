@@ -656,7 +656,7 @@ async fn analyze_session_text(
     target_name: &str,
     session_name: &str,
 ) -> Result<SessionIntelligence, String> {
-    let transcript = session_transcript(adapter, session, max_bytes)
+    let (transcript, active_window) = session_transcript(adapter, session, max_bytes)
         .await
         .map_err(|err| err.to_string())?;
 
@@ -673,6 +673,13 @@ async fn analyze_session_text(
         let sess = session_name.to_string();
         let is_error = result.is_err();
         let error_msg = result.as_ref().err().cloned();
+        let window_number = active_window.map(|w| w as i64);
+        let response_json = result.as_ref().ok().and_then(|r| {
+            serde_json::to_string(&r.intelligence).ok()
+        });
+        let prompt_tokens = result.as_ref().ok().and_then(|r| r.prompt_tokens);
+        let completion_tokens = result.as_ref().ok().and_then(|r| r.completion_tokens);
+        let total_tokens = result.as_ref().ok().and_then(|r| r.total_tokens);
 
         tokio::spawn(async move {
             let repo = wmux_core::storage::AiUsageRepository::new(pool);
@@ -684,11 +691,13 @@ async fn analyze_session_text(
                 session_name: sess,
                 status: if is_error { "error".to_string() } else { "success".to_string() },
                 duration_ms: elapsed_ms,
-                prompt_tokens: None,
-                completion_tokens: None,
-                total_tokens: None,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
                 estimated_cost: None,
                 error_message: error_msg,
+                window_number,
+                response_json,
             };
             if let Err(err) = repo.insert(&event).await {
                 tracing::error!(raw_error = %err, "failed to record AI usage event");
@@ -696,17 +705,18 @@ async fn analyze_session_text(
         });
     }
 
-    result
+    result.map(|r| r.intelligence)
 }
 
 async fn session_transcript(
     adapter: &Adapter,
     session: &str,
     max_bytes: u32,
-) -> Result<String, TmuxError> {
+) -> Result<(String, Option<usize>), TmuxError> {
     let windows = adapter.list_windows(session).await?;
     let mut transcript = String::new();
     transcript.push_str(&format!("session: {session}\n"));
+    let active_window = windows.iter().find(|w| w.active).map(|w| w.index);
 
     let mut remaining = max_bytes as usize;
     for window in windows {
@@ -736,7 +746,7 @@ async fn session_transcript(
         }
     }
 
-    Ok(transcript)
+    Ok((transcript, active_window))
 }
 
 fn apply_session_intelligence(session: &mut Session, intelligence: &SessionIntelligence) {
