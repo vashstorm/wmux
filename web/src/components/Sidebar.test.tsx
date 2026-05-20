@@ -1,8 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { Sidebar } from "./Sidebar.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import * as client from "../api/client.js";
+import { ApiError } from "../api/errors.js";
 
 vi.mock("../api/client.js", () => ({
 	listConnections: vi.fn(),
@@ -14,6 +15,11 @@ vi.mock("../api/client.js", () => ({
 	killSession: vi.fn(),
 	renameSession: vi.fn(),
 	fetchErrorLogs: vi.fn(),
+	listProjects: vi.fn(),
+	createProject: vi.fn(),
+	updateProject: vi.fn(),
+	deleteProject: vi.fn(),
+	listAiStats: vi.fn(),
 }));
 
 const mockListConnections = vi.mocked(client.listConnections);
@@ -22,6 +28,11 @@ const mockListSessions = vi.mocked(client.listSessions);
 const mockListWindows = vi.mocked(client.listWindows);
 const mockListPanes = vi.mocked(client.listPanes);
 const mockFetchErrorLogs = vi.mocked(client.fetchErrorLogs);
+const mockListProjects = vi.mocked(client.listProjects);
+const mockCreateProject = vi.mocked(client.createProject);
+const mockUpdateProject = vi.mocked(client.updateProject);
+const mockDeleteProject = vi.mocked(client.deleteProject);
+const mockListAiStats = vi.mocked(client.listAiStats);
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
 	return <AppProvider>{children}</AppProvider>;
@@ -712,5 +723,120 @@ describe("intelligence badge and summary rendering", () => {
 			expect(button).toHaveClass("sidebar-icon-button", "sidebar-icon-button-row");
 			expect(button.querySelector(".sidebar-icon")).toBeInTheDocument();
 		}
+	});
+});
+
+describe("Projects view", () => {
+	beforeEach(() => {
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
+		vi.mocked(client.listProjects).mockReset().mockResolvedValue([]);
+		vi.mocked(client.createProject).mockReset().mockResolvedValue({ id: "p1", name: "new", path: "/tmp", description: "", createdAt: "", updatedAt: "" });
+		vi.mocked(client.updateProject).mockReset().mockResolvedValue({ id: "p1", name: "new", path: "/tmp", description: "", createdAt: "", updatedAt: "" });
+		vi.mocked(client.deleteProject).mockReset().mockResolvedValue(undefined);
+	});
+
+	test("clicking Projects button loads projects and shows empty state", async () => {
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		await waitFor(() => {
+			expect(screen.getByTestId("projects-empty")).toBeInTheDocument();
+		});
+	});
+
+	test("creates a project and shows it in list", async () => {
+		vi.mocked(client.listProjects)
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([{ id: "p1", name: "wmux-dev", path: "/tmp/wmux", description: "", createdAt: "", updatedAt: "" }]);
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		await waitFor(() => expect(screen.getByTestId("projects-empty")).toBeInTheDocument());
+
+		fireEvent.click(screen.getByTestId("projects-add-button"));
+		const nameInput = screen.getByPlaceholderText("Project name");
+		const pathInput = screen.getByPlaceholderText("Path (optional)");
+		fireEvent.change(nameInput, { target: { value: "wmux-dev" } });
+		fireEvent.change(pathInput, { target: { value: "/tmp/wmux" } });
+		fireEvent.click(screen.getByTestId("project-submit-button"));
+
+		await waitFor(() => {
+			expect(screen.getByText("wmux-dev")).toBeInTheDocument();
+		});
+	});
+
+	test("duplicate project name shows error", async () => {
+		vi.mocked(client.createProject).mockRejectedValue(new ApiError("conflict", "project name already exists", 409));
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		await waitFor(() => expect(screen.getByTestId("projects-empty")).toBeInTheDocument());
+
+		fireEvent.click(screen.getByTestId("projects-add-button"));
+		const nameInput = screen.getByPlaceholderText("Project name");
+		fireEvent.change(nameInput, { target: { value: "dup" } });
+		fireEvent.click(screen.getByTestId("project-submit-button"));
+
+		await waitFor(() => {
+			expect(screen.getByTestId("projects-error")).toBeInTheDocument();
+		});
+	});
+});
+
+describe("Stats view", () => {
+	beforeEach(() => {
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
+	});
+
+	test("clicking Stats button calls listAiStats and renders populated data", async () => {
+		mockListAiStats.mockResolvedValue({
+			data: [
+				{ id: "e1", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 150, promptTokens: 50, completionTokens: 30, totalTokens: 80, estimatedCost: 0.01, errorMessage: null, createdAt: "2024-01-01T00:00:00Z" },
+			],
+			summary: { totalEvents: 1, totalSuccess: 1, totalError: 0, totalDurationMs: 150, totalPromptTokens: 50, totalCompletionTokens: 30, totalTokens: 80, totalEstimatedCost: 0.01 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+		await waitFor(() => {
+			const statsView = screen.getByTestId("stats-view");
+			expect(within(statsView).getByText("openai/gpt-4")).toBeInTheDocument();
+			expect(within(statsView).getByText("1 total")).toBeInTheDocument();
+		});
+	});
+
+	test("empty stats shows empty state", async () => {
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+		await waitFor(() => {
+			expect(screen.getByTestId("stats-empty")).toBeInTheDocument();
+		});
+	});
+
+	test("stats API error shows error state with retry", async () => {
+		mockListAiStats.mockRejectedValue(new ApiError("internal_error", "db error", 500));
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+		await waitFor(() => {
+			expect(screen.getByTestId("stats-error")).toBeInTheDocument();
+		});
+
+		mockListAiStats.mockResolvedValue({
+			data: [],
+			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+		});
+		fireEvent.click(screen.getByTestId("stats-retry-button"));
+		await waitFor(() => {
+			expect(screen.getByTestId("stats-empty")).toBeInTheDocument();
+		});
 	});
 });

@@ -153,6 +153,9 @@ export interface AppConfig {
 		path: string;
 		errorPath: string;
 	};
+	storage?: {
+		path: string;
+	};
 }
 
 export interface ErrorLogsResponse {
@@ -161,6 +164,68 @@ export interface ErrorLogsResponse {
 	lines: string[];
 	truncated: boolean;
 	maxLines: number;
+}
+
+// --- Projects ---
+
+export interface Project {
+	id: string;
+	name: string;
+	path: string;
+	description: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface ProjectListResponse {
+	data: Project[];
+}
+
+export interface NewProject {
+	name: string;
+	path?: string;
+	description?: string;
+}
+
+export interface UpdateProject {
+	name?: string;
+	path?: string;
+	description?: string;
+}
+
+// --- AI Stats ---
+
+export interface AiUsageEvent {
+	id: string;
+	projectId?: string | null;
+	provider: string;
+	model: string;
+	targetName: string;
+	sessionName: string;
+	status: string;
+	durationMs: number;
+	promptTokens?: number | null;
+	completionTokens?: number | null;
+	totalTokens?: number | null;
+	estimatedCost?: number | null;
+	errorMessage?: string | null;
+	createdAt: string;
+}
+
+export interface AiUsageSummary {
+	totalEvents: number;
+	totalSuccess: number;
+	totalError: number;
+	totalDurationMs: number;
+	totalPromptTokens: number;
+	totalCompletionTokens: number;
+	totalTokens: number;
+	totalEstimatedCost: number;
+}
+
+export interface AiStatsResponse {
+	data: AiUsageEvent[];
+	summary: AiUsageSummary;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -566,4 +631,55 @@ export async function clearErrorLogs(): Promise<void> {
 	await apiFetch("/api/logs/errors", {
 		method: "DELETE",
 	});
+}
+
+// --- Projects client functions ---
+
+export async function listProjects(): Promise<Project[]> {
+	const response = (await apiFetch("/api/projects")) as ProjectListResponse;
+	return response.data ?? [];
+}
+
+export async function createProject(data: NewProject): Promise<Project> {
+	return (await apiFetch("/api/projects", {
+		method: "POST",
+		body: JSON.stringify(data),
+	})) as Project;
+}
+
+export async function getProject(id: string): Promise<Project> {
+	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}`)) as Project;
+}
+
+export async function updateProject(id: string, data: UpdateProject): Promise<Project> {
+	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
+		method: "PUT",
+		body: JSON.stringify(data),
+	})) as Project;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+	await apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
+		method: "DELETE",
+	});
+}
+
+// --- AI Stats client functions ---
+
+export interface AiStatsQuery {
+	limit?: number;
+	projectId?: string;
+}
+
+export async function listAiStats(query: AiStatsQuery = {}): Promise<AiStatsResponse> {
+	const params = new URLSearchParams();
+	if (query.limit !== undefined) {
+		params.set("limit", String(query.limit));
+	}
+	if (query.projectId) {
+		params.set("projectId", query.projectId);
+	}
+	const qs = params.toString();
+	const path = qs ? `/api/ai/stats?${qs}` : "/api/ai/stats";
+	return (await apiFetch(path)) as AiStatsResponse;
 }

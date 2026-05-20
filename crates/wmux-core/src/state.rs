@@ -1,5 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
+use sqlx::SqlitePool;
+use tokio::task::JoinHandle;
 
 use wmux_core::config::{ConnectionConfig, Store};
 use wmux_core::intelligence::IntelligenceStore;
@@ -14,6 +18,8 @@ pub struct AppState {
     pub intelligence: IntelligenceStore,
     pub assets_dir: PathBuf,
     pub logging_handle: LoggingHandle,
+    pub storage: Option<SqlitePool>,
+    pub cleanup_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
 }
 
 impl AppState {
@@ -29,7 +35,44 @@ impl AppState {
             intelligence: IntelligenceStore::default(),
             assets_dir,
             logging_handle,
+            storage: None,
+            cleanup_handle: None,
         }
+    }
+
+    pub async fn with_storage(
+        store: Store,
+        assets_dir: PathBuf,
+        logging_handle: LoggingHandle,
+        config_path: &Path,
+    ) -> Result<Self> {
+        let config = store
+            .snapshot()
+            .map_err(|e| anyhow::anyhow!("failed to read config snapshot: {}", e))?;
+        config.validate_storage_path()?;
+
+        let resolved_path =
+            wmux_core::config::resolve_storage_path(&config.storage.path, config_path)?;
+
+        let pool = wmux_core::storage::db::create_pool(&resolved_path).await?;
+        wmux_core::storage::db::run_migrations(&pool).await?;
+
+        let connections = RuntimeConnections::from_vec(config.connections);
+
+        Ok(Self {
+            store,
+            connections,
+            sessions: SessionManager::new(),
+            intelligence: IntelligenceStore::default(),
+            assets_dir,
+            logging_handle,
+            storage: Some(pool),
+            cleanup_handle: None,
+        })
+    }
+
+    pub fn set_cleanup_handle(&mut self, handle: Arc<Mutex<Option<JoinHandle<()>>>>) {
+        self.cleanup_handle = Some(handle);
     }
 }
 

@@ -22,9 +22,24 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
     let logging_handle =
         crate::logging::init_tracing(&config.logs).context("failed to initialize logging")?;
 
+    config.validate_storage_path().context("invalid storage config")?;
+    let config_path = store.path().context("failed to resolve config path")?;
     store
         .replace_in_memory(config)
         .context("failed to prepare runtime config")?;
+    let mut state = AppState::with_storage(
+        store.clone(),
+        assets_dir,
+        logging_handle,
+        &config_path,
+    )
+    .await
+    .context("failed to initialize SQLite storage")?;
+
+    if let Some(pool) = &state.storage {
+        let cleanup_holder = crate::storage::cleanup::spawn_cleanup_task(pool.clone());
+        state.set_cleanup_handle(cleanup_holder);
+    }
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -33,7 +48,6 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
         .local_addr()
         .context("failed to read in-process server port")?
         .port();
-    let state = AppState::new(store, assets_dir, logging_handle);
     let app = crate::routes::router(state);
 
     let server_handle = tokio::spawn(async move {

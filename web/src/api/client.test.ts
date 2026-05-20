@@ -17,6 +17,12 @@ import {
 	analyzeSession,
 	fetchErrorLogs,
 	clearErrorLogs,
+	listProjects,
+	createProject,
+	getProject,
+	updateProject,
+	deleteProject,
+	listAiStats,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -526,5 +532,106 @@ describe("api client", () => {
 	test("clearErrorLogs does not throw on 204", async () => {
 		mockFetch(new Response(null, { status: 204 }));
 		await expect(clearErrorLogs()).resolves.toBeUndefined();
+	});
+
+	describe("projects", () => {
+		test("listProjects returns data array", async () => {
+			mockJsonResponse(200, { data: [{ id: "a1", name: "proj", path: "/tmp", description: "", createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" }] });
+			const result = await listProjects();
+			expect(result).toHaveLength(1);
+			expect(result[0]!.name).toBe("proj");
+		});
+
+		test("createProject POSTs payload and returns project", async () => {
+			mockJsonResponse(201, { id: "a1", name: "proj", path: "/tmp", description: "", createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" });
+			const result = await createProject({ name: "proj", path: "/tmp" });
+			expect(result.name).toBe("proj");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[1]?.method).toBe("POST");
+			const body = JSON.parse(call[1]?.body as string);
+			expect(body.name).toBe("proj");
+			expect(body.path).toBe("/tmp");
+		});
+
+		test("getProject fetches by id", async () => {
+			mockJsonResponse(200, { id: "a1", name: "proj", path: "", description: "", createdAt: "", updatedAt: "" });
+			const result = await getProject("a1");
+			expect(result.id).toBe("a1");
+			expect(result.name).toBe("proj");
+		});
+
+		test("updateProject PUTs payload", async () => {
+			mockJsonResponse(200, { id: "a1", name: "updated", path: "/new", description: "", createdAt: "", updatedAt: "" });
+			const result = await updateProject("a1", { name: "updated", path: "/new" });
+			expect(result.name).toBe("updated");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[1]?.method).toBe("PUT");
+		});
+
+		test("deleteProject sends DELETE and handles 204", async () => {
+			mockFetch(new Response(null, { status: 204 }));
+			await expect(deleteProject("a1")).resolves.toBeUndefined();
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[1]?.method).toBe("DELETE");
+		});
+
+		test("project duplicate name throws ApiError with 409", async () => {
+			mockFetch(
+				new Response(JSON.stringify({ error: { code: "conflict", message: "project name already exists" } }), {
+					status: 409,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+			await expect(createProject({ name: "dup" })).rejects.toThrow(ApiError);
+			try {
+				await createProject({ name: "dup" });
+			} catch (err) {
+				expect(err).toBeInstanceOf(ApiError);
+				expect((err as ApiError).status).toBe(409);
+			}
+		});
+	});
+
+	describe("ai stats", () => {
+		test("listAiStats returns data and summary", async () => {
+			mockJsonResponse(200, {
+				data: [],
+				summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+			});
+			const result = await listAiStats({ limit: 50 });
+			expect(result.data).toEqual([]);
+			expect(result.summary.totalEvents).toBe(0);
+		});
+
+		test("listAiStats encodes query parameters", async () => {
+			mockJsonResponse(200, { data: [], summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 } });
+			await listAiStats({ limit: 50, projectId: "proj-1" });
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			const url = call[0] as string;
+			expect(url).toContain("limit=50");
+			expect(url).toContain("projectId=proj-1");
+		});
+
+		test("listAiStats with empty query calls base path", async () => {
+			mockJsonResponse(200, { data: [], summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 } });
+			await listAiStats();
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toBe("/api/ai/stats");
+		});
+
+		test("listAiStats error response throws ApiError", async () => {
+			mockFetch(
+				new Response(JSON.stringify({ error: { code: "internal_error", message: "db error" } }), {
+					status: 500,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+			await expect(listAiStats()).rejects.toThrow(ApiError);
+		});
 	});
 });

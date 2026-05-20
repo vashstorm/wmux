@@ -3,7 +3,7 @@ use axum::middleware;
 use axum::routing::{delete, get, post};
 use tower_http::services::{ServeDir, ServeFile};
 
-use crate::handlers::{config, connections, health, logs, sessions, terminal};
+use crate::handlers::{ai_stats, config, connections, health, logs, projects, sessions, terminal};
 use crate::http::api_not_found;
 use crate::state::AppState;
 
@@ -86,10 +86,18 @@ pub fn router(state: AppState) -> Router {
             delete(sessions::delete_pane),
         )
         .route("/config", get(config::get).put(config::update))
+        .route("/projects", get(projects::list).post(projects::create))
+        .route(
+            "/projects/{id}",
+            get(projects::get)
+                .put(projects::update)
+                .delete(projects::delete),
+        )
         .route(
             "/logs/errors",
             get(logs::get_error_logs).delete(logs::clear_error_logs),
         )
+        .route("/ai/stats", get(ai_stats::get_stats))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -184,6 +192,44 @@ mod tests {
 
         let state = AppState::new(store, assets_dir, logging_handle);
         (router(state), dir, config_path, error_handle)
+    }
+
+    async fn test_app_with_storage() -> (Router, tempfile::TempDir) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        let db_path = dir.path().join("wmux.db");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+
+        let config = json!({
+            "schemaVersion": 1,
+            "server": { "bind": "127.0.0.1:0" },
+            "auth": { "token": TOKEN },
+            "tmux": { "path": "tmux" },
+            "connections": [],
+            "ui": { "theme": "dark" },
+            "storage": { "path": db_path.to_string_lossy().into_owned() },
+            "intelligence": {
+                "enabled": true,
+                "provider": "openai",
+                "model": "test-model",
+                "apiKey": "secret-key",
+                "baseURL": "http://127.0.0.1:1"
+            }
+        });
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+
+        let store = Config::load(&config_path).expect("load config");
+        let state = AppState::with_storage(store, assets_dir, LoggingHandle::empty(), &config_path)
+            .await
+            .expect("create state with storage");
+
+        (router(state), dir)
     }
 
     fn base_config() -> Value {
@@ -608,5 +654,153 @@ mod tests {
         assert_eq!(lines[0], "new error after clear");
         let lines_str = serde_json::to_string(&lines).expect("serialize");
         assert!(!lines_str.contains("old error line"));
+    }
+
+    #[tokio::test]
+    async fn projects_routes_crud() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        // Create
+        let create_resp = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({
+                    "name": "test-project",
+                    "path": "/tmp/test",
+                    "description": "desc"
+                })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(create_resp.status(), StatusCode::CREATED);
+        let created = json_body(create_resp).await;
+        let id = created["id"].as_str().unwrap().to_string();
+        assert_eq!(created["name"], "test-project");
+
+        // List
+        let list_resp = app
+            .clone()
+            .oneshot(request("GET", "/api/projects", None))
+            .await
+            .expect("response");
+        assert_eq!(list_resp.status(), StatusCode::OK);
+        let list = json_body(list_resp).await;
+        assert_eq!(list["data"].as_array().unwrap().len(), 1);
+
+        // Get
+        let get_resp = app
+            .clone()
+            .oneshot(request("GET", &format!("/api/projects/{id}"), None))
+            .await
+            .expect("response");
+        assert_eq!(get_resp.status(), StatusCode::OK);
+        let fetched = json_body(get_resp).await;
+        assert_eq!(fetched["name"], "test-project");
+
+        // Update
+        let update_resp = app
+            .clone()
+            .oneshot(request(
+                "PUT",
+                &format!("/api/projects/{id}"),
+                Some(json!({
+                    "name": "updated-project",
+                    "path": "/new/path"
+                })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(update_resp.status(), StatusCode::OK);
+        let updated = json_body(update_resp).await;
+        assert_eq!(updated["name"], "updated-project");
+
+        // Delete
+        let del_resp = app
+            .clone()
+            .oneshot(request("DELETE", &format!("/api/projects/{id}"), None))
+            .await
+            .expect("response");
+        assert_eq!(del_resp.status(), StatusCode::NO_CONTENT);
+
+        // Get after delete → 404
+        let get_after = app
+            .oneshot(request("GET", &format!("/api/projects/{id}"), None))
+            .await
+            .expect("response");
+        assert_eq!(get_after.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn projects_routes_errors() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        // Empty name → 400
+        let empty_name_resp = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({ "name": "", "path": "" })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(empty_name_resp.status(), StatusCode::BAD_REQUEST);
+
+        // Duplicate name → 409
+        app.clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({ "name": "dup", "path": "" })),
+            ))
+            .await
+            .expect("response");
+        let dup_resp = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({ "name": "dup", "path": "" })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(dup_resp.status(), StatusCode::CONFLICT);
+
+        // Missing id → 404
+        let missing = app
+            .oneshot(request("GET", "/api/projects/nonexistent", None))
+            .await
+            .expect("response");
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn ai_stats_route_returns_bounded_data() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let resp = app
+            .oneshot(request("GET", "/api/ai/stats?limit=5", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = json_body(resp).await;
+        assert!(body["data"].as_array().is_some());
+        assert!(body["summary"].is_object());
+        assert!(body["summary"]["totalEvents"].is_number());
+    }
+
+    #[tokio::test]
+    async fn ai_stats_route_limit_capped_at_200() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let resp = app
+            .oneshot(request("GET", "/api/ai/stats?limit=1000", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = json_body(resp).await;
+        assert!(body["data"].as_array().unwrap().len() <= 200);
     }
 }

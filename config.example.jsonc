@@ -42,5 +42,8 @@
     "level": "info",
     "path": "",
     "errorPath": ""
+  },
+  "storage": {
+    "path": "data/wmux.db"
   }
 }

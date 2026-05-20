@@ -1,6 +1,8 @@
+pub mod ai_stats;
 pub mod config;
 pub mod connections;
 pub mod health;
 pub mod logs;
+pub mod projects;
 pub mod sessions;
 pub mod terminal;

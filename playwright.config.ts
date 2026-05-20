@@ -64,6 +64,9 @@ if (shouldInitialize) {
 					path: join(tempDir, "wmux.log"),
 					errorPath: join(tempDir, "wmux-error.log"),
 				},
+				storage: {
+					path: join(tempDir, "wmux-playwright.db"),
+				},
 			},
 			null,
 			2,

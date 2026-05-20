@@ -40,3 +40,10 @@ config.jsonc
 
 # Logs
 *.log
+
+# SQLite database files
+data
+data-shm
+data-wal
+*.db
+*.db-journal

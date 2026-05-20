@@ -42,6 +42,8 @@ pub enum ConfigError {
     LockPoisoned,
     #[error("logs path and error path resolve to the same file")]
     InvalidLogsConfig,
+    #[error("storage.path is empty or missing")]
+    StoragePathMissing,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,6 +65,8 @@ pub struct Config {
     pub intelligence: IntelligenceConfig,
     #[serde(default)]
     pub logs: LogsConfig,
+    #[serde(default)]
+    pub storage: StorageConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,6 +152,13 @@ pub struct LogsConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StorageConfig {
+    #[serde(default)]
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IntelligenceConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -222,6 +233,13 @@ impl Config {
         expanded.logs.path = expand_user_path(&expanded.logs.path)?;
         expanded.logs.error_path = expand_user_path(&expanded.logs.error_path)?;
         Ok(expanded)
+    }
+
+    pub fn validate_storage_path(&self) -> Result<()> {
+        if self.storage.path.trim().is_empty() {
+            return Err(ConfigError::StoragePathMissing);
+        }
+        Ok(())
     }
 
     fn normalize(&mut self) {
@@ -316,6 +334,7 @@ impl Default for Config {
             ui: UIConfig::default(),
             intelligence: IntelligenceConfig::default(),
             logs: LogsConfig::default(),
+            storage: StorageConfig::default(),
         };
         config.normalize();
         config
@@ -375,6 +394,14 @@ impl Default for IntelligenceConfig {
             min_session_interval_sec: default_min_session_interval_sec(),
             max_concurrency: default_max_concurrency(),
             cache_ttl_sec: default_cache_ttl_sec(),
+        }
+    }
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            path: String::new(),
         }
     }
 }
@@ -598,6 +625,52 @@ pub fn expand_user_path(path: &str) -> Result<String> {
     Ok(Path::new(&home).join(rest).to_string_lossy().into_owned())
 }
 
+/// Resolves the storage database path, handling ~ expansion and relative paths.
+/// Relative paths are resolved against the config file's parent directory.
+/// Creates parent directories if they don't exist.
+pub fn resolve_storage_path(storage_path: &str, config_path: &Path) -> Result<PathBuf> {
+    let trimmed = storage_path.trim();
+    
+    let expanded = if let Some(rest) = trimmed.strip_prefix("~") {
+        let home = std::env::var("HOME").map_err(|_| ConfigError::HomeDirUnavailable)?;
+        if rest.is_empty() {
+            PathBuf::from(&home)
+        } else if rest.starts_with('/') {
+            Path::new(&home).join(&rest[1..])
+        } else {
+            Path::new(&home).join(rest)
+        }
+    } else {
+        PathBuf::from(trimmed)
+    };
+    
+    if expanded.is_absolute() {
+        if let Some(parent) = expanded.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
+                    context: "create storage directory",
+                    source,
+                })?;
+            }
+        }
+        return Ok(expanded);
+    }
+    
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
+    let resolved = config_dir.join(&expanded);
+    
+    if let Some(parent) = resolved.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
+                context: "create storage directory",
+                source,
+            })?;
+        }
+    }
+    
+    Ok(resolved)
+}
+
 pub fn is_localhost_bind(bind: &str) -> bool {
     let host = extract_bind_host(bind);
     if host.is_empty() {
@@ -776,7 +849,7 @@ fn extract_bind_host(bind: &str) -> String {
     trimmed.trim_matches(['[', ']']).to_string()
 }
 
-fn random_hex(byte_len: usize) -> String {
+pub(crate) fn random_hex(byte_len: usize) -> String {
     let mut bytes = vec![0_u8; byte_len];
     rand::rng().fill_bytes(&mut bytes);
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -1087,5 +1160,94 @@ mod tests {
         let config = parse_config(&data).expect("same directory should be allowed");
         assert_eq!(config.logs.path, format!("{}/", same_dir));
         assert_eq!(config.logs.error_path, format!("{}/", same_dir));
+    }
+
+    #[test]
+    fn config_validate_storage_path_rejects_empty() {
+        let mut config = Config::default();
+        config.storage.path = String::new();
+        let err = config.validate_storage_path().expect_err("empty path should fail");
+        assert!(matches!(err, ConfigError::StoragePathMissing));
+    }
+
+    #[test]
+    fn config_validate_storage_path_rejects_whitespace() {
+        let mut config = Config::default();
+        config.storage.path = "   ".to_string();
+        let err = config.validate_storage_path().expect_err("whitespace path should fail");
+        assert!(matches!(err, ConfigError::StoragePathMissing));
+    }
+
+    #[test]
+    fn config_validate_storage_path_accepts_non_empty() {
+        let mut config = Config::default();
+        config.storage.path = "data/wmux.db".to_string();
+        config.validate_storage_path().expect("non-empty path should pass");
+    }
+
+    #[test]
+    fn config_resolve_storage_path_relative() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let resolved = resolve_storage_path("data/wmux.db", &config_path).expect("resolve relative");
+        assert_eq!(resolved, dir.path().join("data/wmux.db"));
+    }
+
+    #[test]
+    fn config_resolve_storage_path_absolute() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let absolute_path = dir.path().join("wmux.db");
+        let config_path = PathBuf::from("/some/config.jsonc");
+        let resolved = resolve_storage_path(
+            absolute_path.to_str().expect("path to string"),
+            &config_path,
+        )
+        .expect("resolve absolute");
+        assert_eq!(resolved, absolute_path);
+    }
+
+    #[test]
+    fn config_resolve_storage_path_home_expansion() {
+        let home_dir = tempfile::tempdir().expect("tempdir");
+        let config_path = PathBuf::from("/some/config.jsonc");
+        unsafe {
+            std::env::set_var("HOME", home_dir.path());
+        }
+        let resolved = resolve_storage_path("~/wmux.db", &config_path).expect("resolve home");
+        assert_eq!(resolved, home_dir.path().join("wmux.db"));
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn config_resolve_storage_path_creates_parent_directory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let storage_rel = "nested/deep/path/wmux.db";
+        let resolved = resolve_storage_path(storage_rel, &config_path).expect("resolve with dir creation");
+        assert!(dir.path().join("nested/deep/path").exists());
+        assert_eq!(resolved, dir.path().join(storage_rel));
+    }
+
+    #[test]
+    fn config_storage_deserializes_from_jsonc() {
+        let data = r#"{
+          "storage": {
+            "path": "data/wmux.db"
+          }
+        }"#;
+
+        let config = parse_config(data).expect("parse config");
+        assert_eq!(config.storage.path, "data/wmux.db");
+    }
+
+    #[test]
+    fn config_storage_field_in_default_snapshot() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.jsonc");
+        let store = Config::load(&path).expect("load config");
+        let snapshot = store.snapshot().expect("snapshot");
+        assert_eq!(snapshot.storage.path, "");
     }
 }

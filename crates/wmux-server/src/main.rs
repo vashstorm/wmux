@@ -47,7 +47,23 @@ async fn main() -> anyhow::Result<()> {
 
     let logging_handle = wmux_core::logging::init_tracing(&config.logs)
         .with_context(|| "failed to initialize logging")?;
+
+    config.validate_storage_path().context("invalid storage config")?;
     let config_path = store.path().context("failed to resolve config path")?;
+    let mut state = wmux_core::state::AppState::with_storage(
+        store.clone(),
+        PathBuf::from("web/dist"),
+        logging_handle.clone(),
+        &config_path,
+    )
+    .await
+    .context("failed to initialize SQLite storage")?;
+
+    if let Some(pool) = &state.storage {
+        let cleanup_holder = wmux_core::storage::cleanup::spawn_cleanup_task(pool.clone());
+        state.set_cleanup_handle(cleanup_holder);
+    }
+
     tracing::info!(
         version = wmux_core::version(),
         config = %config_path.display(),
@@ -59,13 +75,17 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("failed to bind {}", config.server.bind))?;
     println!("http://{}", config.server.bind);
-    let state = wmux_core::state::AppState::new(store, PathBuf::from("web/dist"), logging_handle);
     let shutdown_state = state.clone();
     let app = wmux_core::routes::router(state);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
+            if let Some(handle_holder) = &shutdown_state.cleanup_handle {
+                if let Some(handle) = handle_holder.lock().unwrap().take() {
+                    handle.abort();
+                }
+            }
             tracing::info!("closing all sessions");
             shutdown_state.sessions.shutdown().await;
             tracing::info!("all sessions closed");

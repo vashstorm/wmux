@@ -1,0 +1,61 @@
+use axum::extract::{Query, State};
+use axum::Json;
+use serde::{Deserialize, Serialize};
+
+use crate::http::{ApiError, ApiResult};
+use crate::state::AppState;
+use crate::storage::models::{AiUsageEvent, AiUsageSummary};
+use crate::storage::AiUsageRepository;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsQuery {
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    pub project_id: Option<String>,
+}
+
+fn default_limit() -> i64 {
+    50
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiStatsResponse {
+    pub data: Vec<AiUsageEvent>,
+    pub summary: AiUsageSummary,
+}
+
+pub async fn get_stats(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> ApiResult<AiStatsResponse> {
+    let pool = storage(&state)?;
+    let repo = AiUsageRepository::new(pool.clone());
+
+    let limit = query.limit.min(200).max(1);
+    let data = repo
+        .list(limit, query.project_id.as_deref())
+        .await
+        .map_err(|err| {
+            tracing::error!(raw_error = %err, "database error listing AI stats");
+            ApiError::internal("database error")
+        })?;
+
+    let summary = repo
+        .summary(query.project_id.as_deref())
+        .await
+        .map_err(|err| {
+            tracing::error!(raw_error = %err, "database error getting AI stats summary");
+            ApiError::internal("database error")
+        })?;
+
+    Ok(Json(AiStatsResponse { data, summary }))
+}
+
+fn storage(state: &AppState) -> Result<&sqlx::SqlitePool, ApiError> {
+    state
+        .storage
+        .as_ref()
+        .ok_or_else(|| ApiError::internal("storage not initialized"))
+}

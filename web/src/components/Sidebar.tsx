@@ -28,6 +28,8 @@ import { NewSessionForm } from "./sidebar/NewSessionForm.js";
 import { SidebarFooter } from "./sidebar/SidebarFooter.js";
 import { SessionCard } from "./sidebar/SessionCard.js";
 import { SidebarIconButton } from "./sidebar/SidebarIconButton.js";
+import { ProjectsView } from "./sidebar/ProjectsView.js";
+import { StatsView } from "./sidebar/StatsView.js";
 
 const SESSION_SYNC_INTERVAL_MS = 2000;
 
@@ -344,11 +346,11 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 					scrollbarGutter: "stable",
 				}}
 			>
-				{activeView === "projects" ? (
-					<Box className="sidebar-empty-view" data-testid="projects-view" sx={{ minHeight: 1 }} />
-				) : activeView === "stats" ? (
-					<Box className="sidebar-empty-view" data-testid="stats-view" sx={{ minHeight: 1 }} />
-				) : selectedTargetName ? (
+			{activeView === "projects" ? (
+				<ProjectsView />
+		) : activeView === "stats" ? (
+				<StatsView />
+			) : selectedTargetName ? (
 					<>
 						<SessionSearch value={searchQuery} onChange={setSearchQuery} />
 

@@ -292,6 +292,9 @@ pub async fn analyze_session(
         &session,
         config.intelligence.max_bytes,
         Duration::from_secs(config.intelligence.timeout_sec as u64),
+        state.storage.as_ref(),
+        target.name.as_str(),
+        session.as_str(),
     )
     .await;
 
@@ -629,9 +632,13 @@ fn spawn_session_intelligence_refreshes(
                 session_name.as_str(),
                 max_bytes,
                 timeout,
+                state.storage.as_ref(),
+                target_name.as_str(),
+                cache_session_name.as_str(),
             )
             .await
             .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
+
             state
                 .intelligence
                 .set(target_name.as_str(), cache_session_name.as_str(), result);
@@ -645,11 +652,51 @@ async fn analyze_session_text(
     session: &str,
     max_bytes: u32,
     timeout: Duration,
+    pool: Option<&sqlx::SqlitePool>,
+    target_name: &str,
+    session_name: &str,
 ) -> Result<SessionIntelligence, String> {
     let transcript = session_transcript(adapter, session, max_bytes)
         .await
         .map_err(|err| err.to_string())?;
-    intelligence::analyze_text(provider, transcript.as_str(), timeout).await
+
+    let start = std::time::Instant::now();
+    let result = intelligence::analyze_text(provider, transcript.as_str(), timeout).await;
+    let elapsed_ms = start.elapsed().as_millis() as i64;
+
+    // Record AI usage event only when analyze_text was actually called
+    if let Some(pool) = pool {
+        let pool = pool.clone();
+        let provider_name = provider.provider.clone();
+        let model_name = provider.model.clone();
+        let target = target_name.to_string();
+        let sess = session_name.to_string();
+        let is_error = result.is_err();
+        let error_msg = result.as_ref().err().cloned();
+
+        tokio::spawn(async move {
+            let repo = wmux_core::storage::AiUsageRepository::new(pool);
+            let event = wmux_core::storage::models::NewAiUsageEvent {
+                project_id: None,
+                provider: provider_name,
+                model: model_name,
+                target_name: target,
+                session_name: sess,
+                status: if is_error { "error".to_string() } else { "success".to_string() },
+                duration_ms: elapsed_ms,
+                prompt_tokens: None,
+                completion_tokens: None,
+                total_tokens: None,
+                estimated_cost: None,
+                error_message: error_msg,
+            };
+            if let Err(err) = repo.insert(&event).await {
+                tracing::error!(raw_error = %err, "failed to record AI usage event");
+            }
+        });
+    }
+
+    result
 }
 
 async fn session_transcript(

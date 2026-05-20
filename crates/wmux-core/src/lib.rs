@@ -11,6 +11,7 @@ pub mod protocol;
 pub mod routes;
 pub mod session;
 pub mod state;
+pub mod storage;
 pub mod tmux;
 
 pub fn version() -> &'static str {
