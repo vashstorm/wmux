@@ -1006,6 +1006,11 @@
 	background-color: var(--terminal-background);
 }
 
+.terminal-container .xterm,
+.terminal-container .xterm * {
+	box-sizing: content-box;
+}
+
 .terminal-container .xterm .xterm-viewport {
 	width: 100%;
 	min-width: 0;

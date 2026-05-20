@@ -22,7 +22,7 @@ interface TerminalSize {
 	rows: number;
 }
 
-const TERMINAL_FIT_COLUMN_GUTTER = 2;
+const TERMINAL_FIT_COLUMN_GUTTER = 6;
 const TERMINAL_FIT_ROW_GUTTER = 1;
 const MIN_TERMINAL_COLS = 2;
 const MIN_TERMINAL_ROWS = 1;
