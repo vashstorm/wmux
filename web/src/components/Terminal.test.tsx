@@ -96,7 +96,7 @@ vi.mock("../state/store.js", () => ({
 }));
 
 const mockSelectedPane: SelectedPane = {
-	connectionId: "conn-1",
+	targetName: "conn-1",
 	session: "dev",
 	window: "@1",
 	pane: "%1",
@@ -155,7 +155,7 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(callArgs.connectionId).toBe("conn-1");
+		expect(callArgs.targetName).toBe("conn-1");
 		expect(callArgs.session).toBe("dev");
 		expect(callArgs.window).toBe("@1");
 		expect(callArgs.pane).toBe("%1");

@@ -21,6 +21,8 @@ body {
 	line-height: var(--line-height-normal);
 	min-height: 100vh;
 	overflow: hidden;
+	background-color: var(--color-background);
+	color: var(--color-text);
 }
 
 #root {

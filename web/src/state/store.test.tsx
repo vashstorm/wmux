@@ -20,20 +20,20 @@ describe("useAppState", () => {
 		return (
 			<div>
 				<span data-testid="connections-count">{state.connections.length}</span>
-				<span data-testid="selected-id">{state.selectedConnectionId ?? "null"}</span>
+				<span data-testid="selected-id">{state.selectedTargetName ?? "null"}</span>
 				<span data-testid="loading-connections">{state.loading.connections ? "true" : "false"}</span>
 				<span data-testid="error">{state.error ? `${state.error.code}:${state.error.message}` : "null"}</span>
 				<span data-testid="show-form">{state.showNewConnectionForm ? "true" : "false"}</span>
 				<span data-testid="show-settings">{state.showSettingsPanel ? "true" : "false"}</span>
 				<button
 					data-testid="set-connections"
-					onClick={() => state.setConnections([{ id: "1", type: "local" }])}
+					onClick={() => state.setConnections([{ targetName: "1", type: "local" }])}
 				>
 					Set Connections
 				</button>
 				<button
 					data-testid="set-selected"
-					onClick={() => state.setSelectedConnectionId("1")}
+					onClick={() => state.setSelectedTargetName("1")}
 				>
 					Select
 				</button>
@@ -73,12 +73,12 @@ describe("useAppState", () => {
 				>
 					Set Panes External Resize
 				</button>
-				<button data-testid="set-pane" onClick={() => state.setSelectedPane({ connectionId: "1", session: "s1", window: "w1", pane: "p1" })}>
+				<button data-testid="set-pane" onClick={() => state.setSelectedPane({ targetName: "1", session: "s1", window: "w1", pane: "p1" })}>
 					Set Pane
 				</button>
 				<button
 					data-testid="set-health"
-					onClick={() => state.setConnectionHealth({ "1": { connectionId: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" } })}
+					onClick={() => state.setConnectionHealth({ "1": { targetName: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" } })}
 				>
 					Set Health
 				</button>
@@ -98,14 +98,14 @@ describe("useAppState", () => {
 				</button>
 				<span data-testid="confirm-title">{state.confirmDialog?.title ?? "null"}</span>
 				<span data-testid="selected-pane">
-					{state.selectedPane ? `${state.selectedPane.connectionId}:${state.selectedPane.pane}` : "null"}
+					{state.selectedPane ? `${state.selectedPane.targetName}:${state.selectedPane.pane}` : "null"}
 				</span>
 				<span data-testid="health-status">{state.connectionHealth["1"]?.status ?? "null"}</span>
 				<span data-testid="editing">{state.editingConnection?.type ?? "null"}</span>
 				<span data-testid="sessions-count">{(state.sessions["1"] ?? []).length}</span>
 				<button
 					data-testid="set-editing"
-					onClick={() => state.setEditingConnection({ id: "1", type: "local" })}
+					onClick={() => state.setEditingConnection({ targetName: "1", type: "local" })}
 				>
 					Set Editing
 				</button>
@@ -184,7 +184,7 @@ describe("useAppState", () => {
 		expect(screen.getByTestId("connections-count").textContent).toBe("1");
 	});
 
-	test("setSelectedConnectionId updates selection", () => {
+	test("setSelectedTargetName updates selection", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-selected"));
 		expect(screen.getByTestId("selected-id").textContent).toBe("1");

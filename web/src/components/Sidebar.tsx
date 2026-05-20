@@ -14,6 +14,7 @@ import {
   Divider,
   Button,
   ListItemText,
+  Collapse,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
@@ -61,12 +62,12 @@ function isApiError(err: unknown): err is Error & { code: string; message: strin
   return err instanceof Error && "code" in err && "message" in err;
 }
 
-export function Sidebar() {
+export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
   const {
     connections,
     setConnections,
-    selectedConnectionId,
-    setSelectedConnectionId,
+    selectedTargetName,
+    setSelectedTargetName,
     setLoading,
     setError,
     setShowSettingsPanel,
@@ -103,21 +104,21 @@ export function Sidebar() {
   // Auto-select first connection on mount / when selected connection is removed
   useEffect(() => {
     if (connections.length === 0) {
-      setSelectedConnectionId(null);
+      setSelectedTargetName(null);
       return;
     }
-    if (selectedConnectionId && connections.some((c) => c.id === selectedConnectionId)) {
+    if (selectedTargetName && connections.some((c) => c.targetName === selectedTargetName)) {
       return;
     }
-    setSelectedConnectionId(connections[0]?.id ?? null);
-  }, [connections, selectedConnectionId, setSelectedConnectionId]);
+    setSelectedTargetName(connections[0]?.targetName ?? null);
+  }, [connections, selectedTargetName, setSelectedTargetName]);
 
   const loadHealth = useCallback(async () => {
     try {
       const healthData = await listConnectionHealth();
-      const healthMap: Record<string, { connectionId: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
+      const healthMap: Record<string, { targetName: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
       for (const h of healthData) {
-        healthMap[h.connectionId] = h;
+        healthMap[h.targetName] = h;
       }
       setConnectionHealth(healthMap);
     } catch {
@@ -142,10 +143,10 @@ export function Sidebar() {
     loadHealth();
   }, [setConnections, setError, setLoading, loadHealth]);
 
-  const loadSessionsForConnection = useCallback(async (connectionId: string) => {
+  const loadSessionsForTarget = useCallback(async (targetName: string) => {
     try {
-      const response = await listSessions(connectionId);
-      setSessions(connectionId, response.data ?? []);
+      const response = await listSessions(targetName);
+      setSessions(targetName, response.data ?? []);
     } catch (err) {
       if (isApiError(err)) {
         if (err.code !== "connection_failed" && err.code !== "unknown_error") {
@@ -173,21 +174,21 @@ export function Sidebar() {
 
   // Load sessions when selected connection changes
   useEffect(() => {
-    if (!selectedConnectionId) return;
+    if (!selectedTargetName) return;
     const prevId = prevSelectedRef.current;
-    prevSelectedRef.current = selectedConnectionId;
+    prevSelectedRef.current = selectedTargetName;
 
-    if (prevId && prevId !== selectedConnectionId) {
+    if (prevId && prevId !== selectedTargetName) {
       setShowNewSessionForm(false);
       setSearchQuery("");
       setSelectedPane(null);
     }
 
-    loadSessionsForConnection(selectedConnectionId);
-  }, [selectedConnectionId, loadSessionsForConnection]);
+    loadSessionsForTarget(selectedTargetName);
+  }, [selectedTargetName, loadSessionsForTarget]);
 
   useEffect(() => {
-    if (!selectedConnectionId) return;
+    if (!selectedTargetName) return;
 
     let cancelled = false;
     let inFlight = false;
@@ -195,7 +196,7 @@ export function Sidebar() {
       if (cancelled || inFlight) return;
       inFlight = true;
       try {
-        await loadSessionsForConnection(selectedConnectionId);
+        await loadSessionsForTarget(selectedTargetName);
       } finally {
         inFlight = false;
       }
@@ -209,57 +210,57 @@ export function Sidebar() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [selectedConnectionId, loadSessionsForConnection]);
+  }, [selectedTargetName, loadSessionsForTarget]);
 
-  const connectionSessions = useMemo(() => {
-    if (!selectedConnectionId) return [];
-    return sessions[selectedConnectionId] ?? [];
-  }, [sessions, selectedConnectionId]);
+  const targetSessions = useMemo(() => {
+    if (!selectedTargetName) return [];
+    return sessions[selectedTargetName] ?? [];
+  }, [sessions, selectedTargetName]);
 
   useEffect(() => {
-    if (!selectedConnectionId || selectedPane?.connectionId !== selectedConnectionId) return;
-    if (!sessions[selectedConnectionId]) return;
-    if (connectionSessions.some((session) => session.name === selectedPane.session)) return;
+    if (!selectedTargetName || selectedPane?.targetName !== selectedTargetName) return;
+    if (!sessions[selectedTargetName]) return;
+    if (targetSessions.some((session) => session.name === selectedPane.session)) return;
 
     setSelectedPane(null);
-  }, [connectionSessions, selectedConnectionId, selectedPane, sessions, setSelectedPane]);
+  }, [targetSessions, selectedTargetName, selectedPane, sessions, setSelectedPane]);
 
   const filteredSessions = useMemo(() => {
-    if (!searchQuery.trim()) return connectionSessions;
+    if (!searchQuery.trim()) return targetSessions;
     const query = searchQuery.toLowerCase();
-    return connectionSessions.filter((s) => s.name?.toLowerCase().includes(query) ?? false);
-  }, [connectionSessions, searchQuery]);
+    return targetSessions.filter((s) => s.name?.toLowerCase().includes(query) ?? false);
+  }, [targetSessions, searchQuery]);
 
   const handleOpenSession = async (sessionName: string) => {
-    if (!selectedConnectionId) return;
-    const connId = selectedConnectionId;
+    if (!selectedTargetName) return;
+    const targetName = selectedTargetName;
 
     try {
-      const windowsResponse = await listWindows(connId, sessionName);
+      const windowsResponse = await listWindows(targetName, sessionName);
       const windows = windowsResponse.data ?? [];
 
       if (windows.length === 0) {
-        setSelectedPane({ connectionId: connId, session: sessionName });
+        setSelectedPane({ targetName: targetName, session: sessionName });
         return;
       }
 
       const initialWindow = windows[0];
       if (!initialWindow) {
-        setSelectedPane({ connectionId: connId, session: sessionName });
+        setSelectedPane({ targetName: targetName, session: sessionName });
         return;
       }
       const initialWindowID = initialWindow.ID;
 
-      const panesResponse = await listPanes(connId, sessionName, initialWindowID);
+      const panesResponse = await listPanes(targetName, sessionName, initialWindowID);
       const panes = panesResponse.data ?? [];
 
-      setWindows(connId, sessionName, windows);
-      setPanes(connId, sessionName, initialWindowID, panes);
+      setWindows(targetName, sessionName, windows);
+      setPanes(targetName, sessionName, initialWindowID, panes);
 
       const initialPane = panes[0];
 
       setSelectedPane({
-        connectionId: connId,
+        targetName: targetName,
         session: sessionName,
         window: initialWindowID,
         pane: initialPane?.ID,
@@ -279,14 +280,14 @@ export function Sidebar() {
    * Used internally; MainPanel imports listPanes directly from client.ts.
    */
   const loadWindowPanes = async (
-    connectionId: string,
+    targetName: string,
     sessionName: string,
     windowId: string,
   ): Promise<PaneInfo[] | null> => {
     try {
-      const panesResponse = await listPanes(connectionId, sessionName, windowId);
+      const panesResponse = await listPanes(targetName, sessionName, windowId);
       const panes = panesResponse.data ?? [];
-      setPanes(connectionId, sessionName, windowId, panes);
+      setPanes(targetName, sessionName, windowId, panes);
       return panes;
     } catch (err) {
       if (isApiError(err)) {
@@ -298,14 +299,14 @@ export function Sidebar() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedConnectionId || !newSessionName.trim()) return;
-    const connId = selectedConnectionId;
+    if (!selectedTargetName || !newSessionName.trim()) return;
+    const targetName = selectedTargetName;
     try {
-      await createSession(connId, newSessionName.trim());
+      await createSession(targetName, newSessionName.trim());
       setNewSessionName("");
       setShowNewSessionForm(false);
-      const response = await listSessions(connId);
-      setSessions(connId, response.data ?? []);
+      const response = await listSessions(targetName);
+      setSessions(targetName, response.data ?? []);
     } catch (err) {
       if (isApiError(err)) {
         setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
@@ -314,21 +315,21 @@ export function Sidebar() {
   };
 
   const reloadSessions = useCallback(async () => {
-    if (!selectedConnectionId) return;
-    const connId = selectedConnectionId;
+    if (!selectedTargetName) return;
+    const targetName = selectedTargetName;
     try {
-      const response = await listSessions(connId);
-      setSessions(connId, response.data ?? []);
+      const response = await listSessions(targetName);
+      setSessions(targetName, response.data ?? []);
     } catch (err) {
       if (isApiError(err)) {
         setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
       }
     }
-  }, [selectedConnectionId, setSessions, setError]);
+  }, [selectedTargetName, setSessions, setError]);
 
   const handleKillSession = (sessionName: string) => {
-    if (!selectedConnectionId) return;
-    const connId = selectedConnectionId;
+    if (!selectedTargetName) return;
+    const targetName = selectedTargetName;
     showConfirm({
       title: "Kill Session",
       message: `Are you sure you want to kill session "${sessionName}"?`,
@@ -336,7 +337,7 @@ export function Sidebar() {
       confirmVariant: "danger",
       onConfirm: async () => {
         try {
-          await killSession(connId, sessionName);
+          await killSession(targetName, sessionName);
           await reloadSessions();
         } catch (err) {
           if (isApiError(err)) {
@@ -353,8 +354,8 @@ export function Sidebar() {
   };
 
   const submitRename = async (sessionName: string) => {
-    if (!selectedConnectionId) return;
-    const connId = selectedConnectionId;
+    if (!selectedTargetName) return;
+    const targetName = selectedTargetName;
     const newName = renameValue.trim();
     if (!newName || newName === sessionName) {
       setRenamingSession(null);
@@ -362,7 +363,7 @@ export function Sidebar() {
       return;
     }
     try {
-      await renameSession(connId, sessionName, newName);
+      await renameSession(targetName, sessionName, newName);
       await reloadSessions();
     } catch (err) {
       if (isApiError(err)) {
@@ -404,12 +405,13 @@ export function Sidebar() {
           minHeight: "var(--app-shell-header-height, 42px)",
           display: "flex",
           alignItems: "center",
-          px: "var(--spacing-lg)",
+          px: "var(--spacing-md)",
           borderBottom: "1px solid var(--color-surface-border)",
           background: "linear-gradient(to bottom, var(--color-glass-highlight), transparent)",
+          flexShrink: 0,
         }}
       >
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", width: "100%", gap: 0.5 }}>
           <Typography
             className="sidebar-brand"
             variant="subtitle1"
@@ -420,12 +422,15 @@ export function Sidebar() {
               color: "var(--color-accent)",
               textTransform: "uppercase",
               letterSpacing: "0.15em",
-              textShadow: "var(--color-accent-glow)",
+              flexShrink: 0,
+              mr: 0.5,
             }}
           >
             Wmux
           </Typography>
-          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+
+          {/* Nav view tabs */}
+          <Stack direction="row" sx={{ alignItems: "center", gap: 0.25 }}>
             <IconButton
               className={`sidebar-header-action${activeView === "projects" ? " is-active" : ""}`}
               onClick={() => setActiveView("projects")}
@@ -433,9 +438,15 @@ export function Sidebar() {
               aria-label="Projects"
               title="Projects"
               size="small"
-              sx={{ width: 30, height: 30 }}
+              sx={{
+                width: 28, height: 28,
+                borderRadius: "var(--radius-sm)",
+                color: activeView === "projects" ? "var(--color-accent)" : "var(--color-text-muted)",
+                bgcolor: activeView === "projects" ? "var(--color-accent-subtle)" : "transparent",
+                "&:hover": { color: "var(--color-accent)", bgcolor: "var(--color-accent-subtle)" },
+              }}
             >
-              <FolderIcon fontSize="small" />
+              <FolderIcon sx={{ fontSize: 16 }} />
             </IconButton>
             <IconButton
               className={`sidebar-header-action${activeView === "session" ? " is-active" : ""}`}
@@ -444,9 +455,15 @@ export function Sidebar() {
               aria-label="Session"
               title="Session"
               size="small"
-              sx={{ width: 30, height: 30 }}
+              sx={{
+                width: 28, height: 28,
+                borderRadius: "var(--radius-sm)",
+                color: activeView === "session" ? "var(--color-accent)" : "var(--color-text-muted)",
+                bgcolor: activeView === "session" ? "var(--color-accent-subtle)" : "transparent",
+                "&:hover": { color: "var(--color-accent)", bgcolor: "var(--color-accent-subtle)" },
+              }}
             >
-              <TerminalIcon fontSize="small" />
+              <TerminalIcon sx={{ fontSize: 16 }} />
             </IconButton>
             <IconButton
               className={`sidebar-header-action${activeView === "stats" ? " is-active" : ""}`}
@@ -455,51 +472,18 @@ export function Sidebar() {
               aria-label="Stats"
               title="Stats"
               size="small"
-              sx={{ width: 30, height: 30 }}
-            >
-              <BarChartIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              className="sidebar-header-action"
-              onClick={() => setShowSettingsPanel(true)}
-              data-testid="open-settings-button"
-              aria-label="Setting"
-              title="Setting"
-              size="small"
-              sx={{ width: 30, height: 30 }}
-            >
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-            <Badge
-              badgeContent={errorLogCount > 0 ? (errorLogCount > 99 ? "99+" : errorLogCount) : undefined}
-              color="error"
-              className="error-logs-badge-wrapper"
-              data-testid="error-logs-badge"
               sx={{
-                "& .MuiBadge-badge": {
-                  bgcolor: "var(--color-danger)",
-                  color: "var(--color-background)",
-                  border: "1px solid var(--color-panel)",
-                  fontSize: "9px",
-                  fontWeight: "var(--font-weight-bold)",
-                  minWidth: 16,
-                  height: 16,
-                },
+                width: 28, height: 28,
+                borderRadius: "var(--radius-sm)",
+                color: activeView === "stats" ? "var(--color-accent)" : "var(--color-text-muted)",
+                bgcolor: activeView === "stats" ? "var(--color-accent-subtle)" : "transparent",
+                "&:hover": { color: "var(--color-accent)", bgcolor: "var(--color-accent-subtle)" },
               }}
             >
-              <IconButton
-                className={`sidebar-header-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
-                onClick={() => setShowErrorLogsPanel(true)}
-                data-testid="open-error-logs-button"
-                aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
-                title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
-                size="small"
-                sx={{ width: 30, height: 30 }}
-              >
-                <DescriptionIcon fontSize="small" />
-              </IconButton>
-            </Badge>
+              <BarChartIcon sx={{ fontSize: 16 }} />
+            </IconButton>
           </Stack>
+
         </Stack>
       </Box>
 
@@ -517,7 +501,7 @@ export function Sidebar() {
           <Box className="sidebar-empty-view" data-testid="projects-view" sx={{ minHeight: 1 }} />
         ) : activeView === "stats" ? (
           <Box className="sidebar-empty-view" data-testid="stats-view" sx={{ minHeight: 1 }} />
-        ) : selectedConnectionId ? (
+        ) : selectedTargetName ? (
           <>
             <Box
               className="sidebar-toolbar"
@@ -553,11 +537,15 @@ export function Sidebar() {
                     pl: 0.5,
                     bgcolor: "var(--color-input-bg)",
                     borderRadius: "var(--radius-sm)",
+                    transition: "box-shadow 200ms ease, border-color 200ms ease",
                     "& .MuiOutlinedInput-notchedOutline": {
                       borderColor: "var(--color-input-border)",
                     },
                     "&:hover .MuiOutlinedInput-notchedOutline": {
                       borderColor: "var(--color-surface-border-hover)",
+                    },
+                    "&.Mui-focused": {
+                      boxShadow: "0 0 0 3px var(--color-accent-subtle)",
                     },
                     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                       borderColor: "var(--color-input-border-focus)",
@@ -576,7 +564,7 @@ export function Sidebar() {
               />
             </Box>
 
-            {showNewSessionForm && (
+            <Collapse in={showNewSessionForm} timeout={250} unmountOnExit>
               <Box
                 component="form"
                 className="sidebar-session-form"
@@ -659,7 +647,7 @@ export function Sidebar() {
                   </Button>
                 </Stack>
               </Box>
-            )}
+            </Collapse>
 
             <Box className="sidebar-sessions-section" sx={{ px: "var(--spacing-sm)" }}>
               <Stack
@@ -751,14 +739,30 @@ export function Sidebar() {
                     const sname = session.name ?? "";
                     if (!sname) return null;
                     const isRenaming = renamingSession === sname;
+                    const isSelected = selectedPane?.targetName === selectedTargetName && selectedPane?.session === sname;
 
                     return (
                       <Box
                         key={sname}
-                        className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}`}
+                        className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${isSelected ? " is-selected" : ""}`}
                         data-testid={`session-card-${sname}`}
                         sx={{
                           mb: 0.75,
+                          borderRadius: "var(--radius-md)",
+                          border: "1px solid",
+                          borderColor: isSelected ? "var(--color-session-card-selected-border)" : "var(--color-session-card-border)",
+                          bgcolor: isSelected ? "var(--color-session-card-selected)" : "var(--color-session-card-bg)",
+                          transition: "border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease",
+                          boxShadow: isSelected ? "0 0 0 1px var(--color-session-card-selected-border), var(--shadow-sm)" : "none",
+                          position: "relative",
+                          overflow: "hidden",
+                          ...(session.attentionState === "explicit" && {
+                            borderColor: "var(--color-attention-explicit)",
+                            boxShadow: "0 0 0 1px var(--color-attention-explicit)",
+                          }),
+                          ...(session.attentionState === "attention" && !isSelected && {
+                            borderColor: "var(--color-attention)",
+                          }),
                         }}
                       >
                         {isRenaming ? (
@@ -800,6 +804,7 @@ export function Sidebar() {
                               className="session-card-body"
                               onClick={() => handleOpenSession(sname)}
                               data-testid={`session-open-${sname}`}
+                              selected={isSelected}
                               sx={{
                                 flexDirection: "column",
                                 alignItems: "stretch",
@@ -807,6 +812,18 @@ export function Sidebar() {
                                 py: "12px",
                                 px: "14px",
                                 minWidth: 0,
+                                borderRadius: "var(--radius-md)",
+                                bgcolor: "transparent",
+                                transition: "background-color 150ms ease",
+                                "&.Mui-selected": {
+                                  bgcolor: "transparent",
+                                },
+                                "&.Mui-selected:hover": {
+                                  bgcolor: "var(--color-surface-hover)",
+                                },
+                                "&:hover": {
+                                  bgcolor: "var(--color-surface-hover)",
+                                },
                               }}
                             >
                               <Box className="session-card-name-group">
@@ -963,13 +980,15 @@ export function Sidebar() {
                                 height: "100%",
                                 px: "10px",
                                 opacity: 0,
-                                transition: "opacity var(--transition-fast)",
-                                background: "linear-gradient(to left, var(--color-panel) 80%, transparent)",
+                                transform: "translateX(4px)",
+                                transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+                                background: "linear-gradient(to left, var(--color-panel) 70%, transparent)",
                                 ".session-card:hover &": {
                                   opacity: 1,
+                                  transform: "translateX(0)",
                                 },
-                                ".session-card.is-active &": {
-                                  background: "linear-gradient(to left, var(--color-glass-highlight) 80%, transparent)",
+                                ".session-card.is-selected &": {
+                                  background: "linear-gradient(to left, var(--color-session-card-selected) 70%, transparent)",
                                 },
                               }}
                             >
@@ -1038,6 +1057,63 @@ export function Sidebar() {
               : "Loading..."}
           </Box>
         )}
+      </Box>
+
+      <Box
+        className="sidebar-footer"
+        sx={{
+          minHeight: "var(--app-shell-header-height, 42px)",
+          display: "flex",
+          alignItems: "center",
+          px: "var(--spacing-md)",
+          borderTop: "1px solid var(--color-surface-border)",
+          background: "linear-gradient(to top, var(--color-glass-highlight), transparent)",
+          flexShrink: 0,
+          justifyContent: "flex-end",
+          gap: 1,
+        }}
+      >
+        <IconButton
+          className="sidebar-footer-action"
+          onClick={() => setShowSettingsPanel(true)}
+          data-testid="open-settings-button"
+          aria-label="Settings"
+          title="Settings"
+          size="small"
+          sx={{ width: 28, height: 28, color: "var(--color-text-muted)", "&:hover": { color: "var(--color-accent)" } }}
+        >
+          <SettingsIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+        <Badge
+          badgeContent={errorLogCount > 0 ? (errorLogCount > 99 ? "99+" : errorLogCount) : undefined}
+          color="error"
+          className="error-logs-badge-wrapper"
+          data-testid="error-logs-badge"
+          sx={{
+            "& .MuiBadge-badge": {
+              bgcolor: "var(--color-danger)",
+              color: "#fff",
+              border: "1px solid var(--color-panel)",
+              fontSize: "9px",
+              fontWeight: "var(--font-weight-bold)",
+              minWidth: 16,
+              height: 16,
+            },
+          }}
+        >
+          <IconButton
+            className={`sidebar-footer-action sidebar-error-logs-button${errorLogCount > 0 ? " has-badge" : ""}`}
+            onClick={() => setShowErrorLogsPanel(true)}
+            data-testid="open-error-logs-button"
+            aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+            title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
+            size="small"
+            sx={{ width: 28, height: 28, color: "var(--color-text-muted)", "&:hover": { color: "var(--color-accent)" } }}
+          >
+            <DescriptionIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Badge>
+        {themeToggle}
       </Box>
     </Paper>
   );

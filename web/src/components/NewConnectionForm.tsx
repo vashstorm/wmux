@@ -88,12 +88,12 @@ export function NewConnectionForm() {
 			}
 
 			if (isEditMode) {
-				const updated = await updateConnection(editingConnection.id, {
+				const updated = await updateConnection(editingConnection.targetName, {
 					...editingConnection,
 					...payload,
-					id: editingConnection.id,
+					targetName: editingConnection.targetName,
 				});
-				setConnections(connections.map((c) => (c.id === editingConnection.id ? updated : c)));
+				setConnections(connections.map((c) => (c.targetName === editingConnection.targetName ? updated : c)));
 			} else {
 				const newConnection = await createConnection(payload);
 				setConnections([...connections, newConnection]);
@@ -103,9 +103,9 @@ export function NewConnectionForm() {
 
 			try {
 				const healthData = await listConnectionHealth();
-				const healthMap: Record<string, { connectionId: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
+				const healthMap: Record<string, { targetName: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
 				for (const h of healthData) {
-					healthMap[h.connectionId] = h;
+					healthMap[h.targetName] = h;
 				}
 				setConnectionHealth(healthMap);
 			} catch {

@@ -51,14 +51,14 @@ describe("api client", () => {
 	});
 
 	test("listConnections returns data array", async () => {
-		mockJsonResponse(200, { data: [{ id: "1", type: "local" }] });
+		mockJsonResponse(200, { data: [{ targetName: "1", type: "local" }] });
 		const result = await listConnections();
 		expect(result).toHaveLength(1);
 		expect(result[0]!.type).toBe("local");
 	});
 
 	test("createConnection POSTs payload", async () => {
-		mockJsonResponse(201, { id: "2", type: "ssh" });
+		mockJsonResponse(201, { targetName: "2", type: "ssh" });
 		const result = await createConnection({ type: "ssh" });
 		expect(result.type).toBe("ssh");
 
@@ -68,14 +68,14 @@ describe("api client", () => {
 	});
 
 	test("getConnection fetches by id", async () => {
-		mockJsonResponse(200, { id: "1", type: "local" });
+		mockJsonResponse(200, { targetName: "1", type: "local" });
 		const result = await getConnection("1");
-		expect(result.id).toBe("1");
+		expect(result.targetName).toBe("1");
 	});
 
 	test("updateConnection PUTs payload", async () => {
-		mockJsonResponse(200, { id: "1", type: "local" });
-		const result = await updateConnection("1", { id: "1", type: "local" });
+		mockJsonResponse(200, { targetName: "1", type: "local" });
+		const result = await updateConnection("1", { targetName: "1", type: "local" });
 		expect(result.type).toBe("local");
 
 		const call = vi.mocked(fetch).mock.calls[0]!;
@@ -92,7 +92,7 @@ describe("api client", () => {
 
 	test("listSessions normalizes mixed formats", async () => {
 		mockJsonResponse(200, {
-			connectionId: "1",
+			targetName: "1",
 			mode: "local",
 			data: ["session1", { name: "session2" }, { Name: "session3" }],
 		});
@@ -105,7 +105,7 @@ describe("api client", () => {
 
 	test("listWindows returns windows", async () => {
 		mockJsonResponse(200, {
-			connectionId: "1",
+			targetName: "1",
 			session: "dev",
 			mode: "local",
 			data: [{ ID: "@1", Name: "editor", Index: 0, Active: true }],
@@ -116,7 +116,7 @@ describe("api client", () => {
 
 	test("listWindows normalizes Rust camelCase fields", async () => {
 		mockJsonResponse(200, {
-			connectionId: "1",
+			targetName: "1",
 			session: "dev",
 			mode: "local",
 			data: [{ id: "@1", name: "editor", index: 0, active: true, paneCount: 1, activePaneId: "%1", activePaneTitle: "shell", attentionState: "attention", attentionCount: 1 }],
@@ -130,7 +130,7 @@ describe("api client", () => {
 
 	test("listPanes returns panes", async () => {
 		mockJsonResponse(200, {
-			connectionId: "1",
+			targetName: "1",
 			session: "dev",
 			window: "@1",
 			mode: "local",
@@ -142,7 +142,7 @@ describe("api client", () => {
 
 	test("listPanes normalizes Rust camelCase fields", async () => {
 		mockJsonResponse(200, {
-			connectionId: "1",
+			targetName: "1",
 			session: "dev",
 			window: "@1",
 			mode: "local",
@@ -156,7 +156,7 @@ describe("api client", () => {
 	});
 
 	test("createSession POSTs name", async () => {
-		mockJsonResponse(200, { connectionId: "1", operation: "create_session", mode: "local", status: "ok" });
+		mockJsonResponse(200, { targetName: "1", operation: "create_session", mode: "local", status: "ok" });
 		await createSession("1", "new-session");
 
 		const call = vi.mocked(fetch).mock.calls[0]!;
@@ -176,13 +176,13 @@ describe("api client", () => {
 	});
 
 	test("listConnectionHealth returns health data", async () => {
-		mockJsonResponse(200, { data: [{ connectionId: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" }] });
+		mockJsonResponse(200, { data: [{ targetName: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" }] });
 		const result = await listConnectionHealth();
 		expect(result[0]!.status).toBe("online");
 	});
 
 	test("getConnectionHealth returns single health", async () => {
-		mockJsonResponse(200, { connectionId: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" });
+		mockJsonResponse(200, { targetName: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" });
 		const result = await getConnectionHealth("1");
 		expect(result.status).toBe("online");
 	});
@@ -222,7 +222,7 @@ describe("api client", () => {
 	});
 
 	test("URL encodes path parameters", async () => {
-		mockJsonResponse(200, { id: "conn#1", type: "local" });
+		mockJsonResponse(200, { targetName: "conn#1", type: "local" });
 		await getConnection("conn#1");
 
 		const call = vi.mocked(fetch).mock.calls[0]!;
@@ -232,7 +232,7 @@ describe("api client", () => {
 	describe("intelligence field normalization", () => {
 		test("listSessions normalizes uppercase intelligence fields", async () => {
 			mockJsonResponse(200, {
-				connectionId: "1",
+				targetName: "1",
 				mode: "local",
 				data: [{
 					name: "session1",
@@ -257,7 +257,7 @@ describe("api client", () => {
 
 		test("listSessions normalizes lowercase intelligence fields", async () => {
 			mockJsonResponse(200, {
-				connectionId: "1",
+				targetName: "1",
 				mode: "local",
 				data: [{
 					name: "session1",
@@ -277,7 +277,7 @@ describe("api client", () => {
 
 		test("listSessions prefers lowercase over uppercase intelligence fields", async () => {
 			mockJsonResponse(200, {
-				connectionId: "1",
+				targetName: "1",
 				mode: "local",
 				data: [{
 					name: "session1",
@@ -442,7 +442,7 @@ describe("api client", () => {
 	describe("analyzeSession", () => {
 		test("analyzeSession POSTs to analyze endpoint", async () => {
 			mockJsonResponse(200, {
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				status: "ok",
 				updated: 1,
@@ -465,13 +465,13 @@ describe("api client", () => {
 			expect(result.intelligence?.status).toBe("waiting");
 
 			const call = vi.mocked(fetch).mock.calls[0]!;
-			expect(call[0]).toContain("/api/connections/conn1/sessions/session1/analyze");
+			expect(call[0]).toContain("/api/targets/conn1/sessions/session1/analyze");
 			expect(call[1]?.method).toBe("POST");
 		});
 
 		test("analyzeSession URL encodes connection and session", async () => {
 			mockJsonResponse(200, {
-				connectionId: "conn#1",
+				targetName: "conn#1",
 				session: "session#2",
 				status: "ok",
 				updated: 0,

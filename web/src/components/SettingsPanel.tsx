@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem, FormControl, InputLabel, Typography, Box, Paper, IconButton } from "@mui/material";
-import { getConfig, type AppConfig, type IntelligenceProviderConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
+import { flushSync } from "react-dom";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem, FormControl, InputLabel, Typography, Box, Paper, IconButton, Switch, FormControlLabel, Slider, Card, CardContent, List, ListItem, Divider, Chip, CircularProgress } from "@mui/material";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
@@ -82,7 +83,7 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [activeTab, setActiveTab] = useState<"general" | "connections" | "theme" | "typography" | "intelligence">("general");
+	const [activeTab, setActiveTab] = useState<"general" | "connections" | "typography" | "intelligence">("general");
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -112,10 +113,10 @@ export function SettingsPanel() {
 	const loadHealth = async () => {
 		try {
 			const healthData = await listConnectionHealth();
-			const healthMap: Record<string, { connectionId: string; status: "online" | "offline"; checkedAt: string; errorCode?: string; message?: string }> = {};
-			for (const h of healthData) {
-				healthMap[h.connectionId] = h;
-			}
+			const healthMap: Record<string, ConnectionHealth> = {};
+				for (const h of healthData) {
+					healthMap[h.targetName] = h;
+				}
 			setConnectionHealth(healthMap);
 		} catch {
 		}
@@ -267,7 +268,7 @@ export function SettingsPanel() {
 								if (connection.type !== "ssh") {
 									return connection;
 								}
-								const pendingConnection = payload.connections.find((item) => item.id === connection.id);
+								const pendingConnection = payload.connections.find((item) => item.targetName === connection.targetName);
 								return {
 									...connection,
 									knownHostsPath: pendingConnection?.knownHostsPath ?? connection.knownHostsPath,
@@ -354,31 +355,31 @@ export function SettingsPanel() {
 		closePanel();
 	};
 
-	const handleDeleteConnection = (connection: { id: string; type: string; host?: string }) => {
-		showConfirm({
-			title: "Delete Connection",
-			message: `Delete connection "${connectionDisplayName(connection)}"? This cannot be undone.`,
-			confirmText: "Delete Connection",
-			confirmVariant: "danger",
-			onConfirm: async () => {
-				try {
-					await deleteConnection(connection.id);
-					const updated = connections.filter((c) => c.id !== connection.id);
-					setConnections(updated);
-					setConfig((prev) => prev ? { ...prev, connections: updated } : prev);
-				} catch (err) {
-					if (err instanceof Error && "code" in err) {
-						const apiErr = err as { code: string; message: string };
-						setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+	const handleDeleteConnection = (connection: ConnectionConfig) => {
+			showConfirm({
+				title: "Delete Connection",
+				message: `Delete connection "${connectionDisplayName(connection)}"? This cannot be undone.`,
+				confirmText: "Delete Connection",
+				confirmVariant: "danger",
+				onConfirm: async () => {
+					try {
+						await deleteConnection(connection.targetName);
+						const updated = connections.filter((c) => c.targetName !== connection.targetName);
+						setConnections(updated);
+						setConfig((prev) => prev ? { ...prev, connections: updated } : prev);
+					} catch (err) {
+						if (err instanceof Error && "code" in err) {
+							const apiErr = err as { code: string; message: string };
+							setError({ code: apiErr.code, message: getErrorMessage(apiErr.code, apiErr.message) });
+						}
 					}
-				}
-			},
-		});
-	};
+				},
+			});
+		};
 
-	const handleEditConnection = (connection: { id: string; type: string; host?: string }) => {
-		setEditingConnection(connection);
-	};
+	const handleEditConnection = (connection: ConnectionConfig) => {
+			setEditingConnection(connection);
+		};
 
 	const handleNewConnection = () => {
 		setEditingConnection(null);
@@ -388,7 +389,6 @@ export function SettingsPanel() {
 	const navItems: { key: typeof activeTab; icon: string; label: string }[] = [
 		{ key: "general", icon: "🔧", label: "General" },
 		{ key: "connections", icon: "🌐", label: "Connections" },
-		{ key: "theme", icon: "🎨", label: "Theme" },
 		{ key: "typography", icon: "🔠", label: "Typography" },
 		{ key: "intelligence", icon: "✨", label: "AI" },
 	];
@@ -397,9 +397,8 @@ export function SettingsPanel() {
 		<Dialog
 			open={showSettingsPanel}
 			onClose={handleCancel}
-			maxWidth="xl"
+			maxWidth="md"
 			fullWidth
-			fullScreen
 			data-testid="settings-panel"
 		>
 			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 3 }}>
@@ -418,13 +417,13 @@ export function SettingsPanel() {
 
 			{isLoading || !formState ? (
 				<DialogContent>
-					<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "200px", gap: 2 }}>
-						<div className="spinner" />
-						<span>Loading settings...</span>
+					<Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "200px", gap: 2 }}>
+						<CircularProgress size={40} />
+						<Typography variant="body2" color="text.secondary">Loading settings...</Typography>
 					</Box>
 				</DialogContent>
 			) : (
-				<Box sx={{ display: "flex", height: "calc(100vh - 130px)", overflow: "hidden" }}>
+				<Box sx={{ display: "flex", height: "70vh", overflow: "hidden" }}>
 					{/* Left: Sidebar Navigation */}
 									<Box role="complementary" sx={{ width: 200, borderRight: 1, borderColor: "divider", p: 1, display: "flex", flexDirection: "column" }}>
 						<nav>
@@ -434,7 +433,7 @@ export function SettingsPanel() {
 									type="button"
 									fullWidth
 									variant={activeTab === item.key ? "contained" : "text"}
-									onClick={() => setActiveTab(item.key)}
+									onClick={() => flushSync(() => setActiveTab(item.key))}
 									sx={{
 										justifyContent: "flex-start",
 										px: 2,
@@ -549,7 +548,7 @@ export function SettingsPanel() {
 										) : (
 											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0 }}>
 												{connections.map((connection) => {
-													const connHealth = connectionHealth[connection.id];
+													const connHealth = connectionHealth[connection.targetName];
 													const statusClass =
 														connHealth?.status === "online"
 															? "is-online"
@@ -562,7 +561,7 @@ export function SettingsPanel() {
 														: "System Terminal";
 
 													return (
-														<Box key={connection.id} component="li" className="settings-connection-item" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, borderRadius: 1, bgcolor: "background.paper", boxShadow: 1 }}>
+														<Box key={connection.targetName} component="li" className="settings-connection-item" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, borderRadius: 1, bgcolor: "background.paper", boxShadow: 1 }}>
 															<Box className="settings-connection-info" sx={{ display: "flex", alignItems: "center", gap: 2 }}>
 																<div
 																	className={`connection-status-dot ${statusClass}`}
@@ -999,17 +998,6 @@ export function SettingsPanel() {
 													/>
 												</div>
 											</Box>
-										</Box>
-									</Box>
-								)}
-
-								{activeTab === "theme" && (
-									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Theme</Typography>
-											<Typography variant="body2" color="text.secondary">
-												The current theme is controlled by the top-right toggle button. Current: {formState?.theme}
-											</Typography>
 										</Box>
 									</Box>
 								)}

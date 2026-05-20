@@ -47,7 +47,7 @@ struct IntelligenceState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SessionKey {
-    connection_id: String,
+    target_name: String,
     session: String,
 }
 
@@ -60,11 +60,11 @@ struct CacheEntry {
 impl IntelligenceStore {
     pub fn get(
         &self,
-        connection_id: &str,
+        target_name: &str,
         session: &str,
         cache_ttl: Duration,
     ) -> Option<SessionIntelligence> {
-        let key = SessionKey::new(connection_id, session);
+        let key = SessionKey::new(target_name, session);
         let state = self.inner.lock().ok()?;
         let entry = state.cache.get(&key)?;
         let mut result = entry.result.clone();
@@ -76,11 +76,11 @@ impl IntelligenceStore {
 
     pub fn should_analyze(
         &self,
-        connection_id: &str,
+        target_name: &str,
         session: &str,
         min_interval: Duration,
     ) -> bool {
-        let key = SessionKey::new(connection_id, session);
+        let key = SessionKey::new(target_name, session);
         self.inner
             .lock()
             .map(|state| {
@@ -94,12 +94,12 @@ impl IntelligenceStore {
 
     pub fn begin_analyze(
         &self,
-        connection_id: &str,
+        target_name: &str,
         session: &str,
         min_interval: Duration,
         max_concurrency: usize,
     ) -> bool {
-        let key = SessionKey::new(connection_id, session);
+        let key = SessionKey::new(target_name, session);
         let Ok(mut state) = self.inner.lock() else {
             return false;
         };
@@ -120,9 +120,9 @@ impl IntelligenceStore {
         true
     }
 
-    pub fn set(&self, connection_id: &str, session: &str, mut result: SessionIntelligence) {
+    pub fn set(&self, target_name: &str, session: &str, mut result: SessionIntelligence) {
         result.stale = false;
-        let key = SessionKey::new(connection_id, session);
+        let key = SessionKey::new(target_name, session);
         if let Ok(mut state) = self.inner.lock() {
             state.in_flight.remove(&key);
             state.cache.insert(
@@ -137,9 +137,9 @@ impl IntelligenceStore {
 }
 
 impl SessionKey {
-    fn new(connection_id: &str, session: &str) -> Self {
+    fn new(target_name: &str, session: &str) -> Self {
         Self {
-            connection_id: connection_id.to_string(),
+            target_name: target_name.to_string(),
             session: session.to_string(),
         }
     }

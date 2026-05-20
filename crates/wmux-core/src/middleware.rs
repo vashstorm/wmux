@@ -29,7 +29,7 @@ pub async fn logging_middleware(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
     let uri = redacted_uri(request.uri());
-    let connection_id = connection_id_from_request(request.uri(), &path).unwrap_or_default();
+    let target_name = target_name_from_request(request.uri(), &path).unwrap_or_default();
     let start = Instant::now();
 
     let response = next.run(request).await;
@@ -45,7 +45,7 @@ pub async fn logging_middleware(request: Request, next: Next) -> Response {
                 %uri,
                 %status,
                 duration_ms,
-                connection_id = %connection_id,
+                target_name = %target_name,
                 error_code = error_log.as_ref().map(|error| error.code).unwrap_or_default(),
                 error_message = error_log.as_ref().map(|error| error.message.as_str()).unwrap_or_default(),
                 "http request failed"
@@ -57,7 +57,7 @@ pub async fn logging_middleware(request: Request, next: Next) -> Response {
                 %uri,
                 %status,
                 duration_ms,
-                connection_id = %connection_id,
+                target_name = %target_name,
                 error_code = error_log.as_ref().map(|error| error.code).unwrap_or_default(),
                 error_message = error_log.as_ref().map(|error| error.message.as_str()).unwrap_or_default(),
                 "http request failed"
@@ -93,24 +93,24 @@ fn redacted_uri(uri: &axum::http::Uri) -> String {
     format!("{}?{}", uri.path(), query)
 }
 
-fn connection_id_from_request(uri: &axum::http::Uri, path: &str) -> Option<String> {
-    connection_id_from_path(path).or_else(|| connection_id_from_query(uri.query()?))
+fn target_name_from_request(uri: &axum::http::Uri, path: &str) -> Option<String> {
+    target_name_from_path(path).or_else(|| target_name_from_query(uri.query()?))
 }
 
-fn connection_id_from_path(path: &str) -> Option<String> {
+fn target_name_from_path(path: &str) -> Option<String> {
     let mut segments = path.split('/').filter(|segment| !segment.is_empty());
     while let Some(segment) = segments.next() {
-        if segment == "connections" {
+        if segment == "targets" || segment == "connections" {
             return segments.next().map(ToString::to_string);
         }
     }
     None
 }
 
-fn connection_id_from_query(query: &str) -> Option<String> {
+fn target_name_from_query(query: &str) -> Option<String> {
     query.split('&').find_map(|pair| {
         let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-        (key == "connectionId").then(|| value.to_string())
+        (key == "targetName").then(|| value.to_string())
     })
 }
 

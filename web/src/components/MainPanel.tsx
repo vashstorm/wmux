@@ -32,12 +32,12 @@ export function MainPanel() {
 	const hasSelectedPane = selectedPane !== null;
 
 	const sessionKey = selectedPane
-		? `${selectedPane.connectionId}:${selectedPane.session}`
+		? `${selectedPane.targetName}:${selectedPane.session}`
 		: null;
 	const sessionWindowState = sessionKey ? windows[sessionKey] : null;
 	const windowSummaries = sessionWindowState?.windows ?? [];
 	const selectedSession = selectedPane
-		? (sessions[selectedPane.connectionId] ?? []).find((session) => session.name === selectedPane.session)
+		? (sessions[selectedPane.targetName] ?? []).find((session) => session.name === selectedPane.session)
 		: null;
 
 	const currentWindowId = selectedPane?.window ?? null;
@@ -58,7 +58,7 @@ export function MainPanel() {
 			?? activePaneId;
 
 		setSelectedPane({
-			connectionId: selectedPane.connectionId,
+			targetName: selectedPane.targetName,
 			session: selectedPane.session,
 			window: windowId,
 			pane: optimisticPaneId,
@@ -67,16 +67,16 @@ export function MainPanel() {
 		if (options.forcePanes || !loadedPanesForWindow || loadedPanesForWindow.length === 0) {
 			try {
 				const panesResponse = await listPanes(
-					selectedPane.connectionId,
+					selectedPane.targetName,
 					selectedPane.session,
 					windowId
 				);
 				const panes = panesResponse.data ?? [];
-				setPanes(selectedPane.connectionId, selectedPane.session, windowId, panes);
+				setPanes(selectedPane.targetName, selectedPane.session, windowId, panes);
 
 				const activePane = panes.find((p) => p.Active) ?? panes[0];
 				setSelectedPane({
-					connectionId: selectedPane.connectionId,
+					targetName: selectedPane.targetName,
 					session: selectedPane.session,
 					window: windowId,
 					pane: activePane?.ID ?? activePaneId,
@@ -104,13 +104,13 @@ export function MainPanel() {
 			inFlight = true;
 			try {
 				const windowsResponse = await listWindows(
-					selectedPane.connectionId,
+					selectedPane.targetName,
 					selectedPane.session,
 				);
 				if (cancelled) return;
 
 				const nextWindows = windowsResponse.data ?? [];
-				setWindows(selectedPane.connectionId, selectedPane.session, nextWindows);
+				setWindows(selectedPane.targetName, selectedPane.session, nextWindows);
 
 				if (!selectedPane.window) return;
 				if (!nextWindows.some((window) => window.ID === selectedPane.window)) {
@@ -118,14 +118,14 @@ export function MainPanel() {
 				}
 
 				const panesResponse = await listPanes(
-					selectedPane.connectionId,
+					selectedPane.targetName,
 					selectedPane.session,
 					selectedPane.window,
 				);
 				if (cancelled) return;
 
 				const nextPanes = panesResponse.data ?? [];
-				setPanes(selectedPane.connectionId, selectedPane.session, selectedPane.window, nextPanes);
+				setPanes(selectedPane.targetName, selectedPane.session, selectedPane.window, nextPanes);
 			} catch {
 				// 保持终端输入顺滑；显式 API 操作仍会显示错误。
 			} finally {
@@ -150,13 +150,13 @@ export function MainPanel() {
 		const loadInitialPanes = async () => {
 			try {
 				const panesResponse = await listPanes(
-					selectedPane.connectionId,
+					selectedPane.targetName,
 					selectedPane.session,
 					selectedPane.window ?? "",
 				);
 				if (cancelled) return;
 				const panes = panesResponse.data ?? [];
-				setPanes(selectedPane.connectionId, selectedPane.session, selectedPane.window ?? "", panes);
+				setPanes(selectedPane.targetName, selectedPane.session, selectedPane.window ?? "", panes);
 			} catch {
 				// 周期同步会继续尝试刷新。
 			}
@@ -167,14 +167,14 @@ export function MainPanel() {
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedPane?.connectionId, selectedPane?.session, selectedPane?.window, setPanes]);
+	}, [selectedPane?.targetName, selectedPane?.session, selectedPane?.window, setPanes]);
 
 	const handleSelectPane = (paneId: string) => {
 		if (!selectedPane) return;
 		if (selectedPane.pane === paneId) return;
 
 		setSelectedPane({
-			connectionId: selectedPane.connectionId,
+			targetName: selectedPane.targetName,
 			session: selectedPane.session,
 			window: selectedPane.window,
 			pane: paneId,
@@ -286,17 +286,24 @@ export function MainPanel() {
 						flexDirection: "column",
 						alignItems: "center",
 						justifyContent: "center",
-						gap: 2,
-						padding: 4,
-						minHeight: 240,
+						gap: 2.5,
+						padding: 5,
+						minHeight: 280,
 					}}>
 						<Box className="empty-state-icon" aria-hidden="true" sx={{
-							color: "text.disabled",
-							opacity: 0.4,
+							width: 64,
+							height: 64,
+							borderRadius: "50%",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							bgcolor: "var(--color-accent-subtle)",
+							color: "primary.main",
+							mb: 0.5,
 						}}>
 							<svg
-								width="24"
-								height="24"
+								width="28"
+								height="28"
 								viewBox="0 0 24 24"
 								fill="none"
 								xmlns="http://www.w3.org/2000/svg"
@@ -308,9 +315,10 @@ export function MainPanel() {
 							</svg>
 						</Box>
 						<Typography className="empty-state-title" sx={{
-							fontSize: "var(--font-size-lg)",
-							fontWeight: 600,
+							fontSize: "var(--font-size-xl)",
+							fontWeight: 700,
 							color: "text.primary",
+							letterSpacing: "-0.01em",
 						}}>
 							Select a session
 						</Typography>
@@ -318,8 +326,10 @@ export function MainPanel() {
 							fontSize: "var(--font-size-sm)",
 							color: "text.secondary",
 							textAlign: "center",
+							maxWidth: 280,
+							lineHeight: 1.6,
 						}}>
-							Click a session card in the sidebar to open the terminal
+							Choose a session from the sidebar to start working in the terminal
 						</Typography>
 					</Box>
 				)}

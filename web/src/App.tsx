@@ -44,7 +44,17 @@ function MuiThemeShell({ children }: { children: React.ReactNode }) {
 	const { uiSettings } = useAppState();
 	const theme = useModeTheme(uiSettings.theme);
 
-	return <ThemeProvider theme={theme}><CssBaseline />{children}</ThemeProvider>;
+	return (
+		<ThemeProvider theme={theme}>
+			<CssBaseline />
+			<div
+				data-mui-color-scheme={uiSettings.theme === "dark" ? "dark" : "light"}
+				style={{ display: "contents" }}
+			>
+				{children}
+			</div>
+		</ThemeProvider>
+	);
 }
 
 function ThemeToggle() {
@@ -74,10 +84,10 @@ function ThemeToggle() {
 			data-testid="theme-toggle"
 			aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
 			onClick={handleToggle}
-			sx={{ position: "fixed", top: 8, right: 8, zIndex: 9999 }}
 			size="small"
+			sx={{ width: 30, height: 30 }}
 		>
-			{isDark ? <LightModeIcon /> : <DarkModeIcon />}
+			{isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
 		</IconButton>
 	);
 }
@@ -88,9 +98,8 @@ export function App() {
 			<UISettingsInit />
 			<MuiThemeShell>
 				<div className="app-shell" data-testid="app-shell">
-					<ThemeToggle />
 					<ConfigConflictBanner />
-					<Sidebar />
+					<Sidebar themeToggle={<ThemeToggle />} />
 					<MainPanel />
 					<ErrorBanner />
 					<ConfirmDialog />

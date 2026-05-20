@@ -18,8 +18,8 @@ const CONTROL_CLIENT_FLAGS: &str = "active-pane";
 
 #[derive(Debug, Error)]
 pub enum SessionError {
-    #[error("connection id is required")]
-    MissingConnectionId,
+    #[error("target name is required")]
+    MissingTargetName,
     #[error("session target is required")]
     MissingTarget,
     #[error("{0} target is required")]
@@ -151,14 +151,14 @@ impl SessionManager {
 
     pub async fn attach_local(
         &self,
-        connection_id: impl Into<String>,
+        target_name: impl Into<String>,
         tmux_path: impl Into<String>,
         target: impl Into<String>,
         initial_size: WindowSize,
     ) -> Result<Session, SessionError> {
-        let connection_id = connection_id.into();
-        if connection_id.trim().is_empty() {
-            return Err(SessionError::MissingConnectionId);
+        let target_name = target_name.into();
+        if target_name.trim().is_empty() {
+            return Err(SessionError::MissingTargetName);
         }
 
         let tmux_path = tmux_path.into();
@@ -176,12 +176,12 @@ impl SessionManager {
             capture_pane_snapshot(&tmux_path, &resolved_pane.pane_id, initial_size).await?;
 
         let session = self.register(
-            connection_id.clone(),
+            target_name.clone(),
             resolved_pane.display_target.clone(),
             process,
             initial_output,
         )?;
-        tracing::info!(connection_id = %connection_id, target = %resolved_pane.display_target, pane_id = %resolved_pane.pane_id, "terminal control client attached");
+        tracing::info!(target_name = %target_name, target = %resolved_pane.display_target, pane_id = %resolved_pane.pane_id, "terminal control client attached");
         Ok(session)
     }
 
@@ -193,21 +193,21 @@ impl SessionManager {
             .map(Session::info)
             .collect::<Vec<_>>();
         active.sort_by(|a, b| {
-            a.connection_id
-                .cmp(&b.connection_id)
+            a.target_name
+                .cmp(&b.target_name)
                 .then_with(|| a.target.cmp(&b.target))
                 .then_with(|| a.id.cmp(&b.id))
         });
         active
     }
 
-    pub async fn detach(&self, connection_id: &str) {
+    pub async fn detach(&self, target_name: &str) {
         let sessions = {
             let state = self.inner.lock().expect("session manager mutex poisoned");
             state
                 .sessions
                 .values()
-                .filter(|session| session.connection_id() == connection_id)
+                .filter(|session| session.target_name() == target_name)
                 .cloned()
                 .collect::<Vec<_>>()
         };
@@ -236,7 +236,7 @@ impl SessionManager {
 
     fn register(
         &self,
-        connection_id: String,
+        target_name: String,
         target: String,
         process: ControlProcessParts,
         initial_output: Option<String>,
@@ -249,10 +249,10 @@ impl SessionManager {
 
         let session = {
             let mut state = self.inner.lock().expect("session manager mutex poisoned");
-            let id = state.next_session_id(&connection_id);
+            let id = state.next_session_id(&target_name);
             Session {
                 id,
-                connection_id,
+                target_name,
                 target,
                 input_tx,
                 control_tx,
@@ -289,14 +289,14 @@ impl SessionManager {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionInfo {
     pub id: String,
-    pub connection_id: String,
+    pub target_name: String,
     pub target: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Session {
     id: String,
-    connection_id: String,
+    target_name: String,
     target: String,
     input_tx: mpsc::Sender<String>,
     control_tx: mpsc::Sender<SessionControl>,
@@ -311,8 +311,8 @@ impl Session {
         &self.id
     }
 
-    pub fn connection_id(&self) -> &str {
-        &self.connection_id
+    pub fn target_name(&self) -> &str {
+        &self.target_name
     }
 
     pub fn target(&self) -> &str {
@@ -369,7 +369,7 @@ impl Session {
     pub fn info(&self) -> SessionInfo {
         SessionInfo {
             id: self.id.clone(),
-            connection_id: self.connection_id.clone(),
+            target_name: self.target_name.clone(),
             target: self.target.clone(),
         }
     }
@@ -388,10 +388,10 @@ struct ManagerState {
 }
 
 impl ManagerState {
-    fn next_session_id(&mut self, connection_id: &str) -> String {
+    fn next_session_id(&mut self, target_name: &str) -> String {
         loop {
             self.next_id += 1;
-            let id = format!("{}#{}", connection_id, self.next_id);
+            let id = format!("{}#{}", target_name, self.next_id);
             if !self.sessions.contains_key(&id) {
                 return id;
             }

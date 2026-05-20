@@ -113,16 +113,23 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								width,
 								height,
 							}}
-							sx={{
-								border: "1px solid",
-								borderColor: isActive ? "primary.main" : "divider",
-								borderRadius: 1,
-								backgroundColor: isActive ? "action.selected" : "background.paper",
-								cursor: "pointer",
-								overflow: "hidden",
-								transition: "border-color 0.15s ease, background-color 0.15s ease",
-							}}
-							onClick={() => onSelectPane(pane.id)}
+								sx={{
+									border: "1.5px solid",
+									borderColor: isActive ? "primary.main" : "divider",
+									borderRadius: 1.5,
+									backgroundColor: isActive ? "action.selected" : "background.paper",
+									cursor: "pointer",
+									overflow: "hidden",
+									transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+									boxShadow: isActive
+									? (theme) => `0 0 0 1px ${theme.palette.primary.main}22, inset 0 0 20px ${theme.palette.primary.main}08`
+									: "none",
+									"&:hover": {
+									borderColor: isActive ? "primary.main" : "primary.light",
+									backgroundColor: isActive ? "action.selected" : "action.hover",
+									},
+								}}
+								onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
 							{(isAttention || isAttentionExplicit) && (
@@ -139,9 +146,9 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								<button
 									type="button"
 									className="pane-box-label"
-									onClick={(event) => {
-										event.stopPropagation();
-										onSelectPane(pane.id);
+								onClick={(event) => {
+									event.stopPropagation();
+									onSelectPane(pane.id);
 									}}
 								>
 									{pane.title}

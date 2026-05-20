@@ -3,11 +3,9 @@ use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use serde::Deserialize;
 use tokio::sync::broadcast;
-use wmux_core::config::ConnectionConfig;
 use wmux_core::session::{
     ClientMessage, ErrorDetail, ServerMessage, Session, SessionError, WindowSize,
 };
-use wmux_core::tmux::Adapter;
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
@@ -16,7 +14,7 @@ use crate::state::AppState;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalQuery {
-    connection_id: Option<String>,
+    target_name: Option<String>,
     session: Option<String>,
     window: Option<String>,
     pane: Option<String>,
@@ -33,13 +31,13 @@ pub async fn websocket(
 }
 
 async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSocket) {
-    let connection_id = query
-        .connection_id
+    let target_name = query
+        .target_name
         .as_deref()
-        .unwrap_or_default()
+        .unwrap_or("local")
         .trim()
         .to_string();
-    tracing::info!(connection_id = %connection_id, session = ?query.session, "terminal websocket connecting");
+    tracing::info!(target_name = %target_name, session = ?query.session, "terminal websocket connecting");
 
     if send_json(
         &mut socket,
@@ -53,29 +51,16 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
         return;
     }
 
-    let connection = match connection_for_terminal_marker(
-        &state,
-        &connection_id,
-        query.session.as_deref(),
-    )
-    .await
-    .and_then(|connection| {
-        require_local_connection(&connection)?;
-        Ok(connection)
-    }) {
-        Ok(connection) => connection,
-        Err(error) => {
-            tracing::warn!(connection_id = %connection_id, error = %error, "terminal connection lookup failed");
-            send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
-            return;
-        }
-    };
-    let resolved_connection_id = connection.id;
+    if let Err(error) = require_terminal_target(&state, target_name.as_str()) {
+        tracing::warn!(target_name = %target_name, error = %error, "terminal target lookup failed");
+        send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
+        return;
+    }
 
     let target = match build_terminal_target(&query) {
         Ok(target) => target,
         Err(message) => {
-            tracing::warn!(connection_id = %resolved_connection_id, %message, "terminal bad request");
+            tracing::warn!(target_name = %target_name, %message, "terminal bad request");
             send_error_and_close(&mut socket, "bad_request", message).await;
             return;
         }
@@ -83,7 +68,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
     let size = match parse_initial_size(&query) {
         Ok(size) => size,
         Err(message) => {
-            tracing::warn!(connection_id = %resolved_connection_id, %message, "terminal bad request");
+            tracing::warn!(target_name = %target_name, %message, "terminal bad request");
             send_error_and_close(&mut socket, "bad_request", message).await;
             return;
         }
@@ -91,7 +76,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
     let tmux_path = match current_config(&state) {
         Ok(config) => config.tmux.path,
         Err(error) => {
-            tracing::error!(connection_id = %resolved_connection_id, error = %error, "terminal config read failed");
+            tracing::error!(target_name = %target_name, error = %error, "terminal config read failed");
             send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
             return;
         }
@@ -99,21 +84,21 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
 
     let session = match state
         .sessions
-        .attach_local(&resolved_connection_id, tmux_path, target, size)
+        .attach_local(&target_name, tmux_path, target, size)
         .await
     {
         Ok(session) => session,
         Err(error) => {
-            tracing::error!(connection_id = %resolved_connection_id, error = %error, "terminal attach failed");
+            tracing::error!(target_name = %target_name, error = %error, "terminal attach failed");
             send_error_and_close(&mut socket, session_error_code(&error), error.to_string()).await;
             return;
         }
     };
 
-    bridge_terminal(socket, session, resolved_connection_id).await;
+    bridge_terminal(socket, session, target_name).await;
 }
 
-async fn bridge_terminal(mut socket: WebSocket, session: Session, connection_id: String) {
+async fn bridge_terminal(mut socket: WebSocket, session: Session, target_name: String) {
     let mut events = session.subscribe();
     if let Some(initial_output) = session.initial_output()
         && send_json(
@@ -175,7 +160,7 @@ async fn bridge_terminal(mut socket: WebSocket, session: Session, connection_id:
     }
 
     let _ = session.close().await;
-    tracing::info!(%connection_id, "terminal websocket disconnected");
+    tracing::info!(%target_name, "terminal websocket disconnected");
     let _ = socket.send(Message::Close(None)).await;
 }
 
@@ -235,7 +220,7 @@ fn terminal_error(code: impl Into<String>, message: impl Into<String>) -> Server
 
 fn session_error_code(error: &SessionError) -> &'static str {
     match error {
-        SessionError::MissingConnectionId
+        SessionError::MissingTargetName
         | SessionError::MissingTarget
         | SessionError::MissingTargetPart(_)
         | SessionError::InvalidWindowSize
@@ -245,53 +230,12 @@ fn session_error_code(error: &SessionError) -> &'static str {
     }
 }
 
-async fn connection_for_terminal_marker(
-    state: &AppState,
-    id: &str,
-    session_marker: Option<&str>,
-) -> Result<ConnectionConfig, ApiError> {
-    if let Some(connection) = find_connection_exact(state, id)? {
-        return Ok(connection);
+fn require_terminal_target(state: &AppState, target_name: &str) -> Result<(), ApiError> {
+    if target_name == "local" {
+        return Ok(());
     }
-
-    let config = current_config(state)?;
-    let adapter = Adapter::new(config.tmux.path);
-    if let Some(connection) = single_local_connection(config.connections) {
-        for marker in [session_marker, Some(id)].into_iter().flatten() {
-            if marker.trim().is_empty() {
-                continue;
-            }
-            if adapter
-                .has_session(marker)
-                .await
-                .map_err(|error| ApiError::not_found(error.to_string()))?
-            {
-                tracing::info!(
-                    session = %marker,
-                    resolved_connection_id = %connection.id,
-                    "resolved local connection from tmux session name marker"
-                );
-                return Ok(connection);
-            }
-        }
-    }
-
-    find_connection(state, id)
-}
-
-fn find_connection_exact(state: &AppState, id: &str) -> Result<Option<ConnectionConfig>, ApiError> {
-    Ok(current_config(state)?
-        .connections
-        .into_iter()
-        .find(|connection| connection.id == id))
-}
-
-fn single_local_connection(connections: Vec<ConnectionConfig>) -> Option<ConnectionConfig> {
-    let mut local_connections = connections
-        .into_iter()
-        .filter(|connection| connection.connection_type.eq_ignore_ascii_case("local"));
-    let connection = local_connections.next()?;
-    local_connections.next().is_none().then_some(connection)
+    let connection = find_connection(state, target_name)?;
+    require_local_connection(&connection)
 }
 
 fn trimmed_non_empty(value: Option<&str>) -> Option<&str> {

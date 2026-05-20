@@ -22,6 +22,38 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/connections/{id}/health", get(connections::health))
         .route(
+            "/targets/{target}/sessions",
+            get(sessions::list_sessions).post(sessions::create_session),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}",
+            delete(sessions::delete_session).patch(sessions::rename_session),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/analyze",
+            post(sessions::analyze_session),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/windows",
+            get(sessions::list_windows).post(sessions::create_window),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/windows/{window}",
+            delete(sessions::delete_window),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/windows/{window}/panes",
+            get(sessions::list_panes),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/windows/{window}/panes/{pane}/split",
+            post(sessions::split_pane),
+        )
+        .route(
+            "/targets/{target}/sessions/{session}/windows/{window}/panes/{pane}",
+            delete(sessions::delete_pane),
+        )
+        .route(
             "/connections/{id}/sessions",
             get(sessions::list_sessions).post(sessions::create_session),
         )
@@ -270,7 +302,7 @@ mod tests {
             .expect("response");
         assert_eq!(created_response.status(), StatusCode::CREATED);
         let created = json_body(created_response).await;
-        let id = created["id"].as_str().expect("connection id").to_string();
+        let id = created["targetName"].as_str().expect("target name").to_string();
         assert_eq!(created["type"], "local");
 
         let get_response = app
@@ -285,7 +317,7 @@ mod tests {
             .oneshot(request(
                 "PUT",
                 &format!("/api/connections/{id}"),
-                Some(json!({ "id": id, "type": "local" })),
+                Some(json!({ "targetName": id, "type": "local" })),
             ))
             .await
             .expect("response");
@@ -296,6 +328,73 @@ mod tests {
             .await
             .expect("response");
         assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn connections_persist_to_config_file() {
+        let (app, _dir, config_path) = test_app(base_config());
+
+        let created_response = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/connections",
+                Some(json!({ "type": "local" })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(created_response.status(), StatusCode::CREATED);
+        let created = json_body(created_response).await;
+        let id = created["targetName"].as_str().expect("target name").to_string();
+
+        let config_content = fs::read_to_string(&config_path).expect("read config");
+        let config: Value = serde_json::from_str(&config_content).expect("parse config");
+        assert_eq!(config["connections"].as_array().expect("connections array").len(), 1);
+        assert_eq!(config["connections"][0]["id"], id);
+
+        let delete_response = app
+            .oneshot(request("DELETE", &format!("/api/connections/{id}"), None))
+            .await
+            .expect("response");
+        assert_eq!(delete_response.status(), StatusCode::NO_CONTENT);
+
+        let config_content = fs::read_to_string(&config_path).expect("read config");
+        let config: Value = serde_json::from_str(&config_content).expect("parse config");
+        assert_eq!(config["connections"].as_array().expect("connections array").len(), 0);
+    }
+
+    #[tokio::test]
+    async fn connections_loaded_from_config_on_startup() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+
+        let config_with_connection = json!({
+            "schemaVersion": 1,
+            "server": { "bind": "127.0.0.1:0" },
+            "auth": { "token": TOKEN },
+            "tmux": { "path": "tmux" },
+            "connections": [{ "type": "local" }],
+            "ui": { "theme": "dark" }
+        });
+        fs::write(&config_path, serde_json::to_string_pretty(&config_with_connection).expect("serialize"))
+            .expect("write config");
+
+        let store = Config::load(&config_path).expect("load config");
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        let app = router(state);
+
+        let response = app
+            .oneshot(request("GET", "/api/connections", None))
+            .await
+            .expect("response");
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        let connections = body["data"].as_array().expect("connections array");
+        assert_eq!(connections.len(), 1);
+        assert_eq!(connections[0]["type"], "local");
     }
 
     #[tokio::test]
@@ -329,7 +428,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ssh_paths_return_not_implemented_and_analyze_returns_result_shape() {
+    async fn ssh_targets_are_distinct_and_tmux_operations_return_not_implemented() {
         let (app, _dir, _config_path) = test_app(base_config());
 
         let ssh_response = app
@@ -337,13 +436,25 @@ mod tests {
             .oneshot(request(
                 "POST",
                 "/api/connections",
-                Some(json!({ "type": "ssh" })),
+                Some(json!({ "type": "ssh", "host": "example.test", "user": "alice", "port": 2222 })),
             ))
             .await
             .expect("response");
-        assert_eq!(ssh_response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert_eq!(ssh_response.status(), StatusCode::CREATED);
+        let ssh_connection = json_body(ssh_response).await;
+        assert_eq!(ssh_connection["targetName"], "alice@example.test:2222");
+        let ssh_sessions_response = app
+            .clone()
+            .oneshot(request(
+                "GET",
+                "/api/targets/alice%40example.test%3A2222/sessions",
+                None,
+            ))
+            .await
+            .expect("response");
+        assert_eq!(ssh_sessions_response.status(), StatusCode::NOT_IMPLEMENTED);
         assert_eq!(
-            json_body(ssh_response).await["error"]["code"],
+            json_body(ssh_sessions_response).await["error"]["code"],
             "not_implemented"
         );
 
@@ -357,21 +468,19 @@ mod tests {
             .await
             .expect("response");
         let connection = json_body(connection_response).await;
-        let id = connection["id"].as_str().expect("connection id");
+        let id = connection["targetName"].as_str().expect("target name");
         let analyze_response = app
             .oneshot(request(
                 "POST",
-                &format!("/api/connections/{id}/sessions/playwright/analyze"),
+                &format!("/api/targets/{id}/sessions/playwright/analyze"),
                 None,
             ))
             .await
             .expect("response");
-        assert_eq!(analyze_response.status(), StatusCode::OK);
+        assert_eq!(analyze_response.status(), StatusCode::NOT_FOUND);
         let analyze_body = json_body(analyze_response).await;
-        assert_eq!(analyze_body["status"], "error");
-        assert_eq!(analyze_body["updated"], 1);
-        assert_eq!(analyze_body["errors"], 1);
-        assert_eq!(analyze_body["intelligence"]["summary"], "Analysis failed");
+        assert_eq!(analyze_body["error"]["code"], "not_found");
+        assert!(!analyze_body.to_string().contains("connectionId"));
     }
 
     #[tokio::test]

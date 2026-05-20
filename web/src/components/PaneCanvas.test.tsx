@@ -37,7 +37,7 @@ const mockPanes: PaneData[] = [
 ];
 
 const mockSelectedPane: SelectedPane = {
-	connectionId: "1",
+	targetName: "1",
 	session: "session1",
 	window: "@1",
 	pane: "%1",

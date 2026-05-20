@@ -1,9 +1,9 @@
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{FromRequestParts, RawPathParams, State};
+use axum::http::request::Parts;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use wmux_core::config::ConnectionConfig;
 use wmux_core::intelligence::{self, ActiveProvider, SessionIntelligence};
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
@@ -11,10 +11,120 @@ use crate::handlers::connections::{current_config, find_connection, require_loca
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
 
+struct TargetContext {
+    name: String,
+    mode: String,
+    adapter: Adapter,
+}
+
+pub struct SessionPath {
+    target: String,
+    session: String,
+}
+
+pub struct TargetPath {
+    target: String,
+}
+
+pub struct WindowPath {
+    target: String,
+    session: String,
+    window: String,
+}
+
+pub struct PanePath {
+    target: String,
+    session: String,
+    window: String,
+    pane: String,
+}
+
+impl<S> FromRequestParts<S> for SessionPath
+where
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let params = RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|error| ApiError::bad_request(error.to_string()))?;
+        Ok(Self {
+            target: target_path_param(&params)?,
+            session: path_param(&params, "session")?,
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for TargetPath
+where
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let params = RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|error| ApiError::bad_request(error.to_string()))?;
+        Ok(Self {
+            target: target_path_param(&params)?,
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for WindowPath
+where
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let params = RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|error| ApiError::bad_request(error.to_string()))?;
+        Ok(Self {
+            target: target_path_param(&params)?,
+            session: path_param(&params, "session")?,
+            window: path_param(&params, "window")?,
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for PanePath
+where
+    S: Send + Sync,
+{
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let params = RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|error| ApiError::bad_request(error.to_string()))?;
+        Ok(Self {
+            target: target_path_param(&params)?,
+            session: path_param(&params, "session")?,
+            window: path_param(&params, "window")?,
+            pane: path_param(&params, "pane")?,
+        })
+    }
+}
+
+fn target_path_param(params: &RawPathParams) -> Result<String, ApiError> {
+    path_param(params, "target").or_else(|_| path_param(params, "id"))
+}
+
+fn path_param(params: &RawPathParams, name: &'static str) -> Result<String, ApiError> {
+    params
+        .iter()
+        .find_map(|(key, value)| (key == name).then(|| value.trim().to_string()))
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| ApiError::bad_request(format!("{name} path parameter is required")))
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionsListResponse {
-    connection_id: String,
+    target_name: String,
     mode: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     adapter_path: String,
@@ -24,7 +134,7 @@ pub struct SessionsListResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowsListResponse {
-    connection_id: String,
+    target_name: String,
     session: String,
     mode: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -35,7 +145,7 @@ pub struct WindowsListResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PanesListResponse {
-    connection_id: String,
+    target_name: String,
     session: String,
     window: String,
     mode: String,
@@ -47,7 +157,7 @@ pub struct PanesListResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyzeSessionResponse {
-    connection_id: String,
+    target_name: String,
     session: String,
     status: &'static str,
     updated: usize,
@@ -71,7 +181,7 @@ pub struct SplitPaneRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionOperationResponse {
-    connection_id: String,
+    target_name: String,
     operation: &'static str,
     mode: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -82,7 +192,7 @@ pub struct SessionOperationResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowOperationResponse {
-    connection_id: String,
+    target_name: String,
     session: String,
     operation: &'static str,
     mode: String,
@@ -94,7 +204,7 @@ pub struct WindowOperationResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PaneOperationResponse {
-    connection_id: String,
+    target_name: String,
     session: String,
     window: String,
     operation: &'static str,
@@ -107,7 +217,7 @@ pub struct PaneOperationResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationResponse {
-    connection_id: String,
+    target_name: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     session: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -123,40 +233,40 @@ pub struct OperationResponse {
 
 pub async fn list_sessions(
     State(state): State<AppState>,
-    Path(id): Path<String>,
+    target: TargetPath,
 ) -> ApiResult<SessionsListResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
-    let mut data = adapter.list_sessions().await.map_err(session_error)?;
-    apply_cached_session_intelligence(&state, &connection, &mut data);
-    spawn_session_intelligence_refreshes(state.clone(), connection.clone(), adapter.clone(), &data);
+    let target = target_context(&state, target.target).await?;
+    let mut data = target.adapter.list_sessions().await.map_err(session_error)?;
+    apply_cached_session_intelligence(&state, target.name.as_str(), &mut data);
+    spawn_session_intelligence_refreshes(state.clone(), target.name.clone(), target.adapter.clone(), &data);
+    tracing::debug!(target_name = %target.name, "listed tmux sessions");
     Ok(Json(SessionsListResponse {
-        connection_id: connection.id,
-        mode: connection.connection_type,
-        adapter_path: adapter.path().to_string(),
+        target_name: target.name,
+        mode: target.mode,
+        adapter_path: target.adapter.path().to_string(),
         data,
     }))
 }
 
 pub async fn create_session(
     State(state): State<AppState>,
-    Path(id): Path<String>,
+    target: TargetPath,
     Json(payload): Json<NamedRequest>,
 ) -> Result<(StatusCode, Json<SessionOperationResponse>), ApiError> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, None, true).await?;
-    let data = adapter
+    let target = target_context(&state, target.target).await?;
+    let data = target
+        .adapter
         .new_session(payload.name.trim())
         .await
         .map_err(session_error)?;
-    tracing::info!(connection_id = %connection.id, session = %payload.name, "session created");
+    tracing::info!(target_name = %target.name, session = %payload.name, "session created");
     Ok((
         StatusCode::CREATED,
         Json(SessionOperationResponse {
-            connection_id: connection.id,
+            target_name: target.name,
             operation: "create_session",
-            mode: connection.connection_type,
-            adapter_path: adapter.path().to_string(),
+            mode: target.mode,
+            adapter_path: target.adapter.path().to_string(),
             data,
         }),
     ))
@@ -164,10 +274,11 @@ pub async fn create_session(
 
 pub async fn analyze_session(
     State(state): State<AppState>,
-    Path((id, session)): Path<(String, String)>,
+    path: SessionPath,
 ) -> ApiResult<AnalyzeSessionResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    require_session(&target.adapter, &session).await?;
     let config = current_config(&state)?;
     let Some(provider) = intelligence::active_provider(&config) else {
         return Err(ApiError::bad_request(
@@ -176,7 +287,7 @@ pub async fn analyze_session(
     };
 
     let result = analyze_session_text(
-        &adapter,
+        &target.adapter,
         &provider,
         &session,
         config.intelligence.max_bytes,
@@ -188,14 +299,12 @@ pub async fn analyze_session(
         Ok(intelligence) => (intelligence, 0),
         Err(message) => (intelligence::error_result(Some(&provider), message), 1),
     };
-    state.intelligence.set(
-        connection.id.as_str(),
-        session.as_str(),
-        intelligence.clone(),
-    );
+    state
+        .intelligence
+        .set(target.name.as_str(), session.as_str(), intelligence.clone());
 
     Ok(Json(AnalyzeSessionResponse {
-        connection_id: connection.id,
+        target_name: target.name,
         session,
         status: if errors == 0 { "ok" } else { "error" },
         updated: 1,
@@ -207,43 +316,47 @@ pub async fn analyze_session(
 
 pub async fn list_windows(
     State(state): State<AppState>,
-    Path((id, session)): Path<(String, String)>,
+    path: SessionPath,
 ) -> ApiResult<WindowsListResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
-    let data = adapter
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    require_session(&target.adapter, &session).await?;
+    let data = target
+        .adapter
         .list_windows(&session)
         .await
         .map_err(session_error)?;
     Ok(Json(WindowsListResponse {
-        connection_id: connection.id,
+        target_name: target.name,
         session,
-        mode: connection.connection_type,
-        adapter_path: adapter.path().to_string(),
+        mode: target.mode,
+        adapter_path: target.adapter.path().to_string(),
         data,
     }))
 }
 
 pub async fn create_window(
     State(state): State<AppState>,
-    Path((id, session)): Path<(String, String)>,
+    path: SessionPath,
     Json(payload): Json<NamedRequest>,
 ) -> Result<(StatusCode, Json<WindowOperationResponse>), ApiError> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
-    let data = adapter
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    require_session(&target.adapter, &session).await?;
+    let data = target
+        .adapter
         .new_window(&session, payload.name.trim())
         .await
         .map_err(session_error)?;
-    tracing::info!(connection_id = %connection.id, session = %session, window = %payload.name, "window created");
+    tracing::info!(target_name = %target.name, session = %session, window = %payload.name, "window created");
     Ok((
         StatusCode::CREATED,
         Json(WindowOperationResponse {
-            connection_id: connection.id,
+            target_name: target.name,
             session,
             operation: "create_window",
-            mode: connection.connection_type,
-            adapter_path: adapter.path().to_string(),
+            mode: target.mode,
+            adapter_path: target.adapter.path().to_string(),
             data,
         }),
     ))
@@ -251,32 +364,35 @@ pub async fn create_window(
 
 pub async fn list_panes(
     State(state): State<AppState>,
-    Path((id, session, window)): Path<(String, String, String)>,
+    path: WindowPath,
 ) -> ApiResult<PanesListResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
-    let data = adapter
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    let window = path.window;
+    require_session(&target.adapter, &session).await?;
+    let data = target
+        .adapter
         .list_panes(&session, &window)
         .await
         .map_err(session_error)?;
     Ok(Json(PanesListResponse {
-        connection_id: connection.id,
+        target_name: target.name,
         session,
         window,
-        mode: connection.connection_type,
-        adapter_path: adapter.path().to_string(),
+        mode: target.mode,
+        adapter_path: target.adapter.path().to_string(),
         data,
     }))
 }
 
 pub async fn delete_session(
     State(state): State<AppState>,
-    Path((id, session)): Path<(String, String)>,
+    path: SessionPath,
 ) -> ApiResult<OperationResponse> {
     write_session_operation(
         state,
-        id,
-        session,
+        path.target,
+        path.session,
         String::new(),
         String::new(),
         "delete_session",
@@ -286,57 +402,63 @@ pub async fn delete_session(
 
 pub async fn rename_session(
     State(state): State<AppState>,
-    Path((id, session)): Path<(String, String)>,
+    path: SessionPath,
     Json(payload): Json<NamedRequest>,
 ) -> ApiResult<OperationResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
-    adapter
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    require_session(&target.adapter, &session).await?;
+    target
+        .adapter
         .rename_session(&session, payload.name.trim())
         .await
         .map_err(session_error)?;
-    tracing::info!(connection_id = %connection.id, session = %session, new_name = %payload.name, "session renamed");
+    tracing::info!(target_name = %target.name, session = %session, new_name = %payload.name, "session renamed");
     Ok(Json(OperationResponse {
-        connection_id: connection.id,
+        target_name: target.name,
         session,
         window: String::new(),
         pane: String::new(),
         operation: "rename_session",
-        mode: connection.connection_type,
-        adapter_path: adapter.path().to_string(),
+        mode: target.mode,
+        adapter_path: target.adapter.path().to_string(),
         status: "accepted",
     }))
 }
 
 pub async fn delete_window(
     State(state): State<AppState>,
-    Path((id, session, window)): Path<(String, String, String)>,
+    path: WindowPath,
 ) -> ApiResult<OperationResponse> {
-    write_session_operation(state, id, session, window, String::new(), "delete_window").await
+    write_session_operation(state, path.target, path.session, path.window, String::new(), "delete_window").await
 }
 
 pub async fn split_pane(
     State(state): State<AppState>,
-    Path((id, session, window, pane)): Path<(String, String, String, String)>,
+    path: PanePath,
     Json(payload): Json<SplitPaneRequest>,
 ) -> Result<(StatusCode, Json<PaneOperationResponse>), ApiError> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
-    let target = build_pane_target(&session, &window, &pane);
-    let data = adapter
-        .split_window(&target, payload.horizontal)
+    let target = target_context(&state, path.target).await?;
+    let session = path.session;
+    let window = path.window;
+    let pane = path.pane;
+    require_session(&target.adapter, &session).await?;
+    let pane_target = build_pane_target(&session, &window, &pane);
+    let data = target
+        .adapter
+        .split_window(&pane_target, payload.horizontal)
         .await
         .map_err(session_error)?;
-    tracing::info!(connection_id = %connection.id, session = %session, window = %window, pane = %pane, "pane split");
+    tracing::info!(target_name = %target.name, session = %session, window = %window, pane = %pane, "pane split");
     Ok((
         StatusCode::CREATED,
         Json(PaneOperationResponse {
-            connection_id: connection.id,
+            target_name: target.name,
             session,
             window,
             operation: "split_pane",
-            mode: connection.connection_type,
-            adapter_path: adapter.path().to_string(),
+            mode: target.mode,
+            adapter_path: target.adapter.path().to_string(),
             data,
         }),
     ))
@@ -344,31 +466,33 @@ pub async fn split_pane(
 
 pub async fn delete_pane(
     State(state): State<AppState>,
-    Path((id, session, window, pane)): Path<(String, String, String, String)>,
+    path: PanePath,
 ) -> ApiResult<OperationResponse> {
-    write_session_operation(state, id, session, window, pane, "delete_pane").await
+    write_session_operation(state, path.target, path.session, path.window, path.pane, "delete_pane").await
 }
 
 async fn write_session_operation(
     state: AppState,
-    id: String,
+    target_name: String,
     session: String,
     window: String,
     pane: String,
     operation: &'static str,
 ) -> ApiResult<OperationResponse> {
-    let (connection, adapter) =
-        connection_and_adapter_for_session_marker(&state, &id, Some(&session), false).await?;
+    let target = target_context(&state, target_name).await?;
+    require_session(&target.adapter, &session).await?;
 
     match operation {
-        "delete_session" => adapter.kill_session(&session).await,
+        "delete_session" => target.adapter.kill_session(&session).await,
         "delete_window" => {
-            adapter
+            target
+                .adapter
                 .kill_window(&build_window_target(&session, &window))
                 .await
         }
         "delete_pane" => {
-            adapter
+            target
+                .adapter
                 .kill_pane(&build_pane_target(&session, &window, &pane))
                 .await
         }
@@ -376,90 +500,48 @@ async fn write_session_operation(
     }
     .map_err(session_error)?;
 
-    tracing::info!(connection_id = %connection.id, %operation, "session operation accepted");
+    tracing::info!(target_name = %target.name, session = %session, %operation, "session operation accepted");
 
     Ok(Json(OperationResponse {
-        connection_id: connection.id,
+        target_name: target.name,
         session,
         window,
         pane,
         operation,
-        mode: connection.connection_type,
-        adapter_path: adapter.path().to_string(),
+        mode: target.mode,
+        adapter_path: target.adapter.path().to_string(),
         status: "accepted",
     }))
 }
 
-async fn connection_and_adapter_for_session_marker(
-    state: &AppState,
-    id: &str,
-    session_marker: Option<&str>,
-    allow_single_local_without_session_marker: bool,
-) -> Result<(ConnectionConfig, Adapter), ApiError> {
-    if let Some(connection) = find_connection_exact(state, id)? {
-        require_local_connection(&connection)?;
-        return Ok((connection, adapter(state)?));
-    }
-
-    let adapter = adapter(state)?;
-    if let Some(connection) = single_local_connection(state)? {
-        if let Some(marker) = session_marker.filter(|value| !value.trim().is_empty()) {
-            if adapter.has_session(marker).await.map_err(session_error)? {
-                tracing::info!(
-                    session = %marker,
-                    resolved_connection_id = %connection.id,
-                    "resolved local connection from tmux session name marker"
-                );
-                return Ok((connection, adapter));
-            }
-        }
-
-        if !id.trim().is_empty() && adapter.has_session(id).await.map_err(session_error)? {
-            tracing::info!(
-                session = %id,
-                resolved_connection_id = %connection.id,
-                "resolved local connection from tmux session name marker"
-            );
-            return Ok((connection, adapter));
-        }
-
-        if allow_single_local_without_session_marker {
-            tracing::info!(
-                connection_marker = %id,
-                resolved_connection_id = %connection.id,
-                "resolved unique local connection for session listing"
-            );
-            return Ok((connection, adapter));
-        }
-    }
-
-    let connection = find_connection(state, id)?;
-    require_local_connection(&connection)?;
-    Ok((connection, adapter))
-}
-
-fn find_connection_exact(state: &AppState, id: &str) -> Result<Option<ConnectionConfig>, ApiError> {
-    Ok(current_config(state)?
-        .connections
-        .into_iter()
-        .find(|connection| connection.id == id))
-}
-
-fn single_local_connection(state: &AppState) -> Result<Option<ConnectionConfig>, ApiError> {
-    let config = current_config(state)?;
-    let mut local_connections = config
-        .connections
-        .into_iter()
-        .filter(|connection| connection.connection_type.eq_ignore_ascii_case("local"));
-    let Some(connection) = local_connections.next() else {
-        return Ok(None);
-    };
-
-    Ok(local_connections.next().is_none().then_some(connection))
-}
-
 fn adapter(state: &AppState) -> Result<Adapter, ApiError> {
     Ok(Adapter::new(current_config(state)?.tmux.path))
+}
+
+async fn target_context(state: &AppState, target_name: String) -> Result<TargetContext, ApiError> {
+    if target_name == "local" {
+        return Ok(TargetContext {
+            name: target_name,
+            mode: "local".to_string(),
+            adapter: adapter(state)?,
+        });
+    }
+
+    let connection = find_connection(state, target_name.as_str())?;
+    require_local_connection(&connection)?;
+    Ok(TargetContext {
+        name: connection.id,
+        mode: connection.connection_type,
+        adapter: adapter(state)?,
+    })
+}
+
+async fn require_session(adapter: &Adapter, session: &str) -> Result<(), ApiError> {
+    if adapter.has_session(session).await.map_err(session_error)? {
+        Ok(())
+    } else {
+        Err(ApiError::not_found(format!("session not found: {session}")))
+    }
 }
 
 fn session_error(error: TmuxError) -> ApiError {
@@ -483,7 +565,7 @@ fn build_pane_target(session: &str, window: &str, pane: &str) -> String {
 
 fn apply_cached_session_intelligence(
     state: &AppState,
-    connection: &ConnectionConfig,
+    target_name: &str,
     sessions: &mut [Session],
 ) {
     let Ok(config) = current_config(state) else {
@@ -499,7 +581,7 @@ fn apply_cached_session_intelligence(
         if let Some(result) =
             state
                 .intelligence
-                .get(connection.id.as_str(), session.name.as_str(), cache_ttl)
+                .get(target_name, session.name.as_str(), cache_ttl)
         {
             apply_session_intelligence(session, &result);
         }
@@ -508,7 +590,7 @@ fn apply_cached_session_intelligence(
 
 fn spawn_session_intelligence_refreshes(
     state: AppState,
-    connection: ConnectionConfig,
+    target_name: String,
     adapter: Adapter,
     sessions: &[Session],
 ) {
@@ -526,7 +608,7 @@ fn spawn_session_intelligence_refreshes(
 
     for session_name in sessions.iter().map(|session| session.name.clone()) {
         if !state.intelligence.begin_analyze(
-            connection.id.as_str(),
+            target_name.as_str(),
             session_name.as_str(),
             min_interval,
             max_concurrency,
@@ -537,7 +619,8 @@ fn spawn_session_intelligence_refreshes(
         let state = state.clone();
         let adapter = adapter.clone();
         let provider = provider.clone();
-        let connection_id = connection.id.clone();
+        let target_name = target_name.clone();
+        let cache_session_name = session_name.clone();
 
         tokio::spawn(async move {
             let result = analyze_session_text(
@@ -551,7 +634,7 @@ fn spawn_session_intelligence_refreshes(
             .unwrap_or_else(|message| intelligence::error_result(Some(&provider), message));
             state
                 .intelligence
-                .set(connection_id.as_str(), session_name.as_str(), result);
+                .set(target_name.as_str(), cache_session_name.as_str(), result);
         });
     }
 }

@@ -83,6 +83,10 @@ pub async fn update(
         return Err(store_error(error));
     }
 
+    if let Ok(latest) = state.store.snapshot() {
+        state.connections.replace_all(latest.connections);
+    }
+
     tracing::info!("config updated");
 
     let latest = state

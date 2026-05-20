@@ -47,7 +47,7 @@ test.describe("connection management", () => {
 
 		await expect(page.getByTestId("sidebar")).toBeVisible();
 
-		const healthResponse = await request.get(`/api/connections/${connection.id}/health`, {
+		const healthResponse = await request.get(`/api/connections/${connection.targetName}/health`, {
 			headers: {
 				Authorization: "Bearer playwright-token",
 			},

@@ -18,9 +18,9 @@ vi.mock("../api/client.js", () => ({
 	updateConfig: vi.fn(),
 	deleteConnection: vi.fn(),
 	listConnectionHealth: vi.fn(),
-	connectionDisplayName: vi.fn((conn: { type: string; host?: string; id: string }) => {
+	connectionDisplayName: vi.fn((conn: { type: string; host?: string; targetName: string }) => {
 		if (conn.type === "local") return "local";
-		return conn.host ?? conn.id;
+		return conn.host ?? conn.targetName;
 	}),
 }));
 
@@ -48,7 +48,7 @@ const defaultConfig = {
 	server: { bind: "127.0.0.1:7331" },
 	auth: { token: "", tokenConfigured: false },
 	tmux: { path: "tmux" },
-	connections: [{ id: "conn1", type: "local" }],
+	connections: [{ targetName: "conn1", type: "local" }],
 	ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
 	intelligence: {
 		enabled: false,
@@ -84,27 +84,6 @@ describe("SettingsPanel intelligence section", () => {
 		});
 
 		expect(screen.getByRole("button", { name: /AI/i })).toBeInTheDocument();
-	});
-
-	test("Theme tab shows read-only current theme info", async () => {
-		mockGetConfig.mockResolvedValue(defaultConfig);
-		mockListConnectionHealth.mockResolvedValue([]);
-
-		render(
-			<TestWrapper>
-				{enableSettingsPanel()}
-				<SettingsPanel />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: /🎨Theme/i }));
-
-		expect(screen.getByText(/The current theme is controlled by the top-right toggle button/i)).toBeInTheDocument();
-		expect(screen.getByText(/Current: dark/i)).toBeInTheDocument();
 	});
 
 	test("Typography tab renders font controls", async () => {

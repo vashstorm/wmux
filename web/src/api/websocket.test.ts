@@ -37,7 +37,7 @@ describe("TerminalWebSocket", () => {
 
 	function createSocket(overrides?: Partial<ConstructorParameters<typeof TerminalWebSocket>[0]>) {
 		return new TerminalWebSocket({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			window: "win-1",
 			pane: "%1",
@@ -53,7 +53,7 @@ describe("TerminalWebSocket", () => {
 
 		const call = vi.mocked(WebSocket).mock.calls[0]!;
 		const url = call[0] as string;
-		expect(url).toContain("connectionId=conn-1");
+		expect(url).toContain("targetName=conn-1");
 		expect(url).toContain("session=dev");
 		expect(url).toContain("window=win-1");
 		expect(url).toContain("pane=%251");

@@ -32,7 +32,7 @@ describe("Sidebar session loading", () => {
 		vi.useRealTimers();
 		vi.clearAllMocks();
 		mockListConnections.mockResolvedValue([
-			{ id: "conn1", type: "local" },
+			{ targetName: "conn1", type: "local" },
 		]);
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockFetchErrorLogs.mockResolvedValue({ enabled: true, path: "/tmp/wmux-error.log", lines: [], truncated: false, maxLines: 1000 });
@@ -42,12 +42,12 @@ describe("Sidebar session loading", () => {
 		test("periodically refreshes sessions for external tmux changes", async () => {
 			mockListSessions
 				.mockResolvedValueOnce({
-					connectionId: "conn1",
+					targetName: "conn1",
 					mode: "local",
 					data: [{ name: "session1" }],
 				})
 				.mockResolvedValueOnce({
-					connectionId: "conn1",
+					targetName: "conn1",
 					mode: "local",
 					data: [
 						{ name: "session1" },
@@ -72,13 +72,13 @@ describe("Sidebar session loading", () => {
 
 		test("loads the first window and first pane without following external tmux active state", async () => {
 			mockListSessions.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				mode: "local",
 				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				mode: "local",
 				data: [
@@ -88,7 +88,7 @@ describe("Sidebar session loading", () => {
 			});
 
 			mockListPanes.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				window: "@1",
 				mode: "local",
@@ -120,13 +120,13 @@ describe("Sidebar session loading", () => {
 
 		test("falls back to first window when no active window", async () => {
 			mockListSessions.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				mode: "local",
 				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				mode: "local",
 				data: [
@@ -135,7 +135,7 @@ describe("Sidebar session loading", () => {
 			});
 
 			mockListPanes.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				window: "@1",
 				mode: "local",
@@ -163,13 +163,13 @@ describe("Sidebar session loading", () => {
 
 		test("sets session only when no windows exist", async () => {
 			mockListSessions.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				mode: "local",
 				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				mode: "local",
 				data: [],
@@ -198,7 +198,7 @@ describe("Sidebar session loading", () => {
 	describe("handleOpenSession error path", () => {
 		test("listWindows failure sets error in store", async () => {
 			mockListSessions.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				mode: "local",
 				data: [{ name: "session1" }],
 			});
@@ -236,13 +236,13 @@ describe("Sidebar session loading", () => {
 
 		test("listPanes failure sets error in store", async () => {
 			mockListSessions.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				mode: "local",
 				data: [{ name: "session1" }],
 			});
 
 			mockListWindows.mockResolvedValue({
-				connectionId: "conn1",
+				targetName: "conn1",
 				session: "session1",
 				mode: "local",
 				data: [
@@ -282,13 +282,13 @@ describe("Sidebar session loading", () => {
 describe("session card attention rendering", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockListConnections.mockResolvedValue([{ id: "conn1", type: "local" }]);
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
 		mockListConnectionHealth.mockResolvedValue([]);
 	});
 
 	test("session card with attention state gets is-attention class", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", attentionState: "attention", attentionCount: 1 }],
 		});
@@ -309,7 +309,7 @@ describe("session card attention rendering", () => {
 
 	test("session card with explicit attention state gets is-attention-explicit class", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", attentionState: "explicit", attentionCount: 1 }],
 		});
@@ -330,7 +330,7 @@ describe("session card attention rendering", () => {
 
 	test("session card with attention shows badge count", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", attentionState: "attention", attentionCount: 2 }],
 		});
@@ -354,16 +354,16 @@ describe("session card attention rendering", () => {
 describe("intelligence badge and summary rendering", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mockListConnections.mockResolvedValue([{ id: "conn1", type: "local" }]);
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockListWindows.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			session: "session1",
 			mode: "local",
 			data: [],
 		});
 		mockListPanes.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			session: "session1",
 			window: "@1",
 			mode: "local",
@@ -373,7 +373,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStatus waiting renders badge with text Waiting", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "waiting" }],
 		});
@@ -395,7 +395,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStatus dead_loop renders badge with text Loop", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "dead_loop" }],
 		});
@@ -417,7 +417,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStatus blocked renders badge with text Blocked", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "blocked" }],
 		});
@@ -439,7 +439,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStatus running renders badge with text Running", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "running" }],
 		});
@@ -461,7 +461,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStatus none does NOT render intelligence badge", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "none" }],
 		});
@@ -482,7 +482,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceSummary renders one-line summary text in the card", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting for input" }],
 		});
@@ -504,7 +504,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceStale true has title that includes stale", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting", intelligenceStale: true }],
 		});
@@ -528,7 +528,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("session with intelligenceError has error indicator in title not raw error text", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1", intelligenceStatus: "none", intelligenceSummary: "Failed", intelligenceError: "API timeout" }],
 		});
@@ -562,7 +562,7 @@ describe("intelligence badge and summary rendering", () => {
 			maxLines: 1000,
 		});
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1" }],
 		});
@@ -581,7 +581,7 @@ describe("intelligence badge and summary rendering", () => {
 
 	test("sidebar header switches between placeholder projects, sessions, and stats views", async () => {
 		mockListSessions.mockResolvedValue({
-			connectionId: "conn1",
+			targetName: "conn1",
 			mode: "local",
 			data: [{ name: "session1" }],
 		});

@@ -1,4 +1,4 @@
-import { Box, Tabs, Tab } from "@mui/material";
+import { Box, Tabs, Tab, keyframes } from "@mui/material";
 import type { PaneData, WindowSummary } from "../state/store.js";
 
 interface WindowTabsProps {
@@ -24,6 +24,12 @@ function inferAppNameFromText(value: string | undefined): string | null {
 	}
 	return null;
 }
+
+const pulseAnimation = keyframes`
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+`;
 
 function getAppCountsFromPanes(panes: PaneData[] | undefined): Record<string, number> {
 	if (!panes || panes.length === 0) {
@@ -162,19 +168,35 @@ export function WindowTabs({
 							className={tabClasses}
 							title={displayName}
 							disableRipple
-							sx={{
-								...tabSxBase,
-								backgroundColor: "background.paper",
-								border: "1px solid",
-								borderColor: isActive ? "primary.main" : "divider",
-								color: isActive ? "primary.main" : "text.secondary",
-								fontWeight: isActive ? 600 : 500,
-								"boxShadow": isActive ? "0 -2px 12px rgba(245, 158, 11, 0.12)" : "none",
-								"&:hover": {
-									backgroundColor: "action.hover",
-									borderColor: "action.hover",
-								},
-							}}
+								sx={{
+									...tabSxBase,
+									position: "relative",
+									backgroundColor: isActive ? "action.selected" : "background.paper",
+									border: "1px solid",
+									borderColor: isActive ? "primary.main" : "divider",
+									color: isActive ? "primary.main" : "text.secondary",
+									fontWeight: isActive ? 600 : 500,
+									boxShadow: isActive
+										? (theme) => `0 0 0 1px ${theme.palette.primary.main}33, ${theme.palette.mode === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"}`
+										: "none",
+									transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+									"&:hover": {
+										backgroundColor: "action.hover",
+										borderColor: isActive ? "primary.main" : "action.hover",
+									},
+									"&::before": isActive
+										? {
+															content: "\"\"",
+												position: "absolute",
+												left: 0,
+												top: "20%",
+												bottom: "20%",
+												width: "3px",
+												borderRadius: "0 4px 4px 0",
+												backgroundColor: "primary.main",
+											}
+										: {},
+								}}
 							label={
 								<Box sx={{ display: "flex", alignItems: "center", gap: 1 }} data-testid={`window-tab-content-${window.id}`}>
 									<Box
@@ -232,7 +254,8 @@ export function WindowTabs({
 												fontWeight: 600,
 												lineHeight: 1,
 												color: "#fff",
-												backgroundColor: "var(--color-attention-explicit)",
+												backgroundColor: isAttentionExplicit ? "var(--color-attention-explicit)" : "var(--color-attention)",
+													animation: isAttentionExplicit ? `${pulseAnimation} 2s infinite` : "none",
 												flexShrink: 0,
 											}}
 										>

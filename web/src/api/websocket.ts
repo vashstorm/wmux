@@ -12,7 +12,7 @@ export type ServerMessage =
 	| { type: "close" };
 
 export interface TerminalWebSocketOptions {
-	connectionId: string;
+	targetName: string;
 	session: string;
 	window?: string;
 	pane?: string;
@@ -45,9 +45,9 @@ export class TerminalWebSocket {
 			return;
 		}
 
-		const { connectionId, session, window: windowId, pane, rows, cols, token } = this.options;
+		const { targetName, session, window: windowId, pane, rows, cols, token } = this.options;
 		const params = new URLSearchParams();
-		params.set("connectionId", connectionId);
+		params.set("targetName", targetName);
 		params.set("session", session);
 		if (windowId) params.set("window", windowId);
 		if (pane) params.set("pane", pane);

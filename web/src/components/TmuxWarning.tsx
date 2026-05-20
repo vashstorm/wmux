@@ -1,13 +1,13 @@
 import { useAppState } from "../state/store.js";
 
 export function TmuxWarning() {
-	const { error, selectedConnectionId, connections } = useAppState();
+	const { error, selectedTargetName, connections } = useAppState();
 
-	if (error?.code !== "tmux_not_found" || !selectedConnectionId) {
+	if (error?.code !== "tmux_not_found" || !selectedTargetName) {
 		return null;
 	}
 
-	const selectedConnection = connections.find((connection) => connection.id === selectedConnectionId);
+	const selectedConnection = connections.find((connection) => connection.targetName === selectedTargetName);
 	if (selectedConnection?.type !== "local") {
 		return null;
 	}

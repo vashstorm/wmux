@@ -38,7 +38,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<unknow
 }
 
 export interface ConnectionConfig {
-	id: string;
+	targetName: string;
 	type: string;
 	host?: string;
 	port?: number;
@@ -51,7 +51,7 @@ export function connectionDisplayName(conn: ConnectionConfig): string {
 	if (conn.type === "local") {
 		return "local";
 	}
-	return conn.host ?? conn.id;
+	return conn.host ?? conn.targetName;
 }
 
 export interface ConnectionsListResponse {
@@ -86,14 +86,14 @@ export interface SessionInfoData {
 }
 
 export interface SessionsListResponse {
-	connectionId: string;
+	targetName: string;
 	mode: string;
 	adapterPath?: string;
 	data: SessionInfoData[];
 }
 
 export interface OperationResponse {
-	connectionId: string;
+	targetName: string;
 	session?: string;
 	window?: string;
 	pane?: string;
@@ -172,26 +172,26 @@ export async function listConnections(): Promise<ConnectionConfig[]> {
 	return response.data ?? [];
 }
 
-export async function createConnection(data: Omit<ConnectionConfig, "id">): Promise<ConnectionConfig> {
+export async function createConnection(data: Omit<ConnectionConfig, "targetName">): Promise<ConnectionConfig> {
 	return (await apiFetch("/api/connections", {
 		method: "POST",
 		body: JSON.stringify(data),
 	})) as ConnectionConfig;
 }
 
-export async function getConnection(id: string): Promise<ConnectionConfig> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(id)}`)) as ConnectionConfig;
+export async function getConnection(targetName: string): Promise<ConnectionConfig> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`)) as ConnectionConfig;
 }
 
-export async function updateConnection(id: string, data: ConnectionConfig): Promise<ConnectionConfig> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(id)}`, {
+export async function updateConnection(targetName: string, data: ConnectionConfig): Promise<ConnectionConfig> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
 		method: "PUT",
 		body: JSON.stringify(data),
 	})) as ConnectionConfig;
 }
 
-export async function deleteConnection(id: string): Promise<void> {
-	await apiFetch(`/api/connections/${encodeURIComponent(id)}`, {
+export async function deleteConnection(targetName: string): Promise<void> {
+	await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
 		method: "DELETE",
 	});
 }
@@ -239,7 +239,7 @@ type RawWindowInfo = Partial<WindowInfo> & {
 };
 
 export interface WindowsListResponse {
-	connectionId: string;
+	targetName: string;
 	session: string;
 	mode: string;
 	adapterPath?: string;
@@ -287,7 +287,7 @@ type RawPaneInfo = Partial<PaneInfo> & {
 };
 
 export interface PanesListResponse {
-	connectionId: string;
+	targetName: string;
 	session: string;
 	window: string;
 	mode: string;
@@ -340,16 +340,16 @@ function normalizePaneInfo(pane: RawPaneInfo): PaneInfo {
 	};
 }
 
-export async function listWindows(connectionId: string, sessionName: string): Promise<WindowsListResponse> {
-	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as Omit<WindowsListResponse, "data"> & { data?: RawWindowInfo[] };
+export async function listWindows(targetName: string, sessionName: string): Promise<WindowsListResponse> {
+	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as Omit<WindowsListResponse, "data"> & { data?: RawWindowInfo[] };
 	return {
 		...response,
 		data: (response.data ?? []).map(normalizeWindowInfo),
 	};
 }
 
-export async function listPanes(connectionId: string, sessionName: string, windowId: string): Promise<PanesListResponse> {
-	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as Omit<PanesListResponse, "data"> & { data?: RawPaneInfo[] };
+export async function listPanes(targetName: string, sessionName: string, windowId: string): Promise<PanesListResponse> {
+	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as Omit<PanesListResponse, "data"> & { data?: RawPaneInfo[] };
 	return {
 		...response,
 		data: (response.data ?? []).map(normalizePaneInfo),
@@ -374,9 +374,9 @@ type NormalizedSession = {
 	intelligenceAppCounts?: Record<string, number>;
 };
 
-export async function listSessions(connectionId: string): Promise<SessionsListResponse> {
-	const response = (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`)) as {
-		connectionId: string;
+export async function listSessions(targetName: string): Promise<SessionsListResponse> {
+	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions`)) as {
+		targetName: string;
 		mode: string;
 		adapterPath?: string;
 		data: Array<{
@@ -441,65 +441,65 @@ export async function listSessions(connectionId: string): Promise<SessionsListRe
 	};
 }
 
-export async function createSession(connectionId: string, name: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions`, {
+export async function createSession(targetName: string, name: string): Promise<OperationResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions`, {
 		method: "POST",
 		body: JSON.stringify({ name }),
 	})) as OperationResponse;
 }
 
-export async function killSession(connectionId: string, session: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}`, {
+export async function killSession(targetName: string, session: string): Promise<OperationResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
 		method: "DELETE",
 	})) as OperationResponse;
 }
 
-export async function renameSession(connectionId: string, session: string, newName: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}`, {
+export async function renameSession(targetName: string, session: string, newName: string): Promise<OperationResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
 		method: "PATCH",
 		body: JSON.stringify({ name: newName }),
 	})) as OperationResponse;
 }
 
-export async function createWindow(connectionId: string, session: string, name: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/windows`, {
+export async function createWindow(targetName: string, session: string, name: string): Promise<OperationResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows`, {
 		method: "POST",
 		body: JSON.stringify({ name }),
 	})) as OperationResponse;
 }
 
-export async function killWindow(connectionId: string, session: string, window: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}`, {
+export async function killWindow(targetName: string, session: string, window: string): Promise<OperationResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}`, {
 		method: "DELETE",
 	})) as OperationResponse;
 }
 
 export async function splitPane(
-	connectionId: string,
+	targetName: string,
 	session: string,
 	window: string,
 	pane: string,
 	horizontal: boolean,
 ): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}/split`, {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}/split`, {
 		method: "POST",
 		body: JSON.stringify({ horizontal }),
 	})) as OperationResponse;
 }
 
 export async function killPane(
-	connectionId: string,
+	targetName: string,
 	session: string,
 	window: string,
 	pane: string,
 ): Promise<OperationResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}`, {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}`, {
 		method: "DELETE",
 	})) as OperationResponse;
 }
 
 export interface ConnectionHealth {
-	connectionId: string;
+	targetName: string;
 	status: "online" | "offline";
 	checkedAt: string;
 	errorCode?: string;
@@ -515,8 +515,8 @@ export async function listConnectionHealth(): Promise<ConnectionHealth[]> {
 	return response.data ?? [];
 }
 
-export async function getConnectionHealth(id: string): Promise<ConnectionHealth> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(id)}/health`)) as ConnectionHealth;
+export async function getConnectionHealth(targetName: string): Promise<ConnectionHealth> {
+	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}/health`)) as ConnectionHealth;
 }
 
 export async function getConfig(): Promise<AppConfig> {
@@ -542,7 +542,7 @@ export interface SessionIntelligence {
 }
 
 export interface AnalyzeSessionResponse {
-	connectionId: string;
+	targetName: string;
 	session: string;
 	status: string;
 	updated: number;
@@ -551,8 +551,8 @@ export interface AnalyzeSessionResponse {
 	intelligence?: SessionIntelligence & { appCounts?: Record<string, number> };
 }
 
-export async function analyzeSession(connectionId: string, session: string): Promise<AnalyzeSessionResponse> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(connectionId)}/sessions/${encodeURIComponent(session)}/analyze`, {
+export async function analyzeSession(targetName: string, session: string): Promise<AnalyzeSessionResponse> {
+	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/analyze`, {
 		method: "POST",
 		body: JSON.stringify({}),
 	})) as AnalyzeSessionResponse;

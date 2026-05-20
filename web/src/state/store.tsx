@@ -55,7 +55,7 @@ export interface SessionWindowState {
  * These are populated once a session is opened and remain stable across refreshes.
  */
 export interface SelectedPane {
-	connectionId: string;
+	targetName: string;
 	session: string;
 	window?: string;
 	pane?: string;
@@ -143,7 +143,7 @@ export interface UISettings {
 
 export interface AppState {
 	connections: ConnectionConfig[];
-	selectedConnectionId: string | null;
+	selectedTargetName: string | null;
 	sessions: Record<string, SessionInfoData[]>;
 	windows: Record<string, SessionWindowState>;
 	loading: {
@@ -181,11 +181,11 @@ export interface ConfirmDialogState {
 
 interface AppContextValue extends AppState {
 	setConnections: (connections: ConnectionConfig[]) => void;
-	setSelectedConnectionId: (id: string | null) => void;
-	setSessions: (connectionId: string, sessions: SessionInfoData[]) => void;
-	updateSession: (connectionId: string, sessionName: string, updates: Partial<SessionInfoData>) => void;
-	setWindows: (connectionId: string, session: string, windows: WindowInfo[]) => void;
-	setPanes: (connectionId: string, session: string, windowId: string, panes: PaneInfo[]) => void;
+	setSelectedTargetName: (targetName: string | null) => void;
+	setSessions: (targetName: string, sessions: SessionInfoData[]) => void;
+	updateSession: (targetName: string, sessionName: string, updates: Partial<SessionInfoData>) => void;
+	setWindows: (targetName: string, session: string, windows: WindowInfo[]) => void;
+	setPanes: (targetName: string, session: string, windowId: string, panes: PaneInfo[]) => void;
 	setLoading: (key: keyof AppState["loading"], value: boolean) => void;
 	setError: (error: { code: string; message: string } | null) => void;
 	setShowNewConnectionForm: (show: boolean) => void;
@@ -205,7 +205,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
 	const [connections, setConnectionsState] = useState<ConnectionConfig[]>([]);
-	const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+	const [selectedTargetName, setSelectedTargetName] = useState<string | null>(null);
 	const [sessions, setSessionsState] = useState<Record<string, SessionInfoData[]>>({});
 	const [windows, setWindowsState] = useState<AppState["windows"]>({});
 	const [loading, setLoadingState] = useState<AppState["loading"]>({
@@ -236,21 +236,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setConnectionsState(newConnections);
 	}, []);
 
-	const setSessions = useCallback((connectionId: string, newSessions: SessionInfoData[]) => {
-		setSessionsState((prev) => ({ ...prev, [connectionId]: newSessions }));
+	const setSessions = useCallback((targetName: string, newSessions: SessionInfoData[]) => {
+		setSessionsState((prev) => ({ ...prev, [targetName]: newSessions }));
 	}, []);
 
-	const updateSession = useCallback((connectionId: string, sessionName: string, updates: Partial<SessionInfoData>) => {
+	const updateSession = useCallback((targetName: string, sessionName: string, updates: Partial<SessionInfoData>) => {
 		setSessionsState((prev) => ({
 			...prev,
-			[connectionId]: (prev[connectionId] ?? []).map((s) =>
+			[targetName]: (prev[targetName] ?? []).map((s) =>
 				s.name === sessionName ? { ...s, ...updates } : s
 			),
 		}));
 	}, []);
 
-	const setWindows = useCallback((connectionId: string, session: string, newWindows: WindowInfo[]) => {
-		const key = `${connectionId}:${session}`;
+	const setWindows = useCallback((targetName: string, session: string, newWindows: WindowInfo[]) => {
+		const key = `${targetName}:${session}`;
 		setWindowsState((prev) => {
 			const existing = prev[key];
 			return {
@@ -264,8 +264,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		});
 	}, []);
 
-	const setPanes = useCallback((connectionId: string, session: string, windowId: string, newPanes: PaneInfo[]) => {
-		const key = `${connectionId}:${session}`;
+	const setPanes = useCallback((targetName: string, session: string, windowId: string, newPanes: PaneInfo[]) => {
+		const key = `${targetName}:${session}`;
 		setWindowsState((prev) => {
 			const existing = prev[key];
 			const nextPanes = newPanes.map(paneInfoToData);
@@ -307,7 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const value: AppContextValue = {
 		connections,
-		selectedConnectionId,
+		selectedTargetName,
 		sessions,
 		windows,
 		loading,
@@ -322,7 +322,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		connectionHealth,
 		editingConnection,
 		setConnections,
-		setSelectedConnectionId,
+		setSelectedTargetName,
 		setSessions,
 		updateSession,
 		setWindows,
@@ -359,6 +359,6 @@ export function useAppState(): AppContextValue {
 }
 
 export function useSelectedConnection(): ConnectionConfig | null {
-	const { connections, selectedConnectionId } = useAppState();
-	return connections.find((c) => c.id === selectedConnectionId) ?? null;
+	const { connections, selectedTargetName } = useAppState();
+	return connections.find((c) => c.targetName === selectedTargetName) ?? null;
 }

@@ -54,7 +54,7 @@ vi.mock("../state/store.js", () => ({
 }));
 
 const selectedPane: SelectedPane = {
-	connectionId: "conn-1",
+	targetName: "conn-1",
 	session: "dev",
 	window: "@1",
 	pane: "%1",
@@ -171,7 +171,7 @@ describe("MainPanel", () => {
 		} as unknown as ReturnType<typeof useAppState>);
 
 		vi.mocked(listWindows).mockResolvedValue({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			mode: "local",
 			data: [
@@ -188,7 +188,7 @@ describe("MainPanel", () => {
 			],
 		});
 		vi.mocked(listPanes).mockResolvedValue({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			window: "@1",
 			mode: "local",
@@ -260,7 +260,7 @@ describe("MainPanel", () => {
 		} as unknown as ReturnType<typeof useAppState>);
 
 		vi.mocked(listWindows).mockResolvedValue({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			mode: "local",
 			data: [{
@@ -274,7 +274,7 @@ describe("MainPanel", () => {
 			}],
 		});
 		vi.mocked(listPanes).mockResolvedValue({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			window: "@1",
 			mode: "local",
@@ -517,7 +517,7 @@ describe("MainPanel", () => {
 		fireEvent.click(screen.getByText("server"));
 
 		expect(setSelectedPaneState).toHaveBeenCalledWith({
-			connectionId: "conn-1",
+			targetName: "conn-1",
 			session: "dev",
 			window: "@2",
 			pane: "%3",
@@ -535,7 +535,7 @@ describe("MainPanel", () => {
 	test("falls back to window name and pane title when current window has no intelligence metadata", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane: {
-				connectionId: "conn-1",
+				targetName: "conn-1",
 				session: "wmux",
 				window: "@2",
 				pane: "%3",
@@ -593,7 +593,7 @@ describe("MainPanel", () => {
 	test("hides app and summary segments when no data is available", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane: {
-				connectionId: "conn-1",
+				targetName: "conn-1",
 				session: "solo",
 			},
 			sessions: {

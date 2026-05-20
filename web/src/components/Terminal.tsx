@@ -52,7 +52,7 @@ function redrawTerminal(terminal: XTerm) {
 
 export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
 	const { setError, uiSettings } = useAppState();
-	const { connectionId, session, window: windowId, pane } = selectedPane;
+	const { targetName, session, window: windowId, pane } = selectedPane;
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<XTerm | null>(null);
@@ -154,7 +154,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 		setErrorMessage(null);
 
 		const ws = new TerminalWebSocket({
-			connectionId,
+			targetName,
 			session,
 			window: windowId,
 			pane,
@@ -201,7 +201,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 
 		ws.connect();
 		wsRef.current = ws;
-	}, [connectionId, fitAndSyncSize, pane, session, setError, windowId]);
+	}, [targetName, fitAndSyncSize, pane, session, setError, windowId]);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
