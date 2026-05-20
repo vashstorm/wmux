@@ -49,6 +49,37 @@ function formatTokens(tokens: number | null | undefined): string {
 	return tokens.toLocaleString();
 }
 
+function formatJson(jsonString: string | null | undefined): { formatted: string | null; content: unknown } {
+	if (!jsonString) return { formatted: null, content: null };
+	try {
+		const parsed = JSON.parse(jsonString);
+		// Extract content: try top-level first, then OpenAI ChatCompletion format (choices[0].message.content)
+		const content = parsed.content
+			?? parsed.choices?.[0]?.message?.content
+			?? null;
+		return {
+			formatted: JSON.stringify(parsed, null, 2),
+			content,
+		};
+	} catch {
+		return { formatted: jsonString, content: null };
+	}
+}
+
+function formatContentAsJson(content: unknown): string | null {
+	if (content == null) return null;
+	if (typeof content === "string") {
+		try {
+			const parsed = JSON.parse(content);
+			return JSON.stringify(parsed, null, 2);
+		} catch {
+			// Not valid JSON — display as a JSON string literal
+			return JSON.stringify(content);
+		}
+	}
+	return JSON.stringify(content, null, 2);
+}
+
 export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 	const isSuccess = event.status === "success";
 	const isError = event.status === "error";
@@ -138,18 +169,35 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					</>
 				)}
 
-				{event.responseJson && (
-					<>
-						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
-							AI Response
-						</Typography>
-						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-							<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
-								{event.responseJson}
+				{(() => {
+					const { formatted, content } = formatJson(event.responseJson);
+					const contentJson = formatContentAsJson(content);
+					if (!formatted) return null;
+					return (
+						<>
+							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+								AI Response
 							</Typography>
-						</Box>
-					</>
-				)}
+							<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
+								<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+									{formatted}
+								</Typography>
+							</Box>
+							{contentJson != null && (
+								<>
+									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+										Content
+									</Typography>
+									<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
+										<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+											{contentJson}
+										</Typography>
+									</Box>
+								</>
+							)}
+						</>
+					);
+				})()}
 
 				{isError && event.errorMessage && (
 					<>
