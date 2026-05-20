@@ -166,7 +166,7 @@ export function SessionCard({
 										variant="body2"
 										title={sname}
 										sx={{
-											fontSize: "14px",
+											fontSize: "16px",
 											fontWeight: "var(--font-weight-bold)",
 											color: "text.primary",
 											whiteSpace: "nowrap",
@@ -245,11 +245,18 @@ export function SessionCard({
 									</Stack>
 								</Stack>
 							</Stack>
-							<Stack
-								direction="row"
-								spacing={1}
+							<Box
 								className="session-card-meta"
-								sx={{ alignItems: "center", flexWrap: "wrap", justifyContent: "flex-start", minHeight: "18px" }}
+								sx={{
+									display: "flex",
+									alignItems: "center",
+									flexWrap: "wrap",
+									justifyContent: "flex-start",
+									minHeight: "18px",
+									width: "100%",
+									m: 0,
+									p: 0,
+								}}
 							>
 								{hasAttention && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
 									<Chip
@@ -303,7 +310,7 @@ export function SessionCard({
 										/>
 									);
 								})}
-							</Stack>
+							</Box>
 						</Box>
 					</ListItemButton>
 				</Box>
