@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Select, MenuItem, FormControl, InputLabel, Typography, Box, Paper, IconButton, Switch, FormControlLabel, Slider, Card, CardContent, List, ListItem, Divider, Chip, CircularProgress } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
+import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, TextFields as TextFieldsIcon } from "@mui/icons-material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -36,6 +37,40 @@ interface SettingsFormState {
 	intelligenceCacheTTLSec: number;
 	editingProvider: ProviderFormState | null;
 }
+
+type SettingsTabKey = "general" | "connections" | "typography" | "intelligence";
+
+const SETTINGS_SECTIONS: Array<{
+	key: SettingsTabKey;
+	label: string;
+	description: string;
+	icon: typeof SettingsOutlinedIcon;
+}> = [
+	{
+		key: "general",
+		label: "General",
+		description: "Server, authentication, and local environment defaults.",
+		icon: SettingsOutlinedIcon,
+	},
+	{
+		key: "connections",
+		label: "Connections",
+		description: "Manage local and SSH connection entries.",
+		icon: LanIcon,
+	},
+	{
+		key: "typography",
+		label: "Typography",
+		description: "Tune interface and terminal text rendering.",
+		icon: TextFieldsIcon,
+	},
+	{
+		key: "intelligence",
+		label: "AI",
+		description: "Configure provider credentials and analysis limits.",
+		icon: PsychologyIcon,
+	},
+];
 
 function buildFormState(config: AppConfig): SettingsFormState {
 	const sshConnection = config.connections.find((connection) => connection.type === "ssh");
@@ -83,7 +118,7 @@ export function SettingsPanel() {
 	const [formState, setFormState] = useState<SettingsFormState | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
-	const [activeTab, setActiveTab] = useState<"general" | "connections" | "typography" | "intelligence">("general");
+	const [activeTab, setActiveTab] = useState<SettingsTabKey>("general");
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -386,12 +421,7 @@ export function SettingsPanel() {
 		setShowNewConnectionForm(true);
 	};
 
-	const navItems: { key: typeof activeTab; icon: string; label: string }[] = [
-		{ key: "general", icon: "🔧", label: "General" },
-		{ key: "connections", icon: "🌐", label: "Connections" },
-		{ key: "typography", icon: "🔠", label: "Typography" },
-		{ key: "intelligence", icon: "✨", label: "AI" },
-	];
+	const activeSection = SETTINGS_SECTIONS.find((section) => section.key === activeTab) ?? SETTINGS_SECTIONS[0]!;
 
 	return (
 		<Dialog
@@ -411,7 +441,7 @@ export function SettingsPanel() {
 					aria-label="Close settings"
 					sx={{ color: "text.secondary" }}
 				>
-					×
+					<CloseIcon fontSize="small" />
 				</IconButton>
 			</DialogTitle>
 
@@ -423,41 +453,73 @@ export function SettingsPanel() {
 					</Box>
 				</DialogContent>
 			) : (
-				<Box sx={{ display: "flex", height: "70vh", overflow: "hidden" }}>
-					{/* Left: Sidebar Navigation */}
-									<Box role="complementary" sx={{ width: 200, borderRight: 1, borderColor: "divider", p: 1, display: "flex", flexDirection: "column" }}>
-						<nav>
-							{navItems.map((item) => (
-								<Button
-									key={item.key}
-									type="button"
-									fullWidth
-									variant={activeTab === item.key ? "contained" : "text"}
-									onClick={() => flushSync(() => setActiveTab(item.key))}
-									sx={{
-										justifyContent: "flex-start",
-										px: 2,
-										py: 1,
-										mb: 0.5,
-										textTransform: "none",
-										fontSize: "0.875rem",
-									}}
-								>
-									<span className="nav-icon" style={{ marginRight: 8 }}>{item.icon}</span>
-									<span className="nav-label">{item.label}</span>
-								</Button>
-							))}
-						</nav>
+				<Box sx={{ display: "flex", height: "72vh", minHeight: 560, overflow: "hidden" }}>
+					<Box
+						role="complementary"
+						sx={{
+							width: 232,
+							borderRight: 1,
+							borderColor: "divider",
+							p: 1.5,
+							display: "flex",
+							flexDirection: "column",
+							bgcolor: "action.hover",
+						}}
+					>
+						<Box sx={{ px: 1, py: 1.25 }}>
+							<Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.8 }}>
+								Workspace
+							</Typography>
+						</Box>
+						<List component="nav" aria-label="Settings sections" data-testid="settings-nav" disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+							{SETTINGS_SECTIONS.map((item) => {
+								const SectionIcon = item.icon;
+								const selected = activeTab === item.key;
+								return (
+									<ListItemButton
+										key={item.key}
+										selected={selected}
+										onClick={() => flushSync(() => setActiveTab(item.key))}
+										sx={{
+											minHeight: 44,
+											px: 1.25,
+											py: 1,
+											gap: 1.25,
+											border: 1,
+											borderColor: selected ? "primary.main" : "transparent",
+											bgcolor: selected ? "action.selected" : "transparent",
+										}}
+									>
+										<SectionIcon sx={{ fontSize: 18, color: selected ? "primary.main" : "text.secondary", flexShrink: 0 }} />
+										<Box sx={{ minWidth: 0 }}>
+											<Typography variant="body2" sx={{ fontWeight: selected ? 700 : 600, lineHeight: 1.2 }}>
+												{item.label}
+											</Typography>
+											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25, lineHeight: 1.25 }}>
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `${formState.fontSize}px UI` : formState.intelligenceEnabled ? "Enabled" : "Disabled"}
+											</Typography>
+										</Box>
+									</ListItemButton>
+								);
+							})}
+						</List>
 
 						<Box sx={{ mt: "auto", p: 1 }}>
 							<Typography variant="caption" color="text.secondary">wmux v{window.performance ? "0.1.0" : "dev"}</Typography>
 						</Box>
 					</Box>
 
-					{/* Right: Content Area */}
 					<Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 						<form className="settings-form" onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-							<Box sx={{ flex: 1, overflow: "auto", p: 3 }} ref={scrollContainerRef}>
+							<Box sx={{ flex: 1, overflow: "auto", px: 3, py: 2.5 }} ref={scrollContainerRef}>
+								<Box sx={{ mb: 3 }}>
+									<Typography data-testid="settings-active-section-title" variant="h6" sx={{ fontSize: "1rem", fontWeight: 700 }}>
+										{activeSection.label}
+									</Typography>
+									<Typography data-testid="settings-active-section-description" variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+										{activeSection.description}
+									</Typography>
+								</Box>
 								{activeTab === "general" && (
 									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
@@ -534,16 +596,17 @@ export function SettingsPanel() {
 												variant="contained"
 												size="small"
 												onClick={handleNewConnection}
+												startIcon={<AddIcon />}
 											>
-												+ NEW
+												NEW
 											</Button>
 										</Box>
 
 										{connections.length === 0 ? (
 											<Box sx={{ textAlign: "center", py: 4 }}>
-												<div className="empty-icon" style={{ fontSize: "48px" }}>🔌</div>
+												<Typography component="div" sx={{ fontSize: 48, lineHeight: 1 }}>🔌</Typography>
 												<Typography sx={{ my: 1 }}>No connections configured yet</Typography>
-												<Button variant="contained" size="small" onClick={handleNewConnection}>+ NEW</Button>
+												<Button variant="contained" size="small" onClick={handleNewConnection} startIcon={<AddIcon />}>NEW</Button>
 											</Box>
 										) : (
 											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0 }}>
@@ -561,7 +624,22 @@ export function SettingsPanel() {
 														: "System Terminal";
 
 													return (
-														<Box key={connection.targetName} component="li" className="settings-connection-item" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, borderRadius: 1, bgcolor: "background.paper", boxShadow: 1 }}>
+														<Box
+															key={connection.targetName}
+															component="li"
+															className="settings-connection-item"
+															sx={{
+																display: "flex",
+																alignItems: "center",
+																justifyContent: "space-between",
+																p: 1.5,
+																mb: 1,
+																border: 1,
+																borderColor: "divider",
+																borderRadius: 1,
+																bgcolor: "background.paper",
+															}}
+														>
 															<Box className="settings-connection-info" sx={{ display: "flex", alignItems: "center", gap: 2 }}>
 																<div
 																	className={`connection-status-dot ${statusClass}`}
@@ -574,31 +652,37 @@ export function SettingsPanel() {
 																	}
 																/>
 																<Box className="settings-connection-details">
-																	<Typography className="settings-connection-name" variant="body2" sx={{ fontWeight: 500 }}>{connectionDisplayName(connection)}</Typography>
-																	<Typography className="settings-connection-meta" variant="caption" color="text.secondary">
-																		{typeLabel} · {subtitle}
-																	</Typography>
+																	<Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+																		<Typography className="settings-connection-name" variant="body2" sx={{ fontWeight: 700 }}>{connectionDisplayName(connection)}</Typography>
+																		<Chip label={typeLabel} size="small" variant="outlined" />
+																	</Stack>
+																	<Typography className="settings-connection-meta" variant="caption" color="text.secondary">{subtitle}</Typography>
 																</Box>
 															</Box>
 															<Box className="settings-connection-actions" sx={{ display: "flex", gap: 0.5 }}>
-																<IconButton
-																	type="button"
-																	className="connection-edit-btn"
-																	onClick={() => handleEditConnection(connection)}
-																	title="Edit connection"
-																	size="small"
-																>
-																	✎
-																</IconButton>
-																<IconButton
-																	type="button"
-																	className="connection-delete-btn"
-																	onClick={() => handleDeleteConnection(connection)}
-																	title="Delete connection"
-																	size="small"
-																>
-																	×
-																</IconButton>
+																<Tooltip title="Edit connection">
+																	<IconButton
+																		type="button"
+																		className="connection-edit-btn"
+																		onClick={() => handleEditConnection(connection)}
+																		aria-label="Edit connection"
+																		size="small"
+																	>
+																		<EditIcon fontSize="small" />
+																	</IconButton>
+																</Tooltip>
+																<Tooltip title="Delete connection">
+																	<IconButton
+																		type="button"
+																		className="connection-delete-btn"
+																		onClick={() => handleDeleteConnection(connection)}
+																		aria-label="Delete connection"
+																		size="small"
+																		color="error"
+																	>
+																		<DeleteIcon fontSize="small" />
+																	</IconButton>
+																</Tooltip>
 															</Box>
 														</Box>
 													);
@@ -612,16 +696,21 @@ export function SettingsPanel() {
 									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>AI Intelligence</Typography>
-											<div className="form-field form-field-toggle">
-												<label htmlFor="intelligence-enabled">Enable AI Intelligence</label>
-												<input
-													id="intelligence-enabled"
-													type="checkbox"
-													checked={formState.intelligenceEnabled}
-													onChange={(event) => updateField("intelligenceEnabled", event.target.checked)}
-													data-testid="intelligence-enabled-checkbox"
-												/>
-											</div>
+											<FormControlLabel
+												control={
+													<Switch
+														id="intelligence-enabled"
+														checked={formState.intelligenceEnabled}
+														onChange={(event) => updateField("intelligenceEnabled", event.target.checked)}
+														slotProps={{
+															input: {
+																"data-testid": "intelligence-enabled-checkbox",
+															} as React.InputHTMLAttributes<HTMLInputElement>,
+														}}
+													/>
+												}
+												label="Enable AI Intelligence"
+											/>
 										</Box>
 
 										<Box>
@@ -649,35 +738,41 @@ export function SettingsPanel() {
 													)}
 													disabled={!formState.intelligenceEnabled}
 													data-testid="intelligence-add-provider-btn"
+													startIcon={<AddIcon />}
 												>
-													+ ADD PROVIDER
+													ADD PROVIDER
 												</Button>
 											</Box>
 
 											{formState.editingProvider && (
 												<Box className="intelligence-provider-editor" data-testid="intelligence-provider-editor" sx={{ display: "flex", flexDirection: "column", gap: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-													<div className="form-field">
-														<label htmlFor="provider-editor-name">Name</label>
-														<input
-															id="provider-editor-name"
-															type="text"
-															value={formState.editingProvider.name}
-															onChange={(event) => setFormState((current) =>
-																current && current.editingProvider
-																	? {
-																		...current,
-																		editingProvider: { ...current.editingProvider, name: event.target.value },
-																	}
-																	: current
-															)}
-															data-testid="provider-editor-name-input"
-															placeholder="my-anthropic"
-														/>
-													</div>
-													<div className="form-field">
-														<label htmlFor="provider-editor-type">Provider Type</label>
-														<select
+													<TextField
+														id="provider-editor-name"
+														label="Name"
+														type="text"
+														value={formState.editingProvider.name}
+														onChange={(event) => setFormState((current) =>
+															current && current.editingProvider
+																? {
+																	...current,
+																	editingProvider: { ...current.editingProvider, name: event.target.value },
+																}
+																: current
+														)}
+														placeholder="my-anthropic"
+														fullWidth
+														slotProps={{
+															htmlInput: {
+																"data-testid": "provider-editor-name-input",
+															},
+														}}
+													/>
+													<FormControl fullWidth>
+														<InputLabel htmlFor="provider-editor-type">Provider Type</InputLabel>
+														<Select
+															native
 															id="provider-editor-type"
+															label="Provider Type"
 															value={formState.editingProvider.provider}
 															onChange={(event) => setFormState((current) =>
 																current && current.editingProvider
@@ -687,75 +782,85 @@ export function SettingsPanel() {
 																	}
 																	: current
 															)}
-															data-testid="provider-editor-type-select"
+															inputProps={{
+																id: "provider-editor-type",
+																"data-testid": "provider-editor-type-select",
+															}}
 														>
 															<option value="anthropic">anthropic</option>
 															<option value="openai">openai</option>
-														</select>
-													</div>
-													<div className="form-field">
-														<label htmlFor="provider-editor-model">Model</label>
-														<input
-															id="provider-editor-model"
-															type="text"
-															value={formState.editingProvider.model}
-															onChange={(event) => setFormState((current) =>
-																current && current.editingProvider
-																	? {
-																		...current,
-																		editingProvider: { ...current.editingProvider, model: event.target.value },
-																	}
-																	: current
-															)}
-															data-testid="provider-editor-model-input"
-															placeholder="claude-sonnet-4-20250514"
-														/>
-													</div>
-													<div className="form-field">
-														<label htmlFor="provider-editor-api-key">API Key</label>
-														<div className="password-input-wrapper">
-															<input
-																id="provider-editor-api-key"
-																type="password"
-																value={formState.editingProvider.apiKeyInput}
-																onChange={(event) => setFormState((current) =>
-																	current && current.editingProvider
-																		? {
-																			...current,
-																			editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
-																		}
-																		: current
-																)}
-																data-testid="provider-editor-api-key-input"
-																placeholder={formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
-																autoComplete="new-password"
-															/>
-														</div>
-														<p className="form-help-text">
-															{formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew
+														</Select>
+													</FormControl>
+													<TextField
+														id="provider-editor-model"
+														label="Model"
+														type="text"
+														value={formState.editingProvider.model}
+														onChange={(event) => setFormState((current) =>
+															current && current.editingProvider
+																? {
+																	...current,
+																	editingProvider: { ...current.editingProvider, model: event.target.value },
+																}
+																: current
+														)}
+														placeholder="claude-sonnet-4-20250514"
+														fullWidth
+														slotProps={{
+															htmlInput: {
+																"data-testid": "provider-editor-model-input",
+															},
+														}}
+													/>
+													<TextField
+														id="provider-editor-api-key"
+														label="API Key"
+														type="password"
+														value={formState.editingProvider.apiKeyInput}
+														onChange={(event) => setFormState((current) =>
+															current && current.editingProvider
+																? {
+																	...current,
+																	editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
+																}
+																: current
+														)}
+														placeholder={formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
+														autoComplete="new-password"
+														fullWidth
+														helperText={
+															formState.editingProvider.apiKeyConfigured && !formState.editingProvider.isNew
 																? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
-																: "API key is required for new providers."}
-														</p>
-													</div>
-													<div className="form-field">
-														<label htmlFor="provider-editor-base-url">Base URL</label>
-														<input
-															id="provider-editor-base-url"
-															type="text"
-															value={formState.editingProvider.baseURL ?? ""}
-															onChange={(event) => setFormState((current) =>
-																current && current.editingProvider
-																	? {
-																		...current,
-																		editingProvider: { ...current.editingProvider, baseURL: event.target.value },
-																	}
-																	: current
-															)}
-															data-testid="provider-editor-base-url-input"
-															placeholder="https://api.openrouter.ai/v1"
-														/>
-														<p className="form-help-text">Optional custom endpoint for OpenAI-compatible providers.</p>
-													</div>
+																: "API key is required for new providers."
+														}
+														slotProps={{
+															htmlInput: {
+																"data-testid": "provider-editor-api-key-input",
+															},
+														}}
+													/>
+													<TextField
+														id="provider-editor-base-url"
+														label="Base URL"
+														type="text"
+														value={formState.editingProvider.baseURL ?? ""}
+														onChange={(event) => setFormState((current) =>
+															current && current.editingProvider
+																? {
+																	...current,
+																	editingProvider: { ...current.editingProvider, baseURL: event.target.value },
+																}
+																: current
+														)}
+														placeholder="https://api.openrouter.ai/v1"
+														fullWidth
+														helperText="Optional custom endpoint for OpenAI-compatible providers."
+														slotProps={{
+															htmlInput: {
+																"data-testid": "provider-editor-base-url-input",
+															},
+														}}
+													/>
 													<Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
 														<Button
 															type="button"
@@ -839,7 +944,7 @@ export function SettingsPanel() {
 
 											{formState.intelligenceProviders.length === 0 && !formState.editingProvider ? (
 												<Box className="intelligence-providers-empty" data-testid="intelligence-providers-empty" sx={{ textAlign: "center", py: 4 }}>
-													<div className="empty-icon" style={{ fontSize: "48px" }}>🤖</div>
+													<Typography component="div" sx={{ fontSize: 48, lineHeight: 1 }}>🤖</Typography>
 													<Typography>No providers configured yet. Add a provider to get started.</Typography>
 												</Box>
 											) : (
@@ -852,21 +957,39 @@ export function SettingsPanel() {
 																component="li"
 																className={`intelligence-provider-card ${isActive ? "is-active" : ""}`}
 																data-testid={`intelligence-provider-card-${provider.name}`}
-																sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1, position: "relative" }}
+																sx={{
+																	display: "flex",
+																	alignItems: "center",
+																	justifyContent: "space-between",
+																	gap: 2,
+																	p: 1.5,
+																	border: 1,
+																	borderColor: isActive ? "primary.main" : "divider",
+																	borderRadius: 1,
+																	position: "relative",
+																	bgcolor: isActive ? "action.selected" : "background.paper",
+																}}
 															>
-																<Box className="intelligence-provider-info" sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-																	<Typography className="intelligence-provider-name" variant="body2" sx={{ fontWeight: 500 }}>{provider.name}</Typography>
+																<Box className="intelligence-provider-info" sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0 }}>
+																	<Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+																		<Typography className="intelligence-provider-name" variant="body2" sx={{ fontWeight: 700 }} noWrap>{provider.name}</Typography>
+																		{isActive && <Chip label="Active" size="small" color="primary" />}
+																	</Stack>
 																	<Box className="intelligence-provider-meta" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-																		<span className="intelligence-provider-badge" data-testid={`provider-type-badge-${provider.name}`}>
-																			{provider.provider}
-																		</span>
-																		<span className="intelligence-provider-model">{provider.model}</span>
+																		<Chip
+																			className="intelligence-provider-badge"
+																			data-testid={`provider-type-badge-${provider.name}`}
+																			label={provider.provider}
+																			size="small"
+																			variant="outlined"
+																		/>
+																		<Typography className="intelligence-provider-model" component="span" variant="caption" color="text.secondary">{provider.model}</Typography>
 																		{provider.apiKeyConfigured && (
-																			<span className="intelligence-provider-key-status" title="API key configured">🔑</span>
+																			<KeyIcon className="intelligence-provider-key-status" titleAccess="API key configured" fontSize="small" color="action" />
 																		)}
 																	</Box>
 																</Box>
-																<Box className="intelligence-provider-actions" sx={{ display: "flex", gap: 0.5, mt: 1 }}>
+																<Box className="intelligence-provider-actions" sx={{ display: "flex", gap: 0.5, flexShrink: 0 }}>
 																	<Button
 																		type="button"
 																		className={`intelligence-set-active-btn ${isActive ? "is-active" : ""}`}
@@ -881,53 +1004,62 @@ export function SettingsPanel() {
 																	>
 																		{isActive ? "★ ACTIVE" : "SET ACTIVE"}
 																	</Button>
-																	<IconButton
-																		type="button"
-																		className="intelligence-edit-btn"
-																		onClick={() => setFormState((current) =>
-																			current ? {
-																				...current,
-																				editingProvider: {
-																					...provider,
-																					isNew: false,
-																					apiKeyInput: "",
-																					originalName: provider.name,
-																				},
-																			} : current
-																		)}
-																		disabled={!formState.intelligenceEnabled}
-																		title="Edit provider"
-																		data-testid={`provider-edit-${provider.name}`}
-																		size="small"
-																	>
-																		✎
-																	</IconButton>
-																	<IconButton
-																		type="button"
-																		className="intelligence-delete-btn"
-																		onClick={() => {
-																			setFormState((current) => {
-																				if (!current) return current;
-																				const providers = current.intelligenceProviders.filter(
-																					(p) => p.name !== provider.name
-																				);
-																				const activeProvider = current.intelligenceActiveProvider === provider.name
-																					? (providers[0]?.name ?? "")
-																					: current.intelligenceActiveProvider;
-																				return {
-																					...current,
-																					intelligenceProviders: providers,
-																					intelligenceActiveProvider: activeProvider,
-																				};
-																			});
-																		}}
-																		disabled={!formState.intelligenceEnabled}
-																		title="Delete provider"
-																		data-testid={`provider-delete-${provider.name}`}
-																		size="small"
-																	>
-																		×
-																	</IconButton>
+																	<Tooltip title="Edit provider">
+																		<span>
+																			<IconButton
+																				type="button"
+																				className="intelligence-edit-btn"
+																				onClick={() => setFormState((current) =>
+																					current ? {
+																						...current,
+																						editingProvider: {
+																							...provider,
+																							isNew: false,
+																							apiKeyInput: "",
+																							originalName: provider.name,
+																						},
+																					} : current
+																				)}
+																				disabled={!formState.intelligenceEnabled}
+																				aria-label="Edit provider"
+																				data-testid={`provider-edit-${provider.name}`}
+																				size="small"
+																			>
+																				<EditIcon fontSize="small" />
+																			</IconButton>
+																		</span>
+																	</Tooltip>
+																	<Tooltip title="Delete provider">
+																		<span>
+																			<IconButton
+																				type="button"
+																				className="intelligence-delete-btn"
+																				onClick={() => {
+																					setFormState((current) => {
+																						if (!current) return current;
+																						const providers = current.intelligenceProviders.filter(
+																							(p) => p.name !== provider.name
+																						);
+																						const activeProvider = current.intelligenceActiveProvider === provider.name
+																							? (providers[0]?.name ?? "")
+																							: current.intelligenceActiveProvider;
+																						return {
+																							...current,
+																							intelligenceProviders: providers,
+																							intelligenceActiveProvider: activeProvider,
+																						};
+																					});
+																				}}
+																				disabled={!formState.intelligenceEnabled}
+																				aria-label="Delete provider"
+																				data-testid={`provider-delete-${provider.name}`}
+																				size="small"
+																				color="error"
+																			>
+																				<DeleteIcon fontSize="small" />
+																			</IconButton>
+																		</span>
+																	</Tooltip>
 																</Box>
 																{isActive && (
 																	<div className="intelligence-provider-active-indicator" data-testid={`provider-active-indicator-${provider.name}`} />
@@ -942,61 +1074,76 @@ export function SettingsPanel() {
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Global Settings</Typography>
 											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-												<div className="form-field">
-													<label htmlFor="intelligence-max-bytes">Max Bytes</label>
-													<input
-														id="intelligence-max-bytes"
-														type="number"
-														value={formState.intelligenceMaxBytes}
-														onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
-														data-testid="intelligence-max-bytes-input"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-timeout-sec">Timeout (sec)</label>
-													<input
-														id="intelligence-timeout-sec"
-														type="number"
-														value={formState.intelligenceTimeoutSec}
-														onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
-														data-testid="intelligence-timeout-sec-input"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-min-session-interval-sec">Min Session Interval (sec)</label>
-													<input
-														id="intelligence-min-session-interval-sec"
-														type="number"
-														value={formState.intelligenceMinSessionIntervalSec}
-														onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
-														data-testid="intelligence-min-session-interval-sec-input"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-max-concurrency">Max Concurrency</label>
-													<input
-														id="intelligence-max-concurrency"
-														type="number"
-														value={formState.intelligenceMaxConcurrency}
-														onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
-														data-testid="intelligence-max-concurrency-input"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
-												<div className="form-field">
-													<label htmlFor="intelligence-cache-ttl-sec">Cache TTL (sec)</label>
-													<input
-														id="intelligence-cache-ttl-sec"
-														type="number"
-														value={formState.intelligenceCacheTTLSec}
-														onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
-														data-testid="intelligence-cache-ttl-sec-input"
-														disabled={!formState.intelligenceEnabled}
-													/>
-												</div>
+												<TextField
+													id="intelligence-max-bytes"
+													label="Max Bytes"
+													type="number"
+													value={formState.intelligenceMaxBytes}
+													onChange={(event) => updateField("intelligenceMaxBytes", Number(event.target.value))}
+													disabled={!formState.intelligenceEnabled}
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "intelligence-max-bytes-input",
+														},
+													}}
+												/>
+												<TextField
+													id="intelligence-timeout-sec"
+													label="Timeout (sec)"
+													type="number"
+													value={formState.intelligenceTimeoutSec}
+													onChange={(event) => updateField("intelligenceTimeoutSec", Number(event.target.value))}
+													disabled={!formState.intelligenceEnabled}
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "intelligence-timeout-sec-input",
+														},
+													}}
+												/>
+												<TextField
+													id="intelligence-min-session-interval-sec"
+													label="Min Session Interval (sec)"
+													type="number"
+													value={formState.intelligenceMinSessionIntervalSec}
+													onChange={(event) => updateField("intelligenceMinSessionIntervalSec", Number(event.target.value))}
+													disabled={!formState.intelligenceEnabled}
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "intelligence-min-session-interval-sec-input",
+														},
+													}}
+												/>
+												<TextField
+													id="intelligence-max-concurrency"
+													label="Max Concurrency"
+													type="number"
+													value={formState.intelligenceMaxConcurrency}
+													onChange={(event) => updateField("intelligenceMaxConcurrency", Number(event.target.value))}
+													disabled={!formState.intelligenceEnabled}
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "intelligence-max-concurrency-input",
+														},
+													}}
+												/>
+												<TextField
+													id="intelligence-cache-ttl-sec"
+													label="Cache TTL (sec)"
+													type="number"
+													value={formState.intelligenceCacheTTLSec}
+													onChange={(event) => updateField("intelligenceCacheTTLSec", Number(event.target.value))}
+													disabled={!formState.intelligenceEnabled}
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "intelligence-cache-ttl-sec-input",
+														},
+													}}
+												/>
 											</Box>
 										</Box>
 									</Box>
@@ -1006,72 +1153,118 @@ export function SettingsPanel() {
 									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Typography</Typography>
-											<div className="form-field">
-												<label htmlFor="settings-font-size">UI Font Size</label>
-												<div className="font-size-control">
-													<input
-														id="settings-font-size"
-														type="range"
-														min={12}
-														max={24}
-														value={formState.fontSize}
-														onChange={(event) => updateField("fontSize", clampUIFontSize(Number(event.target.value)))}
-														data-testid="settings-font-size-input"
-													/>
-													<span className="font-size-value">{formState.fontSize}px</span>
-												</div>
-											</div>
+											<Box
+												data-testid="settings-typography-preview"
+												sx={{
+													mb: 2.5,
+													p: 2,
+													border: 1,
+													borderColor: "divider",
+													borderRadius: 1,
+													bgcolor: "background.paper",
+												}}
+											>
+												<Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+													<MemoryIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+													<Typography variant="caption" color="text.secondary">wmux terminal preview</Typography>
+												</Stack>
+												<Typography
+													component="div"
+													sx={{
+														fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+														fontSize: `${formState.terminalFontSize}px`,
+														fontWeight: formState.terminalFontWeight,
+														lineHeight: 1.55,
+														color: "text.primary",
+														whiteSpace: "pre-wrap",
+													}}
+												>{`$ tmux ls
+main: 2 windows (created today)
+ui: fonts ${formState.terminalFontSize}px / ${formState.terminalFontWeight}`}</Typography>
+											</Box>
+											<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+												<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+													<Typography component="label" htmlFor="settings-font-size" variant="body2">UI Font Size</Typography>
+													<Chip label={`${formState.fontSize}px`} size="small" />
+												</Box>
+												<Slider
+													id="settings-font-size"
+													min={12}
+													max={24}
+													value={formState.fontSize}
+													onChange={(_, value: number) => updateField("fontSize", clampUIFontSize(value))}
+													valueLabelDisplay="auto"
+													slotProps={{
+														input: {
+															"data-testid": "settings-font-size-input",
+														} as React.InputHTMLAttributes<HTMLInputElement>,
+													}}
+												/>
+											</Box>
 
 											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
-												<div className="form-field">
-													<label htmlFor="settings-terminal-font-size">Terminal Font Size</label>
-													<div className="font-size-control">
-														<input
-															id="settings-terminal-font-size"
-															type="range"
-															min={8}
-															max={32}
-															value={formState.terminalFontSize}
-															onChange={(event) => updateField("terminalFontSize", clampTerminalFontSize(Number(event.target.value)))}
-															data-testid="settings-terminal-font-size-input"
-														/>
-														<span className="font-size-value">{formState.terminalFontSize}px</span>
-													</div>
-												</div>
+												<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+													<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+														<Typography component="label" htmlFor="settings-terminal-font-size" variant="body2">Terminal Font Size</Typography>
+														<Chip label={`${formState.terminalFontSize}px`} size="small" />
+													</Box>
+													<Slider
+														id="settings-terminal-font-size"
+														min={8}
+														max={32}
+														value={formState.terminalFontSize}
+														onChange={(_, value: number) => updateField("terminalFontSize", clampTerminalFontSize(value))}
+														valueLabelDisplay="auto"
+														slotProps={{
+															input: {
+																"data-testid": "settings-terminal-font-size-input",
+															} as React.InputHTMLAttributes<HTMLInputElement>,
+														}}
+													/>
+												</Box>
 
-												<div className="form-field">
-													<label htmlFor="settings-terminal-font-weight">Terminal Font Weight</label>
-													<select
+												<FormControl fullWidth>
+													<InputLabel htmlFor="settings-terminal-font-weight">Terminal Font Weight</InputLabel>
+													<Select
+														native
 														id="settings-terminal-font-weight"
+														label="Terminal Font Weight"
 														value={formState.terminalFontWeight}
 														onChange={(event) => updateField("terminalFontWeight", normalizeTerminalFontWeight(event.target.value))}
-														data-testid="settings-terminal-font-weight-input"
-														className="font-weight-select"
+														inputProps={{
+															id: "settings-terminal-font-weight",
+															"data-testid": "settings-terminal-font-weight-input",
+														}}
 													>
 														{VALID_TERMINAL_FONT_WEIGHTS.map((weight) => (
 															<option key={weight} value={weight}>
 																{weight === "normal" ? "Normal" : weight === "bold" ? "Bold" : weight}
 															</option>
 														))}
-													</select>
-													<p className="form-help-text">Font weight for terminal text.</p>
-												</div>
+													</Select>
+													<Typography variant="caption" color="text.secondary" sx={{ mt: 0.75 }}>Font weight for terminal text.</Typography>
+												</FormControl>
 											</Box>
 										</Box>
 									</Box>
 								)}
 							</Box>
 
-							<Box sx={{ p: 2, borderTop: 1, borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-								<div className="settings-footer-status">
-									{isSaving && <span className="saving-indicator">Saving changes...</span>}
-								</div>
+							<Box sx={{ p: 2, borderTop: 1, borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "background.paper" }}>
+								<Box className="settings-footer-status" sx={{ minHeight: 24, display: "flex", alignItems: "center", gap: 1 }}>
+									{isSaving && (
+										<>
+											<CircularProgress size={16} />
+											<Typography variant="caption" color="text.secondary">Saving changes...</Typography>
+										</>
+									)}
+								</Box>
 								<Box sx={{ display: "flex", gap: 1 }}>
 									<Button type="button" variant="outlined" onClick={handleCancel}>
-										CANCEL
+										Cancel
 									</Button>
 									<Button type="submit" variant="contained" disabled={isSaving || isLoading}>
-										{isSaving ? "SAVING..." : "SAVE"}
+										{isSaving ? "Saving..." : "Save"}
 									</Button>
 								</Box>
 							</Box>

@@ -192,6 +192,69 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByTestId("provider-editor-base-url-input")).toBeInTheDocument();
 	});
 
+	test("Settings custom controls are rendered through MUI inputs", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const enableToggle = screen.getByTestId("intelligence-enabled-checkbox") as HTMLInputElement;
+		expect(enableToggle.closest(".MuiSwitch-root")).not.toBeNull();
+		fireEvent.click(enableToggle);
+
+		fireEvent.click(screen.getByTestId("intelligence-add-provider-btn"));
+
+		expect(screen.getByTestId("provider-editor-name-input").closest(".MuiTextField-root")).not.toBeNull();
+		expect(screen.getByTestId("provider-editor-type-select").closest(".MuiFormControl-root")).not.toBeNull();
+		expect(screen.getByTestId("provider-editor-model-input").closest(".MuiTextField-root")).not.toBeNull();
+		expect(screen.getByTestId("provider-editor-api-key-input").closest(".MuiTextField-root")).not.toBeNull();
+		expect(screen.getByTestId("provider-editor-base-url-input").closest(".MuiTextField-root")).not.toBeNull();
+
+		expect(screen.getByTestId("intelligence-max-bytes-input").closest(".MuiTextField-root")).not.toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		expect(screen.getByTestId("settings-font-size-input").closest(".MuiSlider-root")).not.toBeNull();
+		expect(screen.getByTestId("settings-terminal-font-size-input").closest(".MuiSlider-root")).not.toBeNull();
+		expect(screen.getByTestId("settings-terminal-font-weight-input").closest(".MuiFormControl-root")).not.toBeNull();
+	});
+
+	test("Settings panel exposes clearer navigation, page context, and typography preview", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		expect(screen.getByTestId("settings-nav")).toHaveAttribute("aria-label", "Settings sections");
+		expect(screen.getByTestId("settings-active-section-title")).toHaveTextContent("General");
+		expect(screen.getByTestId("settings-active-section-description")).toHaveTextContent("Server, authentication, and local environment defaults.");
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		expect(screen.getByTestId("settings-active-section-title")).toHaveTextContent("Typography");
+		expect(screen.getByTestId("settings-typography-preview")).toHaveTextContent("wmux terminal preview");
+	});
+
 	test("Save payload includes intelligence object with providers array", async () => {
 		mockGetConfig.mockResolvedValue(defaultConfig);
 		mockListConnectionHealth.mockResolvedValue([]);
