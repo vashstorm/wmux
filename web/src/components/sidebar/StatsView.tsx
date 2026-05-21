@@ -8,9 +8,9 @@ import { useAppState } from "../../state/store.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 30000;
 const STATS_FONT_SIZE = {
-	title: "18px",
-	body: "15px",
-	meta: "13px",
+	title: "var(--font-size-lg)",
+	body: "var(--font-size-base)",
+	meta: "var(--font-size-md)",
 };
 
 function getAiSummary(responseJson: string | null | undefined): string | undefined {

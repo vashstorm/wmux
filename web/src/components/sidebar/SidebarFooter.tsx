@@ -50,7 +50,7 @@ export function SidebarFooter({
             bgcolor: "error.main",
             color: "#fff",
             border: (theme) => `1px solid ${theme.palette.background.paper}`,
-            fontSize: "9px",
+            fontSize: "var(--font-size-2xs)",
             fontWeight: 700,
             minWidth: 16,
             height: 16,

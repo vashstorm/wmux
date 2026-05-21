@@ -398,7 +398,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 											size="small"
 											className="sidebar-session-count"
 											sx={{
-												fontSize: "10px",
+												fontSize: "var(--font-size-xs)",
 												fontWeight: "var(--font-weight-semibold)",
 												color: "text.disabled",
 												bgcolor: "background.default",

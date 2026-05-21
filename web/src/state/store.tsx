@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
+import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, clampUIScaleStep } from "../ui/fontSize.js";
 
 export interface WindowSummary {
 	id: string;
@@ -137,7 +138,7 @@ function preservePaneGeometry(current: PaneData[] | undefined, next: PaneData[])
 export interface UISettings {
 	theme: string;
 	windowTheme: string;
-	fontSize: number;
+	uiScaleStep: number;
 	terminalFontSize: number;
 	terminalFontWeight: string;
 }
@@ -147,7 +148,7 @@ export const UI_SETTINGS_STORAGE_KEY = "wmux-ui-settings";
 const DEFAULT_UI_SETTINGS: UISettings = {
 	theme: "dark",
 	windowTheme: "dark",
-	fontSize: 16,
+	uiScaleStep: DEFAULT_UI_SCALE_STEP,
 	terminalFontSize: 14,
 	terminalFontWeight: "normal",
 };
@@ -159,14 +160,22 @@ function readInitialUISettings(): UISettings {
 		const raw = window.localStorage.getItem(UI_SETTINGS_STORAGE_KEY);
 		if (!raw) return DEFAULT_UI_SETTINGS;
 
-		const parsed = JSON.parse(raw) as Partial<UISettings>;
+		const parsed = JSON.parse(raw) as Partial<UISettings> & { fontSize?: number };
 		const theme = normalizeThemeId(parsed.theme, DEFAULT_UI_SETTINGS.theme);
 		const windowTheme = normalizeThemeId(parsed.windowTheme, theme);
+
+		const uiScaleStep = clampUIScaleStep(
+			parsed.uiScaleStep !== undefined
+				? parsed.uiScaleStep
+				: parsed.fontSize !== undefined
+					? fontSizeToScaleStep(parsed.fontSize)
+					: DEFAULT_UI_SCALE_STEP
+		);
 
 		return {
 			theme,
 			windowTheme,
-			fontSize: parsed.fontSize || DEFAULT_UI_SETTINGS.fontSize,
+			uiScaleStep,
 			terminalFontSize: parsed.terminalFontSize || DEFAULT_UI_SETTINGS.terminalFontSize,
 			terminalFontWeight: parsed.terminalFontWeight || DEFAULT_UI_SETTINGS.terminalFontWeight,
 		};

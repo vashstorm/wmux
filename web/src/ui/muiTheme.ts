@@ -15,8 +15,8 @@ const TYPOGRAPHY = {
 	subtitle1: { fontWeight: 600, letterSpacing: "0" },
 	subtitle2: { fontWeight: 500, letterSpacing: "0" },
 	body1: { letterSpacing: "0" },
-	body2: { letterSpacing: "0", fontSize: "0.8125rem" },
-	caption: { letterSpacing: "0.01em", fontSize: "0.75rem" },
+	body2: { letterSpacing: "0" },
+	caption: { letterSpacing: "0.01em" },
 	button: { textTransform: "none" as const, fontWeight: 600, letterSpacing: "0.01em" },
 };
 
@@ -139,7 +139,7 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 		},
 		MuiDialogTitle: {
 			styleOverrides: {
-				root: { fontWeight: 600, fontSize: "1.0625rem" },
+				root: { fontWeight: 600, fontSize: "var(--font-size-lg)" },
 			},
 		},
 		MuiListItemButton: {

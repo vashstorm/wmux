@@ -9,6 +9,7 @@ import { getErrorMessage } from "../api/errors.js";
 import { getAuthToken } from "../api/runtime.js";
 import { TerminalWebSocket } from "../api/websocket.js";
 import { useAppState, type SelectedPane } from "../state/store.js";
+import { getTerminalFontPx } from "../ui/fontSize.js";
 import { getTerminalTheme } from "../ui/themes.js";
 
 interface TerminalProps {
@@ -135,9 +136,9 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	useEffect(() => {
 		const terminal = terminalRef.current;
 		if (!terminal) return;
-		terminal.options.fontSize = uiSettings.terminalFontSize;
+		terminal.options.fontSize = getTerminalFontPx(uiSettings.uiScaleStep);
 		fitAndSyncSize(true);
-	}, [fitAndSyncSize, uiSettings.terminalFontSize]);
+	}, [fitAndSyncSize, uiSettings.uiScaleStep]);
 
 	useEffect(() => {
 		sourceSizeRef.current = sourceSize ?? null;
@@ -212,7 +213,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			scrollback: 0,
 			fontFamily:
 				"'CaskaydiaCove Nerd Font', 'Geist Mono', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
-			fontSize: uiSettings.terminalFontSize,
+			fontSize: getTerminalFontPx(uiSettings.uiScaleStep),
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			fontWeightBold: "bold",
 			theme: getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme),
@@ -287,7 +288,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			wsRef.current?.close();
 			wsRef.current = null;
 		};
-	}, [clearDeferredFits, connectWebSocket, fitAndSyncSize, scheduleDeferredFit, uiSettings.terminalFontSize, uiSettings.terminalFontWeight]);
+	}, [clearDeferredFits, connectWebSocket, fitAndSyncSize, scheduleDeferredFit, uiSettings.uiScaleStep, uiSettings.terminalFontWeight]);
 
 	useEffect(() => {
 		const terminal = terminalRef.current;

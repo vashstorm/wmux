@@ -49,7 +49,7 @@ const defaultConfig = {
 	auth: { token: "", tokenConfigured: false },
 	tmux: { path: "tmux" },
 	connections: [{ targetName: "conn1", type: "local" }],
-	ui: { theme: "dark", windowTheme: "dark", fontSize: 16, terminalFontSize: 14, terminalFontWeight: "normal" },
+	ui: { theme: "dark", windowTheme: "dark", uiScaleStep: 0, terminalFontSize: 14, terminalFontWeight: "normal" },
 	intelligence: {
 		enabled: false,
 		activeProvider: "",
@@ -103,8 +103,10 @@ describe("SettingsPanel intelligence section", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
 
-		expect(screen.getByTestId("settings-font-size-input")).toBeInTheDocument();
-		expect(screen.getByTestId("settings-terminal-font-size-input")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-decrease")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-increase")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-reset")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-value")).toBeInTheDocument();
 		expect(screen.getByTestId("settings-terminal-font-weight-input")).toBeInTheDocument();
 	});
 
@@ -225,8 +227,13 @@ describe("SettingsPanel intelligence section", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
 
-		expect(screen.getByTestId("settings-font-size-input").closest(".MuiSlider-root")).not.toBeNull();
-		expect(screen.getByTestId("settings-terminal-font-size-input").closest(".MuiSlider-root")).not.toBeNull();
+		const decreaseBtn = screen.getByTestId("settings-scale-decrease") as HTMLButtonElement;
+		expect(decreaseBtn).toBeInTheDocument();
+		const increaseBtn = screen.getByTestId("settings-scale-increase") as HTMLButtonElement;
+		expect(increaseBtn).toBeInTheDocument();
+		const resetBtn = screen.getByTestId("settings-scale-reset") as HTMLButtonElement;
+		expect(resetBtn).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-value")).toBeInTheDocument();
 		expect(screen.getByTestId("settings-terminal-font-weight-input").closest(".MuiFormControl-root")).not.toBeNull();
 	});
 
@@ -1405,5 +1412,314 @@ describe("SettingsPanel intelligence section", () => {
 		expect(screen.getByTestId("provider-set-active-provider-b")).toHaveTextContent("");
 		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveAccessibleName("Set provider-a as active provider");
 		expect(screen.getByTestId("provider-set-active-provider-a")).toHaveTextContent("");
+	});
+});
+
+describe("SettingsPanel uiScaleStep", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	test("Typography tab renders step controls", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		expect(screen.getByTestId("settings-scale-decrease")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-increase")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-reset")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-scale-value")).toBeInTheDocument();
+		expect(screen.getByTestId("settings-terminal-font-weight-input")).toBeInTheDocument();
+	});
+
+	test("Save payload includes uiScaleStep", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockResolvedValue(defaultConfig);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const increaseBtn = screen.getByTestId("settings-scale-increase");
+		fireEvent.click(increaseBtn);
+		fireEvent.click(increaseBtn);
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).toHaveBeenCalled();
+		});
+
+		const callArg = mockUpdateConfig.mock.calls[0]?.[0];
+		expect(callArg?.ui?.uiScaleStep).toBe(2);
+	});
+
+	test("terminalFontWeight remains present in payload", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockUpdateConfig.mockResolvedValue(defaultConfig);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const weightSelect = screen.getByTestId("settings-terminal-font-weight-input") as HTMLSelectElement;
+		fireEvent.change(weightSelect, { target: { value: "bold" } });
+
+		const saveButton = screen.getByRole("button", { name: /SAVE/i });
+		fireEvent.click(saveButton);
+
+		await waitFor(() => {
+			expect(mockUpdateConfig).toHaveBeenCalled();
+		});
+
+		const callArg = mockUpdateConfig.mock.calls[0]?.[0];
+		expect(callArg?.ui?.terminalFontWeight).toBe("bold");
+	});
+
+	test("Loads uiScaleStep from config", async () => {
+		const configWithScaleStep = {
+			...defaultConfig,
+			ui: {
+				...defaultConfig.ui,
+				uiScaleStep: 3,
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithScaleStep);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const valueLabel = screen.getByTestId("settings-scale-value");
+		expect(valueLabel).toHaveTextContent("+3");
+	});
+
+	test("Migrates legacy fontSize to uiScaleStep in form state", async () => {
+		const legacyConfig = {
+			...defaultConfig,
+			ui: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 18,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		};
+		mockGetConfig.mockResolvedValue(legacyConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const valueLabel = screen.getByTestId("settings-scale-value");
+		expect(valueLabel).toHaveTextContent("+3");
+	});
+
+	test("Clamps fontSize 20 to uiScaleStep 4", async () => {
+		const legacyConfig = {
+			...defaultConfig,
+			ui: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 20,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		};
+		mockGetConfig.mockResolvedValue(legacyConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const valueLabel = screen.getByTestId("settings-scale-value");
+		expect(valueLabel).toHaveTextContent("+4");
+	});
+
+	test("Decrease button disabled at step -4", async () => {
+		const configAtMin = {
+			...defaultConfig,
+			ui: {
+				...defaultConfig.ui,
+				uiScaleStep: -4,
+			},
+		};
+		mockGetConfig.mockResolvedValue(configAtMin);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const decreaseBtn = screen.getByTestId("settings-scale-decrease") as HTMLButtonElement;
+		expect(decreaseBtn.disabled).toBe(true);
+		const increaseBtn = screen.getByTestId("settings-scale-increase") as HTMLButtonElement;
+		expect(increaseBtn.disabled).toBe(false);
+	});
+
+	test("Increase button disabled at step +4", async () => {
+		const configAtMax = {
+			...defaultConfig,
+			ui: {
+				...defaultConfig.ui,
+				uiScaleStep: 4,
+			},
+		};
+		mockGetConfig.mockResolvedValue(configAtMax);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const increaseBtn = screen.getByTestId("settings-scale-increase") as HTMLButtonElement;
+		expect(increaseBtn.disabled).toBe(true);
+		const decreaseBtn = screen.getByTestId("settings-scale-decrease") as HTMLButtonElement;
+		expect(decreaseBtn.disabled).toBe(false);
+	});
+
+	test("Reset button sets step to 0", async () => {
+		const configAtMax = {
+			...defaultConfig,
+			ui: {
+				...defaultConfig.ui,
+				uiScaleStep: 3,
+			},
+		};
+		mockGetConfig.mockResolvedValue(configAtMax);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const valueLabel = screen.getByTestId("settings-scale-value");
+		expect(valueLabel).toHaveTextContent("+3");
+
+		const resetBtn = screen.getByTestId("settings-scale-reset");
+		fireEvent.click(resetBtn);
+
+		expect(valueLabel).toHaveTextContent("0");
+	});
+
+	test("Increase and decrease buttons respect boundaries", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: /Typography/i }));
+
+		const decreaseBtn = screen.getByTestId("settings-scale-decrease");
+		const increaseBtn = screen.getByTestId("settings-scale-increase");
+		const valueLabel = screen.getByTestId("settings-scale-value");
+
+		expect(valueLabel).toHaveTextContent("0");
+
+		fireEvent.click(decreaseBtn);
+		fireEvent.click(decreaseBtn);
+		expect(valueLabel).toHaveTextContent("-2");
+
+		fireEvent.click(increaseBtn);
+		expect(valueLabel).toHaveTextContent("-1");
 	});
 });

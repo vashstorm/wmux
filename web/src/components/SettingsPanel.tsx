@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
-import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon } from "@mui/icons-material";
+import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
-import { applyUIFontSize, clampUIFontSize, clampTerminalFontSize, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS } from "../ui/fontSize.js";
+import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
 import { normalizeThemeId } from "../ui/themes.js";
 
 
@@ -24,7 +24,7 @@ interface SettingsFormState {
 	windowTheme: string;
 	tokenInput: string;
 	tokenConfigured: boolean;
-	fontSize: number;
+	uiScaleStep: number;
 	terminalFontSize: number;
 	terminalFontWeight: string;
 	intelligenceEnabled: boolean;
@@ -70,6 +70,13 @@ const SETTINGS_SECTIONS: Array<{
 function buildFormState(config: AppConfig): SettingsFormState {
 	const sshConnection = config.connections.find((connection) => connection.type === "ssh");
 	const intel = config.intelligence;
+
+	const uiScaleStep = config.ui.uiScaleStep !== undefined
+		? config.ui.uiScaleStep
+		: config.ui.fontSize !== undefined
+			? fontSizeToScaleStep(config.ui.fontSize)
+			: DEFAULT_UI_SCALE_STEP;
+
 	return {
 		bind: config.server.bind,
 		tmuxPath: config.tmux.path,
@@ -78,8 +85,8 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		windowTheme: normalizeThemeId(config.ui.windowTheme, normalizeThemeId(config.ui.theme)),
 		tokenInput: "",
 		tokenConfigured: Boolean(config.auth.tokenConfigured),
-		fontSize: config.ui.fontSize || 16,
-		terminalFontSize: config.ui.terminalFontSize || 14,
+		uiScaleStep,
+		terminalFontSize: getTerminalFontPx(uiScaleStep),
 		terminalFontWeight: normalizeTerminalFontWeight(config.ui.terminalFontWeight),
 		intelligenceEnabled: intel?.enabled ?? false,
 		intelligenceActiveProvider: intel?.activeProvider ?? "",
@@ -164,12 +171,12 @@ export function SettingsPanel() {
 		if (!formState) {
 			return;
 		}
-		applyUIFontSize(formState.fontSize);
+		applyUIScaleStep(formState.uiScaleStep);
 		setUISettings({
 			theme: formState.theme,
 			windowTheme: formState.windowTheme,
-			fontSize: formState.fontSize,
-			terminalFontSize: formState.terminalFontSize,
+			uiScaleStep: formState.uiScaleStep,
+			terminalFontSize: getTerminalFontPx(formState.uiScaleStep),
 			terminalFontWeight: formState.terminalFontWeight,
 		});
 	}, [formState, setUISettings]);
@@ -214,6 +221,8 @@ export function SettingsPanel() {
 			return result;
 		});
 
+		const fontSize = getUIFontBasePx(formState.uiScaleStep);
+
 		return {
 			...config,
 			server: {
@@ -232,7 +241,8 @@ export function SettingsPanel() {
 				...config.ui,
 				theme: formState.theme,
 				windowTheme: formState.windowTheme,
-				fontSize: formState.fontSize,
+				uiScaleStep: formState.uiScaleStep,
+				fontSize,
 				terminalFontSize: formState.terminalFontSize,
 				terminalFontWeight: formState.terminalFontWeight,
 			},
@@ -258,12 +268,19 @@ export function SettingsPanel() {
 			setConfig(saved);
 			setFormState(buildFormState(saved));
 			setConnections(saved.connections);
-			applyUIFontSize(saved.ui.fontSize);
+
+			const savedScaleStep = saved.ui.uiScaleStep !== undefined
+				? saved.ui.uiScaleStep
+				: saved.ui.fontSize !== undefined
+					? fontSizeToScaleStep(saved.ui.fontSize)
+					: DEFAULT_UI_SCALE_STEP;
+
+			applyUIScaleStep(savedScaleStep);
 			setUISettings({
 				theme: savedTheme,
 				windowTheme: savedWindowTheme,
-				fontSize: saved.ui.fontSize,
-				terminalFontSize: saved.ui.terminalFontSize,
+				uiScaleStep: savedScaleStep,
+				terminalFontSize: getTerminalFontPx(savedScaleStep),
 				terminalFontWeight: saved.ui.terminalFontWeight,
 			});
 			setConfigConflict(null);
@@ -282,7 +299,7 @@ export function SettingsPanel() {
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
-							ui: { ...latest.ui, theme: payload.ui.theme, windowTheme: payload.ui.windowTheme, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
+							ui: { ...latest.ui, theme: payload.ui.theme, windowTheme: payload.ui.windowTheme, uiScaleStep: payload.ui.uiScaleStep, fontSize: payload.ui.fontSize, terminalFontSize: payload.ui.terminalFontSize, terminalFontWeight: payload.ui.terminalFontWeight },
 							intelligence: {
 								...latest.intelligence,
 								enabled: payload.intelligence.enabled,
@@ -373,12 +390,19 @@ export function SettingsPanel() {
 			const theme = normalizeThemeId(config.ui.theme);
 			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
 			setFormState(buildFormState(config));
-			applyUIFontSize(config.ui.fontSize);
+
+			const uiScaleStep = config.ui.uiScaleStep !== undefined
+				? config.ui.uiScaleStep
+				: config.ui.fontSize !== undefined
+					? fontSizeToScaleStep(config.ui.fontSize)
+					: DEFAULT_UI_SCALE_STEP;
+
+			applyUIScaleStep(uiScaleStep);
 			setUISettings({
 				theme,
 				windowTheme,
-				fontSize: config.ui.fontSize,
-				terminalFontSize: config.ui.terminalFontSize,
+				uiScaleStep,
+				terminalFontSize: getTerminalFontPx(uiScaleStep),
 				terminalFontWeight: config.ui.terminalFontWeight,
 			});
 		}
@@ -691,7 +715,7 @@ export function SettingsPanel() {
 												{item.label}
 											</Typography>
 											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25, lineHeight: 1.25 }}>
-												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `${formState.fontSize}px UI` : formState.intelligenceEnabled ? "Enabled" : "Disabled"}
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : formState.intelligenceEnabled ? "Enabled" : "Disabled"}
 											</Typography>
 										</Box>
 									</ListItemButton>
@@ -1172,7 +1196,7 @@ export function SettingsPanel() {
 													component="div"
 													sx={{
 														fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
-														fontSize: `${formState.terminalFontSize}px`,
+														fontSize: `${getTerminalFontPx(formState.uiScaleStep)}px`,
 														fontWeight: formState.terminalFontWeight,
 														lineHeight: 1.55,
 														color: "text.primary",
@@ -1180,49 +1204,52 @@ export function SettingsPanel() {
 													}}
 												>{`$ tmux ls
 main: 2 windows (created today)
-ui: fonts ${formState.terminalFontSize}px / ${formState.terminalFontWeight}`}</Typography>
+ui: scale ${formState.uiScaleStep > 0 ? "+" : ""}${formState.uiScaleStep}`}</Typography>
 											</Box>
 											<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-												<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-													<Typography component="label" htmlFor="settings-font-size" variant="body2">UI Font Size</Typography>
-													<Chip label={`${formState.fontSize}px`} size="small" />
+												<Typography component="label" variant="body2">UI Scale Step</Typography>
+												<Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+													<IconButton
+														data-testid="settings-scale-decrease"
+														onClick={() => updateField("uiScaleStep", clampUIScaleStep(formState.uiScaleStep - 1))}
+														disabled={formState.uiScaleStep <= MIN_UI_SCALE_STEP}
+														size="small"
+														aria-label="Decrease UI scale step"
+													>
+														<RemoveIcon />
+													</IconButton>
+													<Typography
+														data-testid="settings-scale-value"
+														sx={{
+															minWidth: 32,
+															textAlign: "center",
+															fontFamily: "'SFMono-Regular', Consolas, monospace",
+															fontWeight: 600,
+														}}
+													>
+														{formState.uiScaleStep > 0 ? `+${formState.uiScaleStep}` : formState.uiScaleStep}
+													</Typography>
+													<IconButton
+														data-testid="settings-scale-increase"
+														onClick={() => updateField("uiScaleStep", clampUIScaleStep(formState.uiScaleStep + 1))}
+														disabled={formState.uiScaleStep >= MAX_UI_SCALE_STEP}
+														size="small"
+														aria-label="Increase UI scale step"
+													>
+														<AddIcon />
+													</IconButton>
+													<IconButton
+														data-testid="settings-scale-reset"
+														onClick={() => updateField("uiScaleStep", DEFAULT_UI_SCALE_STEP)}
+														size="small"
+														aria-label="Reset UI scale step"
+													>
+														<RestartAltIcon />
+													</IconButton>
 												</Box>
-												<Slider
-													id="settings-font-size"
-													min={12}
-													max={24}
-													value={formState.fontSize}
-													onChange={(_, value: number) => updateField("fontSize", clampUIFontSize(value))}
-													valueLabelDisplay="auto"
-													slotProps={{
-														input: {
-															"data-testid": "settings-font-size-input",
-														} as React.InputHTMLAttributes<HTMLInputElement>,
-													}}
-												/>
 											</Box>
 
-											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 2 }}>
-												<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-													<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-														<Typography component="label" htmlFor="settings-terminal-font-size" variant="body2">Terminal Font Size</Typography>
-														<Chip label={`${formState.terminalFontSize}px`} size="small" />
-													</Box>
-													<Slider
-														id="settings-terminal-font-size"
-														min={8}
-														max={32}
-														value={formState.terminalFontSize}
-														onChange={(_, value: number) => updateField("terminalFontSize", clampTerminalFontSize(value))}
-														valueLabelDisplay="auto"
-														slotProps={{
-															input: {
-																"data-testid": "settings-terminal-font-size-input",
-															} as React.InputHTMLAttributes<HTMLInputElement>,
-														}}
-													/>
-												</Box>
-
+											<Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}>
 												<FormControl fullWidth>
 													<InputLabel htmlFor="settings-terminal-font-weight">Terminal Font Weight</InputLabel>
 													<Select
@@ -1242,7 +1269,7 @@ ui: fonts ${formState.terminalFontSize}px / ${formState.terminalFontWeight}`}</T
 															</option>
 														))}
 													</Select>
-													<Typography variant="caption" color="text.secondary" sx={{ mt: 0.75 }}>Font weight for terminal text.</Typography>
+													<Typography variant="caption" color="text.secondary" sx={{ mt: 0.75 }}>Font weight for terminal text. Size follows UI scale step.</Typography>
 												</FormControl>
 											</Box>
 										</Box>

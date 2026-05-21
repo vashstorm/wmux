@@ -8,11 +8,11 @@ interface AiEventDetailProps {
 }
 
 const DETAIL_FONT_SIZE = {
-	title: "20px",
-	section: "16px",
-	body: "16px",
-	value: "16px",
-	code: "14px",
+	title: "var(--font-size-xl)",
+	section: "var(--font-size-base)",
+	body: "var(--font-size-base)",
+	value: "var(--font-size-base)",
+	code: "var(--font-size-sm)",
 };
 
 function DetailRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {

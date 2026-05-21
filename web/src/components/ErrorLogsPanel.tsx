@@ -124,7 +124,7 @@ export function ErrorLogsPanel() {
 						)}
 						<Paper
 							variant="outlined"
-							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "monospace", fontSize: "0.8125rem", bgcolor: "action.hover" }}
+							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "monospace", fontSize: "var(--font-size-md)", bgcolor: "action.hover" }}
 							data-testid="error-logs-content"
 						>
 							{logLines.map((line, index) => (

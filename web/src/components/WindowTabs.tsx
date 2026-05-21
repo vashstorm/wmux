@@ -485,7 +485,7 @@ export function WindowTabs({
 											height: 20,
 											minWidth: 20,
 											maxWidth: 20,
-											fontSize: "0.68rem",
+											fontSize: "var(--font-size-2xs)",
 											fontWeight: 700,
 											lineHeight: 1,
 											borderRadius: "999px",
@@ -516,7 +516,7 @@ export function WindowTabs({
 												flex: "0 0 20px",
 											}}
 										>
-											<AppIcon sx={{ fontSize: 14 }} />
+											<AppIcon sx={{ fontSize: "var(--font-size-sm)" }} />
 										</Box>
 									)}
 									<Typography
@@ -546,7 +546,7 @@ export function WindowTabs({
 												height: 18,
 												padding: "0 4px",
 												borderRadius: "50%",
-												fontSize: 10,
+												fontSize: "var(--font-size-xs)",
 												fontWeight: 600,
 												lineHeight: 1,
 												color: "#fff",

@@ -60,7 +60,15 @@ describe("api client", () => {
 		mockJsonResponse(200, { data: [{ targetName: "1", type: "local" }] });
 		const result = await listConnections();
 		expect(result).toHaveLength(1);
+		expect(result[0]!.targetName).toBe("1");
 		expect(result[0]!.type).toBe("local");
+	});
+
+	test("listConnections normalizes config-style ids", async () => {
+		mockJsonResponse(200, { data: [{ id: "local-dev", type: "local" }] });
+		const result = await listConnections();
+		expect(result[0]!.targetName).toBe("local-dev");
+		expect(result[0]!.id).toBe("local-dev");
 	});
 
 	test("createConnection POSTs payload", async () => {
@@ -176,10 +184,26 @@ describe("api client", () => {
 		expect(result.schemaVersion).toBe(1);
 	});
 
+	test("getConfig normalizes config connection ids to targetName", async () => {
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [{ id: "local-dev", type: "local" }], ui: { theme: "dark", windowTheme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		const result = await getConfig();
+		expect(result.connections[0]!.targetName).toBe("local-dev");
+		expect(result.connections[0]!.id).toBe("local-dev");
+	});
+
 	test("updateConfig PUTs payload", async () => {
 		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", windowTheme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		const result = await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [], ui: { theme: "light", windowTheme: "light", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
 		expect(result.ui.theme).toBe("light");
+	});
+
+	test("updateConfig writes targetName connections as config ids", async () => {
+		mockJsonResponse(200, { schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [{ id: "local-dev", type: "local" }], ui: { theme: "dark", windowTheme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+		await updateConfig({ schemaVersion: 1, server: { bind: "127.0.0.1:7331" }, auth: { token: "" }, tmux: { path: "tmux" }, connections: [{ targetName: "local-dev", type: "local" }], ui: { theme: "dark", windowTheme: "dark", fontSize: 14, terminalFontSize: 14, terminalFontWeight: "normal" }, intelligence: { enabled: false, providers: [], maxBytes: 12000, timeoutSec: 8, minSessionIntervalSec: 60, maxConcurrency: 3, cacheTTLSec: 300 } });
+
+		const call = vi.mocked(fetch).mock.calls[0]!;
+		const body = JSON.parse(call[1]?.body as string);
+		expect(body.connections).toEqual([{ id: "local-dev", type: "local" }]);
 	});
 
 	test("listConnectionHealth returns health data", async () => {

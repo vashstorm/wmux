@@ -38,6 +38,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<unknow
 }
 
 export interface ConnectionConfig {
+	id?: string;
 	targetName: string;
 	type: string;
 	host?: string;
@@ -52,6 +53,53 @@ export function connectionDisplayName(conn: ConnectionConfig): string {
 		return "local";
 	}
 	return conn.host ?? conn.targetName;
+}
+
+type RawConnectionConfig = Omit<Partial<ConnectionConfig>, "targetName"> & {
+	id?: string;
+	targetName?: string;
+};
+
+function normalizeConnectionConfig(conn: RawConnectionConfig): ConnectionConfig {
+	const targetName = conn.targetName ?? conn.id ?? "";
+	return {
+		id: conn.id ?? targetName,
+		targetName,
+		type: conn.type ?? "local",
+		host: conn.host,
+		port: conn.port,
+		user: conn.user,
+		privateKeyPath: conn.privateKeyPath,
+		knownHostsPath: conn.knownHostsPath,
+	};
+}
+
+function toConfigConnectionPayload(conn: ConnectionConfig): RawConnectionConfig {
+	return {
+		id: conn.id ?? conn.targetName,
+		type: conn.type,
+		host: conn.host,
+		port: conn.port,
+		user: conn.user,
+		privateKeyPath: conn.privateKeyPath,
+		knownHostsPath: conn.knownHostsPath,
+	};
+}
+
+function normalizeAppConfig(config: AppConfig): AppConfig {
+	return {
+		...config,
+		connections: (config.connections as RawConnectionConfig[] | undefined ?? [])
+			.map(normalizeConnectionConfig)
+			.filter((connection) => connection.targetName.length > 0),
+	};
+}
+
+function toConfigPayload(config: AppConfig): Omit<AppConfig, "connections"> & { connections: RawConnectionConfig[] } {
+	return {
+		...config,
+		connections: (config.connections ?? []).map(toConfigConnectionPayload),
+	};
 }
 
 export interface ConnectionsListResponse {
@@ -143,7 +191,8 @@ export interface AppConfig {
 	ui: {
 		theme: string;
 		windowTheme: string;
-		fontSize: number;
+		uiScaleStep?: number;
+		fontSize?: number;
 		terminalFontSize: number;
 		terminalFontWeight: string;
 	};
@@ -236,25 +285,27 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
 export async function listConnections(): Promise<ConnectionConfig[]> {
 	const response = (await apiFetch("/api/connections")) as ConnectionsListResponse;
-	return response.data ?? [];
+	return (response.data ?? [])
+		.map(normalizeConnectionConfig)
+		.filter((connection) => connection.targetName.length > 0);
 }
 
 export async function createConnection(data: Omit<ConnectionConfig, "targetName">): Promise<ConnectionConfig> {
-	return (await apiFetch("/api/connections", {
+	return normalizeConnectionConfig((await apiFetch("/api/connections", {
 		method: "POST",
 		body: JSON.stringify(data),
-	})) as ConnectionConfig;
+	})) as RawConnectionConfig);
 }
 
 export async function getConnection(targetName: string): Promise<ConnectionConfig> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`)) as ConnectionConfig;
+	return normalizeConnectionConfig((await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`)) as RawConnectionConfig);
 }
 
 export async function updateConnection(targetName: string, data: ConnectionConfig): Promise<ConnectionConfig> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
+	return normalizeConnectionConfig((await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
 		method: "PUT",
 		body: JSON.stringify(data),
-	})) as ConnectionConfig;
+	})) as RawConnectionConfig);
 }
 
 export async function deleteConnection(targetName: string): Promise<void> {
@@ -587,14 +638,14 @@ export async function getConnectionHealth(targetName: string): Promise<Connectio
 }
 
 export async function getConfig(): Promise<AppConfig> {
-	return (await apiFetch("/api/config")) as AppConfig;
+	return normalizeAppConfig((await apiFetch("/api/config")) as AppConfig);
 }
 
 export async function updateConfig(data: AppConfig): Promise<AppConfig> {
-	return (await apiFetch("/api/config", {
+	return normalizeAppConfig((await apiFetch("/api/config", {
 		method: "PUT",
-		body: JSON.stringify(data),
-	})) as AppConfig;
+		body: JSON.stringify(toConfigPayload(data)),
+	})) as AppConfig);
 }
 
 export interface SessionIntelligence {

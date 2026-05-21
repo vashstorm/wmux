@@ -83,15 +83,17 @@ vi.mock("../api/websocket.js", () => ({
 	}),
 }));
 
+let mockUISettings = {
+	theme: "dark",
+	windowTheme: "dark",
+	uiScaleStep: 0,
+	terminalFontWeight: "normal",
+};
+
 vi.mock("../state/store.js", () => ({
 	useAppState: vi.fn(() => ({
 		setError: mockSetError,
-		uiSettings: {
-			theme: "dark",
-			windowTheme: "dark",
-			fontSize: 16,
-			terminalFontSize: 14,
-		},
+		uiSettings: mockUISettings,
 	})),
 }));
 
@@ -105,6 +107,12 @@ const mockSelectedPane: SelectedPane = {
 describe("Terminal", () => {
 	beforeEach(() => {
 		sessionStorage.clear();
+		mockUISettings = {
+			theme: "dark",
+			windowTheme: "dark",
+			uiScaleStep: 0,
+			terminalFontWeight: "normal",
+		};
 		mockConnect.mockClear();
 		mockClose.mockClear();
 		mockXTermWrite.mockClear();
@@ -263,5 +271,36 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		capturedOnMessage!({ type: "status", status: "connected" });
 
 		expect(mockXTermWriteln).not.toHaveBeenCalled();
+	});
+
+	test("derives terminal fontSize from uiScaleStep step 0 → 14px", () => {
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.fontSize).toBe(14);
+	});
+
+	test("derives terminal fontSize from uiScaleStep step 4 → 17px", () => {
+		mockUISettings.uiScaleStep = 4;
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.fontSize).toBe(17);
+	});
+
+	test("derives terminal fontSize from uiScaleStep step -4 → 11px", () => {
+		mockUISettings.uiScaleStep = -4;
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.fontSize).toBe(11);
+	});
+
+	test("applies terminalFontWeight to xterm options", () => {
+		mockUISettings.terminalFontWeight = "bold";
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.fontWeight).toBe("bold");
 	});
 });

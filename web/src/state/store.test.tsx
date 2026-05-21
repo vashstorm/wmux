@@ -34,7 +34,7 @@ describe("AppProvider", () => {
 					onClick={() => setUISettings({
 						theme: "light",
 						windowTheme: "light",
-						fontSize: 17,
+						uiScaleStep: 2,
 						terminalFontSize: 15,
 						terminalFontWeight: "bold",
 					})}
@@ -55,7 +55,7 @@ describe("AppProvider", () => {
 		expect(JSON.parse(localStorage.getItem(UI_SETTINGS_STORAGE_KEY) ?? "{}")).toEqual({
 			theme: "light",
 			windowTheme: "light",
-			fontSize: 17,
+			uiScaleStep: 2,
 			terminalFontSize: 15,
 			terminalFontWeight: "bold",
 		});
@@ -542,5 +542,170 @@ describe("updateSession", () => {
 		fireEvent.click(screen.getByTestId("update-conn1"));
 
 		expect(screen.getByTestId("conn1-status").textContent).toBe("running");
+	});
+});
+
+describe("UISettings uiScaleStep", () => {
+	test("uiScaleStep defaults to 0 when no localStorage", () => {
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("0");
+	});
+
+	test("reads uiScaleStep from localStorage", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+			theme: "dark",
+			windowTheme: "dark",
+			uiScaleStep: 2,
+			terminalFontSize: 14,
+			terminalFontWeight: "normal",
+		}));
+
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("2");
+	});
+
+	test("migrates legacy fontSize to uiScaleStep: fontSize 18 maps to step 3", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+			theme: "dark",
+			windowTheme: "dark",
+			fontSize: 18,
+			terminalFontSize: 14,
+			terminalFontWeight: "normal",
+		}));
+
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("3");
+	});
+
+	test("migrates legacy fontSize to uiScaleStep: fontSize 20 maps to step 4 (clamped)", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+			theme: "dark",
+			windowTheme: "dark",
+			fontSize: 20,
+			terminalFontSize: 14,
+			terminalFontWeight: "normal",
+		}));
+
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("4");
+	});
+
+	test("migrates legacy fontSize to uiScaleStep: fontSize 16 maps to step 0", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+			theme: "dark",
+			windowTheme: "dark",
+			fontSize: 16,
+			terminalFontSize: 14,
+			terminalFontWeight: "normal",
+		}));
+
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("0");
+	});
+
+	test("prefers uiScaleStep over legacy fontSize when both present", () => {
+		localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify({
+			theme: "dark",
+			windowTheme: "dark",
+			uiScaleStep: 1,
+			fontSize: 18,
+			terminalFontSize: 14,
+			terminalFontWeight: "normal",
+		}));
+
+		function ScaleStepProbe() {
+			const { uiSettings } = useAppState();
+			return <span data-testid="scale-step">{uiSettings.uiScaleStep}</span>;
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepProbe />
+			</AppProvider>,
+		);
+
+		expect(screen.getByTestId("scale-step").textContent).toBe("1");
+	});
+
+	test("persists uiScaleStep to localStorage", () => {
+		function ScaleStepWriter() {
+			const { setUISettings } = useAppState();
+			return (
+				<button
+					data-testid="set-scale-step"
+					onClick={() => setUISettings({
+						theme: "dark",
+						windowTheme: "dark",
+						uiScaleStep: 3,
+						terminalFontSize: 14,
+						terminalFontWeight: "bold",
+					})}
+				>
+					Set Scale Step
+				</button>
+			);
+		}
+
+		render(
+			<AppProvider>
+				<ScaleStepWriter />
+			</AppProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("set-scale-step"));
+
+		const stored = JSON.parse(localStorage.getItem(UI_SETTINGS_STORAGE_KEY) ?? "{}");
+		expect(stored.uiScaleStep).toBe(3);
+		expect(stored.terminalFontWeight).toBe("bold");
 	});
 });

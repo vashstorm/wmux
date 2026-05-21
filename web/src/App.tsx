@@ -9,7 +9,7 @@ import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig, updateConfig } from "./api/client.js";
-import { applyUIFontSize } from "./ui/fontSize.js";
+import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP } from "./ui/fontSize.js";
 import { useModeTheme } from "./ui/muiTheme.js";
 import { MainPanel } from "./components/MainPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
@@ -28,12 +28,18 @@ function UISettingsInit() {
 		void getConfig().then((config) => {
 			const theme = normalizeThemeId(config.ui.theme);
 			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
-			const fontSize = config.ui.fontSize || 16;
+
+			const uiScaleStep = config.ui.uiScaleStep !== undefined
+				? config.ui.uiScaleStep
+				: config.ui.fontSize !== undefined
+					? fontSizeToScaleStep(config.ui.fontSize)
+					: DEFAULT_UI_SCALE_STEP;
+
 			const terminalFontSize = config.ui.terminalFontSize || 14;
 			const terminalFontWeight = config.ui.terminalFontWeight || "normal";
 
-			applyUIFontSize(fontSize);
-			setUISettings({ theme, windowTheme, fontSize, terminalFontSize, terminalFontWeight });
+			applyUIScaleStep(uiScaleStep);
+			setUISettings({ theme, windowTheme, uiScaleStep, terminalFontSize, terminalFontWeight });
 		}).catch(() => undefined);
 	}, [setUISettings]);
 

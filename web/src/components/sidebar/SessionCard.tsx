@@ -186,7 +186,7 @@ export function SessionCard({
 										variant="body2"
 										title={sname}
 										sx={{
-											fontSize: "16px",
+											fontSize: "var(--font-size-base)",
 											fontWeight: "var(--font-weight-bold)",
 											color: "text.primary",
 											whiteSpace: "nowrap",
@@ -208,7 +208,7 @@ export function SessionCard({
 											className="session-card-time"
 											variant="caption"
 											sx={{
-												fontSize: "10px",
+												fontSize: "var(--font-size-xs)",
 												color: "text.secondary",
 												ml: "auto",
 												textAlign: "right",
@@ -283,7 +283,7 @@ export function SessionCard({
 										label={session.attentionCount}
 										size="small"
 										className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}
-										sx={{ fontSize: "10px", minHeight: 18, height: 18 }}
+										sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
 									/>
 								)}
 								{typeof session.windowCount === "number" && session.windowCount > 0 && (
@@ -292,7 +292,7 @@ export function SessionCard({
 										size="small"
 										className="window-count-badge"
 										sx={{
-											fontSize: "10px",
+											fontSize: "var(--font-size-xs)",
 											fontWeight: "var(--font-weight-semibold)",
 											minHeight: 18,
 											height: 18,
@@ -309,7 +309,7 @@ export function SessionCard({
 											label={`${app} ${count}`}
 											size="small"
 											className={`app-count-badge${appClass}`}
-											sx={{ fontSize: "10px", minHeight: 18, height: 18 }}
+											sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
 										/>
 									);
 								})}

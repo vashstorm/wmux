@@ -67,4 +67,116 @@ test.describe("settings panel", () => {
 
 		await expect(page.getByTestId("confirm-dialog")).not.toBeVisible({ timeout: 5000 });
 	});
+
+	test("typography scale increase twice increases font-size-base", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-nav").getByText("Typography", { exact: true }).click();
+
+		await expect(page.getByTestId("settings-typography-preview")).toBeVisible();
+		await expect(page.getByTestId("settings-scale-value")).toBeVisible();
+
+		const initialFontSize = await page.evaluate(() =>
+			document.documentElement.style.getPropertyValue("--font-size-base")
+		);
+		expect(initialFontSize).toBe("16px");
+
+		await page.getByTestId("settings-scale-increase").click();
+		await page.getByTestId("settings-scale-increase").click();
+
+		await expect(page.getByTestId("settings-scale-value")).toContainText("+2");
+
+		const increasedFontSize = await page.evaluate(() =>
+			document.documentElement.style.getPropertyValue("--font-size-base")
+		);
+		expect(increasedFontSize).toBe("18px");
+	});
+
+	test("typography scale reset returns to default", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-nav").getByText("Typography", { exact: true }).click();
+
+		await expect(page.getByTestId("settings-typography-preview")).toBeVisible();
+		await expect(page.getByTestId("settings-scale-value")).toBeVisible();
+
+		await page.getByTestId("settings-scale-increase").click();
+		await page.getByTestId("settings-scale-increase").click();
+		await expect(page.getByTestId("settings-scale-value")).toContainText("+2");
+
+		await page.getByTestId("settings-scale-reset").click();
+
+		await expect(page.getByTestId("settings-scale-value")).toContainText("0");
+
+		const resetFontSize = await page.evaluate(() =>
+			document.documentElement.style.getPropertyValue("--font-size-base")
+		);
+		expect(resetFontSize).toBe("16px");
+	});
+
+	test("typography scale persists after page refresh", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-nav").getByText("Typography", { exact: true }).click();
+
+		await expect(page.getByTestId("settings-typography-preview")).toBeVisible();
+
+		await page.getByTestId("settings-scale-increase").click();
+		await expect(page.getByTestId("settings-scale-value")).toContainText("+1");
+
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+
+		await page.reload();
+
+		const persistedFontSize = await page.evaluate(() =>
+			document.documentElement.style.getPropertyValue("--font-size-base")
+		);
+		expect(persistedFontSize).toBe("17px");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.getByTestId("settings-nav").getByText("Typography", { exact: true }).click();
+		await expect(page.getByTestId("settings-scale-value")).toContainText("+1");
+	});
+
+	test("terminal preview responds to global scale", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-nav").getByText("Typography", { exact: true }).click();
+
+		const preview = page.getByTestId("settings-typography-preview");
+		await expect(preview).toBeVisible();
+
+		await page.getByTestId("settings-scale-reset").click();
+		await expect(page.getByTestId("settings-scale-value")).toContainText("0");
+
+		const terminalText = preview.locator("div").filter({ hasText: "$ tmux ls" });
+		await expect(terminalText).toBeVisible();
+
+		const initialTerminalFontSize = await terminalText.evaluate((el) =>
+			window.getComputedStyle(el).fontSize
+		);
+		expect(initialTerminalFontSize).toBe("14px");
+
+		await page.getByTestId("settings-scale-increase").click();
+		await page.getByTestId("settings-scale-increase").click();
+
+		const scaledTerminalFontSize = await terminalText.evaluate((el) =>
+			window.getComputedStyle(el).fontSize
+		);
+		expect(scaledTerminalFontSize).toBe("15px");
+	});
 });
