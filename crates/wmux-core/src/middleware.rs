@@ -133,7 +133,8 @@ async fn authenticate(
     };
 
     let bearer_matches = bearer_token(&request) == Some(token.as_str());
-    let query_matches = allow_query_token && query_token(&request).as_deref() == Some(token.as_str());
+    let query_matches =
+        allow_query_token && query_token(&request).as_deref() == Some(token.as_str());
 
     if token.is_empty() || bearer_matches || query_matches {
         return next.run(request).await;
@@ -191,6 +192,5 @@ fn percent_decode_query_value(value: &str) -> Option<String> {
 }
 
 fn error_response(status: StatusCode, code: &'static str, message: &'static str) -> Response {
-    (status, axum::Json(ErrorResponse::new(code, message)))
-        .into_response()
+    (status, axum::Json(ErrorResponse::new(code, message))).into_response()
 }

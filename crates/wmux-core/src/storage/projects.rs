@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sqlx::SqlitePool;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 use crate::config::random_hex;
 use crate::storage::models::{NewProject, Project, UpdateProject};
@@ -17,7 +17,9 @@ pub enum ProjectRepoError {
 }
 
 fn now_utc() -> String {
-    OffsetDateTime::now_utc().format(&Rfc3339).expect("RFC3339 format is infallible")
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .expect("RFC3339 format is infallible")
 }
 
 pub struct ProjectRepository {
@@ -40,7 +42,7 @@ impl ProjectRepository {
 
     pub async fn get_by_id(&self, id: &str) -> Result<Project, ProjectRepoError> {
         let project = sqlx::query_as::<_, Project>(
-            "SELECT id, name, path, description, created_at, updated_at FROM projects WHERE id = ?"
+            "SELECT id, name, path, description, created_at, updated_at FROM projects WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -109,7 +111,7 @@ impl ProjectRepository {
         };
 
         let result = sqlx::query(
-            "UPDATE projects SET name = ?, path = ?, description = ?, updated_at = ? WHERE id = ?"
+            "UPDATE projects SET name = ?, path = ?, description = ?, updated_at = ? WHERE id = ?",
         )
         .bind(new_name)
         .bind(new_path)
@@ -189,7 +191,10 @@ mod tests {
             path: "/new/path".to_string(),
             description: "Updated description".to_string(),
         };
-        let updated = repo.update(&created.id, &update).await.expect("update project");
+        let updated = repo
+            .update(&created.id, &update)
+            .await
+            .expect("update project");
         assert_eq!(updated.name, "updated-name");
         assert_eq!(updated.path, "/new/path");
         assert_eq!(updated.description, "Updated description");

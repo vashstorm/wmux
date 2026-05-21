@@ -21,7 +21,26 @@ const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
 	running: "Running",
 };
 
-const APP_BADGE_ORDER = ["claude", "codex", "opencode", "zsh"] as const;
+const KNOWN_APP_BADGE_ORDER = ["claude", "codex", "opencode", "zsh"] as const;
+const KNOWN_APP_BADGES = new Set<string>(KNOWN_APP_BADGE_ORDER);
+
+function getAppBadgeEntries(appCounts: Record<string, number> | undefined): Array<[string, number]> {
+	if (!appCounts) {
+		return [];
+	}
+
+	return Object.entries(appCounts)
+		.map(([app, count]) => [app.trim().toLowerCase(), count] as [string, number])
+		.filter(([app, count]) => app.length > 0 && typeof count === "number" && count > 0)
+		.sort(([left], [right]) => {
+			const leftKnownIndex = KNOWN_APP_BADGE_ORDER.indexOf(left as (typeof KNOWN_APP_BADGE_ORDER)[number]);
+			const rightKnownIndex = KNOWN_APP_BADGE_ORDER.indexOf(right as (typeof KNOWN_APP_BADGE_ORDER)[number]);
+			if (leftKnownIndex >= 0 && rightKnownIndex >= 0) return leftKnownIndex - rightKnownIndex;
+			if (leftKnownIndex >= 0) return -1;
+			if (rightKnownIndex >= 0) return 1;
+			return left.localeCompare(right);
+		});
+}
 
 interface SessionCardProps {
 	session: SessionInfoData;
@@ -76,6 +95,7 @@ export function SessionCard({
 	const hasIntelligence =
 		(session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) ||
 		session.intelligenceError;
+	const appBadgeEntries = getAppBadgeEntries(session.intelligenceAppCounts);
 
 	return (
 		<Box
@@ -280,32 +300,15 @@ export function SessionCard({
 										}}
 									/>
 								)}
-								{hasIntelligence && (
-									<Chip
-										label={
-											session.intelligenceError
-												? "Error"
-												: INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus ?? ""] ?? session.intelligenceStatus
-										}
-										size="small"
-										className={`intelligence-badge${session.intelligenceError ? " is-error" : session.intelligenceStatus ? ` is-${session.intelligenceStatus}` : ""}`}
-										sx={{
-											fontSize: "10px",
-											fontWeight: "var(--font-weight-semibold)",
-											minHeight: 18,
-											height: 18,
-										}}
-									/>
-								)}
-								{session.intelligenceAppCounts && APP_BADGE_ORDER.map((app) => {
-									const count = session.intelligenceAppCounts![app];
-									if (typeof count !== "number" || count <= 0) return null;
+
+								{appBadgeEntries.map(([app, count]) => {
+									const appClass = KNOWN_APP_BADGES.has(app) ? ` is-${app}` : "";
 									return (
 										<Chip
 											key={app}
 											label={`${app} ${count}`}
 											size="small"
-											className={`app-count-badge is-${app}`}
+											className={`app-count-badge${appClass}`}
 											sx={{ fontSize: "10px", minHeight: 18, height: 18 }}
 										/>
 									);

@@ -1,12 +1,11 @@
 use axum::Json;
 use axum::extract::{FromRequestParts, RawPathParams, State};
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use wmux_core::intelligence::{
-    self, ActiveProvider, CommandClass, IntelligenceStore, SessionIntelligence,
-    WindowCacheDecision,
+    self, ActiveProvider, CommandClass, IntelligenceStore, SessionIntelligence, WindowCacheDecision,
 };
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
@@ -239,9 +238,18 @@ pub async fn list_sessions(
     target: TargetPath,
 ) -> ApiResult<SessionsListResponse> {
     let target = target_context(&state, target.target).await?;
-    let mut data = target.adapter.list_sessions().await.map_err(session_error)?;
+    let mut data = target
+        .adapter
+        .list_sessions()
+        .await
+        .map_err(session_error)?;
     apply_cached_session_intelligence(&state, target.name.as_str(), &mut data);
-    spawn_session_intelligence_refreshes(state.clone(), target.name.clone(), target.adapter.clone(), &data);
+    spawn_session_intelligence_refreshes(
+        state.clone(),
+        target.name.clone(),
+        target.adapter.clone(),
+        &data,
+    );
     tracing::debug!(target_name = %target.name, "listed tmux sessions");
     Ok(Json(SessionsListResponse {
         target_name: target.name,
@@ -294,7 +302,11 @@ pub async fn analyze_session(
     let max_bytes = config.intelligence.max_bytes;
     let max_concurrency = config.intelligence.max_concurrency as usize;
 
-    let windows = target.adapter.list_windows(&session).await.map_err(session_error)?;
+    let windows = target
+        .adapter
+        .list_windows(&session)
+        .await
+        .map_err(session_error)?;
 
     let mut window_results: Vec<WindowAnalysisResult> = Vec::new();
     for window in &windows {
@@ -321,7 +333,10 @@ pub async fn analyze_session(
         .set(&target.name, &session, aggregated.clone());
 
     let updated = window_results.iter().filter(|r| r.provider_called).count();
-    let skipped = window_results.iter().filter(|r| !r.provider_called && !r.is_error).count();
+    let skipped = window_results
+        .iter()
+        .filter(|r| !r.provider_called && !r.is_error)
+        .count();
     let errors = window_results.iter().filter(|r| r.is_error).count();
 
     Ok(Json(AnalyzeSessionResponse {
@@ -342,11 +357,12 @@ pub async fn list_windows(
     let target = target_context(&state, path.target).await?;
     let session = path.session;
     require_session(&target.adapter, &session).await?;
-    let data = target
+    let mut data = target
         .adapter
         .list_windows(&session)
         .await
         .map_err(session_error)?;
+    apply_cached_window_intelligence(&state, target.name.as_str(), session.as_str(), &mut data);
     Ok(Json(WindowsListResponse {
         target_name: target.name,
         session,
@@ -451,7 +467,15 @@ pub async fn delete_window(
     State(state): State<AppState>,
     path: WindowPath,
 ) -> ApiResult<OperationResponse> {
-    write_session_operation(state, path.target, path.session, path.window, String::new(), "delete_window").await
+    write_session_operation(
+        state,
+        path.target,
+        path.session,
+        path.window,
+        String::new(),
+        "delete_window",
+    )
+    .await
 }
 
 pub async fn split_pane(
@@ -489,7 +513,15 @@ pub async fn delete_pane(
     State(state): State<AppState>,
     path: PanePath,
 ) -> ApiResult<OperationResponse> {
-    write_session_operation(state, path.target, path.session, path.window, path.pane, "delete_pane").await
+    write_session_operation(
+        state,
+        path.target,
+        path.session,
+        path.window,
+        path.pane,
+        "delete_pane",
+    )
+    .await
 }
 
 async fn write_session_operation(
@@ -599,12 +631,37 @@ fn apply_cached_session_intelligence(
     let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
 
     for session in sessions {
-        if let Some(result) =
-            state
-                .intelligence
-                .get(target_name, session.name.as_str(), cache_ttl)
+        if let Some(result) = state
+            .intelligence
+            .get(target_name, session.name.as_str(), cache_ttl)
         {
             apply_session_intelligence(session, &result);
+        }
+    }
+}
+
+fn apply_cached_window_intelligence(
+    state: &AppState,
+    target_name: &str,
+    session_name: &str,
+    windows: &mut [Window],
+) {
+    let Ok(config) = current_config(state) else {
+        return;
+    };
+    if intelligence::active_provider(&config).is_none() {
+        return;
+    }
+
+    let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+
+    for window in windows {
+        if let Some((result, _, _, _, _)) =
+            state
+                .intelligence
+                .get_window(target_name, session_name, window.id.as_str(), cache_ttl)
+        {
+            apply_window_intelligence(window, &result);
         }
     }
 }
@@ -730,7 +787,11 @@ async fn analyze_session_text(
                 model: model_name,
                 target_name: target,
                 session_name: sess,
-                status: if is_error { "error".to_string() } else { "success".to_string() },
+                status: if is_error {
+                    "error".to_string()
+                } else {
+                    "success".to_string()
+                },
                 duration_ms: elapsed_ms,
                 prompt_tokens,
                 completion_tokens,
@@ -800,6 +861,18 @@ fn apply_session_intelligence(session: &mut Session, intelligence: &SessionIntel
     session.intelligence_updated_at = Some(intelligence.updated_at.clone());
     session.intelligence_error = intelligence.error.clone();
     session.intelligence_app_counts = intelligence.app_counts.clone();
+}
+
+fn apply_window_intelligence(window: &mut Window, intelligence: &SessionIntelligence) {
+    window.intelligence_app = Some(intelligence.app.clone());
+    window.intelligence_status = Some(intelligence.status.clone());
+    window.intelligence_summary = Some(intelligence.summary.clone());
+    window.intelligence_source = Some(intelligence.source.clone());
+    window.intelligence_confidence = Some(intelligence.confidence);
+    window.intelligence_stale = Some(intelligence.stale);
+    window.intelligence_updated_at = Some(intelligence.updated_at.clone());
+    window.intelligence_error = intelligence.error.clone();
+    window.intelligence_app_counts = intelligence.app_counts.clone();
 }
 
 /// Result of analyzing a single window, including whether the provider was actually called.
@@ -899,7 +972,10 @@ async fn analyze_single_window(
 
             let (intelligence, is_error) = match &result {
                 Ok(analysis) => (analysis.intelligence.clone(), false),
-                Err(err) => (intelligence::error_result(Some(provider), err.message.clone()), true),
+                Err(err) => (
+                    intelligence::error_result(Some(provider), err.message.clone()),
+                    true,
+                ),
             };
 
             if let Some(pool) = pool {
@@ -938,23 +1014,21 @@ async fn analyze_single_window(
                 is_error: false,
             }
         }
-        WindowCacheDecision::InFlight => {
-            WindowAnalysisResult {
-                intelligence: SessionIntelligence {
-                    app: "unknown".to_string(),
-                    status: "none".to_string(),
-                    summary: "Analysis in progress".to_string(),
-                    source: provider.source(),
-                    confidence: 0.0,
-                    stale: true,
-                    updated_at: intelligence::now_rfc3339(),
-                    error: None,
-                    app_counts: None,
-                },
-                provider_called: false,
-                is_error: false,
-            }
-        }
+        WindowCacheDecision::InFlight => WindowAnalysisResult {
+            intelligence: SessionIntelligence {
+                app: "unknown".to_string(),
+                status: "none".to_string(),
+                summary: "Analysis in progress".to_string(),
+                source: provider.source(),
+                confidence: 0.0,
+                stale: true,
+                updated_at: intelligence::now_rfc3339(),
+                error: None,
+                app_counts: None,
+            },
+            provider_called: false,
+            is_error: false,
+        },
     }
 }
 
@@ -964,7 +1038,9 @@ fn classify_command_basename(command: &str) -> String {
     if trimmed.is_empty() {
         return String::new();
     }
-    let basename = trimmed.rfind('/').map_or(trimmed, |pos| &trimmed[pos + 1..]);
+    let basename = trimmed
+        .rfind('/')
+        .map_or(trimmed, |pos| &trimmed[pos + 1..]);
     basename.to_ascii_lowercase()
 }
 
@@ -1030,7 +1106,11 @@ fn record_ai_usage_event(
             model: model_name,
             target_name: target,
             session_name: sess,
-            status: if is_error { "error".to_string() } else { "success".to_string() },
+            status: if is_error {
+                "error".to_string()
+            } else {
+                "success".to_string()
+            },
             duration_ms: elapsed_ms,
             prompt_tokens,
             completion_tokens,
@@ -1088,9 +1168,7 @@ fn aggregate_window_results(
 
     let any_stale = results.iter().any(|r| r.intelligence.stale);
 
-    let error = results
-        .iter()
-        .find_map(|r| r.intelligence.error.clone());
+    let error = results.iter().find_map(|r| r.intelligence.error.clone());
 
     SessionIntelligence {
         app: highest.intelligence.app.clone(),

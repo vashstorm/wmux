@@ -89,7 +89,10 @@ impl RuntimeConnections {
     }
 
     pub fn list(&self) -> Vec<ConnectionConfig> {
-        self.inner.lock().map(|connections| connections.clone()).unwrap_or_default()
+        self.inner
+            .lock()
+            .map(|connections| connections.clone())
+            .unwrap_or_default()
     }
 
     pub fn create(&self, connection: ConnectionConfig) {

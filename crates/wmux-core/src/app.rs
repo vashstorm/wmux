@@ -22,19 +22,16 @@ pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinH
     let logging_handle =
         crate::logging::init_tracing(&config.logs).context("failed to initialize logging")?;
 
-    config.validate_storage_path().context("invalid storage config")?;
+    config
+        .validate_storage_path()
+        .context("invalid storage config")?;
     let config_path = store.path().context("failed to resolve config path")?;
     store
         .replace_in_memory(config)
         .context("failed to prepare runtime config")?;
-    let mut state = AppState::with_storage(
-        store.clone(),
-        assets_dir,
-        logging_handle,
-        &config_path,
-    )
-    .await
-    .context("failed to initialize SQLite storage")?;
+    let mut state = AppState::with_storage(store.clone(), assets_dir, logging_handle, &config_path)
+        .await
+        .context("failed to initialize SQLite storage")?;
 
     if let Some(pool) = &state.storage {
         let cleanup_holder = crate::storage::cleanup::spawn_cleanup_task(pool.clone());

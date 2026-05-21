@@ -1156,7 +1156,9 @@ mod tests {
     fn config_validate_storage_path_rejects_empty() {
         let mut config = Config::default();
         config.storage.path = String::new();
-        let err = config.validate_storage_path().expect_err("empty path should fail");
+        let err = config
+            .validate_storage_path()
+            .expect_err("empty path should fail");
         assert!(matches!(err, ConfigError::StoragePathMissing));
     }
 
@@ -1164,7 +1166,9 @@ mod tests {
     fn config_validate_storage_path_rejects_whitespace() {
         let mut config = Config::default();
         config.storage.path = "   ".to_string();
-        let err = config.validate_storage_path().expect_err("whitespace path should fail");
+        let err = config
+            .validate_storage_path()
+            .expect_err("whitespace path should fail");
         assert!(matches!(err, ConfigError::StoragePathMissing));
     }
 
@@ -1172,7 +1176,9 @@ mod tests {
     fn config_validate_storage_path_accepts_non_empty() {
         let mut config = Config::default();
         config.storage.path = "data".to_string();
-        config.validate_storage_path().expect("non-empty path should pass");
+        config
+            .validate_storage_path()
+            .expect("non-empty path should pass");
     }
 
     #[test]

@@ -48,7 +48,9 @@ async fn main() -> anyhow::Result<()> {
     let logging_handle = wmux_core::logging::init_tracing(&config.logs)
         .with_context(|| "failed to initialize logging")?;
 
-    config.validate_storage_path().context("invalid storage config")?;
+    config
+        .validate_storage_path()
+        .context("invalid storage config")?;
     let config_path = store.path().context("failed to resolve config path")?;
     let mut state = wmux_core::state::AppState::with_storage(
         store.clone(),

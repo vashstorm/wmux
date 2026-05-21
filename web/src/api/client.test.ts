@@ -125,13 +125,14 @@ describe("api client", () => {
 			targetName: "1",
 			session: "dev",
 			mode: "local",
-			data: [{ id: "@1", name: "editor", index: 0, active: true, paneCount: 1, activePaneId: "%1", activePaneTitle: "shell", attentionState: "attention", attentionCount: 1 }],
+			data: [{ id: "@1", name: "editor", index: 0, active: true, paneCount: 1, activePaneId: "%1", activePaneTitle: "shell", attentionState: "attention", attentionCount: 1, intelligenceSummary: "Window summary" }],
 		});
 		const result = await listWindows("1", "dev");
 		expect(result.data[0]!.ID).toBe("@1");
 		expect(result.data[0]!.Active).toBe(true);
 		expect(result.data[0]!.ActivePaneID).toBe("%1");
 		expect(result.data[0]!.AttentionState).toBe("attention");
+		expect(result.data[0]!.IntelligenceSummary).toBe("Window summary");
 	});
 
 	test("listPanes returns panes", async () => {

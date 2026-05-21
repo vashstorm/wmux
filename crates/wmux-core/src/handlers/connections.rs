@@ -1,10 +1,10 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::{Deserialize, Serialize};
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 use wmux_core::config::{Config, ConfigError, ConnectionConfig};
 use wmux_core::tmux::Adapter;
 
@@ -103,7 +103,9 @@ pub async fn health(
 ) -> ApiResult<ConnectionHealthResponse> {
     let connection = find_connection(&state, &id)?;
     let config = current_config(&state)?;
-    Ok(Json(check_connection_health(&connection, &config.tmux.path).await))
+    Ok(Json(
+        check_connection_health(&connection, &config.tmux.path).await,
+    ))
 }
 
 pub async fn update(
@@ -127,7 +129,10 @@ pub async fn update(
     Ok(Json(RuntimeConnection::from(updated)))
 }
 
-pub async fn delete(State(state): State<AppState>, Path(id): Path<String>) -> Result<Response, ApiError> {
+pub async fn delete(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     if state.connections.delete(&id).is_none() {
         return Err(ApiError::not_found(format!("connection not found: {id}")));
     }
@@ -162,7 +167,9 @@ pub fn find_connection(state: &AppState, id: &str) -> Result<ConnectionConfig, A
 pub fn require_local_connection(connection: &ConnectionConfig) -> Result<(), ApiError> {
     match connection.connection_type.as_str() {
         "local" => Ok(()),
-        "ssh" => Err(ApiError::not_implemented("ssh connections are not implemented")),
+        "ssh" => Err(ApiError::not_implemented(
+            "ssh connections are not implemented",
+        )),
         other => Err(ApiError::bad_request(format!(
             "unsupported connection type {other:?}"
         ))),
@@ -227,8 +234,12 @@ fn normalize_connection_payload(connection: &mut ConnectionConfig) {
 fn validate_local_connection_payload(connection: &ConnectionConfig) -> Result<(), ApiError> {
     match connection.connection_type.as_str() {
         "local" => Ok(()),
-        "ssh" => Err(ApiError::not_implemented("ssh connections are not implemented")),
-        _ => Err(ApiError::bad_request("connection type must be local or ssh")),
+        "ssh" => Err(ApiError::not_implemented(
+            "ssh connections are not implemented",
+        )),
+        _ => Err(ApiError::bad_request(
+            "connection type must be local or ssh",
+        )),
     }
 }
 

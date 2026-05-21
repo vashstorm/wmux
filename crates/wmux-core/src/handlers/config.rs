@@ -1,7 +1,10 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use serde::{Deserialize, Serialize};
-use wmux_core::config::{AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig, UIConfig};
+use wmux_core::config::{
+    AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig,
+    UIConfig,
+};
 
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
@@ -115,13 +118,15 @@ fn new_config_response(config: &Config) -> ConfigResponse {
         .providers
         .iter()
         .zip(config.intelligence.providers.iter())
-        .map(|(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
-            name: sanitized_provider.name.clone(),
-            provider: sanitized_provider.provider.clone(),
-            model: sanitized_provider.model.clone(),
-            base_url: sanitized_provider.base_url.clone(),
-            api_key_configured: !original_provider.api_key.trim().is_empty(),
-        })
+        .map(
+            |(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
+                name: sanitized_provider.name.clone(),
+                provider: sanitized_provider.provider.clone(),
+                model: sanitized_provider.model.clone(),
+                base_url: sanitized_provider.base_url.clone(),
+                api_key_configured: !original_provider.api_key.trim().is_empty(),
+            },
+        )
         .collect();
 
     ConfigResponse {
@@ -156,7 +161,12 @@ fn preserve_secret_fields(current: &Config, payload: &mut Config) {
         payload.intelligence.api_key = current.intelligence.api_key.clone();
     }
 
-    let payload_names: Vec<String> = payload.intelligence.providers.iter().map(|p| p.name.clone()).collect();
+    let payload_names: Vec<String> = payload
+        .intelligence
+        .providers
+        .iter()
+        .map(|p| p.name.clone())
+        .collect();
     let mut matched_existing = Vec::new();
     for provider in &mut payload.intelligence.providers {
         if !provider.api_key.trim().is_empty() {
@@ -173,16 +183,17 @@ fn preserve_secret_fields(current: &Config, payload: &mut Config) {
             matched_existing.push(index);
             continue;
         }
-        if let Some((index, existing)) = current
-            .intelligence
-            .providers
-            .iter()
-            .enumerate()
-            .find(|(idx, existing)| {
-                !matched_existing.contains(idx)
-                    && !existing.api_key.trim().is_empty()
-                    && !payload_names.contains(&existing.name)
-            })
+        if let Some((index, existing)) =
+            current
+                .intelligence
+                .providers
+                .iter()
+                .enumerate()
+                .find(|(idx, existing)| {
+                    !matched_existing.contains(idx)
+                        && !existing.api_key.trim().is_empty()
+                        && !payload_names.contains(&existing.name)
+                })
         {
             provider.api_key = existing.api_key.clone();
             matched_existing.push(index);

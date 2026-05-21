@@ -348,7 +348,10 @@ mod tests {
             .expect("response");
         assert_eq!(created_response.status(), StatusCode::CREATED);
         let created = json_body(created_response).await;
-        let id = created["targetName"].as_str().expect("target name").to_string();
+        let id = created["targetName"]
+            .as_str()
+            .expect("target name")
+            .to_string();
         assert_eq!(created["type"], "local");
 
         let get_response = app
@@ -391,11 +394,20 @@ mod tests {
             .expect("response");
         assert_eq!(created_response.status(), StatusCode::CREATED);
         let created = json_body(created_response).await;
-        let id = created["targetName"].as_str().expect("target name").to_string();
+        let id = created["targetName"]
+            .as_str()
+            .expect("target name")
+            .to_string();
 
         let config_content = fs::read_to_string(&config_path).expect("read config");
         let config: Value = serde_json::from_str(&config_content).expect("parse config");
-        assert_eq!(config["connections"].as_array().expect("connections array").len(), 1);
+        assert_eq!(
+            config["connections"]
+                .as_array()
+                .expect("connections array")
+                .len(),
+            1
+        );
         assert_eq!(config["connections"][0]["id"], id);
 
         let delete_response = app
@@ -406,7 +418,13 @@ mod tests {
 
         let config_content = fs::read_to_string(&config_path).expect("read config");
         let config: Value = serde_json::from_str(&config_content).expect("parse config");
-        assert_eq!(config["connections"].as_array().expect("connections array").len(), 0);
+        assert_eq!(
+            config["connections"]
+                .as_array()
+                .expect("connections array")
+                .len(),
+            0
+        );
     }
 
     #[tokio::test]
@@ -425,8 +443,11 @@ mod tests {
             "connections": [{ "type": "local" }],
             "ui": { "theme": "dark" }
         });
-        fs::write(&config_path, serde_json::to_string_pretty(&config_with_connection).expect("serialize"))
-            .expect("write config");
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config_with_connection).expect("serialize"),
+        )
+        .expect("write config");
 
         let store = Config::load(&config_path).expect("load config");
         let state = AppState::new(store, assets_dir, LoggingHandle::empty());

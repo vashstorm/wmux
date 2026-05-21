@@ -108,12 +108,10 @@ describe("MainPanel", () => {
 	const setError = vi.fn();
 
 	const expectTitleSegments = (expected: {
-		session: string;
-		app: string;
 		summary: string;
 	}) => {
-		expect(screen.getByTestId("main-title-session").textContent).toBe(expected.session);
-		expect(screen.getByTestId("main-title-app").textContent).toBe(expected.app);
+		expect(screen.queryByTestId("main-title-session")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument();
 		expect(screen.getByTestId("main-title-summary").textContent).toBe(expected.summary);
 	};
 
@@ -314,7 +312,7 @@ describe("MainPanel", () => {
 		expect(setSelectedPane).not.toHaveBeenCalled();
 	});
 
-	test("renders title as session name, app name, and summary", () => {
+	test("renders title as summary without session or app name", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
 			sessions: {
@@ -360,9 +358,7 @@ describe("MainPanel", () => {
 		render(<MainPanel />);
 
 		expectTitleSegments({
-			session: "dev",
-			app: "cursor",
-			summary: "Pane summary",
+			summary: "Window summary",
 		});
 	});
 
@@ -429,8 +425,6 @@ describe("MainPanel", () => {
 		const { rerender } = render(<MainPanel />);
 
 		expectTitleSegments({
-			session: "dev",
-			app: "editor-app",
 			summary: "Editing files",
 		});
 
@@ -443,8 +437,6 @@ describe("MainPanel", () => {
 		rerender(<MainPanel />);
 
 		expectTitleSegments({
-			session: "dev",
-			app: "server-app",
 			summary: "Server running",
 		});
 	});
@@ -509,8 +501,6 @@ describe("MainPanel", () => {
 		const { rerender } = render(<MainPanel />);
 
 		expectTitleSegments({
-			session: "dev",
-			app: "editor-app",
 			summary: "Editing files",
 		});
 
@@ -526,8 +516,6 @@ describe("MainPanel", () => {
 		rerender(<MainPanel />);
 
 		expectTitleSegments({
-			session: "dev",
-			app: "server-app",
 			summary: "Server running",
 		});
 	});
@@ -584,13 +572,11 @@ describe("MainPanel", () => {
 		render(<MainPanel />);
 
 		expectTitleSegments({
-			session: "wmux",
-			app: "opencode",
 			summary: "bun install",
 		});
 	});
 
-	test("hides app and summary segments when no data is available", () => {
+	test("hides title segments when no summary data is available", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane: {
 				targetName: "conn-1",
@@ -615,8 +601,9 @@ describe("MainPanel", () => {
 
 		render(<MainPanel />);
 
-		expect(screen.getByTestId("main-title-session").textContent).toBe("solo");
+		expect(screen.queryByTestId("main-title-session")).not.toBeInTheDocument();
 		expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument();
 		expect(screen.queryByTestId("main-title-summary")).not.toBeInTheDocument();
+		expect(screen.getByText("Wmux")).toBeInTheDocument();
 	});
 });

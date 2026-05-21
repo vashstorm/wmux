@@ -14,7 +14,7 @@ interface SelectWindowOptions {
 }
 
 interface TitleSegment {
-	key: "session" | "app" | "summary";
+	key: "status" | "summary";
 	value: string;
 }
 
@@ -189,23 +189,19 @@ export function MainPanel() {
 			return [];
 		}
 
-		const sessionName = selectedPane.session;
 		const windowSummary = windowSummaries.find((w) => w.id === selectedPane.window);
 		const paneData = currentPanes.find((p) => p.id === selectedPane.pane);
-		const appName = paneData?.intelligenceApp
-			?? windowSummary?.intelligenceApp
-			?? selectedSession?.intelligenceApp
-			?? windowSummary?.name
-			?? paneData?.title;
-		const summary = paneData?.intelligenceSummary
-			?? windowSummary?.intelligenceSummary
+		const status = paneData?.intelligenceStatus
+			?? windowSummary?.intelligenceStatus
+			?? selectedSession?.intelligenceStatus;
+		const summary = windowSummary?.intelligenceSummary
+			?? paneData?.intelligenceSummary
 			?? paneData?.title
 			?? windowSummary?.activePaneTitle
 			?? selectedSession?.intelligenceSummary;
 
 		return [
-			{ key: "session", value: sessionName },
-			{ key: "app", value: appName },
+			...(status && status !== "none" ? [{ key: "status" as const, value: status }] : []),
 			{ key: "summary", value: summary },
 		].filter((segment): segment is TitleSegment => Boolean(segment.value && segment.value.trim()));
 	};
@@ -234,11 +230,10 @@ export function MainPanel() {
 								data-testid={`main-title-${segment.key}`}
 								title={segment.value}
 								sx={{
-									color: segment.key === "session" ? "primary.main" : segment.key === "app" ? "text.secondary" : "text.disabled",
-									fontWeight: segment.key === "session" ? 700 : 500,
-									 ...(segment.key === "summary" ? {
+									color: segment.key === "summary" ? "text.disabled" : "text.secondary",
+									fontWeight: 500,
+									...(segment.key === "summary" ? {
 										opacity: 0.7,
-										maxWidth: 320,
 										overflow: "hidden",
 										textOverflow: "ellipsis",
 										whiteSpace: "nowrap",

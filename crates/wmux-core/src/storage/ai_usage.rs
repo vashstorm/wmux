@@ -1,13 +1,15 @@
 use anyhow::Result;
 use sqlx::SqlitePool;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 use crate::config::random_hex;
 use crate::storage::models::{AiUsageEvent, AiUsageSummary, NewAiUsageEvent};
 
 fn now_utc() -> String {
-    OffsetDateTime::now_utc().format(&Rfc3339).expect("RFC3339 format is infallible")
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .expect("RFC3339 format is infallible")
 }
 
 pub struct AiUsageRepository {
@@ -415,11 +417,17 @@ mod tests {
         .await
         .expect("insert event 2");
 
-        let list_a = repo.list(10, Some("project-A")).await.expect("list project A");
+        let list_a = repo
+            .list(10, Some("project-A"))
+            .await
+            .expect("list project A");
         assert_eq!(list_a.len(), 1);
         assert_eq!(list_a[0].id, "event-1");
 
-        let list_b = repo.list(10, Some("project-B")).await.expect("list project B");
+        let list_b = repo
+            .list(10, Some("project-B"))
+            .await
+            .expect("list project B");
         assert_eq!(list_b.len(), 1);
         assert_eq!(list_b[0].id, "event-2");
 
@@ -541,7 +549,10 @@ mod tests {
         .await
         .expect("insert event 2");
 
-        let summary_a = repo.summary(Some("project-A")).await.expect("summary project A");
+        let summary_a = repo
+            .summary(Some("project-A"))
+            .await
+            .expect("summary project A");
         assert_eq!(summary_a.total_events, 1);
         assert_eq!(summary_a.total_duration_ms, 100);
         assert_eq!(summary_a.total_tokens, 80);

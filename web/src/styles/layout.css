@@ -234,6 +234,7 @@
 .main-title-segment {
 	display: inline-flex;
 	align-items: center;
+	flex: 0 1 auto;
 	min-width: 0;
 	max-width: min(36%, 420px);
 	padding: 4px 0;
@@ -249,7 +250,8 @@
 }
 
 .main-title-segment.is-summary {
-	flex: 1;
+	flex: 1 1 auto;
+	max-width: none;
 }
 
 .main-title-segment-value {

@@ -429,6 +429,33 @@ describe("session card attention rendering", () => {
 		expect(claudeBadge).toHaveClass("app-count-badge", "is-claude");
 	});
 
+	test("session card renders arbitrary app count badges", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{
+				name: "session1",
+				windowCount: 1,
+				intelligenceAppCounts: { wmux: 1 },
+			}],
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+		});
+
+		const badgeLabel = screen.getByText("wmux 1");
+		const badge = badgeLabel.closest(".app-count-badge");
+		expect(badge).toBeInTheDocument();
+		expect(badge).not.toHaveClass("is-wmux");
+	});
+
 	test("session card shows updated time on the session name row", async () => {
 		mockListSessions.mockResolvedValue({
 			targetName: "conn1",

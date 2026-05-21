@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex};
 use sqlx::SqlitePool;
+use std::sync::{Arc, Mutex};
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use tokio::task::JoinHandle;
@@ -12,14 +12,14 @@ const RETENTION_DAYS: i64 = 31;
 /// Returns the cutoff timestamp: now_utc - 31 days, formatted as RFC3339.
 pub fn cutoff_31_days_ago() -> String {
     let cutoff = OffsetDateTime::now_utc() - time::Duration::days(RETENTION_DAYS);
-    cutoff.format(&Rfc3339).expect("RFC3339 format is infallible")
+    cutoff
+        .format(&Rfc3339)
+        .expect("RFC3339 format is infallible")
 }
 
 /// Spawns a cleanup task that runs once after a short startup delay, then every 24 hours.
 /// Returns a shared handle holder for abort during shutdown.
-pub fn spawn_cleanup_task(
-    pool: SqlitePool,
-) -> Arc<Mutex<Option<JoinHandle<()>>>> {
+pub fn spawn_cleanup_task(pool: SqlitePool) -> Arc<Mutex<Option<JoinHandle<()>>>> {
     let handle_holder = Arc::new(Mutex::new(None::<JoinHandle<()>>));
     let holder_for_task = Arc::clone(&handle_holder);
 
@@ -36,7 +36,9 @@ pub fn spawn_cleanup_task(
         }
     });
 
-    *holder_for_task.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(join_handle);
+    *holder_for_task
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(join_handle);
     handle_holder
 }
 
@@ -70,13 +72,21 @@ mod tests {
     async fn cleanup_task_aborts_cleanly() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("test.db");
-        let pool = crate::storage::db::create_pool(&db_path).await.expect("create pool");
-        crate::storage::db::run_migrations(&pool).await.expect("migrations");
+        let pool = crate::storage::db::create_pool(&db_path)
+            .await
+            .expect("create pool");
+        crate::storage::db::run_migrations(&pool)
+            .await
+            .expect("migrations");
 
         let holder = spawn_cleanup_task(pool.clone());
 
         // Abort the task immediately
-        if let Some(handle) = holder.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take() {
+        if let Some(handle) = holder
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+        {
             handle.abort();
             let _ = handle.await;
         }

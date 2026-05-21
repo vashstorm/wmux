@@ -1,13 +1,13 @@
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Serialize;
 
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
-use crate::storage::models::{NewProject, Project, UpdateProject};
 use crate::storage::ProjectRepository;
+use crate::storage::models::{NewProject, Project, UpdateProject};
 
 #[derive(Serialize)]
 pub struct ProjectListResponse {
@@ -38,10 +38,7 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(project)))
 }
 
-pub async fn get(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> ApiResult<Project> {
+pub async fn get(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
@@ -55,7 +52,10 @@ pub async fn update(
 ) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.update(&id, &payload).await.map_err(map_project_error)?;
+    let project = repo
+        .update(&id, &payload)
+        .await
+        .map_err(map_project_error)?;
 
     tracing::info!(project_id = %project.id, name = %project.name, "project updated");
 

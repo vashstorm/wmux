@@ -23,14 +23,14 @@ mod tests {
         db::run_migrations(&pool).await.expect("run migrations");
 
         let projects_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='projects'"
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='projects'",
         )
         .fetch_one(&pool)
         .await
         .expect("count projects");
 
         let events_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ai_usage_events'"
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ai_usage_events'",
         )
         .fetch_one(&pool)
         .await

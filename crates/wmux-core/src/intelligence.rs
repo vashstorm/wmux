@@ -102,12 +102,7 @@ impl IntelligenceStore {
         Some(result)
     }
 
-    pub fn should_analyze(
-        &self,
-        target_name: &str,
-        session: &str,
-        min_interval: Duration,
-    ) -> bool {
+    pub fn should_analyze(&self, target_name: &str, session: &str, min_interval: Duration) -> bool {
         let key = SessionKey::new(target_name, session);
         self.inner
             .lock()
@@ -366,7 +361,7 @@ pub async fn analyze_text(
             "messages": [
                 {
                     "role": "system",
-                    "content": "Analyze a tmux session transcript. Return only JSON with application, status, summary, confidence. application must be one of claude,codex,opencode,zsh,unknown. status must be one of none,waiting,dead_loop,blocked,waiting_confirm,waiting_idle,running. 使用中文回复。"
+                    "content": "Analyze a tmux session transcript. Return only JSON with application, status, summary, confidence. application should be the detected app or CLI name as a lowercase identifier, or unknown if unsure. status must be one of none,waiting,dead_loop,blocked,waiting_confirm,waiting_idle,running. 使用中文回复。"
                 },
                 {
                     "role": "user",
@@ -390,16 +385,13 @@ pub async fn analyze_text(
         });
     }
 
-    let body = response
-        .text()
-        .await
-        .map_err(|err| AiProviderError {
-            message: format!("read AI provider response: {err}"),
-            raw_response: None,
-        })?;
+    let body = response.text().await.map_err(|err| AiProviderError {
+        message: format!("read AI provider response: {err}"),
+        raw_response: None,
+    })?;
 
-    let completion: ChatCompletionResponse = serde_json::from_str(&body)
-        .map_err(|err| AiProviderError {
+    let completion: ChatCompletionResponse =
+        serde_json::from_str(&body).map_err(|err| AiProviderError {
             message: format!("decode AI provider response: {err}"),
             raw_response: Some(body.clone()),
         })?;
@@ -413,15 +405,17 @@ pub async fn analyze_text(
             raw_response: Some(body.clone()),
         })?;
 
-    let parsed: ModelIntelligence = serde_json::from_str(strip_json_fence(content))
-        .map_err(|err| AiProviderError {
+    let parsed: ModelIntelligence =
+        serde_json::from_str(strip_json_fence(content)).map_err(|err| AiProviderError {
             message: format!("decode AI intelligence JSON: {err}"),
             raw_response: Some(body.clone()),
         })?;
-    let intelligence = parsed.into_intelligence(provider).map_err(|message| AiProviderError {
-        message,
-        raw_response: Some(body.clone()),
-    })?;
+    let intelligence = parsed
+        .into_intelligence(provider)
+        .map_err(|message| AiProviderError {
+            message,
+            raw_response: Some(body.clone()),
+        })?;
 
     let usage = completion.usage.unwrap_or_default();
     Ok(AnalysisResult {
@@ -588,13 +582,8 @@ where
 
 impl ModelIntelligence {
     fn into_intelligence(self, provider: &ActiveProvider) -> Result<SessionIntelligence, String> {
-        let app = normalize_enum(self.application.as_str());
+        let app = normalize_application(self.application.as_str());
         let status = normalize_enum(self.status.as_str());
-        if !is_valid_app(app.as_str()) {
-            return Err(format!(
-                "AI provider returned unsupported application {app:?}"
-            ));
-        }
         if !is_valid_status(status.as_str()) {
             return Err(format!(
                 "AI provider returned unsupported status {status:?}"
@@ -626,8 +615,13 @@ fn normalize_enum(value: &str) -> String {
     value.trim().to_ascii_lowercase().replace('-', "_")
 }
 
-fn is_valid_app(value: &str) -> bool {
-    matches!(value, "claude" | "codex" | "opencode" | "zsh" | "unknown")
+fn normalize_application(value: &str) -> String {
+    let app = normalize_enum(value);
+    if app.is_empty() {
+        "unknown".to_string()
+    } else {
+        app
+    }
 }
 
 fn is_valid_status(value: &str) -> bool {
@@ -656,7 +650,9 @@ pub fn classify_command(command: &str) -> CommandClass {
         return CommandClass::Unknown;
     }
 
-    let basename = trimmed.rfind('/').map_or(trimmed, |pos| &trimmed[pos + 1..]);
+    let basename = trimmed
+        .rfind('/')
+        .map_or(trimmed, |pos| &trimmed[pos + 1..]);
     if basename.is_empty() {
         return CommandClass::Unknown;
     }
@@ -666,8 +662,8 @@ pub fn classify_command(command: &str) -> CommandClass {
     match lower.as_str() {
         "opencode" | "claude" | "codex" => CommandClass::AiCli,
         "sh" | "bash" | "zsh" | "fish" | "make" | "python" | "python3" | "ruby" | "node"
-        | "npm" | "bun" | "cargo" | "go" | "rustc" | "grep" | "awk" | "sed" | "cat"
-        | "ls" | "vim" | "nvim" => CommandClass::NonAi,
+        | "npm" | "bun" | "cargo" | "go" | "rustc" | "grep" | "awk" | "sed" | "cat" | "ls"
+        | "vim" | "nvim" => CommandClass::NonAi,
         _ => CommandClass::Unknown,
     }
 }
@@ -897,14 +893,16 @@ mod tests {
 
     #[test]
     fn deserialize_confidence_accepts_numeric_and_string_values() {
-        let parsed: ModelIntelligence =
-            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":0.9}"#)
-                .expect("numeric confidence should parse");
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"zsh","status":"waiting","summary":"test","confidence":0.9}"#,
+        )
+        .expect("numeric confidence should parse");
         assert!((parsed.confidence.unwrap() - 0.9).abs() < f32::EPSILON);
 
-        let parsed: ModelIntelligence =
-            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":1}"#)
-                .expect("integer confidence should parse");
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"zsh","status":"waiting","summary":"test","confidence":1}"#,
+        )
+        .expect("integer confidence should parse");
         assert!((parsed.confidence.unwrap() - 1.0).abs() < f32::EPSILON);
 
         let parsed: ModelIntelligence =
@@ -912,14 +910,16 @@ mod tests {
                 .expect("string 'high' confidence should parse");
         assert!((parsed.confidence.unwrap() - 1.0).abs() < f32::EPSILON);
 
-        let parsed: ModelIntelligence =
-            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"medium"}"#)
-                .expect("string 'medium' confidence should parse");
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"medium"}"#,
+        )
+        .expect("string 'medium' confidence should parse");
         assert!((parsed.confidence.unwrap() - 0.5).abs() < f32::EPSILON);
 
-        let parsed: ModelIntelligence =
-            serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"low"}"#)
-                .expect("string 'low' confidence should parse");
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"zsh","status":"waiting","summary":"test","confidence":"low"}"#,
+        )
+        .expect("string 'low' confidence should parse");
         assert!((parsed.confidence.unwrap() - 0.0).abs() < f32::EPSILON);
 
         let parsed: ModelIntelligence =
@@ -947,6 +947,27 @@ mod tests {
         assert_eq!(intelligence.status, "waiting_idle");
         assert_eq!(intelligence.summary, "修改完成，全部92个测试通过。");
         assert!((intelligence.confidence - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn model_intelligence_accepts_arbitrary_application_name() {
+        let provider = ActiveProvider {
+            name: "test".to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            api_key: "key".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+        };
+
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"wmux","status":"running","summary":"wmux 服务正在运行。","confidence":0.9}"#,
+        )
+        .expect("arbitrary application should parse");
+
+        let intelligence = parsed.into_intelligence(&provider).expect("should convert");
+        assert_eq!(intelligence.app, "wmux");
+        assert_eq!(intelligence.status, "running");
+        assert_eq!(intelligence.app_counts.unwrap().get("wmux"), Some(&1));
     }
 
     #[test]
@@ -1137,7 +1158,9 @@ mod tests {
 
         // Set window 0
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash1,
             CommandClass::AiCli,
@@ -1147,7 +1170,9 @@ mod tests {
 
         // Set window 1
         store.set_window(
-            "conn", "dev", "1",
+            "conn",
+            "dev",
+            "1",
             sample_window_intelligence("waiting"),
             hash2,
             CommandClass::AiCli,
@@ -1156,11 +1181,15 @@ mod tests {
         );
 
         // Retrieve independently
-        let w0 = store.get_window("conn", "dev", "0", ttl).expect("window 0 cached");
+        let w0 = store
+            .get_window("conn", "dev", "0", ttl)
+            .expect("window 0 cached");
         assert_eq!(w0.0.status, "running");
         assert_eq!(w0.1, hash1);
 
-        let w1 = store.get_window("conn", "dev", "1", ttl).expect("window 1 cached");
+        let w1 = store
+            .get_window("conn", "dev", "1", ttl)
+            .expect("window 1 cached");
         assert_eq!(w1.0.status, "waiting");
         assert_eq!(w1.1, hash2);
 
@@ -1178,7 +1207,9 @@ mod tests {
 
         // Initial set
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting_idle"),
             hash,
             CommandClass::AiCli,
@@ -1188,7 +1219,9 @@ mod tests {
 
         // Same params → SkipUnchanged
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1215,7 +1248,9 @@ mod tests {
 
         // Set with "running" status
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::AiCli,
@@ -1225,7 +1260,9 @@ mod tests {
 
         // Same params + AiCli + running → SkipBlocked
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1252,7 +1289,9 @@ mod tests {
 
         // Set with "running" status + NonAi
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::NonAi,
@@ -1262,7 +1301,9 @@ mod tests {
 
         // NonAi + running → SkipUnchanged (NOT SkipBlocked)
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::NonAi,
             "zsh",
@@ -1275,7 +1316,10 @@ mod tests {
             WindowCacheDecision::SkipUnchanged(result) => {
                 assert_eq!(result.status, "running");
             }
-            _ => panic!("expected SkipUnchanged for NonAi+running, got {:?}", decision),
+            _ => panic!(
+                "expected SkipUnchanged for NonAi+running, got {:?}",
+                decision
+            ),
         }
     }
 
@@ -1289,7 +1333,9 @@ mod tests {
 
         // Set with old hash
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             old_hash,
             CommandClass::AiCli,
@@ -1299,7 +1345,9 @@ mod tests {
 
         // Changed hash → Proceed
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             new_hash,
             CommandClass::AiCli,
             "claude",
@@ -1315,7 +1363,9 @@ mod tests {
 
         // Verify in-flight tracking
         let decision2 = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             new_hash,
             CommandClass::AiCli,
             "claude",
@@ -1338,7 +1388,9 @@ mod tests {
 
         // Set with AiCli
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             hash,
             CommandClass::AiCli,
@@ -1348,7 +1400,9 @@ mod tests {
 
         // Changed class → Proceed (even if hash same)
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::NonAi, // Changed!
             "zsh",
@@ -1373,7 +1427,9 @@ mod tests {
 
         // Set with old sig
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             hash,
             CommandClass::AiCli,
@@ -1383,7 +1439,9 @@ mod tests {
 
         // Changed sig → Proceed
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1408,7 +1466,9 @@ mod tests {
 
         // Set window 0 with running + AiCli
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::AiCli,
@@ -1418,7 +1478,9 @@ mod tests {
 
         // Same hash but different sig → Proceed (NOT SkipBlocked from old entry)
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1445,7 +1507,9 @@ mod tests {
 
         // Window not in cache → first call Proceed
         let decision1 = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1460,7 +1524,9 @@ mod tests {
 
         // Second call → InFlight
         let decision2 = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1482,7 +1548,9 @@ mod tests {
 
         // Fill up concurrency limit (max = 2)
         let d1 = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1493,7 +1561,9 @@ mod tests {
         assert!(matches!(d1, WindowCacheDecision::Proceed));
 
         let d2 = store.begin_analyze_window(
-            "conn", "dev", "1",
+            "conn",
+            "dev",
+            "1",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1505,7 +1575,9 @@ mod tests {
 
         // Third window blocked by concurrency
         let d3 = store.begin_analyze_window(
-            "conn", "dev", "2",
+            "conn",
+            "dev",
+            "2",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1535,7 +1607,9 @@ mod tests {
 
         // Set window
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             hash,
             CommandClass::AiCli,
@@ -1545,7 +1619,9 @@ mod tests {
 
         // Very short TTL → stale
         let ttl_zero = Duration::from_secs(0);
-        let result = store.get_window("conn", "dev", "0", ttl_zero).expect("cached");
+        let result = store
+            .get_window("conn", "dev", "0", ttl_zero)
+            .expect("cached");
         assert!(result.0.stale);
         assert_eq!(result.0.status, "waiting");
     }
@@ -1580,7 +1656,9 @@ mod tests {
 
         // Set window with old hash
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             old_hash,
             CommandClass::AiCli,
@@ -1590,7 +1668,9 @@ mod tests {
 
         // Changed hash but min_interval not passed → SkipUnchanged (stale cached result)
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             new_hash,
             CommandClass::AiCli,
             "claude",
@@ -1620,7 +1700,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::NonAi,
@@ -1629,7 +1711,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::NonAi,
             "zsh",
@@ -1642,7 +1726,10 @@ mod tests {
             WindowCacheDecision::SkipUnchanged(result) => {
                 assert_eq!(result.status, "running");
             }
-            _ => panic!("expected SkipUnchanged for NonAi+unchanged, got {:?}", decision),
+            _ => panic!(
+                "expected SkipUnchanged for NonAi+unchanged, got {:?}",
+                decision
+            ),
         }
     }
 
@@ -1654,7 +1741,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::AiCli,
@@ -1663,7 +1752,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1677,7 +1768,10 @@ mod tests {
                 assert_eq!(result.status, "blocked");
                 assert!(!result.stale);
             }
-            _ => panic!("expected SkipBlocked for AiCli+running+unchanged, got {:?}", decision),
+            _ => panic!(
+                "expected SkipBlocked for AiCli+running+unchanged, got {:?}",
+                decision
+            ),
         }
     }
 
@@ -1689,7 +1783,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             hash,
             CommandClass::AiCli,
@@ -1698,7 +1794,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1712,7 +1810,10 @@ mod tests {
                 assert_eq!(result.status, "waiting");
                 assert_ne!(result.status, "blocked");
             }
-            _ => panic!("expected SkipUnchanged for AiCli+not-running+unchanged, got {:?}", decision),
+            _ => panic!(
+                "expected SkipUnchanged for AiCli+not-running+unchanged, got {:?}",
+                decision
+            ),
         }
     }
 
@@ -1724,7 +1825,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::Unknown,
@@ -1733,7 +1836,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::Unknown,
             "unknown",
@@ -1746,7 +1851,10 @@ mod tests {
             WindowCacheDecision::SkipUnchanged(result) => {
                 assert_eq!(result.status, "running");
             }
-            _ => panic!("expected SkipUnchanged for Unknown+running+unchanged, got {:?}", decision),
+            _ => panic!(
+                "expected SkipUnchanged for Unknown+running+unchanged, got {:?}",
+                decision
+            ),
         }
     }
 
@@ -1759,7 +1867,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("waiting"),
             old_hash,
             CommandClass::AiCli,
@@ -1768,7 +1878,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             new_hash,
             CommandClass::AiCli,
             "claude",
@@ -1794,7 +1906,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::NonAi,
@@ -1803,7 +1917,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::NonAi,
             "zsh",
@@ -1815,7 +1931,10 @@ mod tests {
         assert!(matches!(decision, WindowCacheDecision::SkipUnchanged(_)));
 
         let provider_called = matches!(decision, WindowCacheDecision::Proceed);
-        assert!(!provider_called, "SkipUnchanged must set provider_called to false");
+        assert!(
+            !provider_called,
+            "SkipUnchanged must set provider_called to false"
+        );
     }
 
     #[test]
@@ -1829,7 +1948,9 @@ mod tests {
         let min_interval = Duration::from_secs(0);
 
         store.set_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             sample_window_intelligence("running"),
             hash,
             CommandClass::AiCli,
@@ -1838,7 +1959,9 @@ mod tests {
         );
 
         let decision = store.begin_analyze_window(
-            "conn", "dev", "0",
+            "conn",
+            "dev",
+            "0",
             hash,
             CommandClass::AiCli,
             "claude",
@@ -1848,7 +1971,10 @@ mod tests {
         );
 
         let provider_called = matches!(decision, WindowCacheDecision::Proceed);
-        assert!(!provider_called, "SkipBlocked must set provider_called to false");
+        assert!(
+            !provider_called,
+            "SkipBlocked must set provider_called to false"
+        );
 
         match decision {
             WindowCacheDecision::SkipBlocked(cached_intel) => {

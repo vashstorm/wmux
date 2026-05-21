@@ -62,12 +62,11 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
     .await
     .context("failed to execute migration SQL")?;
 
-    let columns: Vec<String> = sqlx::query_scalar(
-        "SELECT name FROM pragma_table_info('ai_usage_events')"
-    )
-    .fetch_all(&mut *tx)
-    .await
-    .context("check ai_usage_events columns")?;
+    let columns: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info('ai_usage_events')")
+            .fetch_all(&mut *tx)
+            .await
+            .context("check ai_usage_events columns")?;
 
     if !columns.contains(&"window_number".to_string()) {
         sqlx::query("ALTER TABLE ai_usage_events ADD COLUMN window_number INTEGER")
@@ -100,7 +99,7 @@ mod tests {
         run_migrations(&pool).await.expect("run migrations");
 
         let projects_exist: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects')"
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='projects')",
         )
         .fetch_one(&pool)
         .await
@@ -125,12 +124,11 @@ mod tests {
         let pool = create_pool(&db_path).await.expect("create pool");
         run_migrations(&pool).await.expect("run migrations");
 
-        let projects_columns: Vec<(String, String)> = sqlx::query_as(
-            "SELECT name, type FROM pragma_table_info('projects') ORDER BY cid"
-        )
-        .fetch_all(&pool)
-        .await
-        .expect("get projects columns");
+        let projects_columns: Vec<(String, String)> =
+            sqlx::query_as("SELECT name, type FROM pragma_table_info('projects') ORDER BY cid")
+                .fetch_all(&pool)
+                .await
+                .expect("get projects columns");
 
         assert_eq!(projects_columns.len(), 6);
         assert_eq!(projects_columns[0].0, "id");
@@ -147,7 +145,7 @@ mod tests {
         assert_eq!(projects_columns[5].1, "TEXT");
 
         let events_columns: Vec<(String, String)> = sqlx::query_as(
-            "SELECT name, type FROM pragma_table_info('ai_usage_events') ORDER BY cid"
+            "SELECT name, type FROM pragma_table_info('ai_usage_events') ORDER BY cid",
         )
         .fetch_all(&pool)
         .await
