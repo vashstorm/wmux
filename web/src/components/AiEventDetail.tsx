@@ -7,16 +7,24 @@ interface AiEventDetailProps {
 	onClose: () => void;
 }
 
+const DETAIL_FONT_SIZE = {
+	title: "20px",
+	section: "16px",
+	body: "16px",
+	value: "16px",
+	code: "14px",
+};
+
 function DetailRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
 	return (
-		<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", py: 0.5 }}>
-			<Typography variant="caption" sx={{ color: "text.secondary", fontSize: "var(--font-size-xs)", flexShrink: 0, minWidth: 100 }}>
+		<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2, py: 0.75 }}>
+			<Typography variant="caption" sx={{ color: "text.secondary", fontSize: DETAIL_FONT_SIZE.body, flexShrink: 0, minWidth: 140 }}>
 				{label}
 			</Typography>
 			<Typography
 				variant="body2"
 				sx={{
-					fontSize: "var(--font-size-sm)",
+					fontSize: DETAIL_FONT_SIZE.value,
 					fontWeight: "var(--font-weight-medium)",
 					textAlign: "right",
 					wordBreak: "break-all",
@@ -107,7 +115,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					<Typography
 						variant="subtitle2"
 						sx={{
-							fontSize: "var(--font-size-md)",
+							fontSize: DETAIL_FONT_SIZE.title,
 							fontWeight: "var(--font-weight-bold)",
 							fontFamily: "var(--font-display)",
 							letterSpacing: "0.05em",
@@ -120,7 +128,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 						size="small"
 						color={isSuccess ? "success" : isError ? "error" : "default"}
 						variant="outlined"
-						sx={{ fontSize: "var(--font-size-xs)", height: 20 }}
+						sx={{ fontSize: DETAIL_FONT_SIZE.body, height: 28 }}
 					/>
 				</Box>
 				<IconButton size="small" onClick={onClose} aria-label="Close detail" data-testid="ai-event-detail-close">
@@ -129,16 +137,16 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 			</Box>
 
 			<Box sx={{ flex: 1, overflowY: "auto", px: "var(--spacing-lg)", py: "var(--spacing-md)" }}>
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 					Model
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-					<Typography variant="body2" sx={{ fontSize: "var(--font-size-md)", fontWeight: "var(--font-weight-semibold)" }}>
+					<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}>
 						{event.provider}/{event.model}
 					</Typography>
 				</Box>
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 					Connection
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -148,7 +156,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					<DetailRow label="Window" value={event.windowNumber != null ? event.windowNumber.toString() : "—"} />
 				</Box>
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 					Performance
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -160,7 +168,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				{(event.estimatedCost != null) && (
 					<>
-						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 							Cost
 						</Typography>
 						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -175,21 +183,21 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					if (!formatted) return null;
 					return (
 						<>
-							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 								AI Response
 							</Typography>
 							<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-								<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+								<Typography variant="body2" component="pre" sx={{ fontSize: DETAIL_FONT_SIZE.code, fontFamily: "var(--font-mono)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
 									{formatted}
 								</Typography>
 							</Box>
 							{contentJson != null && (
 								<>
-									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 										Content
 									</Typography>
 									<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-										<Typography variant="body2" component="pre" sx={{ fontSize: "var(--font-size-xs)", fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+										<Typography variant="body2" component="pre" sx={{ fontSize: DETAIL_FONT_SIZE.code, fontFamily: "var(--font-mono)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
 											{contentJson}
 										</Typography>
 									</Box>
@@ -201,11 +209,11 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				{isError && event.errorMessage && (
 					<>
-						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 							Error
 						</Typography>
 						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "error.main", color: "error.contrastText", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "error.dark" }}>
-							<Typography variant="body2" sx={{ fontSize: "var(--font-size-sm)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+							<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
 								{event.errorMessage}
 							</Typography>
 						</Box>
@@ -214,7 +222,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				<Divider sx={{ my: 1.5 }} />
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: "var(--font-size-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
 					Metadata
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>

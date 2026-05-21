@@ -7,6 +7,11 @@ import { ApiError } from "../../api/errors.js";
 import { useAppState } from "../../state/store.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 30000;
+const STATS_FONT_SIZE = {
+	title: "18px",
+	body: "15px",
+	meta: "13px",
+};
 
 function getAiSummary(responseJson: string | null | undefined): string | undefined {
 	if (!responseJson) return undefined;
@@ -77,7 +82,7 @@ export function StatsView() {
 	return (
 		<Box data-testid="stats-view" sx={{ minHeight: 1 }}>
 			<Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
-				<Typography variant="subtitle2" sx={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="subtitle2" sx={{ fontSize: STATS_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}>
 					AI Usage Stats
 				</Typography>
 				<Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
@@ -91,7 +96,7 @@ export function StatsView() {
 							/>
 						}
 						label="Auto"
-						sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: "var(--font-size-xs)" } }}
+						sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: STATS_FONT_SIZE.body } }}
 					/>
 					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-refresh-button" aria-label="Refresh stats" disabled={loading}>
 						<RefreshIcon fontSize="small" />
@@ -99,13 +104,13 @@ export function StatsView() {
 				</Stack>
 			</Stack>
 			{lastRefreshedAt && (
-				<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", mb: 1, display: "block" }} data-testid="stats-last-refreshed">
+				<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.body, mb: 1.5, display: "block" }} data-testid="stats-last-refreshed">
 					Last updated: {lastRefreshedAt.toLocaleTimeString()}
 				</Typography>
 			)}
 
 			{error && (
-				<Box data-testid="stats-error" sx={{ mb: 1, p: 1, bgcolor: "error.main", color: "error.contrastText", borderRadius: "var(--radius-sm)", fontSize: "var(--font-size-xs)" }}>
+				<Box data-testid="stats-error" sx={{ mb: 1, p: 1, bgcolor: "error.main", color: "error.contrastText", borderRadius: "var(--radius-sm)", fontSize: STATS_FONT_SIZE.body }}>
 					<Typography variant="caption">{error}</Typography>
 					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-retry-button" sx={{ color: "inherit", ml: 0.5 }} aria-label="Retry">
 						<RefreshIcon fontSize="small" />
@@ -116,10 +121,10 @@ export function StatsView() {
 			{summary && (
 				<Box data-testid="stats-summary" sx={{ mb: 1, p: 1, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 					<Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-						<Chip label={`${summary.totalEvents} total`} size="small" variant="outlined" />
-						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" />
-						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" />
-						<Chip label={`${summary.totalDurationMs}ms`} size="small" variant="outlined" />
+						<Chip label={`${summary.totalEvents} total`} size="small" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
+						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
+						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
+						<Chip label={`${summary.totalDurationMs}ms`} size="small" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
 					</Stack>
 				</Box>
 			)}
@@ -137,7 +142,7 @@ export function StatsView() {
 							data-testid={`stats-event-${event.id}`}
 							sx={{
 								px: 1,
-								py: 0.5,
+								py: 0.75,
 								borderRadius: "var(--radius-sm)",
 								cursor: "pointer",
 								bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
@@ -148,59 +153,59 @@ export function StatsView() {
 							<Stack direction="row" spacing={1} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
 								<Box
 									sx={{
-										width: 6,
-										height: 6,
+										width: 7,
+										height: 7,
 										borderRadius: "50%",
 										bgcolor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
 										flexShrink: 0,
 									}}
 								/>
-							<Typography
-								variant="body2"
-								sx={{
-									fontSize: "var(--font-size-xs)",
-									fontWeight: "var(--font-weight-medium)",
-									whiteSpace: "nowrap",
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									minWidth: 0,
-									flex: 1,
-								}}
-								title={`${event.provider}/${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
-							>
-								{event.provider}/{event.model}
-							</Typography>
-							{event.windowNumber != null && (
-								<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", flexShrink: 0 }}>
-									W{event.windowNumber}
-								</Typography>
-							)}
-							{getAiSummary(event.responseJson) && (
 								<Typography
-									variant="caption"
+									variant="body2"
 									sx={{
-										fontSize: "10px",
-										flexShrink: 1,
-										minWidth: 0,
+										fontSize: STATS_FONT_SIZE.body,
+										fontWeight: "var(--font-weight-medium)",
+										whiteSpace: "nowrap",
 										overflow: "hidden",
 										textOverflow: "ellipsis",
-										color: "text.secondary",
-										ml: 0.5,
+										minWidth: 0,
+										flex: 1,
 									}}
+									title={`${event.provider}/${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
 								>
-									{getAiSummary(event.responseJson)}
+									{event.provider}/{event.model}
 								</Typography>
-							)}
-							<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", flexShrink: 0 }}>
-								{event.durationMs}ms
-							</Typography>
+								{event.windowNumber != null && (
+									<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
+										W{event.windowNumber}
+									</Typography>
+								)}
+								{getAiSummary(event.responseJson) && (
+									<Typography
+										variant="caption"
+										sx={{
+											fontSize: STATS_FONT_SIZE.meta,
+											flexShrink: 1,
+											minWidth: 0,
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											color: "text.secondary",
+											ml: 0.5,
+										}}
+									>
+										{getAiSummary(event.responseJson)}
+									</Typography>
+								)}
+								<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
+									{event.durationMs}ms
+								</Typography>
 								{event.totalTokens != null && (
-									<Typography variant="caption" color="text.disabled" sx={{ fontSize: "10px", flexShrink: 0 }}>
+									<Typography variant="caption" color="text.disabled" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
 										{event.totalTokens}t
 									</Typography>
 								)}
 								{event.estimatedCost != null && (
-									<Typography variant="caption" color="text.disabled" sx={{ fontSize: "10px", flexShrink: 0 }}>
+									<Typography variant="caption" color="text.disabled" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
 										${event.estimatedCost.toFixed(4)}
 									</Typography>
 								)}

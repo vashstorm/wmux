@@ -1,6 +1,8 @@
 use axum::Router;
+use axum::http::{Method, header};
 use axum::middleware;
 use axum::routing::{delete, get, post};
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::handlers::{ai_stats, config, connections, health, logs, projects, sessions, terminal};
@@ -123,7 +125,22 @@ pub fn router(state: AppState) -> Router {
         .nest("/api", api)
         .fallback_service(static_service)
         .layer(middleware::from_fn(crate::middleware::logging_middleware))
+        .layer(cors_layer())
         .with_state(state)
+}
+
+fn cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
 }
 
 #[cfg(test)]
@@ -312,6 +329,30 @@ mod tests {
             .await
             .expect("response");
         assert_eq!(authorized.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn cors_preflight_allows_protected_api_without_auth() {
+        let (app, _dir, _config_path) = test_app(base_config());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri("/api/config")
+                    .header(header::ORIGIN, "http://localhost:5173")
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert!(response.status().is_success());
+        assert_eq!(
+            response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            Some(&header::HeaderValue::from_static("*"))
+        );
     }
 
     #[tokio::test]

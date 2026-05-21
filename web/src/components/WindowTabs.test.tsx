@@ -237,6 +237,71 @@ describe("WindowTabs", () => {
 		expect(screen.queryByText("OpenCode")).not.toBeInTheDocument();
 	});
 
+	test("renders app icons for common terminal apps", () => {
+		const windowsWithApps: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "editor",
+				index: 0,
+				active: true,
+				paneCount: 1,
+				activePaneID: "%1",
+				activePaneTitle: "bash",
+				intelligenceApp: "claude",
+			},
+			{
+				id: "@2",
+				name: "tools",
+				index: 1,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%2",
+				activePaneTitle: "OpenCode",
+			},
+			{
+				id: "@3",
+				name: "codex",
+				index: 2,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%3",
+				activePaneTitle: "codex",
+			},
+			{
+				id: "@4",
+				name: "shell",
+				index: 3,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%4",
+				activePaneTitle: "zsh",
+			},
+			{
+				id: "@5",
+				name: "python",
+				index: 4,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%5",
+				activePaneTitle: "python3",
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithApps}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByTestId("window-tab-app-icon-@1")).toHaveAccessibleName("Claude");
+		expect(screen.getByTestId("window-tab-app-icon-@2")).toHaveAccessibleName("OpenCode");
+		expect(screen.getByTestId("window-tab-app-icon-@3")).toHaveAccessibleName("Codex");
+		expect(screen.getByTestId("window-tab-app-icon-@4")).toHaveAccessibleName("zsh");
+		expect(screen.getByTestId("window-tab-app-icon-@5")).toHaveAccessibleName("Python");
+	});
+
 	test("keeps per-window labels when there is no window-level app data", () => {
 		const windowsWithRawName: WindowSummary[] = [
 			{
@@ -297,6 +362,7 @@ describe("attention rendering", () => {
 
 		const tab = screen.getByTestId("window-tab-active");
 		expect(tab).toHaveClass("is-attention");
+		expect(tab).toHaveClass("status-attention");
 		expect(tab).not.toHaveClass("is-attention-explicit");
 	});
 
@@ -349,9 +415,58 @@ describe("attention rendering", () => {
 
 		const tab = screen.getByTestId("window-tab-active");
 		expect(tab).toHaveClass("is-attention-explicit");
+		expect(tab).toHaveClass("status-explicit");
 		const badge = document.querySelector(".attention-badge");
 		expect(badge).toBeInTheDocument();
 		expect(badge?.textContent).toBe("2");
+	});
+
+	test("window intelligence status maps to status classes", () => {
+		const windowsWithStatuses: WindowSummary[] = [
+			{
+				id: "@1",
+				name: "runner",
+				index: 0,
+				active: true,
+				paneCount: 1,
+				activePaneID: "%1",
+				activePaneTitle: "codex",
+				intelligenceStatus: "running",
+			},
+			{
+				id: "@2",
+				name: "confirm",
+				index: 1,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%2",
+				activePaneTitle: "claude",
+				intelligenceStatus: "waiting_confirm",
+			},
+			{
+				id: "@3",
+				name: "blocked",
+				index: 2,
+				active: false,
+				paneCount: 1,
+				activePaneID: "%3",
+				activePaneTitle: "opencode",
+				intelligenceStatus: "dead_loop",
+			},
+		];
+
+		render(
+			<WindowTabs
+				windows={windowsWithStatuses}
+				selectedWindowId="@1"
+				onSelectWindow={() => {}}
+			/>,
+		);
+
+		expect(screen.getByTestId("window-tab-active")).toHaveClass("status-running");
+		const inactiveTabs = screen.getAllByTestId("window-tab");
+		expect(inactiveTabs[0]).toHaveClass("status-waiting");
+		expect(inactiveTabs[1]).toHaveClass("status-blocked");
 	});
 
 	test("window with no attention state shows no attention badge", () => {

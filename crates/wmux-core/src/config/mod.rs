@@ -462,32 +462,49 @@ pub fn default_config_path() -> &'static str {
     DEFAULT_CONFIG_FILE_NAME
 }
 
+pub fn fallback_config_path() -> Result<PathBuf> {
+    expand_user_path("~/Library/Application Support/wmux/config.jsonc").map(PathBuf::from)
+}
+
 pub fn default_config() -> Config {
     Config::default()
 }
 
 pub fn load(path: impl AsRef<Path>) -> Result<Store> {
     let path = resolve_path(path.as_ref())?;
-    if !path.exists() {
-        let store = Store {
+    if path.exists() {
+        let (config, mod_time) = load_config_file(&path)?;
+        return Ok(Store {
             inner: Arc::new(Mutex::new(StoreInner {
                 path,
-                mod_time: None,
-                config: Config::default(),
+                mod_time: Some(mod_time),
+                config,
             })),
-        };
-        store.save()?;
-        return Ok(store);
+        });
     }
 
-    let (config, mod_time) = load_config_file(&path)?;
-    Ok(Store {
+    if let Ok(fallback) = fallback_config_path() {
+        if fallback.exists() {
+            let (config, mod_time) = load_config_file(&fallback)?;
+            return Ok(Store {
+                inner: Arc::new(Mutex::new(StoreInner {
+                    path: fallback,
+                    mod_time: Some(mod_time),
+                    config,
+                })),
+            });
+        }
+    }
+
+    let store = Store {
         inner: Arc::new(Mutex::new(StoreInner {
             path,
-            mod_time: Some(mod_time),
-            config,
+            mod_time: None,
+            config: Config::default(),
         })),
-    })
+    };
+    store.save()?;
+    Ok(store)
 }
 
 pub fn parse_config(data: &str) -> Result<Config> {

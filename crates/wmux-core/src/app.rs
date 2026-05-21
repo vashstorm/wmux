@@ -3,13 +3,16 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use tokio::task::JoinHandle;
 
-use crate::config::{Config, default_config_path};
+use crate::config::Config;
 use crate::state::AppState;
 
-pub async fn start_in_process(assets_dir: PathBuf) -> Result<(String, u16, JoinHandle<()>)> {
+pub async fn start_in_process(
+    assets_dir: PathBuf,
+    config_path: PathBuf,
+) -> Result<(String, u16, JoinHandle<()>)> {
     let token = random_token();
-    let store = Config::load(default_config_path())
-        .with_context(|| format!("failed to load config from {}", default_config_path()))?;
+    let store = Config::load(&config_path)
+        .with_context(|| format!("failed to load config from {}", config_path.display()))?;
     let mut config = store
         .snapshot()
         .context("failed to read config snapshot")?

@@ -35,9 +35,11 @@ impl BackendState {
 fn main() {
     let app = tauri::Builder::default()
         .setup(|app| {
-            let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../web/dist");
+            let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            let assets_dir = manifest_dir.join("../web/dist");
+            let config_path = tauri_config_path(&manifest_dir);
             let (token, port, server_handle) = tauri::async_runtime::block_on(
-                wmux_core::app::start_in_process(assets_dir),
+                wmux_core::app::start_in_process(assets_dir, config_path),
             )?;
             app.manage(BackendState::new(server_handle));
 
@@ -65,4 +67,16 @@ fn main() {
             app_handle.state::<BackendState>().stop();
         }
     });
+}
+
+fn tauri_config_path(manifest_dir: &std::path::Path) -> PathBuf {
+    if cfg!(debug_assertions) {
+        let workspace_config = manifest_dir.join("../config.jsonc");
+        if workspace_config.exists() {
+            return workspace_config;
+        }
+    }
+
+    wmux_core::config::fallback_config_path()
+        .unwrap_or_else(|_| PathBuf::from(wmux_core::config::default_config_path()))
 }
