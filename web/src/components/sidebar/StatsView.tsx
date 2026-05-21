@@ -121,10 +121,8 @@ export function StatsView() {
 			{summary && (
 				<Box data-testid="stats-summary" sx={{ mb: 1, p: 1, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 					<Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-						<Chip label={`${summary.totalEvents} total`} size="small" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
 						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
 						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
-						<Chip label={`${summary.totalDurationMs}ms`} size="small" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
 					</Stack>
 				</Box>
 			)}
@@ -171,9 +169,9 @@ export function StatsView() {
 										minWidth: 0,
 										flex: 1,
 									}}
-									title={`${event.provider}/${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
+									title={`${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
 								>
-									{event.provider}/{event.model}
+									{event.model}
 								</Typography>
 								{event.windowNumber != null && (
 									<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>

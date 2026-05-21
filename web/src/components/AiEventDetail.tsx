@@ -142,7 +142,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 					<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}>
-						{event.provider}/{event.model}
+						{event.model}
 					</Typography>
 				</Box>
 
