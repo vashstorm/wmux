@@ -1,5 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
-  <rect width="16" height="16" fill="#0a0e1a" rx="2"/>
-  <rect x="1" y="1" width="14" height="14" fill="none" stroke="#f59e0b" stroke-width="1" opacity="0.2"/>
-  <path d="M3 4h2v7H3zm2 5h2v2H5zm2 1h2v2H7zm2-1h2v2H9zm2-5h2v7h-2z" fill="#f59e0b" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Wmux">
+  <defs>
+    <linearGradient id="shell" x1="96" y1="70" x2="928" y2="954" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#172033"/>
+      <stop offset="0.55" stop-color="#0d1424"/>
+      <stop offset="1" stop-color="#070b14"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="190" y1="218" x2="834" y2="806" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.48" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="shadow" x="30" y="28" width="964" height="1008" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="30" flood-color="#020617" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <rect x="66" y="52" width="892" height="920" rx="210" fill="url(#shell)" filter="url(#shadow)"/>
+  <rect x="104" y="90" width="816" height="844" rx="176" fill="none" stroke="#f8fafc" stroke-opacity="0.08" stroke-width="10"/>
+  <path d="M214 284c0-37.6 30.4-68 68-68h460c37.6 0 68 30.4 68 68v456c0 37.6-30.4 68-68 68H282c-37.6 0-68-30.4-68-68V284Z" fill="#0f172a"/>
+  <path d="M214 284c0-37.6 30.4-68 68-68h460c37.6 0 68 30.4 68 68v82H214v-82Z" fill="url(#accent)"/>
+  <circle cx="294" cy="292" r="22" fill="#082f49" fill-opacity="0.76"/>
+  <circle cx="366" cy="292" r="22" fill="#082f49" fill-opacity="0.58"/>
+  <circle cx="438" cy="292" r="22" fill="#082f49" fill-opacity="0.4"/>
+  <path d="M324 480 442 588 324 696" fill="none" stroke="#67e8f9" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M510 696h190" fill="none" stroke="#fbbf24" stroke-width="66" stroke-linecap="round"/>
+  <path d="M632 444h96v208h-96zM496 444h96v148h-96z" fill="#f8fafc" fill-opacity="0.12"/>
 </svg>

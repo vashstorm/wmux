@@ -17,7 +17,7 @@
   },
   "bundle": {
     "active": true,
-    "icon": [],
+    "icon": ["icons/icon.icns", "../web/public/favicon.svg"],
     "targets": ["app"],
     "macOS": {
       "minimumSystemVersion": "11.0"
