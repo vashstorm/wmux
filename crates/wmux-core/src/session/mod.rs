@@ -819,11 +819,7 @@ fn terminal_snapshot_output(
     if output.is_empty() {
         return None;
     }
-    let mut snapshot = String::from("\x1b[0m");
-    if let Some(background_sequence) = first_sgr_background_sequence(output) {
-        snapshot.push_str(background_sequence);
-    }
-    snapshot.push_str("\x1b[H\x1b[2J\x1b[?7l");
+    let mut snapshot = String::from("\x1b[0m\x1b[H\x1b[2J\x1b[?7l");
     for (index, line) in output.lines().take(size.rows as usize).enumerate() {
         snapshot.push_str(&format!(
             "\x1b[{};1H{}",
@@ -838,35 +834,6 @@ fn terminal_snapshot_output(
         snapshot.push_str(&format!("\x1b[{row};{col}H"));
     }
     Some(snapshot)
-}
-
-fn first_sgr_background_sequence(output: &str) -> Option<&str> {
-    let bytes = output.as_bytes();
-    let mut cursor = 0;
-    while cursor + 2 < bytes.len() {
-        let Some(offset) = output[cursor..].find("\x1b[") else {
-            break;
-        };
-        let start = cursor + offset;
-        let params_start = start + 2;
-        let Some(end_offset) = output[params_start..].find('m') else {
-            break;
-        };
-        let end = params_start + end_offset;
-        let params = &output[params_start..end];
-        if sgr_params_include_background(params) {
-            return Some(&output[start..=end]);
-        }
-        cursor = end + 1;
-    }
-    None
-}
-
-fn sgr_params_include_background(params: &str) -> bool {
-    params
-        .split(';')
-        .filter_map(|param| param.parse::<u16>().ok())
-        .any(|param| param == 48 || (40..=47).contains(&param) || (100..=107).contains(&param))
 }
 
 fn fit_snapshot_line(line: &str, cols: usize) -> String {
@@ -1403,7 +1370,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_snapshot_clears_with_captured_background() {
+    fn terminal_snapshot_clears_with_default_background() {
         let snapshot = terminal_snapshot_output(
             "\x1b[48;5;238mprompt",
             None,
@@ -1411,12 +1378,12 @@ mod tests {
         )
         .unwrap();
 
-        assert!(snapshot.starts_with("\x1b[0m\x1b[48;5;238m\x1b[H\x1b[2J"));
+        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
         assert!(snapshot.contains("\x1b[1;1H\x1b[48;5;238mprompt"));
     }
 
     #[test]
-    fn terminal_snapshot_detects_truecolor_background_after_foreground() {
+    fn terminal_snapshot_preserves_truecolor_line_background_after_foreground() {
         let snapshot = terminal_snapshot_output(
             "\x1b[38;2;255;255;255m\x1b[48;2;36;39;58mOpenCode",
             None,
@@ -1424,7 +1391,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(snapshot.starts_with("\x1b[0m\x1b[48;2;36;39;58m\x1b[H\x1b[2J"));
+        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
+        assert!(snapshot.contains("\x1b[1;1H\x1b[38;2;255;255;255m\x1b[48;2;36;39;58mOpenCode"));
     }
 
     #[test]
