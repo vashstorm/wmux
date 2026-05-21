@@ -249,15 +249,7 @@ export function MainPanel() {
 								</Typography>
 							</Box>
 						))
-					) : (
-						<Typography
-							component="span"
-							className="main-title-fallback"
-							sx={{ color: "text.secondary" }}
-						>
-							Wmux
-						</Typography>
-					)}
+					) : null}
 				</Box>
 			</header>
 
