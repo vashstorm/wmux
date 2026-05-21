@@ -47,3 +47,6 @@ data-shm
 data-wal
 *.db
 *.db-journal
+
+# Design docs (local only)
+docs/
