@@ -23,9 +23,7 @@ interface TerminalSize {
 }
 
 const TERMINAL_FIT_COLUMN_GUTTER = 6;
-const TERMINAL_FIT_ROW_GUTTER = 1;
 const MIN_TERMINAL_COLS = 2;
-const MIN_TERMINAL_ROWS = 1;
 
 function normalizeTerminalSize(cols: number | undefined, rows: number | undefined): TerminalSize | null {
 	if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
@@ -33,16 +31,16 @@ function normalizeTerminalSize(cols: number | undefined, rows: number | undefine
 	return { cols, rows };
 }
 
-function applyColumnGutter(size: TerminalSize): TerminalSize {
+function applyFitGutter(size: TerminalSize): TerminalSize {
 	return {
 		cols: Math.max(MIN_TERMINAL_COLS, size.cols - TERMINAL_FIT_COLUMN_GUTTER),
-		rows: Math.max(MIN_TERMINAL_ROWS, size.rows - TERMINAL_FIT_ROW_GUTTER),
+		rows: size.rows,
 	};
 }
 
 function resolveDisplaySize(fittedSize: TerminalSize | null, sourceSize: TerminalSize | null | undefined): TerminalSize | null {
 	if (!fittedSize) return sourceSize ?? null;
-	return applyColumnGutter(fittedSize);
+	return applyFitGutter(fittedSize);
 }
 
 function redrawTerminal(terminal: XTerm) {

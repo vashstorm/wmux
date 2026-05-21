@@ -45,10 +45,12 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 		? panes.find((pane) => pane.id === selectedPane.pane)
 		: null;
 	const selectedPaneSourceSize = useMemo(() => {
-		if (!selectedPaneData || selectedPaneData.width <= 0 || selectedPaneData.height <= 0) {
+		const cols = selectedPaneData?.sourceCols ?? selectedPaneData?.width;
+		const rows = selectedPaneData?.sourceRows ?? selectedPaneData?.height;
+		if (!cols || !rows || cols <= 0 || rows <= 0) {
 			return null;
 		}
-		return { cols: selectedPaneData.width, rows: selectedPaneData.height };
+		return { cols, rows };
 	}, [selectedPaneData]);
 
 	if (panes.length === 0) {

@@ -975,7 +975,7 @@
 	height: 100%;
 	min-width: 0;
 	min-height: 0;
-	padding: var(--spacing-sm);
+	padding: 0;
 	border-radius: var(--radius-sm);
 	overflow: hidden;
 	background-color: var(--terminal-background);

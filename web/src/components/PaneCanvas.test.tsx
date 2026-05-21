@@ -6,10 +6,14 @@ import type { PaneData, SelectedPane } from "../state/store.js";
 vi.mock("./Terminal.js", () => ({
 	Terminal: vi.fn(({
 		selectedPane,
+		sourceSize,
 	}: {
 		selectedPane: SelectedPane;
+		sourceSize?: { cols: number; rows: number } | null;
 	}) => (
-		<div data-testid="mock-terminal">{selectedPane.pane}</div>
+		<div data-testid="mock-terminal" data-source-size={sourceSize ? `${sourceSize.cols}x${sourceSize.rows}` : ""}>
+			{selectedPane.pane}
+		</div>
 	)),
 }));
 
@@ -130,6 +134,25 @@ describe("PaneCanvas", () => {
 		const terminals = screen.getAllByTestId("mock-terminal");
 		expect(terminals).toHaveLength(1);
 		expect(terminals[0]).toHaveTextContent("%1");
+	});
+
+	test("passes tmux source size to Terminal when preserved pane geometry is stale", () => {
+		render(
+			<PaneCanvas
+				panes={[{
+					...mockPanes[0]!,
+					width: 80,
+					height: 24,
+					sourceCols: 120,
+					sourceRows: 40,
+				}]}
+				selectedPaneId="%1"
+				onSelectPane={() => {}}
+				selectedPane={mockSelectedPane}
+			/>,
+		);
+
+		expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-source-size", "120x40");
 	});
 
 	test("keeps pane overlay backgrounds transparent while terminal is mounted", () => {
