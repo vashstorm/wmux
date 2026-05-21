@@ -37,7 +37,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
         .unwrap_or("local")
         .trim()
         .to_string();
-    tracing::info!(target_name = %target_name, session = ?query.session, "terminal websocket connecting");
+    tracing::debug!(target_name = %target_name, session = ?query.session, "terminal websocket connecting");
 
     if send_json(
         &mut socket,
@@ -160,7 +160,7 @@ async fn bridge_terminal(mut socket: WebSocket, session: Session, target_name: S
     }
 
     let _ = session.close().await;
-    tracing::info!(%target_name, "terminal websocket disconnected");
+    tracing::debug!(%target_name, "terminal websocket disconnected");
     let _ = socket.send(Message::Close(None)).await;
 }
 

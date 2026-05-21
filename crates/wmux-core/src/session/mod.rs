@@ -181,7 +181,7 @@ impl SessionManager {
             process,
             initial_output,
         )?;
-        tracing::info!(target_name = %target_name, target = %resolved_pane.display_target, pane_id = %resolved_pane.pane_id, "terminal control client attached");
+        tracing::debug!(target_name = %target_name, target = %resolved_pane.display_target, pane_id = %resolved_pane.pane_id, "terminal control client attached");
         Ok(session)
     }
 
