@@ -195,14 +195,11 @@ mod tests {
         let store = Config::load(&config_path).expect("load config");
 
         let error_log_path = dir.path().join("wmux-error.log");
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&error_log_path)
+        let writer = wmux_core::logging::RotatingFileWriter::open(error_log_path.clone(), 0, 0)
             .expect("open test error log");
-        let shared_file = std::sync::Arc::new(std::sync::Mutex::new(file));
+        let shared_writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
         let error_handle =
-            wmux_core::logging::ErrorLogHandle::new(shared_file.clone(), error_log_path.clone());
+            wmux_core::logging::ErrorLogHandle::new(shared_writer.clone(), error_log_path.clone());
         let logging_handle = wmux_core::logging::LoggingHandle {
             error_log: Some(error_handle.clone()),
         };
@@ -632,12 +629,12 @@ mod tests {
         let (app, _dir, _config_path, error_handle) = test_app_with_error_log(base_config());
 
         {
-            let mut f = error_handle.file.lock().expect("lock");
+            let mut f = error_handle.writer.lock().expect("lock");
             use std::io::Write;
             for i in 0..1010 {
                 writeln!(f, "error line {}", i).expect("write");
             }
-            f.sync_all().expect("sync");
+            f.flush().expect("flush");
         }
 
         let response = app
@@ -658,10 +655,10 @@ mod tests {
         let (app, _dir, _config_path, error_handle) = test_app_with_error_log(base_config());
 
         {
-            let mut f = error_handle.file.lock().expect("lock");
+            let mut f = error_handle.writer.lock().expect("lock");
             use std::io::Write;
             writeln!(f, "old error line").expect("write");
-            f.sync_all().expect("sync");
+            f.flush().expect("flush");
         }
 
         let del_response = app
@@ -672,10 +669,10 @@ mod tests {
         assert_eq!(del_response.status(), StatusCode::NO_CONTENT);
 
         {
-            let mut f = error_handle.file.lock().expect("lock");
+            let mut f = error_handle.writer.lock().expect("lock");
             use std::io::Write;
             writeln!(f, "new error after clear").expect("write");
-            f.sync_all().expect("sync");
+            f.flush().expect("flush");
         }
 
         let response = app

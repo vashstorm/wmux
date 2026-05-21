@@ -41,9 +41,13 @@
   "logs": {
     "level": "info",
     "path": "",
-    "errorPath": ""
+    "errorPath": "",
+    // Rotate each log file after it reaches this size in bytes. Set 0 to disable.
+    "rotationSizeBytes": 10485760,
+    // Delete rotated log files older than this many days. Set 0 to disable cleanup.
+    "retentionDays": 14
   },
-"storage": {
+  "storage": {
     // Directory path for the SQLite database. Relative paths resolve against the project directory.
     "path": "data"
   }

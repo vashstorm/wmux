@@ -148,6 +148,10 @@ pub struct LogsConfig {
     pub path: String,
     #[serde(default = "default_error_log_path")]
     pub error_path: String,
+    #[serde(default = "default_log_rotation_size_bytes")]
+    pub rotation_size_bytes: u64,
+    #[serde(default = "default_log_retention_days")]
+    pub retention_days: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -375,6 +379,8 @@ impl Default for LogsConfig {
             level: default_log_level(),
             path: default_log_path(),
             error_path: default_error_log_path(),
+            rotation_size_bytes: default_log_rotation_size_bytes(),
+            retention_days: default_log_retention_days(),
         }
     }
 }
@@ -929,6 +935,14 @@ fn default_error_log_path() -> String {
     DEFAULT_LOG_DIR.to_string()
 }
 
+fn default_log_rotation_size_bytes() -> u64 {
+    10 * 1024 * 1024
+}
+
+fn default_log_retention_days() -> u64 {
+    14
+}
+
 fn default_storage_path() -> String {
     "data".to_string()
 }
@@ -969,6 +983,8 @@ mod tests {
         assert_eq!(config.logs.level, "info");
         assert_eq!(config.logs.path, "logs/");
         assert_eq!(config.logs.error_path, "logs/");
+        assert_eq!(config.logs.rotation_size_bytes, 10 * 1024 * 1024);
+        assert_eq!(config.logs.retention_days, 14);
         assert_eq!(config.storage.path, "data");
     }
 
@@ -1124,6 +1140,8 @@ mod tests {
         assert_eq!(config.logs.level, "info");
         assert_eq!(config.logs.path, "");
         assert_eq!(config.logs.error_path, "./errors.log");
+        assert_eq!(config.logs.rotation_size_bytes, 10 * 1024 * 1024);
+        assert_eq!(config.logs.retention_days, 14);
     }
 
     #[test]

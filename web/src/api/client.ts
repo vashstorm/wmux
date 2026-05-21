@@ -201,6 +201,8 @@ export interface AppConfig {
 		level: string;
 		path: string;
 		errorPath: string;
+		rotationSizeBytes?: number;
+		retentionDays?: number;
 	};
 	storage?: {
 		path: string;

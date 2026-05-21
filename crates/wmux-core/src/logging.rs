@@ -1,8 +1,9 @@
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tracing::Level;
 use tracing_subscriber::fmt::MakeWriter;
@@ -10,9 +11,9 @@ use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::Subscribe
 
 use crate::config::{ConfigError, LogsConfig, resolve_log_file_path};
 
-/// Wrapper for Arc<Mutex<File>> that implements MakeWriter.
+/// Wrapper for Arc<Mutex<RotatingFileWriter>> that implements MakeWriter.
 #[derive(Clone)]
-struct SharedFileWriter(Arc<Mutex<std::fs::File>>);
+struct SharedFileWriter(Arc<Mutex<RotatingFileWriter>>);
 
 impl<'a> MakeWriter<'a> for SharedFileWriter {
     type Writer = OwningMutexWriter;
@@ -23,7 +24,7 @@ impl<'a> MakeWriter<'a> for SharedFileWriter {
 }
 
 /// Owning writer that locks on each write operation.
-struct OwningMutexWriter(Arc<Mutex<std::fs::File>>);
+struct OwningMutexWriter(Arc<Mutex<RotatingFileWriter>>);
 
 impl Write for OwningMutexWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -44,14 +45,14 @@ impl Write for OwningMutexWriter {
 /// A cloneable handle to the shared error log file.
 #[derive(Clone)]
 pub struct ErrorLogHandle {
-    pub file: Arc<Mutex<std::fs::File>>,
+    pub(crate) writer: Arc<Mutex<RotatingFileWriter>>,
     path: PathBuf,
 }
 
 impl ErrorLogHandle {
     /// Create an ErrorLogHandle for testing.
-    pub fn new(file: Arc<Mutex<std::fs::File>>, path: PathBuf) -> Self {
-        Self { file, path }
+    pub fn new(writer: Arc<Mutex<RotatingFileWriter>>, path: PathBuf) -> Self {
+        Self { writer, path }
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -84,14 +85,10 @@ impl ErrorLogHandle {
 
     /// Clear (truncate) the error log file.
     pub fn clear(&self) -> Result<(), std::io::Error> {
-        let mut file = self
-            .file
+        self.writer
             .lock()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "mutex poisoned"))?;
-        file.set_len(0)?;
-        file.seek(SeekFrom::Start(0))?;
-        file.sync_all()?;
-        Ok(())
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "mutex poisoned"))?
+            .clear()
     }
 }
 
@@ -121,19 +118,12 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
         None
     } else {
         let log_file_path = resolve_log_file_path(&config.path, "wmux.log")?;
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file_path)
-            .map_err(|source| ConfigError::Io {
-                context: "open log file",
-                source,
-            })?;
+        let writer = open_rotating_writer(&log_file_path, config, "open log file")?;
         Some(
             tracing_subscriber::fmt::layer()
                 .with_ansi(false)
                 .with_target(false)
-                .with_writer(Mutex::new(file)),
+                .with_writer(SharedFileWriter(writer)),
         )
     };
 
@@ -142,17 +132,10 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
             (None, None)
         } else {
             let error_file_path = resolve_log_file_path(&config.error_path, "wmux-error.log")?;
-            let file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&error_file_path)
-                .map_err(|source| ConfigError::Io {
-                    context: "open error log file",
-                    source,
-                })?;
-            let shared_file = Arc::new(Mutex::new(file));
+            let shared_file =
+                open_rotating_writer(&error_file_path, config, "open error log file")?;
             let handle = ErrorLogHandle {
-                file: shared_file.clone(),
+                writer: shared_file.clone(),
                 path: error_file_path,
             };
             let writer = SharedFileWriter(shared_file);
@@ -178,6 +161,174 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
     })
 }
 
+fn open_rotating_writer(
+    path: &Path,
+    config: &LogsConfig,
+    context: &'static str,
+) -> Result<Arc<Mutex<RotatingFileWriter>>, ConfigError> {
+    RotatingFileWriter::open(
+        path.to_path_buf(),
+        config.rotation_size_bytes,
+        config.retention_days,
+    )
+    .map(|writer| Arc::new(Mutex::new(writer)))
+    .map_err(|source| ConfigError::Io { context, source })
+}
+
+pub struct RotatingFileWriter {
+    path: PathBuf,
+    file: Option<File>,
+    rotation_size_bytes: u64,
+    retention_days: u64,
+}
+
+impl RotatingFileWriter {
+    pub fn open(
+        path: PathBuf,
+        rotation_size_bytes: u64,
+        retention_days: u64,
+    ) -> std::io::Result<Self> {
+        cleanup_rotated_logs(&path, retention_days)?;
+        let file = open_append_file(&path)?;
+        Ok(Self {
+            path,
+            file: Some(file),
+            rotation_size_bytes,
+            retention_days,
+        })
+    }
+
+    pub fn clear(&mut self) -> std::io::Result<()> {
+        let file = self.file_mut()?;
+        file.set_len(0)?;
+        file.seek(SeekFrom::Start(0))?;
+        file.sync_all()
+    }
+
+    fn rotate_if_needed(&mut self, incoming_bytes: usize) -> std::io::Result<()> {
+        if self.rotation_size_bytes == 0 {
+            return Ok(());
+        }
+
+        let current_len = self
+            .file_mut()?
+            .metadata()
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        if current_len == 0
+            || current_len.saturating_add(incoming_bytes as u64) <= self.rotation_size_bytes
+        {
+            return Ok(());
+        }
+
+        self.rotate()?;
+        cleanup_rotated_logs(&self.path, self.retention_days)
+    }
+
+    fn rotate(&mut self) -> std::io::Result<()> {
+        if let Some(mut file) = self.file.take() {
+            file.flush()?;
+            file.sync_all()?;
+        }
+
+        if self.path.exists() && self.path.metadata()?.len() > 0 {
+            std::fs::rename(&self.path, next_rotated_path(&self.path)?)?;
+        }
+
+        self.file = Some(open_append_file(&self.path)?);
+        Ok(())
+    }
+
+    fn file_mut(&mut self) -> std::io::Result<&mut File> {
+        self.file
+            .as_mut()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "log file is closed"))
+    }
+}
+
+impl Write for RotatingFileWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.rotate_if_needed(buf.len())?;
+        self.file_mut()?.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file_mut()?.flush()
+    }
+}
+
+fn open_append_file(path: &Path) -> std::io::Result<File> {
+    OpenOptions::new().create(true).append(true).open(path)
+}
+
+fn next_rotated_path(path: &Path) -> std::io::Result<PathBuf> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid log path"))?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    for index in 0..1000 {
+        let suffix = if index == 0 {
+            timestamp.to_string()
+        } else {
+            format!("{timestamp}.{index}")
+        };
+        let candidate = parent.join(format!("{file_name}.{suffix}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        "too many rotated log files for the same timestamp",
+    ))
+}
+
+fn cleanup_rotated_logs(path: &Path, retention_days: u64) -> std::io::Result<()> {
+    if retention_days == 0 {
+        return Ok(());
+    }
+
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    if !parent.exists() {
+        return Ok(());
+    }
+
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return Ok(());
+    };
+    let rotated_prefix = format!("{file_name}.");
+    let retention = Duration::from_secs(retention_days.saturating_mul(24 * 60 * 60));
+    let cutoff = SystemTime::now()
+        .checked_sub(retention)
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    for entry in std::fs::read_dir(parent)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let Some(entry_name) = entry_path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !entry_name.starts_with(&rotated_prefix) || !entry.file_type()?.is_file() {
+            continue;
+        }
+        let modified = entry.metadata()?.modified().unwrap_or(SystemTime::now());
+        if modified < cutoff {
+            std::fs::remove_file(entry_path)?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,21 +338,15 @@ mod tests {
     fn error_log_handle_read_lines_returns_last_n() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("test-error.log");
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .expect("open");
+        std::fs::write(
+            &path,
+            (0..5)
+                .map(|i| format!("error line {i}\n"))
+                .collect::<String>(),
+        )
+        .expect("write");
 
-        for i in 0..5 {
-            writeln!(file, "error line {}", i).expect("write");
-        }
-        file.sync_all().expect("sync");
-
-        let handle = ErrorLogHandle {
-            file: Arc::new(Mutex::new(file)),
-            path,
-        };
+        let handle = test_error_log_handle(path);
 
         let (lines, truncated) = handle.read_lines(3);
         assert_eq!(lines.len(), 3);
@@ -214,19 +359,9 @@ mod tests {
     fn error_log_handle_read_lines_no_truncation() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("test-error.log");
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .expect("open");
+        std::fs::write(&path, "only line\n").expect("write");
 
-        writeln!(file, "only line").expect("write");
-        file.sync_all().expect("sync");
-
-        let handle = ErrorLogHandle {
-            file: Arc::new(Mutex::new(file)),
-            path,
-        };
+        let handle = test_error_log_handle(path);
 
         let (lines, truncated) = handle.read_lines(1000);
         assert_eq!(lines.len(), 1);
@@ -237,35 +372,22 @@ mod tests {
     fn error_log_handle_clear_then_write() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("test-error.log");
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .expect("open");
+        let handle = test_error_log_handle(path);
 
-        let handle = ErrorLogHandle {
-            file: Arc::new(Mutex::new(file)),
-            path: path.clone(),
-        };
-
-        // Write before
         {
-            let mut f = handle.file.lock().expect("lock");
-            writeln!(f, "before clear").expect("write");
-            f.sync_all().expect("sync before");
+            let mut writer = handle.writer.lock().expect("lock");
+            writeln!(writer, "before clear").expect("write");
+            writer.flush().expect("sync before");
         }
 
-        // Clear
         handle.clear().expect("clear");
 
-        // Write after
         {
-            let mut f = handle.file.lock().expect("lock");
-            writeln!(f, "after clear").expect("write");
-            f.sync_all().expect("sync after");
+            let mut writer = handle.writer.lock().expect("lock");
+            writeln!(writer, "after clear").expect("write");
+            writer.flush().expect("sync after");
         }
 
-        // Read - should only have "after clear"
         let (lines, _) = handle.read_lines(10);
         assert_eq!(lines.len(), 1);
         assert_eq!(lines[0], "after clear");
@@ -275,5 +397,68 @@ mod tests {
     fn logging_handle_empty_has_no_error_log() {
         let handle = LoggingHandle::empty();
         assert!(handle.error_log.is_none());
+    }
+
+    #[test]
+    fn rotating_file_writer_rotates_when_size_limit_is_exceeded() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("wmux.log");
+        let mut writer = RotatingFileWriter::open(path.clone(), 12, 14).expect("open");
+
+        writeln!(writer, "first").expect("write first");
+        writer.flush().expect("flush first");
+        writeln!(writer, "second").expect("write second");
+        writer.flush().expect("flush second");
+
+        let active = std::fs::read_to_string(&path).expect("read active");
+        assert_eq!(active, "second\n");
+        assert_eq!(rotated_logs(&path).len(), 1);
+    }
+
+    #[test]
+    fn rotating_file_writer_deletes_expired_rotated_logs() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("wmux.log");
+        let old_rotated = dir.path().join("wmux.log.1");
+        std::fs::write(&old_rotated, "old").expect("write old");
+        let old_file = OpenOptions::new()
+            .write(true)
+            .open(&old_rotated)
+            .expect("open old");
+        old_file
+            .set_times(
+                std::fs::FileTimes::new().set_modified(
+                    SystemTime::now()
+                        .checked_sub(Duration::from_secs(3 * 24 * 60 * 60))
+                        .expect("old time"),
+                ),
+            )
+            .expect("set time");
+
+        let _writer = RotatingFileWriter::open(path, 1024, 1).expect("open");
+
+        assert!(!old_rotated.exists());
+    }
+
+    fn test_error_log_handle(path: PathBuf) -> ErrorLogHandle {
+        let writer = RotatingFileWriter::open(path.clone(), 0, 0).expect("open writer");
+        ErrorLogHandle::new(Arc::new(Mutex::new(writer)), path)
+    }
+
+    fn rotated_logs(path: &Path) -> Vec<PathBuf> {
+        let file_name = path.file_name().unwrap().to_string_lossy();
+        let prefix = format!("{file_name}.");
+        let mut logs = std::fs::read_dir(path.parent().unwrap())
+            .expect("read dir")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|entry_path| {
+                entry_path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().starts_with(&prefix))
+                    .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+        logs.sort();
+        logs
     }
 }
