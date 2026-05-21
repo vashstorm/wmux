@@ -1254,7 +1254,7 @@
 .session-card-list {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 4px;
 	margin-top: var(--spacing-sm);
 }
 
@@ -1263,12 +1263,12 @@
 	align-items: center;
 	border-radius: var(--radius-md);
 	overflow: hidden;
-	transition: all var(--transition-base);
+	transition: border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base);
 	position: relative;
 }
 
 .session-card:hover {
-	transform: translateY(-1px);
+	transform: none;
 }
 
 .session-card.is-active {
@@ -1285,8 +1285,8 @@
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
-	gap: 4px;
-	padding: 8px 14px;
+	gap: 3px;
+	padding: 6px 12px;
 	cursor: pointer;
 	text-align: left;
 	min-width: 0;
@@ -1297,7 +1297,7 @@
 	width: 100%;
 	min-width: 0;
 	flex-direction: column;
-	gap: 4px;
+	gap: 3px;
 }
 
 .session-card-top {
@@ -1323,7 +1323,7 @@
 .session-card-meta {
 	display: flex;
 	align-items: center;
-	gap: var(--spacing-sm);
+	gap: 5px;
 	flex-wrap: wrap;
 	justify-content: flex-start;
 	width: 100%;
@@ -1351,9 +1351,9 @@
 	font-weight: var(--font-weight-semibold);
 	line-height: 1;
 	flex-shrink: 0;
-	color: #405068;
-	background-color: rgba(78, 98, 132, 0.12);
-	border: 1px solid rgba(78, 98, 132, 0.2);
+	color: var(--color-text-muted);
+	background-color: var(--color-surface);
+	border: 1px solid var(--color-surface-border);
 }
 
 .session-card-badges {
@@ -1702,15 +1702,15 @@
 	display: inline-flex;
 	align-items: center;
 	padding: 1px 6px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-full);
 	font-size: var(--font-size-2xs);
 	font-weight: 600;
 	letter-spacing: 0;
 	text-transform: uppercase;
 	line-height: 1.4;
-	color: #52525b;
-	background-color: rgba(82, 82, 91, 0.12);
-	border: 1px solid rgba(82, 82, 91, 0.18);
+	color: var(--color-text-muted);
+	background-color: var(--color-surface);
+	border: 1px solid var(--color-surface-border);
 }
 
 .intelligence-badge.is-dead_loop {
@@ -1766,16 +1766,16 @@
 	display: inline-flex;
 	align-items: center;
 	padding: 1px 5px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-full);
 	font-size: var(--font-size-2xs);
 	font-weight: 600;
 	letter-spacing: 0;
 	text-transform: uppercase;
 	line-height: 1.4;
 	flex-shrink: 0;
-	color: #334155;
-	background-color: rgba(51, 65, 85, 0.1);
-	border: 1px solid rgba(51, 65, 85, 0.16);
+	color: var(--color-text-muted);
+	background-color: var(--color-surface);
+	border: 1px solid var(--color-surface-border);
 }
 
 .app-count-badge.is-claude {
@@ -1813,7 +1813,7 @@
 	height: 18px;
 	min-height: 18px;
 	padding: 0 6px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius-full);
 	font-size: var(--font-size-2xs);
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0;

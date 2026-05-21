@@ -102,7 +102,6 @@ export function SessionCard({
 			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${isSelected ? " is-selected" : ""}`}
 			data-testid={`session-card-${sname}`}
 			sx={{
-				mb: 0.75,
 				borderRadius: "var(--radius-md)",
 				border: "1px solid",
 				borderColor: isSelected
@@ -111,7 +110,7 @@ export function SessionCard({
 				bgcolor: isSelected
 					? "var(--color-session-card-selected)"
 					: "var(--color-session-card-bg)",
-				transition: "border-color 200ms ease, background-color 200ms ease, box-shadow 200ms ease",
+				transition: "border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base)",
 				boxShadow: isSelected
 					? "0 0 0 1px var(--color-session-card-selected-border), var(--shadow-sm)"
 					: "none",
@@ -152,35 +151,34 @@ export function SessionCard({
 					/>
 				</Box>
 			) : (
-				<Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
-					<ListItemButton
-						className="session-card-body"
-						onClick={() => onOpen(sname)}
-						data-testid={`session-open-${sname}`}
-						selected={isSelected}
-						sx={{
-							flexDirection: "column",
-							alignItems: "stretch",
-							gap: "4px",
-							py: "8px",
-							px: "14px",
-							minWidth: 0,
-							borderRadius: "var(--radius-md)",
-							bgcolor: "transparent",
-							transition: "background-color 150ms ease",
-							"&.Mui-selected": { bgcolor: "transparent" },
-							"&.Mui-selected:hover": { bgcolor: "action.hover" },
-							"&:hover": { bgcolor: "action.hover" },
-						}}
-					>
+				<ListItemButton
+					className="session-card-body"
+					onClick={() => onOpen(sname)}
+					data-testid={`session-open-${sname}`}
+					selected={isSelected}
+					sx={{
+						flexDirection: "column",
+						alignItems: "stretch",
+						gap: "3px",
+						py: "6px",
+						px: "12px",
+						minWidth: 0,
+						borderRadius: "var(--radius-md)",
+						bgcolor: "transparent",
+						transition: "background-color var(--transition-fast)",
+						"&.Mui-selected": { bgcolor: "transparent" },
+						"&.Mui-selected:hover": { bgcolor: "action.hover" },
+						"&:hover": { bgcolor: "action.hover" },
+					}}
+				>
 						<Box className="session-card-name-group">
 							<Stack
 								direction="row"
-								spacing={1}
+								spacing={0.5}
 								className="session-card-top"
 								sx={{ alignItems: "center", justifyContent: "space-between", minWidth: 0 }}
 							>
-								<Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
+								<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
 									<Typography
 										className="session-card-name"
 										variant="body2"
@@ -316,7 +314,6 @@ export function SessionCard({
 							</Box>
 						</Box>
 					</ListItemButton>
-				</Box>
 			)}
 		</Box>
 	);
