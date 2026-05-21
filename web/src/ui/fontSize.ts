@@ -4,7 +4,7 @@ export const DEFAULT_UI_FONT_SIZE = 16;
 
 export const MIN_TERMINAL_FONT_SIZE = 8;
 export const MAX_TERMINAL_FONT_SIZE = 32;
-export const DEFAULT_TERMINAL_FONT_SIZE = 14;
+export const DEFAULT_TERMINAL_FONT_SIZE = 17;
 
 export function clampUIFontSize(size: number): number {
 	if (size < MIN_UI_FONT_SIZE) return MIN_UI_FONT_SIZE;
@@ -66,7 +66,7 @@ export function getUIFontBasePx(step: number): number {
 }
 
 export function getTerminalFontPx(step: number): number {
-	return Math.round(14 * getUIScaleFactor(step));
+	return Math.round(DEFAULT_TERMINAL_FONT_SIZE * getUIScaleFactor(step));
 }
 
 export function fontSizeToScaleStep(fontSize: number): number {
@@ -92,10 +92,10 @@ export function applyUIScaleStep(step: number): void {
 	const root = document.documentElement;
 
 	// Font-size tokens
-	root.style.setProperty("--font-size-2xs", `${Math.round(baseSize * 0.625)}px`);
-	root.style.setProperty("--font-size-xs", `${Math.round(baseSize * 0.6875)}px`);
-	root.style.setProperty("--font-size-sm", `${Math.round(baseSize * 0.75)}px`);
-	root.style.setProperty("--font-size-md", `${Math.round(baseSize * 0.8125)}px`);
+	root.style.setProperty("--font-size-2xs", `${Math.round(baseSize * 0.6875)}px`);
+	root.style.setProperty("--font-size-xs", `${Math.round(baseSize * 0.75)}px`);
+	root.style.setProperty("--font-size-sm", `${Math.round(baseSize * 0.8125)}px`);
+	root.style.setProperty("--font-size-md", `${Math.round(baseSize * 0.875)}px`);
 	root.style.setProperty("--font-size-base", `${baseSize}px`);
 	root.style.setProperty("--font-size-lg", `${Math.round(baseSize * 1.125)}px`);
 	root.style.setProperty("--font-size-xl", `${Math.round(baseSize * 1.25)}px`);

@@ -38,7 +38,7 @@ export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) 
 						fontWeight: "var(--font-weight-bold)",
 						color: "primary.main",
 						textTransform: "uppercase",
-						letterSpacing: "0.15em",
+						letterSpacing: "0",
 						flexShrink: 0,
 						mr: 0.5,
 					}}

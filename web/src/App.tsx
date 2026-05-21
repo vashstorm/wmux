@@ -9,7 +9,7 @@ import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig, updateConfig } from "./api/client.js";
-import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP } from "./ui/fontSize.js";
+import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE } from "./ui/fontSize.js";
 import { useModeTheme } from "./ui/muiTheme.js";
 import { MainPanel } from "./components/MainPanel.js";
 import { Sidebar } from "./components/Sidebar.js";
@@ -35,7 +35,7 @@ function UISettingsInit() {
 					? fontSizeToScaleStep(config.ui.fontSize)
 					: DEFAULT_UI_SCALE_STEP;
 
-			const terminalFontSize = config.ui.terminalFontSize || 14;
+			const terminalFontSize = config.ui.terminalFontSize || DEFAULT_TERMINAL_FONT_SIZE;
 			const terminalFontWeight = config.ui.terminalFontWeight || "normal";
 
 			applyUIScaleStep(uiScaleStep);

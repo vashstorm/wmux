@@ -362,6 +362,55 @@ describe("MainPanel", () => {
 		});
 	});
 
+	test("renders the status segment without truncation", () => {
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [{
+						...windowOne,
+						intelligenceStatus: "running",
+						intelligenceSummary: "Window summary",
+					}],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+							intelligenceStatus: "running",
+							intelligenceSummary: "Pane summary",
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expect(screen.getByTestId("main-title-status").textContent).toBe("running");
+		expect(screen.getByTestId("main-title-summary").textContent).toBe("Window summary");
+	});
+
 	test("updates title when selected window changes", () => {
 		const mockState = {
 			selectedPane,

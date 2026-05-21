@@ -248,6 +248,19 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		});
 	});
 
+	test("uses ui windowTheme for the terminal palette when no prop is provided", () => {
+		mockUISettings = { ...mockUISettings, theme: "light", windowTheme: "dark" };
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.theme).toMatchObject({
+			background: "#0a0e1a",
+			cursor: "#f59e0b",
+			blue: "#8b5cf6",
+		});
+		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#0a0e1a");
+	});
+
 	test("applies the terminal theme background to the wrapper", () => {
 		render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />);
 
@@ -273,27 +286,27 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		expect(mockXTermWriteln).not.toHaveBeenCalled();
 	});
 
-	test("derives terminal fontSize from uiScaleStep step 0 → 14px", () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
-
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontSize).toBe(14);
-	});
-
-	test("derives terminal fontSize from uiScaleStep step 4 → 17px", () => {
-		mockUISettings.uiScaleStep = 4;
+	test("derives terminal fontSize from uiScaleStep step 0 → 17px", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.fontSize).toBe(17);
 	});
 
-	test("derives terminal fontSize from uiScaleStep step -4 → 11px", () => {
+	test("derives terminal fontSize from uiScaleStep step 4 → 20px", () => {
+		mockUISettings.uiScaleStep = 4;
+		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
+		expect(xtermOptions.fontSize).toBe(20);
+	});
+
+	test("derives terminal fontSize from uiScaleStep step -4 → 14px", () => {
 		mockUISettings.uiScaleStep = -4;
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontSize).toBe(11);
+		expect(xtermOptions.fontSize).toBe(14);
 	});
 
 	test("applies terminalFontWeight to xterm options", () => {

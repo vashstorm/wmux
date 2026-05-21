@@ -4,18 +4,19 @@
 
 :root {
   /* --- Typography --- */
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-md: 13px;
+  --font-size-2xs: 11px;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
   --font-size-base: 16px;
   --font-size-lg: 18px;
   --font-size-xl: 20px;
   --font-size-2xl: 24px;
   --font-size-3xl: 38px;
 
-  --line-height-tight: 1.00;
-  --line-height-normal: 1.50;
-  --line-height-relaxed: 2.00;
+  --line-height-tight: 1.20;
+  --line-height-normal: 1.45;
+  --line-height-relaxed: 1.70;
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;

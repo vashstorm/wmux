@@ -78,21 +78,21 @@ describe("getUIFontBasePx", () => {
 });
 
 describe("getTerminalFontPx", () => {
-	test("step -4 → 11px (14 * 0.80 rounded)", () => {
-		expect(getTerminalFontPx(-4)).toBe(11);
+	test("step -4 → 14px (17 * 0.80 rounded)", () => {
+		expect(getTerminalFontPx(-4)).toBe(14);
 	});
 
-	test("step 0 → 14px (14 * 1.00)", () => {
-		expect(getTerminalFontPx(0)).toBe(14);
+	test("step 0 → 17px (17 * 1.00)", () => {
+		expect(getTerminalFontPx(0)).toBe(17);
 	});
 
-	test("step 4 → 17px (14 * 1.20 rounded)", () => {
-		expect(getTerminalFontPx(4)).toBe(17);
+	test("step 4 → 20px (17 * 1.20 rounded)", () => {
+		expect(getTerminalFontPx(4)).toBe(20);
 	});
 
 	test("out-of-range clamps before computing", () => {
-		expect(getTerminalFontPx(-99)).toBe(11);
-		expect(getTerminalFontPx(99)).toBe(17);
+		expect(getTerminalFontPx(-99)).toBe(14);
+		expect(getTerminalFontPx(99)).toBe(20);
 	});
 });
 
@@ -129,6 +129,15 @@ describe("applyUIScaleStep", () => {
 		applyUIScaleStep(0);
 		const value = getComputedStyle(document.documentElement).getPropertyValue("--font-size-base").trim();
 		expect(value).toBe("16px");
+	});
+
+	test("step 0 sets readable component font tokens", () => {
+		applyUIScaleStep(0);
+		const styles = getComputedStyle(document.documentElement);
+		expect(styles.getPropertyValue("--font-size-2xs").trim()).toBe("11px");
+		expect(styles.getPropertyValue("--font-size-xs").trim()).toBe("12px");
+		expect(styles.getPropertyValue("--font-size-sm").trim()).toBe("13px");
+		expect(styles.getPropertyValue("--font-size-md").trim()).toBe("14px");
 	});
 
 	test("step 4 sets --font-size-base to 19px", () => {

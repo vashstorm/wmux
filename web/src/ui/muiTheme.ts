@@ -8,16 +8,18 @@ const SHAPE = { borderRadius: 8 };
 const TYPOGRAPHY = {
 	fontFamily:
 		"'Inter', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-	h1: { fontWeight: 700, letterSpacing: "-0.02em" },
-	h2: { fontWeight: 700, letterSpacing: "-0.01em" },
-	h3: { fontWeight: 600, letterSpacing: "-0.01em" },
-	h6: { fontWeight: 600, letterSpacing: "-0.01em" },
-	subtitle1: { fontWeight: 600, letterSpacing: "0" },
-	subtitle2: { fontWeight: 500, letterSpacing: "0" },
-	body1: { letterSpacing: "0" },
-	body2: { letterSpacing: "0" },
-	caption: { letterSpacing: "0.01em" },
-	button: { textTransform: "none" as const, fontWeight: 600, letterSpacing: "0.01em" },
+	h1: { fontSize: "var(--font-size-3xl)", fontWeight: 700, lineHeight: 1.15, letterSpacing: "0" },
+	h2: { fontSize: "var(--font-size-2xl)", fontWeight: 700, lineHeight: 1.18, letterSpacing: "0" },
+	h3: { fontSize: "var(--font-size-xl)", fontWeight: 600, lineHeight: 1.22, letterSpacing: "0" },
+	h4: { fontSize: "var(--font-size-lg)", fontWeight: 600, lineHeight: 1.25, letterSpacing: "0" },
+	h5: { fontSize: "var(--font-size-base)", fontWeight: 600, lineHeight: 1.3, letterSpacing: "0" },
+	h6: { fontSize: "var(--font-size-md)", fontWeight: 600, lineHeight: 1.35, letterSpacing: "0" },
+	subtitle1: { fontSize: "var(--font-size-base)", fontWeight: 600, lineHeight: 1.35, letterSpacing: "0" },
+	subtitle2: { fontSize: "var(--font-size-md)", fontWeight: 600, lineHeight: 1.35, letterSpacing: "0" },
+	body1: { fontSize: "var(--font-size-base)", lineHeight: "var(--line-height-normal)", letterSpacing: "0" },
+	body2: { fontSize: "var(--font-size-sm)", lineHeight: "var(--line-height-normal)", letterSpacing: "0" },
+	caption: { fontSize: "var(--font-size-xs)", lineHeight: 1.35, letterSpacing: "0" },
+	button: { fontSize: "var(--font-size-sm)", lineHeight: 1.3, textTransform: "none" as const, fontWeight: 600, letterSpacing: "0" },
 };
 
 function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): Theme["components"] {
@@ -58,7 +60,9 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 			styleOverrides: {
 				root: {
 					borderRadius: 8,
+					fontSize: "var(--font-size-sm)",
 					fontWeight: 600,
+					lineHeight: 1.3,
 					transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
 				},
 				contained: {
@@ -96,6 +100,7 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 					height: 36,
 					borderRadius: 8,
 					transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+					fontSize: "var(--font-size-sm)",
 					fontWeight: 500,
 					textTransform: "none",
 				},
@@ -113,6 +118,8 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 				root: {
 					"& .MuiOutlinedInput-root": {
 						borderRadius: 8,
+						fontSize: "var(--font-size-sm)",
+						lineHeight: "var(--line-height-normal)",
 						transition: "box-shadow 150ms ease",
 						"&.Mui-focused": {
 							boxShadow: `0 0 0 3px ${palette.primary.main}24`,
@@ -123,7 +130,44 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 		},
 		MuiChip: {
 			styleOverrides: {
-				root: { borderRadius: 6 },
+				root: {
+					borderRadius: 6,
+					fontSize: "var(--font-size-xs)",
+					fontWeight: 600,
+					lineHeight: 1.2,
+				},
+			},
+		},
+		MuiInputLabel: {
+			styleOverrides: {
+				root: {
+					fontSize: "var(--font-size-sm)",
+					lineHeight: 1.35,
+				},
+			},
+		},
+		MuiFormControlLabel: {
+			styleOverrides: {
+				label: {
+					fontSize: "var(--font-size-sm)",
+					lineHeight: 1.35,
+				},
+			},
+		},
+		MuiMenuItem: {
+			styleOverrides: {
+				root: {
+					fontSize: "var(--font-size-sm)",
+					lineHeight: "var(--line-height-normal)",
+				},
+			},
+		},
+		MuiTooltip: {
+			styleOverrides: {
+				tooltip: {
+					fontSize: "var(--font-size-xs)",
+					lineHeight: 1.35,
+				},
 			},
 		},
 		MuiDialog: {

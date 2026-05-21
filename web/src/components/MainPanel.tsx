@@ -216,7 +216,7 @@ export function MainPanel() {
 					fontSize: "var(--font-size-xl)",
 					fontWeight: 700,
 					color: "text.primary",
-					letterSpacing: "0.05em",
+					letterSpacing: "0",
 					display: "flex",
 					gap: 1.5,
 					alignItems: "center",
@@ -318,7 +318,7 @@ export function MainPanel() {
 							fontSize: "var(--font-size-xl)",
 							fontWeight: 700,
 							color: "text.primary",
-							letterSpacing: "-0.01em",
+							letterSpacing: "0",
 						}}>
 							Select a session
 						</Typography>

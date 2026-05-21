@@ -35,8 +35,8 @@ body {
 /* --- Typography utilities --- */
 h1, h2, h3, h4, h5, h6 {
 	font-weight: var(--font-weight-bold);
-	line-height: var(--line-height-normal);
-	letter-spacing: -0.01em;
+	line-height: var(--line-height-tight);
+	letter-spacing: 0;
 }
 
 /* --- Focus styles --- */

@@ -64,7 +64,8 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const sourceSizeRef = useRef<TerminalSize | null>(sourceSize ?? null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
-	const terminalTheme = getTerminalTheme(windowTheme ?? uiSettings.windowTheme ?? document.documentElement.dataset.theme);
+	const terminalThemeId = windowTheme ?? uiSettings.windowTheme ?? uiSettings.theme ?? document.documentElement.dataset.theme;
+	const terminalTheme = getTerminalTheme(terminalThemeId);
 	const terminalStyle = {
 		"--terminal-background": terminalTheme.background ?? "var(--color-background)",
 		backgroundColor: terminalTheme.background ?? "var(--color-background)",
@@ -216,7 +217,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			fontSize: getTerminalFontPx(uiSettings.uiScaleStep),
 			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
 			fontWeightBold: "bold",
-			theme: getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme),
+			theme: terminalTheme,
 		});
 
 		const fitAddon = new FitAddon();
@@ -293,15 +294,9 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	useEffect(() => {
 		const terminal = terminalRef.current;
 		if (!terminal) return;
-		terminal.options.theme = getTerminalTheme(uiSettings.theme);
-		terminal.refresh(0, terminal.rows);
-	}, [uiSettings.theme]);
-
-	useEffect(() => {
-		const terminal = terminalRef.current;
-		if (!terminal) return;
-		terminal.options.theme = getTerminalTheme(windowTheme ?? document.documentElement.dataset.theme);
-	}, [windowTheme]);
+		terminal.options.theme = terminalTheme;
+		redrawTerminal(terminal);
+	}, [terminalTheme]);
 
 	const handleReconnect = () => {
 		wsRef.current?.close();

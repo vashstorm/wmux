@@ -686,7 +686,7 @@ export function SettingsPanel() {
 						}}
 					>
 						<Box sx={{ px: 1, py: 1.25 }}>
-							<Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0.8 }}>
+							<Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0 }}>
 								Workspace
 							</Typography>
 						</Box>

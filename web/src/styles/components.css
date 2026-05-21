@@ -362,7 +362,7 @@
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 	white-space: nowrap;
 }
 
@@ -527,7 +527,7 @@
 .version-info {
 	font-size: var(--font-size-2xs);
 	text-transform: uppercase;
-	letter-spacing: 0.1em;
+	letter-spacing: 0;
 	opacity: 0.5;
 }
 
@@ -703,7 +703,7 @@
 	font-size: var(--font-size-lg);
 	font-weight: var(--font-weight-semibold);
 	margin-bottom: var(--spacing-lg);
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 }
 
 /* --- Form Fields --- */
@@ -754,7 +754,7 @@
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 	transition: all var(--transition-base);
 }
 
@@ -1018,14 +1018,22 @@
 	min-height: 0;
 	max-height: 100%;
 	overflow-x: hidden;
+	background-color: var(--terminal-background) !important;
 }
 
 .terminal-container .xterm-screen {
 	max-width: 100%;
 	overflow: visible;
+	background-color: var(--terminal-background) !important;
 }
 
 .terminal-container .xterm-screen canvas {
+	background-color: var(--terminal-background) !important;
+}
+
+.terminal-container .xterm .xterm-rows,
+.terminal-container .xterm .composition-view {
+	background-color: var(--terminal-background) !important;
 }
 
 .terminal-container .xterm .xterm-rows span.xterm-italic,
@@ -1227,7 +1235,7 @@
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-semibold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 }
 
 .sidebar-section-action {
@@ -1457,7 +1465,7 @@
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-sm);
 	font-weight: var(--font-weight-bold);
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 }
 
 /* --- Main Workspace --- */
@@ -1697,7 +1705,7 @@
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-2xs);
 	font-weight: 600;
-	letter-spacing: 0.02em;
+	letter-spacing: 0;
 	text-transform: uppercase;
 	line-height: 1.4;
 	color: #52525b;
@@ -1761,7 +1769,7 @@
 	border-radius: var(--radius-sm);
 	font-size: var(--font-size-2xs);
 	font-weight: 600;
-	letter-spacing: 0.02em;
+	letter-spacing: 0;
 	text-transform: uppercase;
 	line-height: 1.4;
 	flex-shrink: 0;
@@ -1875,7 +1883,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	justify-content: center;
 	height: 200px;
 	font-size: var(--font-size-sm);
-	letter-spacing: 0.1em;
+	letter-spacing: 0;
 	text-transform: uppercase;
 }
 
@@ -1910,7 +1918,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	font-size: var(--font-size-xs);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.15em;
+	letter-spacing: 0;
 	margin-bottom: var(--spacing-md);
 }
 
@@ -1924,7 +1932,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	font-size: var(--font-size-2xs);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.1em;
+	letter-spacing: 0;
 	transition: all var(--transition-base);
 	cursor: pointer;
 }
@@ -1954,7 +1962,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	border-radius: var(--radius-sm);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 	transition: all var(--transition-base);
 }
 
@@ -2004,7 +2012,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	font-size: var(--font-size-2xs);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 	transition: all var(--transition-base);
 }
 
@@ -2091,7 +2099,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 	font-size: var(--font-size-2xs);
 	font-weight: var(--font-weight-semibold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0;
 }
 
 .intelligence-provider-model {

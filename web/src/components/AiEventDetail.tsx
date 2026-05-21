@@ -118,7 +118,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 							fontSize: DETAIL_FONT_SIZE.title,
 							fontWeight: "var(--font-weight-bold)",
 							fontFamily: "var(--font-display)",
-							letterSpacing: "0.05em",
+							letterSpacing: "0",
 						}}
 					>
 						Event Detail
@@ -137,7 +137,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 			</Box>
 
 			<Box sx={{ flex: 1, overflowY: "auto", px: "var(--spacing-lg)", py: "var(--spacing-md)" }}>
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 					Model
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -146,7 +146,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					</Typography>
 				</Box>
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 					Connection
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -156,7 +156,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					<DetailRow label="Window" value={event.windowNumber != null ? event.windowNumber.toString() : "—"} />
 				</Box>
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 					Performance
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -168,7 +168,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				{(event.estimatedCost != null) && (
 					<>
-						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 							Cost
 						</Typography>
 						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -183,7 +183,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					if (!formatted) return null;
 					return (
 						<>
-							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 								AI Response
 							</Typography>
 							<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -193,7 +193,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 							</Box>
 							{contentJson != null && (
 								<>
-									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 										Content
 									</Typography>
 									<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
@@ -209,7 +209,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				{isError && event.errorMessage && (
 					<>
-						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 							Error
 						</Typography>
 						<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "error.main", color: "error.contrastText", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "error.dark" }}>
@@ -222,7 +222,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 
 				<Divider sx={{ my: 1.5 }} />
 
-				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: "var(--font-weight-semibold)" }}>
+				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 					Metadata
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>

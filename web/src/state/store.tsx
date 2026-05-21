@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
-import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, clampUIScaleStep } from "../ui/fontSize.js";
+import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE, clampUIScaleStep } from "../ui/fontSize.js";
 
 export interface WindowSummary {
 	id: string;
@@ -149,7 +149,7 @@ const DEFAULT_UI_SETTINGS: UISettings = {
 	theme: "dark",
 	windowTheme: "dark",
 	uiScaleStep: DEFAULT_UI_SCALE_STEP,
-	terminalFontSize: 14,
+	terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
 	terminalFontWeight: "normal",
 };
 
