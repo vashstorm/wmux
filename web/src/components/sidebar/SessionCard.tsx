@@ -99,7 +99,7 @@ export function SessionCard({
 
 	return (
 		<Box
-			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${isSelected ? " is-selected" : ""}`}
+			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${session.intelligenceStatus === "waiting_confirm" ? " is-waiting-confirm" : ""}${session.intelligenceStatus === "blocked" ? " is-blocked" : ""}${isSelected ? " is-selected" : ""}`}
 			data-testid={`session-card-${sname}`}
 			sx={{
 				borderRadius: "var(--radius-md)",
@@ -116,12 +116,20 @@ export function SessionCard({
 					: "none",
 				position: "relative",
 				overflow: "hidden",
-				...(session.attentionState === "explicit" && {
+				...(session.attentionState === "explicit" && session.intelligenceStatus !== "waiting_confirm" && session.intelligenceStatus !== "blocked" && {
 					borderColor: "var(--color-attention-explicit)",
 					boxShadow: "0 0 0 1px var(--color-attention-explicit)",
 				}),
-				...(session.attentionState === "attention" && !isSelected && {
+				...(session.attentionState === "attention" && !isSelected && session.intelligenceStatus !== "waiting_confirm" && session.intelligenceStatus !== "blocked" && {
 					borderColor: "var(--color-attention)",
+				}),
+				...(session.intelligenceStatus === "waiting_confirm" && {
+					borderColor: "#7c2d12",
+					boxShadow: "0 0 0 1px #7c2d12",
+				}),
+				...(session.intelligenceStatus === "blocked" && {
+					borderColor: "#be123c",
+					boxShadow: "0 0 0 1px #be123c",
 				}),
 			}}
 		>
