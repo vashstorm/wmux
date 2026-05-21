@@ -102,6 +102,9 @@ Minimal example:
   ],
   "ui": {
     "theme": "dark"
+  },
+  "storage": {
+    "path": "data"
   }
 }
 ```

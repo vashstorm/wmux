@@ -38,9 +38,15 @@ fn main() {
             let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
             let assets_dir = manifest_dir.join("../web/dist");
             let config_path = tauri_config_path(&manifest_dir);
-            let (token, port, server_handle) = tauri::async_runtime::block_on(
+            let (token, port, server_handle) = match tauri::async_runtime::block_on(
                 wmux_core::app::start_in_process(assets_dir, config_path),
-            )?;
+            ) {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    eprintln!("{}", wmux_core::app::format_startup_error(&error));
+                    return Err(error.into());
+                }
+            };
             app.manage(BackendState::new(server_handle));
 
             let initialization_script = format!(
@@ -74,6 +80,13 @@ fn tauri_config_path(manifest_dir: &std::path::Path) -> PathBuf {
         let workspace_config = manifest_dir.join("../config.jsonc");
         if workspace_config.exists() {
             return workspace_config;
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        let cwd_config = cwd.join("config.jsonc");
+        if cwd_config.exists() {
+            return cwd_config;
         }
     }
 

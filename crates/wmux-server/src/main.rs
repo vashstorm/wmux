@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use anyhow::Context;
 use clap::Parser;
@@ -21,22 +22,27 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> ExitCode {
     let cli = Cli::parse();
+    match run(cli).await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{}", wmux_core::app::format_startup_error(&error));
+            ExitCode::FAILURE
+        }
+    }
+}
 
+async fn run(cli: Cli) -> anyhow::Result<()> {
     if cli.version {
         println!("{}", wmux_core::version());
         return Ok(());
     }
 
-    let store = wmux_core::config::Config::load(&cli.config)
-        .with_context(|| format!("failed to load config from {}", cli.config.display()))?;
-    let config = store
-        .snapshot()
-        .context("failed to read config snapshot")?
-        .expanded()
-        .context("failed to expand config paths")?;
-    config.validate_auth().context("invalid config")?;
+    let startup = wmux_core::app::load_startup_config(cli.config)?;
+    let store = startup.store;
+    let config_path = startup.config_path;
+    let config = startup.config;
 
     if cli.print_config_and_exit {
         serde_json::to_writer_pretty(std::io::stdout(), &config)
@@ -48,10 +54,6 @@ async fn main() -> anyhow::Result<()> {
     let logging_handle = wmux_core::logging::init_tracing(&config.logs)
         .with_context(|| "failed to initialize logging")?;
 
-    config
-        .validate_storage_path()
-        .context("invalid storage config")?;
-    let config_path = store.path().context("failed to resolve config path")?;
     let mut state = wmux_core::state::AppState::with_storage(
         store.clone(),
         PathBuf::from("web/dist"),

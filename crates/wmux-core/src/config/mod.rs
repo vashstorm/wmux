@@ -153,7 +153,7 @@ pub struct LogsConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageConfig {
-    #[serde(default)]
+    #[serde(default = "default_storage_path")]
     pub path: String,
 }
 
@@ -401,7 +401,7 @@ impl Default for IntelligenceConfig {
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
-            path: String::new(),
+            path: default_storage_path(),
         }
     }
 }
@@ -929,6 +929,10 @@ fn default_error_log_path() -> String {
     DEFAULT_LOG_DIR.to_string()
 }
 
+fn default_storage_path() -> String {
+    "data".to_string()
+}
+
 fn is_zero_u16(value: &u16) -> bool {
     *value == 0
 }
@@ -965,6 +969,7 @@ mod tests {
         assert_eq!(config.logs.level, "info");
         assert_eq!(config.logs.path, "logs/");
         assert_eq!(config.logs.error_path, "logs/");
+        assert_eq!(config.storage.path, "data");
     }
 
     #[test]
@@ -1264,6 +1269,6 @@ mod tests {
         let path = dir.path().join("config.jsonc");
         let store = Config::load(&path).expect("load config");
         let snapshot = store.snapshot().expect("snapshot");
-        assert_eq!(snapshot.storage.path, "");
+        assert_eq!(snapshot.storage.path, "data");
     }
 }

@@ -3,21 +3,76 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use tokio::task::JoinHandle;
 
-use crate::config::Config;
+use crate::config::{Config, Store};
 use crate::state::AppState;
+
+#[derive(Debug)]
+pub struct StartupConfig {
+    pub store: Store,
+    pub config_path: PathBuf,
+    pub config: Config,
+}
+
+pub fn load_startup_config(config_path: PathBuf) -> Result<StartupConfig> {
+    let store = Config::load(&config_path)
+        .with_context(|| format!("failed to load config from {}", config_path.display()))?;
+    let loaded_config_path = store.path().with_context(|| {
+        format!(
+            "failed to resolve loaded config path requested as {}",
+            config_path.display()
+        )
+    })?;
+    let config = store
+        .snapshot()
+        .with_context(|| {
+            format!(
+                "failed to read config snapshot from {}",
+                loaded_config_path.display()
+            )
+        })?
+        .expanded()
+        .with_context(|| {
+            format!(
+                "failed to expand paths in config {}",
+                loaded_config_path.display()
+            )
+        })?;
+    config
+        .validate_auth()
+        .with_context(|| format!("invalid auth config in {}", loaded_config_path.display()))?;
+    config
+        .validate_storage_path()
+        .with_context(|| format!("invalid storage config in {}", loaded_config_path.display()))?;
+
+    Ok(StartupConfig {
+        store,
+        config_path: loaded_config_path,
+        config,
+    })
+}
+
+pub fn format_startup_error(error: &anyhow::Error) -> String {
+    let mut lines = vec!["wmux startup failed".to_string()];
+    for (index, cause) in error.chain().enumerate() {
+        if index == 0 {
+            lines.push(format!("error: {cause}"));
+        } else {
+            lines.push(format!("caused by: {cause}"));
+        }
+    }
+    lines.join("\n")
+}
 
 pub async fn start_in_process(
     assets_dir: PathBuf,
     config_path: PathBuf,
 ) -> Result<(String, u16, JoinHandle<()>)> {
     let token = random_token();
-    let store = Config::load(&config_path)
-        .with_context(|| format!("failed to load config from {}", config_path.display()))?;
-    let mut config = store
-        .snapshot()
-        .context("failed to read config snapshot")?
-        .expanded()
-        .context("failed to expand config paths")?;
+    let startup = load_startup_config(config_path)?;
+    let store = startup.store;
+    let mut config = startup.config;
+    let config_path = startup.config_path;
+
     config.server.bind = "127.0.0.1:0".to_string();
     config.auth.token = token.clone();
     config.validate_auth().context("invalid config")?;
@@ -25,10 +80,6 @@ pub async fn start_in_process(
     let logging_handle =
         crate::logging::init_tracing(&config.logs).context("failed to initialize logging")?;
 
-    config
-        .validate_storage_path()
-        .context("invalid storage config")?;
-    let config_path = store.path().context("failed to resolve config path")?;
     store
         .replace_in_memory(config)
         .context("failed to prepare runtime config")?;
@@ -66,4 +117,38 @@ fn random_token() -> String {
         token.push_str(&format!("{byte:02x}"));
     }
     token
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    #[test]
+    fn startup_config_empty_file_uses_bootable_default() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        fs::write(&config_path, "").expect("write empty config");
+
+        let startup = load_startup_config(config_path.clone()).expect("load startup config");
+
+        assert_eq!(startup.config_path, config_path);
+        assert_eq!(startup.config.storage.path, "data");
+        assert!(startup.config_path.exists());
+    }
+
+    #[test]
+    fn startup_config_error_mentions_path_and_cause() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        fs::write(&config_path, r#"{"server":{"bind":"0.0.0.0:7331"}}"#).expect("write config");
+
+        let error = load_startup_config(config_path.clone()).expect_err("auth should fail");
+        let message = format_startup_error(&error);
+
+        assert!(message.contains("wmux startup failed"));
+        assert!(message.contains(&config_path.display().to_string()));
+        assert!(message.contains("auth token is required for non-localhost bind address"));
+    }
 }
