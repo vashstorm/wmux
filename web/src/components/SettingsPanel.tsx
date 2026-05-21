@@ -93,7 +93,7 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		intelligenceEnabled: intel?.enabled ?? false,
 		intelligenceActiveProvider: intel?.activeProvider ?? "",
 		intelligenceProviders: intel?.providers ?? [],
-		intelligenceMaxBytes: intel?.maxBytes ?? 4096,
+		intelligenceMaxBytes: intel?.maxBytes ?? 20000,
 		intelligenceTimeoutSec: intel?.timeoutSec ?? 30,
 		intelligenceMinSessionIntervalSec: intel?.minSessionIntervalSec ?? 60,
 		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,

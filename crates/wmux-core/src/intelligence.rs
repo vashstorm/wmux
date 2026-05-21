@@ -10,6 +10,12 @@ use time::format_description::well_known::Rfc3339;
 
 use crate::config::{Config, IntelligenceProviderConfig};
 
+const ANALYSIS_SYSTEM_PROMPT: &str = r#"Analyze a tmux session transcript. Return only JSON with application, status, summary, confidence.
+application should be the detected app or CLI name as a lowercase identifier, or unknown if unsure.
+High-priority application recognition: claude, opencode, and codex are first-class AI CLI identifiers. If pane title, command, or transcript content shows one of these tools, return that exact identifier with high confidence unless the transcript clearly proves a different active application. These identifiers outrank shell/process wrapper names such as zsh, bash, sh, tmux, node, bun, cargo, or make.
+status must be one of none,waiting,dead_loop,blocked,waiting_confirm,waiting_idle,running.
+使用中文回复。"#;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionIntelligence {
@@ -361,7 +367,7 @@ pub async fn analyze_text(
             "messages": [
                 {
                     "role": "system",
-                    "content": "Analyze a tmux session transcript. Return only JSON with application, status, summary, confidence. application should be the detected app or CLI name as a lowercase identifier, or unknown if unsure. status must be one of none,waiting,dead_loop,blocked,waiting_confirm,waiting_idle,running. 使用中文回复。"
+                    "content": ANALYSIS_SYSTEM_PROMPT
                 },
                 {
                     "role": "user",
@@ -918,6 +924,13 @@ mod tests {
             error: None,
             app_counts: None,
         }
+    }
+
+    #[test]
+    fn analysis_system_prompt_prioritizes_known_ai_cli_identifiers() {
+        assert!(ANALYSIS_SYSTEM_PROMPT.contains("claude, opencode, and codex"));
+        assert!(ANALYSIS_SYSTEM_PROMPT.contains("High-priority application recognition"));
+        assert!(ANALYSIS_SYSTEM_PROMPT.contains("zsh, bash, sh, tmux"));
     }
 
     #[test]

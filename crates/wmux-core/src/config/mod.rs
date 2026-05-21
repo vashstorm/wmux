@@ -852,7 +852,7 @@ fn default_terminal_font_weight() -> String {
 }
 
 fn default_max_bytes() -> u32 {
-    12_000
+    20_000
 }
 
 fn default_timeout_sec() -> u32 {
@@ -912,7 +912,7 @@ mod tests {
         assert_eq!(config.ui.font_size, 16);
         assert_eq!(config.ui.terminal_font_size, 14);
         assert_eq!(config.ui.terminal_font_weight, "normal");
-        assert_eq!(config.intelligence.max_bytes, 12_000);
+        assert_eq!(config.intelligence.max_bytes, 20_000);
         assert_eq!(config.intelligence.timeout_sec, 8);
         assert_eq!(config.intelligence.min_session_interval_sec, 60);
         assert_eq!(config.intelligence.max_concurrency, 3);

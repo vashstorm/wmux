@@ -13,6 +13,8 @@ use crate::handlers::connections::{current_config, find_connection, require_loca
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
 
+const WINDOW_AI_TRANSCRIPT_MAX_BYTES: u32 = 20_000;
+
 struct TargetContext {
     name: String,
     mode: String,
@@ -299,7 +301,7 @@ pub async fn analyze_session(
 
     let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
     let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
-    let max_bytes = config.intelligence.max_bytes;
+    let max_bytes = effective_window_ai_max_bytes(config.intelligence.max_bytes);
     let max_concurrency = config.intelligence.max_concurrency as usize;
 
     let windows = target
@@ -681,7 +683,7 @@ fn spawn_session_intelligence_refreshes(
 
     let min_interval = Duration::from_secs(config.intelligence.min_session_interval_sec as u64);
     let timeout = Duration::from_secs(config.intelligence.timeout_sec as u64);
-    let max_bytes = config.intelligence.max_bytes;
+    let max_bytes = effective_window_ai_max_bytes(config.intelligence.max_bytes);
     let max_concurrency = config.intelligence.max_concurrency as usize;
 
     for session_name in sessions.iter().map(|session| session.name.clone()) {
@@ -933,13 +935,18 @@ async fn analyze_single_window(
         .map(|p| classify_command_basename(&p.current_command))
         .unwrap_or_default();
 
+    let max_bytes = effective_window_ai_max_bytes(max_bytes);
+    let mut remaining = max_bytes as usize;
     let mut pane_contents: Vec<(usize, String)> = Vec::new();
     for pane in &panes {
-        let remaining = max_bytes as usize;
+        if remaining == 0 {
+            break;
+        }
         if let Ok(content) = adapter
             .capture_pane(pane.id.as_str(), remaining.min(max_bytes as usize) as u32)
             .await
         {
+            remaining = remaining.saturating_sub(content.len());
             pane_contents.push((pane.index, content));
         }
     }
@@ -964,7 +971,10 @@ async fn analyze_single_window(
 
     match decision {
         WindowCacheDecision::Proceed => {
-            let transcript = build_window_transcript(session_name, window, &panes, &pane_contents);
+            let transcript = truncate_utf8_bytes(
+                &build_window_transcript(session_name, window, &panes, &pane_contents),
+                max_bytes as usize,
+            );
 
             let start = std::time::Instant::now();
             let result = intelligence::analyze_text(provider, transcript.as_str(), timeout).await;
@@ -1042,6 +1052,26 @@ fn classify_command_basename(command: &str) -> String {
         .rfind('/')
         .map_or(trimmed, |pos| &trimmed[pos + 1..]);
     basename.to_ascii_lowercase()
+}
+
+fn effective_window_ai_max_bytes(configured_max_bytes: u32) -> u32 {
+    if configured_max_bytes == 0 {
+        WINDOW_AI_TRANSCRIPT_MAX_BYTES
+    } else {
+        configured_max_bytes.min(WINDOW_AI_TRANSCRIPT_MAX_BYTES)
+    }
+}
+
+fn truncate_utf8_bytes(text: &str, max_bytes: usize) -> String {
+    if text.len() <= max_bytes {
+        return text.to_string();
+    }
+
+    let mut end = max_bytes;
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_string()
 }
 
 /// Builds a transcript string for a single window.
@@ -1221,6 +1251,21 @@ mod aggregate_tests {
             provider_called: false,
             is_error: false,
         }
+    }
+
+    #[test]
+    fn window_ai_max_bytes_is_capped_at_20k() {
+        assert_eq!(effective_window_ai_max_bytes(24_000), 20_000);
+        assert_eq!(effective_window_ai_max_bytes(20_000), 20_000);
+        assert_eq!(effective_window_ai_max_bytes(4_096), 4_096);
+        assert_eq!(effective_window_ai_max_bytes(0), 20_000);
+    }
+
+    #[test]
+    fn truncate_utf8_bytes_respects_char_boundaries() {
+        assert_eq!(truncate_utf8_bytes("abcdef", 3), "abc");
+        assert_eq!(truncate_utf8_bytes("你好吗", 4), "你");
+        assert_eq!(truncate_utf8_bytes("short", 10), "short");
     }
 
     #[test]
