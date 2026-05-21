@@ -15,7 +15,7 @@ test.describe("error logs", () => {
 
 	test("displays deterministic error log in standalone dialog", async ({ page }) => {
 		const tempDir = process.env.WMUX_PLAYWRIGHT_TEMP_DIR!;
-		const errorLogPath = join(tempDir, "wmux-error.log");
+		const errorLogPath = join(tempDir, "logs", "wmux-error.log");
 		writeFileSync(errorLogPath, "2026-05-18T00:00:00Z ERROR playwright deterministic error log\n");
 
 		await page.goto("/");
@@ -34,7 +34,7 @@ test.describe("error logs", () => {
 
 	test("clears error logs with confirmation", async ({ page }) => {
 		const tempDir = process.env.WMUX_PLAYWRIGHT_TEMP_DIR!;
-		const errorLogPath = join(tempDir, "wmux-error.log");
+		const errorLogPath = join(tempDir, "logs", "wmux-error.log");
 		writeFileSync(errorLogPath, "2026-05-18T00:00:00Z ERROR playwright deterministic error log\n");
 
 		await page.goto("/");

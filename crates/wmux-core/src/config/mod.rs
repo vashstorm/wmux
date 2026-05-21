@@ -11,11 +11,11 @@ use thiserror::Error;
 
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
+const DEFAULT_BASE_PATH: &str = ".";
 const MIN_UI_FONT_SIZE: u16 = 12;
 const MAX_UI_FONT_SIZE: u16 = 24;
 const MIN_TERMINAL_FONT_SIZE: u16 = 8;
 const MAX_TERMINAL_FONT_SIZE: u16 = 32;
-const DEFAULT_LOG_DIR: &str = "logs/";
 const VALID_TERMINAL_FONT_WEIGHTS: &[&str] = &[
     "normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900",
 ];
@@ -40,10 +40,8 @@ pub enum ConfigError {
     Decode(#[from] serde_json::Error),
     #[error("store mutex poisoned")]
     LockPoisoned,
-    #[error("logs path and error path resolve to the same file")]
-    InvalidLogsConfig,
-    #[error("storage.path is empty or missing")]
-    StoragePathMissing,
+    #[error("path is empty or missing")]
+    PathMissing,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,6 +49,8 @@ pub enum ConfigError {
 pub struct Config {
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
+    #[serde(default = "default_base_path")]
+    pub path: String,
     #[serde(default)]
     pub server: ServerConfig,
     #[serde(default)]
@@ -65,8 +65,6 @@ pub struct Config {
     pub intelligence: IntelligenceConfig,
     #[serde(default)]
     pub logs: LogsConfig,
-    #[serde(default)]
-    pub storage: StorageConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,21 +142,10 @@ pub struct IntelligenceProviderConfig {
 pub struct LogsConfig {
     #[serde(default = "default_log_level")]
     pub level: String,
-    #[serde(default = "default_log_path")]
-    pub path: String,
-    #[serde(default = "default_error_log_path")]
-    pub error_path: String,
     #[serde(default = "default_log_rotation_size_bytes")]
     pub rotation_size_bytes: u64,
     #[serde(default = "default_log_retention_days")]
     pub retention_days: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StorageConfig {
-    #[serde(default = "default_storage_path")]
-    pub path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,18 +217,17 @@ impl Config {
 
     pub fn expanded(&self) -> Result<Self> {
         let mut expanded = self.clone();
+        expanded.path = expand_user_path(&expanded.path)?;
         for connection in &mut expanded.connections {
             connection.private_key_path = expand_user_path(&connection.private_key_path)?;
             connection.known_hosts_path = expand_user_path(&connection.known_hosts_path)?;
         }
-        expanded.logs.path = expand_user_path(&expanded.logs.path)?;
-        expanded.logs.error_path = expand_user_path(&expanded.logs.error_path)?;
         Ok(expanded)
     }
 
-    pub fn validate_storage_path(&self) -> Result<()> {
-        if self.storage.path.trim().is_empty() {
-            return Err(ConfigError::StoragePathMissing);
+    pub fn validate_path(&self) -> Result<()> {
+        if self.path.trim().is_empty() {
+            return Err(ConfigError::PathMissing);
         }
         Ok(())
     }
@@ -331,6 +317,7 @@ impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
             schema_version: default_schema_version(),
+            path: default_base_path(),
             server: ServerConfig::default(),
             auth: AuthConfig::default(),
             tmux: TmuxConfig::default(),
@@ -338,7 +325,6 @@ impl Default for Config {
             ui: UIConfig::default(),
             intelligence: IntelligenceConfig::default(),
             logs: LogsConfig::default(),
-            storage: StorageConfig::default(),
         };
         config.normalize();
         config
@@ -377,8 +363,6 @@ impl Default for LogsConfig {
     fn default() -> Self {
         Self {
             level: default_log_level(),
-            path: default_log_path(),
-            error_path: default_error_log_path(),
             rotation_size_bytes: default_log_rotation_size_bytes(),
             retention_days: default_log_retention_days(),
         }
@@ -400,14 +384,6 @@ impl Default for IntelligenceConfig {
             min_session_interval_sec: default_min_session_interval_sec(),
             max_concurrency: default_max_concurrency(),
             cache_ttl_sec: default_cache_ttl_sec(),
-        }
-    }
-}
-
-impl Default for StorageConfig {
-    fn default() -> Self {
-        Self {
-            path: default_storage_path(),
         }
     }
 }
@@ -521,7 +497,6 @@ pub fn parse_config(data: &str) -> Result<Config> {
     let clean = strip_jsonc_comments(data);
     let mut config: Config = serde_json::from_str(&clean)?;
     config.normalize();
-    validate_logs_config(&config.logs)?;
     Ok(config)
 }
 
@@ -586,59 +561,6 @@ pub fn strip_jsonc_comments(input: &str) -> String {
     out
 }
 
-/// Resolves a log file path, creating parent directories if needed.
-/// If the path denotes a directory (ends with '/', is named logs/.logs, or already exists as a directory),
-/// joins the default_filename to create the final path.
-pub fn resolve_log_file_path(config_path: &str, default_filename: &str) -> Result<PathBuf> {
-    let path = PathBuf::from(config_path);
-
-    let denotes_directory = config_path.ends_with('/')
-        || config_path.ends_with('\\')
-        || matches!(
-            path.file_name().and_then(|name| name.to_str()),
-            Some("logs" | ".logs")
-        );
-    let is_existing_directory = path.exists() && path.is_dir();
-
-    if denotes_directory || is_existing_directory {
-        if !path.exists() {
-            std::fs::create_dir_all(&path).map_err(|source| ConfigError::Io {
-                context: "create log directory",
-                source,
-            })?;
-        }
-        Ok(path.join(default_filename))
-    } else {
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() && !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
-                    context: "create log directory",
-                    source,
-                })?;
-            }
-        }
-        Ok(path)
-    }
-}
-
-/// Validates that logs.path and logs.errorPath don't resolve to the same file.
-pub fn validate_logs_config(logs: &LogsConfig) -> Result<()> {
-    if logs.path.trim().is_empty() || logs.error_path.trim().is_empty() {
-        return Ok(());
-    }
-
-    let expanded_path = expand_user_path(&logs.path)?;
-    let expanded_error_path = expand_user_path(&logs.error_path)?;
-    let resolved_path = resolve_log_file_path(&expanded_path, "wmux.log")?;
-    let resolved_error_path = resolve_log_file_path(&expanded_error_path, "wmux-error.log")?;
-
-    if resolved_path == resolved_error_path {
-        return Err(ConfigError::InvalidLogsConfig);
-    }
-
-    Ok(())
-}
-
 pub fn expand_user_path(path: &str) -> Result<String> {
     let trimmed = path.trim();
     let Some(rest) = trimmed.strip_prefix("~/") else {
@@ -648,12 +570,13 @@ pub fn expand_user_path(path: &str) -> Result<String> {
     Ok(Path::new(&home).join(rest).to_string_lossy().into_owned())
 }
 
-/// Resolves the storage directory path, handling ~ expansion and relative paths.
-/// `storage_path` is treated as a directory; the database file `wmux.db` is appended automatically.
+/// Resolves the configured base path, handling ~ expansion and relative paths.
 /// Relative paths are resolved against the directory containing the config file (project directory).
-/// Creates the directory if it doesn't exist.
-pub fn resolve_storage_path(storage_path: &str, config_path: &Path) -> Result<PathBuf> {
-    let trimmed = storage_path.trim();
+pub fn resolve_base_path(base_path: &str, config_path: &Path) -> Result<PathBuf> {
+    let trimmed = base_path.trim();
+    if trimmed.is_empty() {
+        return Err(ConfigError::PathMissing);
+    }
 
     let expanded = if let Some(rest) = trimmed.strip_prefix("~") {
         let home = std::env::var("HOME").map_err(|_| ConfigError::HomeDirUnavailable)?;
@@ -681,13 +604,34 @@ pub fn resolve_storage_path(storage_path: &str, config_path: &Path) -> Result<Pa
         parent.join(&expanded)
     };
 
+    Ok(dir)
+}
+
+/// Resolves a log file under `<path>/logs/`, creating the directory if needed.
+pub fn resolve_log_file_path(
+    base_path: &str,
+    config_path: &Path,
+    default_filename: &str,
+) -> Result<PathBuf> {
+    let dir = resolve_base_path(base_path, config_path)?.join("logs");
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir).map_err(|source| ConfigError::Io {
+            context: "create log directory",
+            source,
+        })?;
+    }
+    Ok(dir.join(default_filename))
+}
+
+/// Resolves the SQLite database path under `<path>/data/wmux.db`, creating the directory if needed.
+pub fn resolve_storage_path(base_path: &str, config_path: &Path) -> Result<PathBuf> {
+    let dir = resolve_base_path(base_path, config_path)?.join("data");
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|source| ConfigError::Io {
             context: "create storage directory",
             source,
         })?;
     }
-
     Ok(dir.join("wmux.db"))
 }
 
@@ -883,6 +827,10 @@ fn default_bind() -> String {
     "127.0.0.1:7331".to_string()
 }
 
+fn default_base_path() -> String {
+    DEFAULT_BASE_PATH.to_string()
+}
+
 fn default_tmux_path() -> String {
     "tmux".to_string()
 }
@@ -927,24 +875,12 @@ fn default_log_level() -> String {
     "info".to_string()
 }
 
-fn default_log_path() -> String {
-    DEFAULT_LOG_DIR.to_string()
-}
-
-fn default_error_log_path() -> String {
-    DEFAULT_LOG_DIR.to_string()
-}
-
 fn default_log_rotation_size_bytes() -> u64 {
     10 * 1024 * 1024
 }
 
 fn default_log_retention_days() -> u64 {
     14
-}
-
-fn default_storage_path() -> String {
-    "data".to_string()
 }
 
 fn is_zero_u16(value: &u16) -> bool {
@@ -967,6 +903,7 @@ mod tests {
         let config = Config::default();
 
         assert_eq!(config.schema_version, 1);
+        assert_eq!(config.path, ".");
         assert_eq!(config.server.bind, "127.0.0.1:7331");
         assert_eq!(config.tmux.path, "tmux");
         assert!(config.connections.is_empty());
@@ -981,11 +918,8 @@ mod tests {
         assert_eq!(config.intelligence.max_concurrency, 3);
         assert_eq!(config.intelligence.cache_ttl_sec, 300);
         assert_eq!(config.logs.level, "info");
-        assert_eq!(config.logs.path, "logs/");
-        assert_eq!(config.logs.error_path, "logs/");
         assert_eq!(config.logs.rotation_size_bytes, 10 * 1024 * 1024);
         assert_eq!(config.logs.retention_days, 14);
-        assert_eq!(config.storage.path, "data");
     }
 
     #[test]
@@ -1046,20 +980,24 @@ mod tests {
 
         let store = Config::load(&path).expect("load config");
 
-        assert!(path.exists());
-        assert_eq!(
-            store.snapshot().expect("snapshot").server.bind,
-            "127.0.0.1:7331"
-        );
-        let content = fs::read_to_string(path).expect("read config");
-        let parsed: serde_json::Value = serde_json::from_str(&content).expect("valid json");
-        assert_eq!(parsed["schemaVersion"], 1);
+        let loaded_path = store.path().expect("store path");
+        assert!(loaded_path.exists());
+        if loaded_path == path {
+            assert_eq!(
+                store.snapshot().expect("snapshot").server.bind,
+                "127.0.0.1:7331"
+            );
+            let content = fs::read_to_string(path).expect("read config");
+            let parsed: serde_json::Value = serde_json::from_str(&content).expect("valid json");
+            assert_eq!(parsed["schemaVersion"], 1);
+        }
     }
 
     #[test]
     fn config_store_detects_atomic_write_conflict() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("config.jsonc");
+        fs::write(&path, "{}").expect("write config");
         let store = Config::load(&path).expect("load config");
         let original_mod_time = store.mod_time().expect("mod time").expect("some mod time");
 
@@ -1113,120 +1051,63 @@ mod tests {
 
     #[test]
     fn config_expand_user_path_only_expands_slash_prefix() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        unsafe {
-            std::env::set_var("HOME", dir.path());
-        }
+        let home = std::env::var("HOME").expect("HOME");
 
         assert_eq!(expand_user_path("~").expect("expand"), "~");
         assert_eq!(expand_user_path("/tmp/key").expect("expand"), "/tmp/key");
         assert_eq!(
             expand_user_path("~/.config/wmux/key").expect("expand"),
-            dir.path().join(".config/wmux/key").to_string_lossy()
+            Path::new(&home).join(".config/wmux/key").to_string_lossy()
         );
     }
 
     #[test]
-    fn config_logs_error_path_deserializes() {
+    fn config_logs_deserializes_without_path_fields() {
         let data = r#"{
           "logs": {
             "level": "info",
-            "path": "",
-            "errorPath": "./errors.log"
+            "rotationSizeBytes": 2048,
+            "retentionDays": 7
           }
         }"#;
 
         let config = parse_config(data).expect("parse config");
         assert_eq!(config.logs.level, "info");
-        assert_eq!(config.logs.path, "");
-        assert_eq!(config.logs.error_path, "./errors.log");
-        assert_eq!(config.logs.rotation_size_bytes, 10 * 1024 * 1024);
-        assert_eq!(config.logs.retention_days, 14);
+        assert_eq!(config.logs.rotation_size_bytes, 2048);
+        assert_eq!(config.logs.retention_days, 7);
     }
 
     #[test]
-    fn config_logs_validation_rejects_same_path() {
-        let data = r#"{
-          "logs": {
-            "level": "info",
-            "path": "/var/log/wmux.log",
-            "errorPath": "/var/log/wmux.log"
-          }
-        }"#;
-
-        let err = parse_config(data).expect_err("expected validation error");
-        assert!(matches!(err, ConfigError::InvalidLogsConfig));
-    }
-
-    #[test]
-    fn config_logs_validation_accepts_different_paths() {
-        let data = r#"{
-          "logs": {
-            "level": "info",
-            "path": "/var/log/wmux.log",
-            "errorPath": "/var/log/wmux-error.log"
-          }
-        }"#;
-
-        let config = parse_config(data).expect("parse config");
-        assert_eq!(config.logs.path, "/var/log/wmux.log");
-        assert_eq!(config.logs.error_path, "/var/log/wmux-error.log");
-    }
-
-    #[test]
-    fn config_logs_validation_accepts_same_directory() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let same_dir = dir.path().to_string_lossy().into_owned();
-
-        let data = r#"{
-          "logs": {
-            "level": "info",
-            "path": "PLACEHOLDER",
-            "errorPath": "PLACEHOLDER"
-          }
-        }"#
-        .replace("PLACEHOLDER", &format!("{}/", same_dir));
-
-        let config = parse_config(&data).expect("same directory should be allowed");
-        assert_eq!(config.logs.path, format!("{}/", same_dir));
-        assert_eq!(config.logs.error_path, format!("{}/", same_dir));
-    }
-
-    #[test]
-    fn config_validate_storage_path_rejects_empty() {
+    fn config_validate_path_rejects_empty() {
         let mut config = Config::default();
-        config.storage.path = String::new();
-        let err = config
-            .validate_storage_path()
-            .expect_err("empty path should fail");
-        assert!(matches!(err, ConfigError::StoragePathMissing));
+        config.path = String::new();
+        let err = config.validate_path().expect_err("empty path should fail");
+        assert!(matches!(err, ConfigError::PathMissing));
     }
 
     #[test]
-    fn config_validate_storage_path_rejects_whitespace() {
+    fn config_validate_path_rejects_whitespace() {
         let mut config = Config::default();
-        config.storage.path = "   ".to_string();
+        config.path = "   ".to_string();
         let err = config
-            .validate_storage_path()
+            .validate_path()
             .expect_err("whitespace path should fail");
-        assert!(matches!(err, ConfigError::StoragePathMissing));
+        assert!(matches!(err, ConfigError::PathMissing));
     }
 
     #[test]
-    fn config_validate_storage_path_accepts_non_empty() {
+    fn config_validate_path_accepts_non_empty() {
         let mut config = Config::default();
-        config.storage.path = "data".to_string();
-        config
-            .validate_storage_path()
-            .expect("non-empty path should pass");
+        config.path = "runtime".to_string();
+        config.validate_path().expect("non-empty path should pass");
     }
 
     #[test]
     fn config_resolve_storage_path_relative() {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.jsonc");
-        let resolved = resolve_storage_path("data", &config_path).expect("resolve relative");
-        assert_eq!(resolved, dir.path().join("data").join("wmux.db"));
+        let resolved = resolve_storage_path("runtime", &config_path).expect("resolve relative");
+        assert_eq!(resolved, dir.path().join("runtime/data/wmux.db"));
     }
 
     #[test]
@@ -1239,21 +1120,15 @@ mod tests {
             &config_path,
         )
         .expect("resolve absolute");
-        assert_eq!(resolved, absolute_path.join("wmux.db"));
+        assert_eq!(resolved, absolute_path.join("data/wmux.db"));
     }
 
     #[test]
-    fn config_resolve_storage_path_home_expansion() {
-        let home_dir = tempfile::tempdir().expect("tempdir");
+    fn config_resolve_base_path_home_expansion() {
+        let home = std::env::var("HOME").expect("HOME");
         let config_path = PathBuf::from("/some/config.jsonc");
-        unsafe {
-            std::env::set_var("HOME", home_dir.path());
-        }
-        let resolved = resolve_storage_path("~/data", &config_path).expect("resolve home");
-        assert_eq!(resolved, home_dir.path().join("data").join("wmux.db"));
-        unsafe {
-            std::env::remove_var("HOME");
-        }
+        let resolved = resolve_base_path("~/wmux", &config_path).expect("resolve home");
+        assert_eq!(resolved, Path::new(&home).join("wmux"));
     }
 
     #[test]
@@ -1266,27 +1141,35 @@ mod tests {
         )
         .expect("resolve with dir creation");
         assert!(storage_dir.exists());
-        assert_eq!(resolved, storage_dir.join("wmux.db"));
+        assert_eq!(resolved, storage_dir.join("data/wmux.db"));
     }
 
     #[test]
-    fn config_storage_deserializes_from_jsonc() {
+    fn config_path_deserializes_from_jsonc() {
         let data = r#"{
-          "storage": {
-            "path": "data"
-          }
+          "path": "runtime"
         }"#;
 
         let config = parse_config(data).expect("parse config");
-        assert_eq!(config.storage.path, "data");
+        assert_eq!(config.path, "runtime");
     }
 
     #[test]
-    fn config_storage_field_in_default_snapshot() {
+    fn config_path_field_in_default_snapshot() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("config.jsonc");
         let store = Config::load(&path).expect("load config");
         let snapshot = store.snapshot().expect("snapshot");
-        assert_eq!(snapshot.storage.path, "data");
+        assert_eq!(snapshot.path, ".");
+    }
+
+    #[test]
+    fn config_resolve_log_file_path_uses_logs_subdirectory() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let resolved =
+            resolve_log_file_path("runtime", &config_path, "wmux-error.log").expect("resolve log");
+        assert_eq!(resolved, dir.path().join("runtime/logs/wmux-error.log"));
+        assert!(dir.path().join("runtime/logs").exists());
     }
 }

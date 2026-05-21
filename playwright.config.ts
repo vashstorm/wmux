@@ -46,6 +46,7 @@ if (shouldInitialize) {
 		JSON.stringify(
 			{
 				schemaVersion: 1,
+				path: tempDir,
 				server: {
 					bind: `127.0.0.1:${port}`,
 				},
@@ -61,11 +62,6 @@ if (shouldInitialize) {
 				},
 				logs: {
 					level: "info",
-					path: join(tempDir, "wmux.log"),
-					errorPath: join(tempDir, "wmux-error.log"),
-				},
-				storage: {
-					path: join(tempDir, "wmux-playwright.db"),
 				},
 			},
 			null,

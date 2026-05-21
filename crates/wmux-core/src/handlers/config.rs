@@ -13,6 +13,7 @@ use crate::state::AppState;
 #[serde(rename_all = "camelCase")]
 pub struct ConfigResponse {
     schema_version: u32,
+    path: String,
     server: ServerConfig,
     auth: ConfigAuthResponse,
     tmux: TmuxConfig,
@@ -131,6 +132,7 @@ fn new_config_response(config: &Config) -> ConfigResponse {
 
     ConfigResponse {
         schema_version: sanitized.schema_version,
+        path: sanitized.path,
         server: sanitized.server,
         auth: ConfigAuthResponse {
             token: String::new(),

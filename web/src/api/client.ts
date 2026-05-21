@@ -89,6 +89,7 @@ function toConfigConnectionPayload(conn: ConnectionConfig): RawConnectionConfig 
 function normalizeAppConfig(config: AppConfig): AppConfig {
 	return {
 		...config,
+		path: config.path ?? ".",
 		connections: (config.connections as RawConnectionConfig[] | undefined ?? [])
 			.map(normalizeConnectionConfig)
 			.filter((connection) => connection.targetName.length > 0),
@@ -177,6 +178,7 @@ export interface IntelligenceConfig {
 
 export interface AppConfig {
 	schemaVersion: number;
+	path: string;
 	server: {
 		bind: string;
 	};
@@ -199,13 +201,8 @@ export interface AppConfig {
 	intelligence: IntelligenceConfig;
 	logs?: {
 		level: string;
-		path: string;
-		errorPath: string;
 		rotationSizeBytes?: number;
 		retentionDays?: number;
-	};
-	storage?: {
-		path: string;
 	};
 }
 

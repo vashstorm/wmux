@@ -51,7 +51,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let logging_handle = wmux_core::logging::init_tracing(&config.logs)
+    let logging_handle = wmux_core::logging::init_tracing(&config.logs, &config.path, &config_path)
         .with_context(|| "failed to initialize logging")?;
 
     let mut state = wmux_core::state::AppState::with_storage(

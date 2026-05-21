@@ -105,7 +105,11 @@ impl LoggingHandle {
     }
 }
 
-pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
+pub fn init_tracing(
+    config: &LogsConfig,
+    base_path: &str,
+    config_path: &Path,
+) -> Result<LoggingHandle, ConfigError> {
     let level = Level::from_str(&config.level).unwrap_or(Level::INFO);
 
     let filter = EnvFilter::builder()
@@ -114,10 +118,8 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
 
     let console_layer = tracing_subscriber::fmt::layer().with_target(false);
 
-    let main_file_layer: Option<_> = if config.path.trim().is_empty() {
-        None
-    } else {
-        let log_file_path = resolve_log_file_path(&config.path, "wmux.log")?;
+    let main_file_layer: Option<_> = {
+        let log_file_path = resolve_log_file_path(base_path, config_path, "wmux.log")?;
         let writer = open_rotating_writer(&log_file_path, config, "open log file")?;
         Some(
             tracing_subscriber::fmt::layer()
@@ -127,25 +129,20 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
         )
     };
 
-    let (error_log_handle, error_layer): (Option<ErrorLogHandle>, Option<_>) =
-        if config.error_path.trim().is_empty() {
-            (None, None)
-        } else {
-            let error_file_path = resolve_log_file_path(&config.error_path, "wmux-error.log")?;
-            let shared_file =
-                open_rotating_writer(&error_file_path, config, "open error log file")?;
-            let handle = ErrorLogHandle {
-                writer: shared_file.clone(),
-                path: error_file_path,
-            };
-            let writer = SharedFileWriter(shared_file);
-            let layer = tracing_subscriber::fmt::layer()
-                .with_ansi(false)
-                .with_target(false)
-                .with_writer(writer)
-                .with_filter(tracing_subscriber::filter::LevelFilter::ERROR);
-            (Some(handle), Some(layer))
-        };
+    let error_file_path = resolve_log_file_path(base_path, config_path, "wmux-error.log")?;
+    let shared_file = open_rotating_writer(&error_file_path, config, "open error log file")?;
+    let handle = ErrorLogHandle {
+        writer: shared_file.clone(),
+        path: error_file_path,
+    };
+    let writer = SharedFileWriter(shared_file);
+    let error_layer = Some(
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(writer)
+            .with_filter(tracing_subscriber::filter::LevelFilter::ERROR),
+    );
 
     // Build registry with optional layers
     let registry = tracing_subscriber::registry()
@@ -157,7 +154,7 @@ pub fn init_tracing(config: &LogsConfig) -> Result<LoggingHandle, ConfigError> {
     registry.try_init().ok();
 
     Ok(LoggingHandle {
-        error_log: error_log_handle,
+        error_log: Some(handle),
     })
 }
 

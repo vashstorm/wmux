@@ -79,6 +79,7 @@ Config rules:
 - `server.bind` defaults to `127.0.0.1:7331`.
 - `auth.token` may be empty only when binding to localhost.
 - Non-localhost bind addresses require a non-empty auth token.
+- `path` is the base runtime directory; logs are written under `path/logs/`, and SQLite under `path/data/`.
 - Only local tmux connections are active in V1.
 
 Minimal example:
@@ -86,6 +87,7 @@ Minimal example:
 ```json
 {
   "schemaVersion": 1,
+  "path": ".",
   "server": {
     "bind": "127.0.0.1:7331"
   },
@@ -102,9 +104,6 @@ Minimal example:
   ],
   "ui": {
     "theme": "dark"
-  },
-  "storage": {
-    "path": "data"
   }
 }
 ```

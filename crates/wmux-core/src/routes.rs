@@ -212,7 +212,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.jsonc");
         let assets_dir = dir.path().join("assets");
-        let storage_dir = dir.path().join("data");
+        let runtime_dir = dir.path().join("runtime");
         fs::create_dir_all(&assets_dir).expect("create assets dir");
         fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
 
@@ -223,7 +223,7 @@ mod tests {
             "tmux": { "path": "tmux" },
             "connections": [],
             "ui": { "theme": "dark" },
-            "storage": { "path": storage_dir.to_string_lossy().into_owned() },
+            "path": runtime_dir.to_string_lossy().into_owned(),
             "intelligence": {
                 "enabled": true,
                 "provider": "openai",

@@ -49,10 +49,9 @@ impl AppState {
         let config = store
             .snapshot()
             .map_err(|e| anyhow::anyhow!("failed to read config snapshot: {}", e))?;
-        config.validate_storage_path()?;
+        config.validate_path()?;
 
-        let resolved_path =
-            wmux_core::config::resolve_storage_path(&config.storage.path, config_path)?;
+        let resolved_path = wmux_core::config::resolve_storage_path(&config.path, config_path)?;
 
         let pool = wmux_core::storage::db::create_pool(&resolved_path).await?;
         wmux_core::storage::db::run_migrations(&pool).await?;

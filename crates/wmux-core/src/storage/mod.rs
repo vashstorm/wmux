@@ -4,8 +4,6 @@ pub mod db;
 pub mod models;
 pub mod projects;
 
-pub use crate::config::StorageConfig;
-
 pub use ai_usage::AiUsageRepository;
 pub use models::*;
 pub use projects::{ProjectRepoError, ProjectRepository};

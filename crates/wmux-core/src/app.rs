@@ -41,8 +41,8 @@ pub fn load_startup_config(config_path: PathBuf) -> Result<StartupConfig> {
         .validate_auth()
         .with_context(|| format!("invalid auth config in {}", loaded_config_path.display()))?;
     config
-        .validate_storage_path()
-        .with_context(|| format!("invalid storage config in {}", loaded_config_path.display()))?;
+        .validate_path()
+        .with_context(|| format!("invalid path config in {}", loaded_config_path.display()))?;
 
     Ok(StartupConfig {
         store,
@@ -77,8 +77,8 @@ pub async fn start_in_process(
     config.auth.token = token.clone();
     config.validate_auth().context("invalid config")?;
 
-    let logging_handle =
-        crate::logging::init_tracing(&config.logs).context("failed to initialize logging")?;
+    let logging_handle = crate::logging::init_tracing(&config.logs, &config.path, &config_path)
+        .context("failed to initialize logging")?;
 
     store
         .replace_in_memory(config)
@@ -134,7 +134,7 @@ mod tests {
         let startup = load_startup_config(config_path.clone()).expect("load startup config");
 
         assert_eq!(startup.config_path, config_path);
-        assert_eq!(startup.config.storage.path, "data");
+        assert_eq!(startup.config.path, ".");
         assert!(startup.config_path.exists());
     }
 

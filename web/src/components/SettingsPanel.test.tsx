@@ -45,6 +45,7 @@ function enableSettingsPanel() {
 
 const defaultConfig = {
 	schemaVersion: 1,
+	path: ".",
 	server: { bind: "127.0.0.1:7331" },
 	auth: { token: "", tokenConfigured: false },
 	tmux: { path: "tmux" },
@@ -60,7 +61,7 @@ const defaultConfig = {
 		maxConcurrency: 3,
 		cacheTTLSec: 300,
 	},
-	logs: { level: "info", path: "", errorPath: "/tmp/wmux-error.log" },
+	logs: { level: "info" },
 };
 
 describe("SettingsPanel intelligence section", () => {

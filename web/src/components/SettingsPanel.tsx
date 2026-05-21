@@ -17,6 +17,7 @@ interface ProviderFormState extends IntelligenceProviderConfig {
 }
 
 interface SettingsFormState {
+	path: string;
 	bind: string;
 	tmuxPath: string;
 	knownHostsPath: string;
@@ -78,6 +79,7 @@ function buildFormState(config: AppConfig): SettingsFormState {
 			: DEFAULT_UI_SCALE_STEP;
 
 	return {
+		path: config.path,
 		bind: config.server.bind,
 		tmuxPath: config.tmux.path,
 		knownHostsPath: sshConnection?.knownHostsPath ?? "~/.ssh/known_hosts",
@@ -225,6 +227,7 @@ export function SettingsPanel() {
 
 		return {
 			...config,
+			path: formState.path.trim(),
 			server: {
 				...config.server,
 				bind: formState.bind.trim(),
@@ -296,6 +299,7 @@ export function SettingsPanel() {
 						const latest = await getConfig();
 						const retryPayload: AppConfig = {
 							...latest,
+							path: payload.path,
 							server: { ...latest.server, bind: payload.server.bind },
 							auth: { token: payload.auth.token },
 							tmux: { ...latest.tmux, path: payload.tmux.path },
@@ -746,6 +750,18 @@ export function SettingsPanel() {
 													placeholder="127.0.0.1:7331"
 													fullWidth
 													helperText="IP address and port to listen on."
+												/>
+
+												<TextField
+													id="settings-runtime-path"
+													label="Runtime Path"
+													type="text"
+													value={formState.path}
+													onChange={(event) => updateField("path", event.target.value)}
+													data-testid="settings-runtime-path-input"
+													placeholder="."
+													fullWidth
+													helperText="Base directory for logs and SQLite data."
 												/>
 
 												<TextField

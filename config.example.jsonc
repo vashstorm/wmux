@@ -2,6 +2,9 @@
   // Increment when the config schema changes.
   "schemaVersion": 1,
 
+  // Base runtime directory. Logs go to <path>/logs/, SQLite goes to <path>/data/.
+  "path": ".",
+
   "server": {
     // Localhost binds can omit auth.token. Non-localhost binds must set it.
     "bind": "127.0.0.1:7331"
@@ -32,7 +35,7 @@
     }
   ],
 
-"ui": {
+  "ui": {
     "theme": "dark",
     "fontSize": 16,
     "terminalFontSize": 14,
@@ -40,15 +43,9 @@
   },
   "logs": {
     "level": "info",
-    "path": "",
-    "errorPath": "",
     // Rotate each log file after it reaches this size in bytes. Set 0 to disable.
     "rotationSizeBytes": 10485760,
     // Delete rotated log files older than this many days. Set 0 to disable cleanup.
     "retentionDays": 14
-  },
-  "storage": {
-    // Directory path for the SQLite database. Relative paths resolve against the project directory.
-    "path": "data"
   }
 }
