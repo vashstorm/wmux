@@ -406,7 +406,7 @@ pub async fn analyze_text(
         })?;
 
     let parsed: ModelIntelligence =
-        serde_json::from_str(strip_json_fence(content)).map_err(|err| AiProviderError {
+        parse_model_intelligence(content).map_err(|err| AiProviderError {
             message: format!("decode AI intelligence JSON: {err}"),
             raw_response: Some(body.clone()),
         })?;
@@ -493,6 +493,65 @@ fn strip_json_fence(content: &str) -> &str {
     trimmed
 }
 
+fn parse_model_intelligence(content: &str) -> Result<ModelIntelligence, serde_json::Error> {
+    let stripped = strip_json_fence(content);
+    match serde_json::from_str(stripped) {
+        Ok(parsed) => Ok(parsed),
+        Err(original_err) => {
+            let repaired = repair_missing_property_commas(stripped);
+            if repaired == stripped {
+                return Err(original_err);
+            }
+            serde_json::from_str(&repaired).map_err(|_| original_err)
+        }
+    }
+}
+
+fn repair_missing_property_commas(content: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut repaired = String::with_capacity(content.len() + lines.len());
+
+    for (index, line) in lines.iter().enumerate() {
+        repaired.push_str(line);
+        if should_insert_comma(line, lines.get(index + 1).copied()) {
+            repaired.push(',');
+        }
+        if index + 1 < lines.len() {
+            repaired.push('\n');
+        }
+    }
+
+    repaired
+}
+
+fn should_insert_comma(line: &str, next_line: Option<&str>) -> bool {
+    let current = line.trim_end();
+    let Some(next) = next_line.map(str::trim_start) else {
+        return false;
+    };
+
+    !current.is_empty()
+        && !current.ends_with(',')
+        && !current.ends_with('{')
+        && !current.ends_with('[')
+        && next.starts_with('"')
+        && next.contains("\":")
+        && line_ends_with_json_value(current)
+}
+
+fn line_ends_with_json_value(line: &str) -> bool {
+    line.ends_with('"')
+        || line.ends_with('}')
+        || line.ends_with(']')
+        || line.ends_with("true")
+        || line.ends_with("false")
+        || line.ends_with("null")
+        || line
+            .as_bytes()
+            .last()
+            .is_some_and(|byte| byte.is_ascii_digit())
+}
+
 impl ActiveProvider {
     pub fn source(&self) -> String {
         if self.name.trim().is_empty() {
@@ -568,10 +627,13 @@ where
 
         fn visit_str<E: Error>(self, value: &str) -> Result<Self::Value, E> {
             let v = match value.trim().to_ascii_lowercase().as_str() {
-                "high" | "very_high" => 1.0,
-                "medium" | "med" => 0.5,
-                "low" | "very_low" => 0.0,
-                s => s.parse::<f32>().map_err(Error::custom)?,
+                "high" | "very_high" | "高" | "高置信度" => 1.0,
+                "medium" | "med" | "中" | "中等" | "中置信度" => 0.5,
+                "low" | "very_low" | "低" | "低置信度" => 0.0,
+                s => match s.parse::<f32>() {
+                    Ok(value) => value,
+                    Err(_) => return Ok(None),
+                },
             };
             Ok(Some(v))
         }
@@ -922,6 +984,18 @@ mod tests {
         .expect("string 'low' confidence should parse");
         assert!((parsed.confidence.unwrap() - 0.0).abs() < f32::EPSILON);
 
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"wmux","status":"waiting_idle","summary":"test","confidence":"中"}"#,
+        )
+        .expect("Chinese confidence should parse");
+        assert!((parsed.confidence.unwrap() - 0.5).abs() < f32::EPSILON);
+
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"wmux","status":"waiting_idle","summary":"test","confidence":"unknown"}"#,
+        )
+        .expect("unknown confidence string should not fail the whole response");
+        assert_eq!(parsed.confidence, None);
+
         let parsed: ModelIntelligence =
             serde_json::from_str(r#"{"application":"zsh","status":"waiting","summary":"test"}"#)
                 .expect("missing confidence should parse");
@@ -947,6 +1021,24 @@ mod tests {
         assert_eq!(intelligence.status, "waiting_idle");
         assert_eq!(intelligence.summary, "修改完成，全部92个测试通过。");
         assert!((intelligence.confidence - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn parse_model_intelligence_repairs_missing_property_commas() {
+        let parsed = parse_model_intelligence(
+            r#"{
+  "application": "wmux"
+  "status": "waiting_idle"
+  "summary": "编译并运行 wmux-tauri 后出现 401 警告。"
+  "confidence": "中"
+}"#,
+        )
+        .expect("model JSON with missing property commas should parse");
+
+        assert_eq!(parsed.application, "wmux");
+        assert_eq!(parsed.status, "waiting_idle");
+        assert_eq!(parsed.summary, "编译并运行 wmux-tauri 后出现 401 警告。");
+        assert!((parsed.confidence.unwrap() - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]
