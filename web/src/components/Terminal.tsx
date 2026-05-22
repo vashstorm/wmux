@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import { Box } from "@mui/material";
+import WifiOffIcon from "@mui/icons-material/WifiOff";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -322,9 +323,10 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 					data-testid="terminal-disconnected"
 				>
 					<div className="terminal-disconnected-content">
-						<p className="terminal-disconnected-text">
+						<WifiOffIcon className="terminal-disconnected-icon" />
+						<h3 className="terminal-disconnected-title">
 							Disconnected from terminal
-						</p>
+						</h3>
 						{errorMessage && (
 							<p className="terminal-disconnected-error">{errorMessage}</p>
 						)}

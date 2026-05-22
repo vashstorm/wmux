@@ -296,16 +296,50 @@
 /* --- Error Banner --- */
 .error-banner {
 	position: fixed;
-	top: var(--spacing-md);
+	bottom: var(--spacing-xl);
 	left: 50%;
 	transform: translateX(-50%);
 	z-index: var(--z-toast);
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: var(--spacing-md);
 	padding: var(--spacing-md) var(--spacing-lg);
 	border-radius: var(--radius-md);
 	max-width: 520px;
+	width: calc(100% - var(--spacing-xl) * 2);
+	background-color: var(--color-panel);
+	border: 1px solid var(--color-panel-border);
+	box-shadow: var(--shadow-lg);
+	backdrop-filter: blur(12px);
+	background-color: rgba(20, 26, 34, 0.85); /* Glassmorphic dark overlay by default */
+	transition: all var(--transition-base);
+	animation: slideUp var(--transition-base) forwards;
+}
+
+/* Color theme adaptions for premium look */
+[data-mui-color-scheme="light"] .error-banner {
+	background-color: rgba(255, 255, 255, 0.9);
+	border-color: rgba(239, 68, 68, 0.2);
+}
+
+[data-mui-color-scheme="dark"] .error-banner {
+	background-color: rgba(20, 26, 34, 0.9);
+	border-color: rgba(239, 68, 68, 0.3);
+}
+
+.error-banner-icon {
+	color: var(--color-danger);
+	font-size: 20px !important;
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.error-banner-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing-xs);
+	min-width: 0;
 }
 
 .config-conflict-banner {
@@ -360,27 +394,60 @@
 
 .error-banner-code {
 	font-size: var(--font-size-xs);
-	font-weight: var(--font-weight-semibold);
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text);
 	text-transform: uppercase;
-	letter-spacing: 0;
+	letter-spacing: 0.5px;
 	white-space: nowrap;
 }
 
 .error-banner-message {
-	font-size: var(--font-size-sm);
-	flex: 1;
+	font-size: var(--font-size-xs);
+	color: var(--color-text-muted);
+	line-height: 1.45;
+	word-break: break-word;
+}
+
+[data-mui-color-scheme="light"] .error-banner-message {
+	color: var(--color-text);
 }
 
 .error-banner-dismiss {
+	background: none;
+	border: none;
+	padding: 0;
 	width: 24px;
 	height: 24px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-sm);
-	font-size: var(--font-size-lg);
-	line-height: 1;
-	transition: color var(--transition-fast), background-color var(--transition-fast);
+	color: var(--color-text-disabled);
+	transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+	cursor: pointer;
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.error-banner-dismiss:hover {
+	color: var(--color-text);
+	background-color: var(--color-surface-hover);
+	transform: scale(1.05);
+}
+
+.error-banner-dismiss-icon {
+	font-size: 18px !important;
+}
+
+@keyframes slideUp {
+	from {
+		transform: translate(-50%, var(--spacing-lg));
+		opacity: 0;
+	}
+	to {
+		transform: translate(-50%, 0);
+		opacity: 1;
+	}
 }
 
 /* --- Confirm Dialog --- */
@@ -1048,6 +1115,9 @@
 	align-items: center;
 	justify-content: center;
 	z-index: var(--z-dropdown);
+	background-color: rgba(13, 17, 23, 0.7);
+	backdrop-filter: blur(6px);
+	transition: all var(--transition-base);
 }
 
 .terminal-disconnected-content {
@@ -1055,23 +1125,64 @@
 	flex-direction: column;
 	align-items: center;
 	gap: var(--spacing-md);
-	padding: var(--spacing-lg);
+	padding: var(--spacing-xl);
+	background-color: var(--color-panel);
+	border: 1px solid var(--color-panel-border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-lg);
+	max-width: 360px;
+	width: 90%;
+	text-align: center;
 }
 
-.terminal-disconnected-text {
+.terminal-disconnected-icon {
+	font-size: 40px !important;
+	color: var(--color-danger);
+	opacity: 0.9;
+	margin-bottom: var(--spacing-xs);
+}
+
+.terminal-disconnected-title {
 	font-size: var(--font-size-base);
+	font-weight: var(--font-weight-bold);
+	color: var(--color-text);
+	margin: 0;
 }
 
 .terminal-disconnected-error {
-	font-size: var(--font-size-sm);
+	font-size: var(--font-size-xs);
+	color: var(--color-danger);
+	font-family: var(--font-mono);
+	background-color: rgba(239, 68, 68, 0.1);
+	border: 1px solid rgba(239, 68, 68, 0.2);
+	padding: var(--spacing-xs) var(--spacing-sm);
+	border-radius: var(--radius-sm);
+	margin: 0;
+	word-break: break-all;
+	width: 100%;
 }
 
 .terminal-reconnect-btn {
-	padding: var(--spacing-sm) var(--spacing-md);
+	padding: var(--spacing-sm) var(--spacing-lg);
 	border-radius: var(--radius-input);
 	font-size: var(--font-size-sm);
-	font-weight: var(--font-weight-medium);
-	transition: background-color var(--transition-fast);
+	font-weight: var(--font-weight-bold);
+	color: #ffffff;
+	background-color: var(--color-accent);
+	border: none;
+	cursor: pointer;
+	transition: all var(--transition-fast);
+	box-shadow: var(--shadow-sm);
+}
+
+.terminal-reconnect-btn:hover {
+	background-color: var(--color-accent-hover);
+	transform: translateY(-1px);
+	box-shadow: var(--shadow-md);
+}
+
+.terminal-reconnect-btn:active {
+	transform: translateY(0);
 }
 
 /* --- Settings Section --- */

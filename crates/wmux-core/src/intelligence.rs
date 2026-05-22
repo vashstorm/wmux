@@ -657,9 +657,16 @@ impl ModelIntelligence {
                 "AI provider returned unsupported status {status:?}"
             ));
         }
-        let summary = self.summary.trim();
+        let mut summary = self.summary.trim().to_string();
         if summary.is_empty() {
-            return Err("AI provider returned an empty summary".to_string());
+            summary = match status.as_str() {
+                "none" | "waiting_idle" => "终端空闲".to_string(),
+                "waiting" | "waiting_confirm" => "等待输入/确认".to_string(),
+                "dead_loop" => "检测到死循环".to_string(),
+                "blocked" => "命令受阻".to_string(),
+                "running" => "命令运行中".to_string(),
+                _ => "无活动任务".to_string(),
+            };
         }
 
         let mut app_counts = HashMap::new();
@@ -1073,6 +1080,28 @@ mod tests {
         assert_eq!(intelligence.app, "wmux");
         assert_eq!(intelligence.status, "running");
         assert_eq!(intelligence.app_counts.unwrap().get("wmux"), Some(&1));
+    }
+
+    #[test]
+    fn model_intelligence_empty_summary_fallback() {
+        let provider = ActiveProvider {
+            name: "test".to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            api_key: "key".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+        };
+
+        let parsed: ModelIntelligence = serde_json::from_str(
+            r#"{"application":"zsh","status":"none","summary":"","confidence":"high"}"#,
+        )
+        .expect("empty summary should parse");
+
+        let intelligence = parsed.into_intelligence(&provider).expect("should convert");
+        assert_eq!(intelligence.app, "zsh");
+        assert_eq!(intelligence.status, "none");
+        assert_eq!(intelligence.summary, "终端空闲");
+        assert!((intelligence.confidence - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
