@@ -1158,6 +1158,7 @@ mod tests {
     fn config_path_field_in_default_snapshot() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("config.jsonc");
+        fs::write(&path, "").expect("write empty config");
         let store = Config::load(&path).expect("load config");
         let snapshot = store.snapshot().expect("snapshot");
         assert_eq!(snapshot.path, ".");

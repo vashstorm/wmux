@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, IconButton, List, ListItem, Chip, Stack, Switch, FormControlLabel } from "@mui/material";
+import { Box, Typography, IconButton, List, ListItem, Chip, Stack, Switch, FormControlLabel, Tooltip } from "@mui/material";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { listAiStats } from "../../api/client.js";
+import { cleanupAiStats, listAiStats } from "../../api/client.js";
 import type { AiUsageEvent, AiUsageSummary } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 import { useAppState } from "../../state/store.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 30000;
 const STATS_FONT_SIZE = {
-	title: "var(--font-size-lg)",
-	body: "var(--font-size-base)",
-	meta: "var(--font-size-md)",
+	title: "var(--font-size-sm)",
+	body: "var(--font-size-sm)",
+	meta: "var(--font-size-xs)",
 };
 
 function getAiSummary(responseJson: string | null | undefined): string | undefined {
@@ -24,11 +25,13 @@ function getAiSummary(responseJson: string | null | undefined): string | undefin
 }
 
 export function StatsView() {
-	const { selectedAiEvent, setSelectedAiEvent } = useAppState();
+	const { selectedAiEvent, setSelectedAiEvent, showConfirm } = useAppState();
 	const [events, setEvents] = useState<AiUsageEvent[]>([]);
 	const [summary, setSummary] = useState<AiUsageSummary | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [cleaning, setCleaning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [cleanupMessage, setCleanupMessage] = useState<string | null>(null);
 	const [autoRefresh, setAutoRefresh] = useState(true);
 	const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 	const intervalRef = useRef<number | null>(null);
@@ -41,8 +44,10 @@ export function StatsView() {
 			setEvents(response.data);
 			setSummary(response.summary);
 			setLastRefreshedAt(new Date());
+			return response;
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "Failed to load stats");
+			return null;
 		} finally {
 			setLoading(false);
 		}
@@ -75,9 +80,41 @@ export function StatsView() {
 	}, [resetInterval]);
 
 	const handleManualRefresh = useCallback(() => {
+		setCleanupMessage(null);
 		void loadStats();
 		resetInterval();
 	}, [loadStats, resetInterval]);
+
+	const performCleanup = useCallback(async () => {
+		setCleaning(true);
+		setError(null);
+		setCleanupMessage(null);
+		try {
+			const result = await cleanupAiStats();
+			if (result.deleted > 0) {
+				setSelectedAiEvent(null);
+			}
+			await loadStats();
+			setCleanupMessage(result.deleted > 0 ? `Cleaned ${result.deleted} old records` : "Already latest per window");
+			resetInterval();
+		} catch (err) {
+			setError(err instanceof ApiError ? err.message : "Failed to clean stats");
+		} finally {
+			setCleaning(false);
+		}
+	}, [loadStats, resetInterval, setSelectedAiEvent]);
+
+	const handleCleanup = useCallback(() => {
+		showConfirm({
+			title: "Clean AI Usage Logs",
+			message: "This will keep only the latest record for each target, session, and window. Older AI usage records will be permanently deleted.",
+			confirmText: "Clean",
+			confirmVariant: "danger",
+			onConfirm: () => {
+				void performCleanup();
+			},
+		});
+	}, [performCleanup, showConfirm]);
 
 	return (
 		<Box data-testid="stats-view" sx={{ minHeight: 1 }}>
@@ -101,11 +138,29 @@ export function StatsView() {
 					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-refresh-button" aria-label="Refresh stats" disabled={loading}>
 						<RefreshIcon fontSize="small" />
 					</IconButton>
+					<Tooltip title="Keep latest record per window">
+						<span>
+							<IconButton
+								size="small"
+								onClick={handleCleanup}
+								data-testid="stats-cleanup-button"
+								aria-label="Clean AI usage logs"
+								disabled={loading || cleaning || events.length === 0}
+							>
+								<DeleteSweepIcon fontSize="small" />
+							</IconButton>
+						</span>
+					</Tooltip>
 				</Stack>
 			</Stack>
 			{lastRefreshedAt && (
 				<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.body, mb: 1.5, display: "block" }} data-testid="stats-last-refreshed">
 					Last updated: {lastRefreshedAt.toLocaleTimeString()}
+				</Typography>
+			)}
+			{cleanupMessage && (
+				<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.body, mb: 1, display: "block" }} data-testid="stats-cleanup-message">
+					{cleanupMessage}
 				</Typography>
 			)}
 
@@ -121,8 +176,8 @@ export function StatsView() {
 			{summary && (
 				<Box data-testid="stats-summary" sx={{ mb: 1, p: 1, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 					<Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
-						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.body, height: 30 }} />
+						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.meta, height: 24 }} />
+						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.meta, height: 24 }} />
 					</Stack>
 				</Box>
 			)}
@@ -169,42 +224,13 @@ export function StatsView() {
 										minWidth: 0,
 										flex: 1,
 									}}
-									title={`${event.model} ${getAiSummary(event.responseJson) ?? ""}`}
+									title={`${event.sessionName} ${getAiSummary(event.responseJson) ?? ""}`}
 								>
-									{event.model}
+									{event.sessionName}
 								</Typography>
 								{event.windowNumber != null && (
 									<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
 										W{event.windowNumber}
-									</Typography>
-								)}
-								{getAiSummary(event.responseJson) && (
-									<Typography
-										variant="caption"
-										sx={{
-											fontSize: STATS_FONT_SIZE.meta,
-											flexShrink: 1,
-											minWidth: 0,
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-											color: "text.secondary",
-											ml: 0.5,
-										}}
-									>
-										{getAiSummary(event.responseJson)}
-									</Typography>
-								)}
-								<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
-									{event.durationMs}ms
-								</Typography>
-								{event.totalTokens != null && (
-									<Typography variant="caption" color="text.disabled" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
-										{event.totalTokens}t
-									</Typography>
-								)}
-								{event.estimatedCost != null && (
-									<Typography variant="caption" color="text.disabled" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
-										${event.estimatedCost.toFixed(4)}
 									</Typography>
 								)}
 							</Stack>

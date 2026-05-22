@@ -4,7 +4,7 @@ import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
 import { AiEventDetail } from "./AiEventDetail.js";
-import { listPanes, listWindows } from "../api/client.js";
+import { listPanes, listWindows, type AiUsageEvent } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 
 const ACTIVE_WINDOW_SYNC_INTERVAL_MS = 1000;
@@ -14,8 +14,51 @@ interface SelectWindowOptions {
 }
 
 interface TitleSegment {
-	key: "status" | "summary";
+	key: "app" | "status" | "summary";
 	value: string;
+}
+
+interface EventIntelligence {
+	app: string;
+	status: string;
+	summary: string;
+}
+
+function getAiEventDetails(event: AiUsageEvent): EventIntelligence {
+	const res: EventIntelligence = { app: "", status: "", summary: "" };
+	if (!event.responseJson) return res;
+	try {
+		const parsed = JSON.parse(event.responseJson);
+		// Try content from OpenAI format or direct content
+		const contentStr = parsed.choices?.[0]?.message?.content ?? parsed.content ?? null;
+		
+		if (contentStr) {
+			if (typeof contentStr === "string") {
+				try {
+					const parsedContent = JSON.parse(contentStr);
+					res.app = parsedContent.application ?? parsedContent.app ?? "";
+					res.status = parsedContent.status ?? "";
+					res.summary = parsedContent.summary ?? "";
+				} catch {
+					// Not JSON string content, treat it as summary
+					res.summary = contentStr;
+				}
+			} else if (typeof contentStr === "object") {
+				const contentObj = contentStr as Record<string, unknown>;
+				res.app = String(contentObj.application ?? contentObj.app ?? "");
+				res.status = String(contentObj.status ?? "");
+				res.summary = String(contentObj.summary ?? "");
+			}
+		} else {
+			// Try top-level application / status / summary if it was direct
+			res.app = parsed.application ?? parsed.app ?? "";
+			res.status = parsed.status ?? "";
+			res.summary = parsed.summary ?? "";
+		}
+	} catch {
+		// Ignore parsing errors
+	}
+	return res;
 }
 
 export function MainPanel() {
@@ -185,6 +228,21 @@ export function MainPanel() {
 	};
 
 	const buildTitleSegments = (): TitleSegment[] => {
+		if (selectedAiEvent) {
+			const details = getAiEventDetails(selectedAiEvent);
+			const segments: TitleSegment[] = [];
+			if (details.app) {
+				segments.push({ key: "app", value: details.app });
+			}
+			if (details.status) {
+				segments.push({ key: "status", value: details.status });
+			}
+			if (details.summary) {
+				segments.push({ key: "summary", value: details.summary });
+			}
+			return segments;
+		}
+
 		if (!hasSelectedPane || !selectedPane) {
 			return [];
 		}

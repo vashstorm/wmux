@@ -278,6 +278,10 @@ export interface AiStatsResponse {
 	summary: AiUsageSummary;
 }
 
+export interface AiStatsCleanupResponse {
+	deleted: number;
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
 	return (await apiFetch("/api/health")) as HealthResponse;
 }
@@ -734,4 +738,14 @@ export async function listAiStats(query: AiStatsQuery = {}): Promise<AiStatsResp
 	const qs = params.toString();
 	const path = qs ? `/api/ai/stats?${qs}` : "/api/ai/stats";
 	return (await apiFetch(path)) as AiStatsResponse;
+}
+
+export async function cleanupAiStats(query: Pick<AiStatsQuery, "projectId"> = {}): Promise<AiStatsCleanupResponse> {
+	const params = new URLSearchParams();
+	if (query.projectId) {
+		params.set("projectId", query.projectId);
+	}
+	const qs = params.toString();
+	const path = qs ? `/api/ai/stats/cleanup?${qs}` : "/api/ai/stats/cleanup";
+	return (await apiFetch(path, { method: "POST" })) as AiStatsCleanupResponse;
 }

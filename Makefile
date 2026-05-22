@@ -6,6 +6,7 @@ PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 TAURI_DRIVER ?= tauri-driver
 TAURI_WDIO ?= bun run tauri-e2e
 VERSION ?= dev
+MACOS_DMG_DIR ?= target/release/bundle/dmg
 
 RUST_SOURCES := $(shell find crates -type f \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \))
 WEB_SOURCES := $(shell find web/src web/index.html web/package.json web/vite.config.ts web/tsconfig.json -type f 2>/dev/null)
@@ -49,7 +50,19 @@ tauri-dev:
 tauri-build:
 	cargo tauri build
 
-build-app: tauri-build
+build-app:
+	@if [ "$$(uname -s)" != "Darwin" ]; then \
+		echo "build-app DMG install flow is only supported on macOS."; \
+		exit 1; \
+	fi
+	cargo tauri build --bundles dmg
+	@dmg_path="$$(ls -t "$(MACOS_DMG_DIR)"/*.dmg 2>/dev/null | head -n 1)"; \
+		if [ -z "$$dmg_path" ]; then \
+			echo "Built DMG not found under $(MACOS_DMG_DIR)."; \
+			exit 1; \
+		fi; \
+		open "$$dmg_path"; \
+		echo "Opened $$dmg_path"
 
 tauri-e2e:
 	$(MAKE) tauri-build

@@ -8,17 +8,18 @@ interface AiEventDetailProps {
 }
 
 const DETAIL_FONT_SIZE = {
-	title: "var(--font-size-xl)",
-	section: "var(--font-size-base)",
-	body: "var(--font-size-base)",
-	value: "var(--font-size-base)",
+	title: "var(--font-size-lg)",
+	section: "var(--font-size-xs)",
+	label: "var(--font-size-xs)",
+	body: "var(--font-size-sm)",
+	value: "var(--font-size-sm)",
 	code: "var(--font-size-sm)",
 };
 
 function DetailRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
 	return (
 		<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2, py: 0.75 }}>
-			<Typography variant="caption" sx={{ color: "text.secondary", fontSize: DETAIL_FONT_SIZE.body, flexShrink: 0, minWidth: 140 }}>
+			<Typography variant="caption" sx={{ color: "text.secondary", fontSize: DETAIL_FONT_SIZE.label, flexShrink: 0, minWidth: 140 }}>
 				{label}
 			</Typography>
 			<Typography
@@ -128,7 +129,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 						size="small"
 						color={isSuccess ? "success" : isError ? "error" : "default"}
 						variant="outlined"
-						sx={{ fontSize: DETAIL_FONT_SIZE.body, height: 28 }}
+						sx={{ fontSize: DETAIL_FONT_SIZE.label, height: 24 }}
 					/>
 				</Box>
 				<IconButton size="small" onClick={onClose} aria-label="Close detail" data-testid="ai-event-detail-close">
@@ -141,7 +142,7 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					Model
 				</Typography>
 				<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-					<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}>
+					<Typography variant="body2" sx={{ fontSize: "var(--font-size-base)", fontWeight: "var(--font-weight-semibold)" }}>
 						{event.model}
 					</Typography>
 				</Box>

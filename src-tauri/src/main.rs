@@ -33,6 +33,10 @@ impl BackendState {
 }
 
 fn main() {
+    unsafe {
+        std::env::set_var("LANG", "en_US.UTF-8");
+        std::env::set_var("LC_ALL", "en_US.UTF-8");
+    }
     let app = tauri::Builder::default()
         .setup(|app| {
             let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

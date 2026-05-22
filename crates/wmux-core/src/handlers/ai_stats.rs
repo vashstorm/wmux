@@ -26,6 +26,12 @@ pub struct AiStatsResponse {
     pub summary: AiUsageSummary,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiStatsCleanupResponse {
+    pub deleted: u64,
+}
+
 pub async fn get_stats(
     State(state): State<AppState>,
     Query(query): Query<StatsQuery>,
@@ -51,6 +57,24 @@ pub async fn get_stats(
         })?;
 
     Ok(Json(AiStatsResponse { data, summary }))
+}
+
+pub async fn cleanup_stale_window_events(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+) -> ApiResult<AiStatsCleanupResponse> {
+    let pool = storage(&state)?;
+    let repo = AiUsageRepository::new(pool.clone());
+
+    let deleted = repo
+        .delete_stale_window_events(query.project_id.as_deref())
+        .await
+        .map_err(|err| {
+            tracing::error!(raw_error = %err, "database error cleaning AI stats");
+            ApiError::internal("database error")
+        })?;
+
+    Ok(Json(AiStatsCleanupResponse { deleted }))
 }
 
 fn storage(state: &AppState) -> Result<&sqlx::SqlitePool, ApiError> {

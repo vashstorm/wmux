@@ -16,6 +16,13 @@ import { clearErrorLogs, fetchErrorLogs } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 
+const ERROR_LOGS_FONT_SIZE = {
+	title: "var(--font-size-lg)",
+	subtitle: "var(--font-size-sm)",
+	body: "var(--font-size-sm)",
+	code: "var(--font-size-xs)",
+};
+
 export function ErrorLogsPanel() {
 	const {
 		showErrorLogsPanel,
@@ -89,8 +96,8 @@ export function ErrorLogsPanel() {
 		<Dialog open={showErrorLogsPanel} onClose={closePanel} fullWidth maxWidth="md" data-testid="error-logs-panel">
 			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 2 }}>
 				<Box>
-					<Typography variant="h6" component="span" id="error-logs-title">Error Logs</Typography>
-					<Typography variant="body2" color="text.secondary" sx={{ display: "block" }}>Recent backend error entries</Typography>
+					<Typography variant="h6" component="span" id="error-logs-title" sx={{ fontSize: ERROR_LOGS_FONT_SIZE.title }}>Error Logs</Typography>
+					<Typography variant="body2" color="text.secondary" sx={{ display: "block", fontSize: ERROR_LOGS_FONT_SIZE.subtitle }}>Recent backend error entries</Typography>
 				</Box>
 				<IconButton onClick={closePanel} aria-label="Close error logs" size="small">
 					<CloseIcon />
@@ -98,33 +105,33 @@ export function ErrorLogsPanel() {
 			</DialogTitle>
 			<DialogContent dividers sx={{ minHeight: 300, maxHeight: 600, overflow: "auto" }}>
 				{logEnabled && logPath && (
-					<Typography variant="body2" color="text.secondary" sx={{ mb: 1 }} data-testid="error-logs-path">
+					<Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: ERROR_LOGS_FONT_SIZE.body }} data-testid="error-logs-path">
 						Reading from <code>{logPath}</code>
 					</Typography>
 				)}
 
 				{isLoadingLogs || !hasLoadedLogs ? (
 					<Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 4 }}>
-						<Typography>Loading error logs...</Typography>
+						<Typography sx={{ fontSize: ERROR_LOGS_FONT_SIZE.body }}>Loading error logs...</Typography>
 					</Box>
 				) : !logEnabled ? (
 					<Box sx={{ py: 2 }} data-testid="error-logs-not-configured">
-						<Typography color="text.secondary">Error log file is not configured.</Typography>
+						<Typography color="text.secondary" sx={{ fontSize: ERROR_LOGS_FONT_SIZE.body }}>Error log file is not configured.</Typography>
 					</Box>
 				) : logLines.length === 0 ? (
 					<Box sx={{ py: 2 }} data-testid="error-logs-empty">
-						<Typography color="text.secondary">No error logs found.</Typography>
+						<Typography color="text.secondary" sx={{ fontSize: ERROR_LOGS_FONT_SIZE.body }}>No error logs found.</Typography>
 					</Box>
 				) : (
 					<>
 						{logTruncated && (
-							<Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+							<Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: ERROR_LOGS_FONT_SIZE.body }}>
 								Showing the last {maxLines} lines. Older entries have been truncated.
 							</Typography>
 						)}
 						<Paper
 							variant="outlined"
-							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "monospace", fontSize: "var(--font-size-md)", bgcolor: "action.hover" }}
+							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "var(--font-mono)", fontSize: ERROR_LOGS_FONT_SIZE.code, bgcolor: "action.hover" }}
 							data-testid="error-logs-content"
 						>
 							{logLines.map((line, index) => (
@@ -132,7 +139,7 @@ export function ErrorLogsPanel() {
 									key={`${index}-${line}`}
 									component="code"
 									data-testid="error-log-entry"
-									sx={{ display: "block", whiteSpace: "pre-wrap", wordBreak: "break-all", py: 0.25 }}
+									sx={{ display: "block", fontSize: "inherit", fontFamily: "inherit", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-all", py: 0.25 }}
 								>
 									{line}
 								</Box>

@@ -100,6 +100,10 @@ pub fn router(state: AppState) -> Router {
             get(logs::get_error_logs).delete(logs::clear_error_logs),
         )
         .route("/ai/stats", get(ai_stats::get_stats))
+        .route(
+            "/ai/stats/cleanup",
+            post(ai_stats::cleanup_stale_window_events),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth_middleware,
@@ -834,5 +838,67 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let body = json_body(resp).await;
         assert!(body["data"].as_array().unwrap().len() <= 200);
+    }
+
+    #[tokio::test]
+    async fn ai_stats_cleanup_route_keeps_latest_event_per_window() {
+        let (app, dir) = test_app_with_storage().await;
+        let db_path = dir.path().join("runtime/data/wmux.db");
+        let pool = wmux_core::storage::db::create_pool(&db_path)
+            .await
+            .expect("create pool");
+
+        for (id, window, created_at) in [
+            ("old-window-1", 1_i64, "2024-01-01T00:00:00Z"),
+            ("new-window-1", 1_i64, "2024-01-02T00:00:00Z"),
+            ("only-window-2", 2_i64, "2024-01-01T00:00:00Z"),
+        ] {
+            sqlx::query(
+                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(id)
+            .bind(None::<String>)
+            .bind("test")
+            .bind("model")
+            .bind("local")
+            .bind("session-a")
+            .bind("success")
+            .bind(0)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<f64>)
+            .bind(None::<String>)
+            .bind(window)
+            .bind(None::<String>)
+            .bind(created_at)
+            .execute(&pool)
+            .await
+            .expect("insert event");
+        }
+
+        let resp = app
+            .clone()
+            .oneshot(request("POST", "/api/ai/stats/cleanup", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(json_body(resp).await["deleted"], 1);
+
+        let stats = app
+            .oneshot(request("GET", "/api/ai/stats?limit=10", None))
+            .await
+            .expect("response");
+        let body = json_body(stats).await;
+        let ids: Vec<&str> = body["data"]
+            .as_array()
+            .expect("data array")
+            .iter()
+            .filter_map(|event| event["id"].as_str())
+            .collect();
+
+        assert!(ids.contains(&"new-window-1"));
+        assert!(ids.contains(&"only-window-2"));
+        assert!(!ids.contains(&"old-window-1"));
     }
 }

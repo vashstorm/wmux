@@ -96,12 +96,19 @@ export function SessionCard({
 		(session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) ||
 		session.intelligenceError;
 	const appBadgeEntries = getAppBadgeEntries(session.intelligenceAppCounts);
+	const intelligenceBadgeClass = session.intelligenceError ? "error" : session.intelligenceStatus;
+	const intelligenceBadgeLabel = session.intelligenceError
+		? "Error"
+		: session.intelligenceStatus
+			? INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]
+			: undefined;
 
 	return (
 		<Box
 			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${session.intelligenceStatus === "waiting_confirm" ? " is-waiting-confirm" : ""}${session.intelligenceStatus === "blocked" ? " is-blocked" : ""}${isSelected ? " is-selected" : ""}`}
 			data-testid={`session-card-${sname}`}
 			sx={{
+				width: "100%",
 				borderRadius: "var(--radius-md)",
 				border: "1px solid",
 				borderColor: isSelected
@@ -304,6 +311,14 @@ export function SessionCard({
 											height: 18,
 											minWidth: 18,
 										}}
+									/>
+								)}
+								{hasIntelligence && intelligenceBadgeClass && intelligenceBadgeLabel && (
+									<Chip
+										label={intelligenceBadgeLabel}
+										size="small"
+										className={`intelligence-badge is-${intelligenceBadgeClass}`}
+										sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
 									/>
 								)}
 

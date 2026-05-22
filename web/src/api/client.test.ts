@@ -23,6 +23,7 @@ import {
 	updateProject,
 	deleteProject,
 	listAiStats,
+	cleanupAiStats,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -663,6 +664,25 @@ describe("api client", () => {
 				}),
 			);
 			await expect(listAiStats()).rejects.toThrow(ApiError);
+		});
+
+		test("cleanupAiStats posts cleanup request", async () => {
+			mockJsonResponse(200, { deleted: 3 });
+			const result = await cleanupAiStats();
+
+			expect(result.deleted).toBe(3);
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toBe("/api/ai/stats/cleanup");
+			expect(call[1]?.method).toBe("POST");
+		});
+
+		test("cleanupAiStats encodes project filter", async () => {
+			mockJsonResponse(200, { deleted: 1 });
+			await cleanupAiStats({ projectId: "proj-1" });
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toBe("/api/ai/stats/cleanup?projectId=proj-1");
+			expect(call[1]?.method).toBe("POST");
 		});
 	});
 });

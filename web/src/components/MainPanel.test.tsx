@@ -653,6 +653,59 @@ describe("MainPanel", () => {
 		expect(screen.queryByTestId("main-title-session")).not.toBeInTheDocument();
 		expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument();
 		expect(screen.queryByTestId("main-title-summary")).not.toBeInTheDocument();
-		expect(screen.getByText("Wmux")).toBeInTheDocument();
+		expect(screen.queryByText("Wmux")).not.toBeInTheDocument();
+	});
+
+	test("renders app, status, and summary in header when selectedAiEvent is active", () => {
+		const mockEvent = {
+			id: "event-1",
+			projectId: "proj-1",
+			provider: "deepseek",
+			model: "deepseek-v4-flash",
+			targetName: "conn-1",
+			sessionName: "rt-audio",
+			status: "success",
+			durationMs: 2100,
+			responseJson: JSON.stringify({
+				choices: [
+					{
+						message: {
+							role: "assistant",
+							content: JSON.stringify({
+								application: "zsh",
+								status: "none",
+								summary: "活跃的zsh shell在虚拟环境中"
+							})
+						}
+					}
+				]
+			}),
+			createdAt: "2026-05-22T10:56:48Z"
+		};
+
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: null,
+			selectedAiEvent: mockEvent,
+			setSelectedAiEvent: vi.fn(),
+			sessions: {},
+			windows: {},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expect(screen.getByTestId("main-title-app").textContent).toBe("zsh");
+		expect(screen.getByTestId("main-title-status").textContent).toBe("none");
+		expect(screen.getByTestId("main-title-summary").textContent).toBe("活跃的zsh shell在虚拟环境中");
 	});
 });

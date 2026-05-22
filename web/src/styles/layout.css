@@ -249,6 +249,7 @@
 	font-weight: 300;
 }
 
+.main-title-segment.is-app,
 .main-title-segment.is-status {
 	flex: 0 0 auto;
 	max-width: none;

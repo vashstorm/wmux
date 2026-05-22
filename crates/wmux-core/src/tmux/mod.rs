@@ -76,7 +76,12 @@ pub struct TokioCommandRunner;
 
 impl CommandRunner for TokioCommandRunner {
     async fn run(&self, program: &str, args: &[&str]) -> io::Result<Output> {
-        Command::new(program).args(args).output().await
+        Command::new(program)
+            .env("LANG", "en_US.UTF-8")
+            .env("LC_ALL", "en_US.UTF-8")
+            .args(args)
+            .output()
+            .await
     }
 }
 

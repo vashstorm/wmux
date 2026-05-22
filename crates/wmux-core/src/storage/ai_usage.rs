@@ -132,6 +132,57 @@ impl AiUsageRepository {
 
         Ok(result.rows_affected())
     }
+
+    pub async fn delete_stale_window_events(
+        &self,
+        project_id: Option<&str>,
+    ) -> Result<u64, sqlx::Error> {
+        let result = if let Some(pid) = project_id {
+            sqlx::query(
+                r#"
+                DELETE FROM ai_usage_events AS old
+                WHERE old.project_id = ?
+                  AND EXISTS (
+                    SELECT 1
+                    FROM ai_usage_events AS newer
+                    WHERE newer.project_id = old.project_id
+                      AND newer.target_name = old.target_name
+                      AND newer.session_name = old.session_name
+                      AND newer.window_number IS old.window_number
+                      AND (
+                        newer.created_at > old.created_at
+                        OR (newer.created_at = old.created_at AND newer.rowid > old.rowid)
+                      )
+                  )
+                "#,
+            )
+            .bind(pid)
+            .execute(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                r#"
+                DELETE FROM ai_usage_events AS old
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM ai_usage_events AS newer
+                    WHERE newer.project_id IS old.project_id
+                      AND newer.target_name = old.target_name
+                      AND newer.session_name = old.session_name
+                      AND newer.window_number IS old.window_number
+                      AND (
+                        newer.created_at > old.created_at
+                        OR (newer.created_at = old.created_at AND newer.rowid > old.rowid)
+                      )
+                )
+                "#,
+            )
+            .execute(&self.pool)
+            .await?
+        };
+
+        Ok(result.rows_affected())
+    }
 }
 
 #[cfg(test)]
@@ -338,6 +389,169 @@ mod tests {
         assert_eq!(summary.total_completion_tokens, 30);
         assert_eq!(summary.total_tokens, 100);
         assert!((summary.total_estimated_cost - 0.012).abs() < 0.001);
+    }
+
+    #[tokio::test]
+    async fn ai_usage_delete_stale_window_events_keeps_latest_per_window() {
+        let (pool, _dir) = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        for (id, target, session, window, created_at) in [
+            (
+                "old-window-1",
+                "local",
+                "session-a",
+                Some(1_i64),
+                "2024-01-01T00:00:00Z",
+            ),
+            (
+                "new-window-1",
+                "local",
+                "session-a",
+                Some(1_i64),
+                "2024-01-02T00:00:00Z",
+            ),
+            (
+                "old-window-2",
+                "local",
+                "session-a",
+                Some(2_i64),
+                "2024-01-01T00:00:00Z",
+            ),
+            (
+                "new-window-2",
+                "local",
+                "session-a",
+                Some(2_i64),
+                "2024-01-03T00:00:00Z",
+            ),
+            (
+                "same-number-other-session",
+                "local",
+                "session-b",
+                Some(1_i64),
+                "2024-01-01T00:00:00Z",
+            ),
+            (
+                "old-null-window",
+                "local",
+                "session-a",
+                None,
+                "2024-01-01T00:00:00Z",
+            ),
+            (
+                "new-null-window",
+                "local",
+                "session-a",
+                None,
+                "2024-01-04T00:00:00Z",
+            ),
+        ] {
+            sqlx::query(
+                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(id)
+            .bind(None::<String>)
+            .bind("test")
+            .bind("model")
+            .bind(target)
+            .bind(session)
+            .bind("success")
+            .bind(0)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<f64>)
+            .bind(None::<String>)
+            .bind(window)
+            .bind(None::<String>)
+            .bind(created_at)
+            .execute(&repo.pool)
+            .await
+            .expect("insert event");
+        }
+
+        let deleted = repo
+            .delete_stale_window_events(None)
+            .await
+            .expect("delete stale window events");
+        assert_eq!(deleted, 3);
+
+        let remaining = repo.list(20, None).await.expect("list remaining");
+        let ids: Vec<&str> = remaining.iter().map(|event| event.id.as_str()).collect();
+
+        assert!(ids.contains(&"new-window-1"));
+        assert!(ids.contains(&"new-window-2"));
+        assert!(ids.contains(&"same-number-other-session"));
+        assert!(ids.contains(&"new-null-window"));
+        assert!(!ids.contains(&"old-window-1"));
+        assert!(!ids.contains(&"old-window-2"));
+        assert!(!ids.contains(&"old-null-window"));
+    }
+
+    #[tokio::test]
+    async fn ai_usage_delete_stale_window_events_respects_project_filter() {
+        let (pool, _dir) = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        for project in ["project-A", "project-B"] {
+            sqlx::query(
+                "INSERT INTO projects (id, name, path, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+            )
+            .bind(project)
+            .bind(project)
+            .bind("")
+            .bind("")
+            .bind("2024-01-01T00:00:00Z")
+            .bind("2024-01-01T00:00:00Z")
+            .execute(&repo.pool)
+            .await
+            .expect("insert project");
+        }
+
+        for (id, project, created_at) in [
+            ("a-old", "project-A", "2024-01-01T00:00:00Z"),
+            ("a-new", "project-A", "2024-01-02T00:00:00Z"),
+            ("b-old", "project-B", "2024-01-01T00:00:00Z"),
+            ("b-new", "project-B", "2024-01-02T00:00:00Z"),
+        ] {
+            sqlx::query(
+                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(id)
+            .bind(project)
+            .bind("test")
+            .bind("model")
+            .bind("local")
+            .bind("session-a")
+            .bind("success")
+            .bind(0)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<f64>)
+            .bind(None::<String>)
+            .bind(Some(1_i64))
+            .bind(None::<String>)
+            .bind(created_at)
+            .execute(&repo.pool)
+            .await
+            .expect("insert event");
+        }
+
+        let deleted = repo
+            .delete_stale_window_events(Some("project-A"))
+            .await
+            .expect("delete stale project events");
+        assert_eq!(deleted, 1);
+
+        let remaining = repo.list(20, None).await.expect("list remaining");
+        let ids: Vec<&str> = remaining.iter().map(|event| event.id.as_str()).collect();
+
+        assert!(ids.contains(&"a-new"));
+        assert!(ids.contains(&"b-old"));
+        assert!(ids.contains(&"b-new"));
+        assert!(!ids.contains(&"a-old"));
     }
 
     #[tokio::test]

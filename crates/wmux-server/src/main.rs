@@ -23,6 +23,10 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    unsafe {
+        std::env::set_var("LANG", "en_US.UTF-8");
+        std::env::set_var("LC_ALL", "en_US.UTF-8");
+    }
     let cli = Cli::parse();
     match run(cli).await {
         Ok(()) => ExitCode::SUCCESS,

@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { Sidebar } from "./Sidebar.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import * as client from "../api/client.js";
 import { ApiError } from "../api/errors.js";
@@ -20,6 +21,7 @@ vi.mock("../api/client.js", () => ({
 	updateProject: vi.fn(),
 	deleteProject: vi.fn(),
 	listAiStats: vi.fn(),
+	cleanupAiStats: vi.fn(),
 }));
 
 const mockListConnections = vi.mocked(client.listConnections);
@@ -33,6 +35,7 @@ const mockCreateProject = vi.mocked(client.createProject);
 const mockUpdateProject = vi.mocked(client.updateProject);
 const mockDeleteProject = vi.mocked(client.deleteProject);
 const mockListAiStats = vi.mocked(client.listAiStats);
+const mockCleanupAiStats = vi.mocked(client.cleanupAiStats);
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
 	return <AppProvider>{children}</AppProvider>;
@@ -832,8 +835,41 @@ describe("Projects view", () => {
 		fireEvent.click(screen.getByTestId("open-stats-button"));
 		await waitFor(() => {
 			const statsView = screen.getByTestId("stats-view");
-			expect(within(statsView).getByText("openai/gpt-4")).toBeInTheDocument();
-			expect(within(statsView).getByText("1 total")).toBeInTheDocument();
+			expect(within(statsView).getByTestId("stats-event-e1")).toBeInTheDocument();
+			expect(within(statsView).getByText("sess1")).toBeInTheDocument();
+			expect(within(statsView).getByText("1 ✓")).toBeInTheDocument();
+		});
+	});
+
+	test("stats cleanup keeps latest event per window and refreshes data", async () => {
+		mockListAiStats
+			.mockResolvedValueOnce({
+				data: [
+					{ id: "e1", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 150, promptTokens: 50, completionTokens: 30, totalTokens: 80, estimatedCost: 0.01, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-01T00:00:00Z" },
+					{ id: "e2", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 120, promptTokens: 45, completionTokens: 20, totalTokens: 65, estimatedCost: 0.008, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-02T00:00:00Z" },
+				],
+				summary: { totalEvents: 2, totalSuccess: 2, totalError: 0, totalDurationMs: 270, totalPromptTokens: 95, totalCompletionTokens: 50, totalTokens: 145, totalEstimatedCost: 0.018 },
+			})
+			.mockResolvedValueOnce({
+				data: [
+					{ id: "e2", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 120, promptTokens: 45, completionTokens: 20, totalTokens: 65, estimatedCost: 0.008, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-02T00:00:00Z" },
+				],
+				summary: { totalEvents: 1, totalSuccess: 1, totalError: 0, totalDurationMs: 120, totalPromptTokens: 45, totalCompletionTokens: 20, totalTokens: 65, totalEstimatedCost: 0.008 },
+			});
+		mockCleanupAiStats.mockResolvedValue({ deleted: 1 });
+
+		render(<TestWrapper><Sidebar /><ConfirmDialog /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-stats-button"));
+		await waitFor(() => expect(screen.getByTestId("stats-event-e1")).toBeInTheDocument());
+
+		fireEvent.click(screen.getByTestId("stats-cleanup-button"));
+		fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
+		await waitFor(() => {
+			expect(mockCleanupAiStats).toHaveBeenCalledTimes(1);
+			expect(screen.getByTestId("stats-cleanup-message")).toHaveTextContent("Cleaned 1 old records");
+			expect(screen.queryByTestId("stats-event-e1")).not.toBeInTheDocument();
+			expect(screen.getByTestId("stats-event-e2")).toBeInTheDocument();
 		});
 	});
 

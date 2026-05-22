@@ -662,6 +662,8 @@ async fn spawn_control_process(
     initial_size: WindowSize,
 ) -> Result<ControlProcessParts, SessionError> {
     let mut child = Command::new(tmux_path)
+        .env("LANG", "en_US.UTF-8")
+        .env("LC_ALL", "en_US.UTF-8")
         .args([
             "-C",
             "attach-session",
@@ -759,6 +761,8 @@ async fn capture_pane_snapshot(
 
 async fn run_tmux_output(tmux_path: &str, args: Vec<String>) -> Result<String, SessionError> {
     let output = Command::new(tmux_path)
+        .env("LANG", "en_US.UTF-8")
+        .env("LC_ALL", "en_US.UTF-8")
         .args(args)
         .stdin(Stdio::null())
         .output()
