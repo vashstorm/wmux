@@ -3,6 +3,7 @@ pub mod cleanup;
 pub mod db;
 pub mod models;
 pub mod projects;
+pub mod sync;
 
 pub use ai_usage::AiUsageRepository;
 pub use models::*;

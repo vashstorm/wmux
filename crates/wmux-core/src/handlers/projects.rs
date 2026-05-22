@@ -33,15 +33,42 @@ pub async fn list(State(state): State<AppState>) -> ApiResult<ProjectListRespons
 
 pub async fn create(
     State(state): State<AppState>,
-    Json(payload): Json<NewProject>,
+    Json(mut payload): Json<NewProject>,
 ) -> Result<(StatusCode, Json<Project>), ApiError> {
     if payload.name.trim().is_empty() {
         return Err(ApiError::bad_request("project name cannot be empty"));
     }
 
     let pool = storage(&state)?;
+    let session_to_check = payload.session_name.as_deref().unwrap_or(payload.name.as_str());
+
+    let config = state.store.snapshot().map_err(|e| {
+        ApiError::internal(format!("failed to read config: {}", e))
+    })?;
+    let tmux_path = if config.tmux.path.is_empty() {
+        "tmux"
+    } else {
+        &config.tmux.path
+    };
+    let adapter = Adapter::new(tmux_path);
+
+    if let Ok(true) = adapter.has_session(session_to_check).await {
+        if let Ok(snapshot) = snapshot_from_tmux(&adapter, session_to_check).await {
+            payload.layout_json = Some(snapshot.layout_json);
+        }
+    }
+
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.create(&payload).await.map_err(map_project_error)?;
+    let mut project = repo.create(&payload).await.map_err(map_project_error)?;
+
+    if let Ok(true) = adapter.has_session(session_to_check).await {
+        let now_str = time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .expect("RFC3339 format is infallible");
+        if let Ok(updated) = repo.update_snapshot(&project.id, &project.layout_json, "running", &now_str).await {
+            project = updated;
+        }
+    }
 
     tracing::info!(project_id = %project.id, name = %project.name, "project created");
 
@@ -72,13 +99,44 @@ pub async fn update(
     Ok(Json(project))
 }
 
+#[derive(serde::Deserialize)]
+pub struct DeleteParams {
+    #[serde(default)]
+    pub kill_session: bool,
+}
+
 pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    axum::extract::Query(params): axum::extract::Query<DeleteParams>,
 ) -> Result<Response, ApiError> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
+    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
+
     repo.delete(&id).await.map_err(map_project_error)?;
+
+    if params.kill_session {
+        let session_name = if project.session_name.is_empty() {
+            &project.name
+        } else {
+            &project.session_name
+        };
+
+        let config = state.store.snapshot().map_err(|e| {
+            ApiError::internal(format!("failed to read config: {}", e))
+        })?;
+        let tmux_path = if config.tmux.path.is_empty() {
+            "tmux"
+        } else {
+            &config.tmux.path
+        };
+        let adapter = Adapter::new(tmux_path);
+
+        if let Ok(true) = adapter.has_session(session_name).await {
+            let _ = adapter.kill_session(session_name).await;
+        }
+    }
 
     tracing::info!(project_id = %id, "project deleted");
 

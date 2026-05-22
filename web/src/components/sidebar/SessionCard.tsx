@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import type { SessionInfoData } from "../../api/client.js";
 import { SidebarIconButton } from "./SidebarIconButton.js";
 
@@ -49,6 +50,7 @@ interface SessionCardProps {
 	onRename: (sessionName: string) => void;
 	onKill: (sessionName: string) => void;
 	onSubmitRename: (sessionName: string, newName: string) => Promise<void>;
+	onBuildProject: (sessionName: string) => void;
 }
 
 export function SessionCard({
@@ -58,6 +60,7 @@ export function SessionCard({
 	onRename,
 	onKill,
 	onSubmitRename,
+	onBuildProject,
 }: SessionCardProps) {
 	const sname = session.name ?? "";
 	const [isRenaming, setIsRenaming] = useState(false);
@@ -271,6 +274,24 @@ export function SessionCard({
 											".session-card:hover &": { opacity: 1 },
 										}}
 									>
+										<SidebarIconButton
+											className="session-action-btn"
+											icon={CreateNewFolderIcon}
+											variant="row"
+											onClick={(e) => { e.stopPropagation(); onBuildProject(sname); }}
+											aria-label={`Build project from ${sname}`}
+											title="Build project"
+											data-testid={`build-project-${sname}`}
+											sx={{
+												color: "text.secondary",
+												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+												"&:hover": {
+													bgcolor: "action.hover",
+													color: "primary.main",
+													transform: "scale(1.1)",
+												},
+											}}
+										/>
 										<SidebarIconButton
 											className="session-action-btn"
 											icon={EditIcon}

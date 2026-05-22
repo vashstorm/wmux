@@ -67,9 +67,11 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     .await
     .context("failed to initialize SQLite storage")?;
 
-    if let Some(pool) = &state.storage {
+    if let Some(pool) = state.storage.clone() {
         let cleanup_holder = wmux_core::storage::cleanup::spawn_cleanup_task(pool.clone());
         state.set_cleanup_handle(cleanup_holder);
+        let sync_holder = wmux_core::storage::sync::spawn_sync_task(pool, store.clone());
+        state.set_sync_handle(sync_holder);
     }
 
     tracing::info!(
@@ -90,6 +92,11 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
             if let Some(handle_holder) = &shutdown_state.cleanup_handle {
+                if let Some(handle) = handle_holder.lock().unwrap().take() {
+                    handle.abort();
+                }
+            }
+            if let Some(handle_holder) = &shutdown_state.sync_handle {
                 if let Some(handle) = handle_holder.lock().unwrap().take() {
                     handle.abort();
                 }

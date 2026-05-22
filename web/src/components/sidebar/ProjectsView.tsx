@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Box, Typography, IconButton, TextField, Button, List, ListItem, ListItemText, Stack, Collapse } from "@mui/material";
+import { Box, Typography, IconButton, TextField, Button, List, ListItem, ListItemText, Stack, Collapse, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Checkbox } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -19,6 +19,10 @@ export function ProjectsView() {
 	const [formName, setFormName] = useState("");
 	const [formPath, setFormPath] = useState("");
 	const [formDescription, setFormDescription] = useState("");
+
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+	const [killSessionCheckbox, setKillSessionCheckbox] = useState(false);
 
 	const loadProjects = useCallback(async () => {
 		setLoading(true);
@@ -79,17 +83,27 @@ export function ProjectsView() {
 		}
 	};
 
-	const handleDelete = async (id: string) => {
-		if (!window.confirm("Delete this project?")) return;
+	const handleDeleteClick = (project: Project) => {
+		setProjectToDelete(project);
+		setKillSessionCheckbox(false);
+		setDeleteDialogOpen(true);
+	};
+
+	const handleConfirmDelete = async () => {
+		if (!projectToDelete) return;
 		setError(null);
 		try {
-			await deleteProject(id);
-			if (selectedProject?.id === id) {
+			await deleteProject(projectToDelete.id, killSessionCheckbox);
+			if (selectedProject?.id === projectToDelete.id) {
 				setSelectedProject(null);
 			}
 			await loadProjects();
+			setDeleteDialogOpen(false);
+			setProjectToDelete(null);
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "Failed to delete project");
+			setDeleteDialogOpen(false);
+			setProjectToDelete(null);
 		}
 	};
 
@@ -165,7 +179,7 @@ export function ProjectsView() {
 							secondaryAction={
 								<Stack direction="row" spacing={0.25}>
 									<IconButton size="small" onClick={(e) => { e.stopPropagation(); startEdit(project); }} data-testid={`project-edit-${project.id}`} aria-label="Edit"><EditIcon fontSize="small" /></IconButton>
-									<IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }} data-testid={`project-delete-${project.id}`} aria-label="Delete"><DeleteIcon fontSize="small" /></IconButton>
+									<IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteClick(project); }} data-testid={`project-delete-${project.id}`} aria-label="Delete"><DeleteIcon fontSize="small" /></IconButton>
 								</Stack>
 							}
 						>
@@ -177,6 +191,91 @@ export function ProjectsView() {
 					))}
 				</List>
 			)}
+
+			<Dialog
+				open={deleteDialogOpen}
+				onClose={() => setDeleteDialogOpen(false)}
+				slotProps={{
+					paper: {
+						sx: {
+							bgcolor: "background.paper",
+							backgroundImage: "none",
+							borderRadius: "var(--radius-md)",
+							border: "1px solid",
+							borderColor: "divider",
+							p: 1.5,
+							minWidth: 320,
+						}
+					}
+				}}
+				data-testid="delete-project-dialog"
+			>
+				<DialogTitle sx={{ p: 0, mb: 1, fontSize: "var(--font-size-base)", fontWeight: "var(--font-weight-semibold)" }}>
+					Delete Project
+				</DialogTitle>
+				<DialogContent sx={{ p: 0, mb: 2 }}>
+					<DialogContentText sx={{ fontSize: "var(--font-size-sm)", color: "text.secondary", mb: 2 }}>
+						Are you sure you want to delete project <strong>{projectToDelete?.name}</strong>? This action cannot be undone.
+					</DialogContentText>
+					{projectToDelete?.sessionName && (
+						<FormControlLabel
+							control={
+								<Checkbox
+									checked={killSessionCheckbox}
+									onChange={(e) => setKillSessionCheckbox(e.target.checked)}
+									size="small"
+									sx={{
+										color: "primary.main",
+										"&.Mui-checked": {
+											color: "primary.main",
+										},
+									}}
+									data-testid="kill-session-checkbox"
+								/>
+							}
+							label={
+								<Typography variant="body2" sx={{ fontSize: "var(--font-size-sm)" }}>
+									Also terminate active tmux session <code>{projectToDelete.sessionName}</code>
+								</Typography>
+							}
+						/>
+					)}
+				</DialogContent>
+				<DialogActions sx={{ p: 0, justifyContent: "flex-end", gap: 1 }}>
+					<Button
+						onClick={() => setDeleteDialogOpen(false)}
+						size="small"
+						sx={{
+							textTransform: "none",
+							fontWeight: "var(--font-weight-medium)",
+							color: "text.secondary",
+							"&:hover": {
+								bgcolor: "action.hover",
+							}
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						onClick={handleConfirmDelete}
+						variant="contained"
+						color="error"
+						size="small"
+						sx={{
+							textTransform: "none",
+							fontWeight: "var(--font-weight-semibold)",
+							boxShadow: "none",
+							"&:hover": {
+								boxShadow: "none",
+								bgcolor: "error.dark",
+							}
+						}}
+						data-testid="confirm-delete-button"
+					>
+						Delete
+					</Button>
+				</DialogActions>
+			</Dialog>
 		</Box>
 	);
 }

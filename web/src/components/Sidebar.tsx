@@ -19,6 +19,8 @@ import {
 	killSession,
 	renameSession,
 	fetchErrorLogs,
+	listProjects,
+	createProject,
 } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -58,6 +60,8 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 		setSelectedAiEvent,
 		setWindows,
 		setPanes,
+		selectedProject,
+		setSelectedProject,
 	} = useAppState();
 
 	const [searchQuery, setSearchQuery] = useState("");
@@ -315,6 +319,34 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 		}
 	};
 
+	const handleBuildProject = async (sessionName: string) => {
+		try {
+			const existingProjects = await listProjects();
+			const matched = existingProjects.find(
+				(p) => p.sessionName === sessionName || p.name === sessionName
+			);
+			if (matched) {
+				setSelectedProject(matched);
+				setActiveView("projects");
+			} else {
+				const newProj = await createProject({
+					name: sessionName,
+					sessionName: sessionName,
+					path: "",
+					description: `Imported from active session ${sessionName}`,
+				});
+				setSelectedProject(newProj);
+				setActiveView("projects");
+			}
+		} catch (err) {
+			if (isApiError(err)) {
+				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
+			} else {
+				setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to build project" });
+			}
+		}
+	};
+
 	return (
 		<Paper
 			component="aside"
@@ -459,6 +491,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 											onRename={handleRenameSession}
 											onKill={handleKillSession}
 											onSubmitRename={handleSubmitRename}
+											onBuildProject={handleBuildProject}
 										/>
 									))}
 								</List>

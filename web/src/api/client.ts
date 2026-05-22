@@ -739,8 +739,9 @@ export async function updateProject(id: string, data: UpdateProject): Promise<Pr
 	})) as Project;
 }
 
-export async function deleteProject(id: string): Promise<void> {
-	await apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
+export async function deleteProject(id: string, killSession = false): Promise<void> {
+	const qs = killSession ? "?kill_session=true" : "";
+	await apiFetch(`/api/projects/${encodeURIComponent(id)}${qs}`, {
 		method: "DELETE",
 	});
 }
