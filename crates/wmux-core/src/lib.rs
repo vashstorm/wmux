@@ -7,6 +7,8 @@ pub mod http;
 pub mod intelligence;
 pub mod logging;
 pub mod middleware;
+pub mod project_ai;
+pub mod project_runtime;
 pub mod protocol;
 pub mod routes;
 pub mod session;

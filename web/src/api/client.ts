@@ -160,7 +160,6 @@ export interface IntelligenceProviderConfig {
 	name: string;
 	provider: string;
 	model: string;
-	apiKey?: string;
 	baseURL?: string;
 	apiKeyConfigured?: boolean;
 }
@@ -223,6 +222,17 @@ export interface Project {
 	description: string;
 	createdAt: string;
 	updatedAt: string;
+	sessionName: string;
+	status: string;
+	workdir: string;
+	layoutJson: string;
+	detailsJson: string;
+	progressJson: string;
+	aiHtml: string;
+	aiStatus: string;
+	aiError: string;
+	lastSyncedAt: string | null;
+	schemaVersion: number;
 }
 
 export interface ProjectListResponse {
@@ -233,12 +243,27 @@ export interface NewProject {
 	name: string;
 	path?: string;
 	description?: string;
+	sessionName?: string;
+	workdir?: string;
+	layoutJson?: string;
+	detailsJson?: string;
+	progressJson?: string;
 }
 
 export interface UpdateProject {
 	name?: string;
 	path?: string;
 	description?: string;
+	sessionName?: string;
+	workdir?: string;
+	layoutJson?: string;
+	detailsJson?: string;
+	progressJson?: string;
+}
+
+export interface ProjectActionResponse {
+	project: Project;
+	operation: string;
 }
 
 // --- AI Stats ---
@@ -718,6 +743,24 @@ export async function deleteProject(id: string): Promise<void> {
 	await apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
 		method: "DELETE",
 	});
+}
+
+export async function launchProject(id: string): Promise<ProjectActionResponse> {
+	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/launch`, {
+		method: "POST",
+	})) as ProjectActionResponse;
+}
+
+export async function syncProjectFromTmux(id: string): Promise<ProjectActionResponse> {
+	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/sync-from-tmux`, {
+		method: "POST",
+	})) as ProjectActionResponse;
+}
+
+export async function generateProjectAiHtml(id: string): Promise<Project> {
+	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/generate-ai-html`, {
+		method: "POST",
+	})) as Project;
 }
 
 // --- AI Stats client functions ---

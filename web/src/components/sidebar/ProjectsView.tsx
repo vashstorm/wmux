@@ -4,11 +4,13 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
-import { listProjects, createProject, updateProject, deleteProject } from "../../api/client.js";
+import { useAppState } from "../../state/store.js";
+import { listProjects, createProject, updateProject, deleteProject, getProject } from "../../api/client.js";
 import type { Project, NewProject } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 
 export function ProjectsView() {
+	const { selectedProject, setSelectedProject } = useAppState();
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -41,14 +43,23 @@ export function ProjectsView() {
 		setEditingId(null);
 	};
 
+	const handleSelect = (project: Project) => {
+		if (selectedProject?.id === project.id) {
+			setSelectedProject(null);
+			return;
+		}
+		setSelectedProject(project);
+	};
+
 	const handleCreate = async (e: React.FormEvent) => {
 		e.preventDefault();
 		if (!formName.trim()) return;
 		setError(null);
 		try {
-			await createProject({ name: formName.trim(), path: formPath.trim(), description: formDescription.trim() });
+			const created = await createProject({ name: formName.trim(), path: formPath.trim(), description: formDescription.trim() });
 			resetForm();
 			await loadProjects();
+			setSelectedProject(created);
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "Failed to create project");
 		}
@@ -60,6 +71,7 @@ export function ProjectsView() {
 		setError(null);
 		try {
 			await updateProject(editingId, { name: formName.trim() || undefined, path: formPath.trim(), description: formDescription.trim() });
+			await refreshSelectedProject(editingId);
 			resetForm();
 			await loadProjects();
 		} catch (err) {
@@ -72,11 +84,24 @@ export function ProjectsView() {
 		setError(null);
 		try {
 			await deleteProject(id);
+			if (selectedProject?.id === id) {
+				setSelectedProject(null);
+			}
 			await loadProjects();
 		} catch (err) {
 			setError(err instanceof ApiError ? err.message : "Failed to delete project");
 		}
 	};
+
+	const refreshSelectedProject = useCallback(async (id: string) => {
+		if (!selectedProject || selectedProject.id !== id) return;
+		try {
+			const updated = await getProject(id);
+			setSelectedProject(updated);
+		} catch {
+			// stale reads are acceptable
+		}
+	}, [selectedProject, setSelectedProject]);
 
 	const startEdit = (project: Project) => {
 		setEditingId(project.id);
@@ -122,12 +147,28 @@ export function ProjectsView() {
 			) : (
 				<List disablePadding dense>
 					{projects.map((project) => (
-						<ListItem key={project.id} data-testid={`project-item-${project.id}`} sx={{ px: 1, py: 0.5, borderRadius: "var(--radius-sm)", "&:hover": { bgcolor: "action.hover" } }} secondaryAction={
-							<Stack direction="row" spacing={0.25}>
-								<IconButton size="small" onClick={() => startEdit(project)} data-testid={`project-edit-${project.id}`} aria-label="Edit"><EditIcon fontSize="small" /></IconButton>
-								<IconButton size="small" onClick={() => handleDelete(project.id)} data-testid={`project-delete-${project.id}`} aria-label="Delete"><DeleteIcon fontSize="small" /></IconButton>
-							</Stack>
-						}>
+						<ListItem
+							key={project.id}
+							data-testid={`project-item-${project.id}`}
+							onClick={() => handleSelect(project)}
+							sx={{
+								px: 1,
+								py: 0.5,
+								borderRadius: "var(--radius-sm)",
+								cursor: "pointer",
+								bgcolor: selectedProject?.id === project.id ? "primary.main" : "transparent",
+								color: selectedProject?.id === project.id ? "primary.contrastText" : "inherit",
+								"&:hover": { bgcolor: selectedProject?.id === project.id ? "primary.dark" : "action.hover" },
+								borderLeft: selectedProject?.id === project.id ? "3px solid" : "3px solid transparent",
+								borderColor: selectedProject?.id === project.id ? "primary.light" : "transparent",
+							}}
+							secondaryAction={
+								<Stack direction="row" spacing={0.25}>
+									<IconButton size="small" onClick={(e) => { e.stopPropagation(); startEdit(project); }} data-testid={`project-edit-${project.id}`} aria-label="Edit"><EditIcon fontSize="small" /></IconButton>
+									<IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }} data-testid={`project-delete-${project.id}`} aria-label="Delete"><DeleteIcon fontSize="small" /></IconButton>
+								</Stack>
+							}
+						>
 							<ListItemText
 							primary={project.name}
 							secondary={project.path || project.description || undefined}

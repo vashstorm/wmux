@@ -762,8 +762,44 @@ describe("Projects view", () => {
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
 		vi.mocked(client.listProjects).mockReset().mockResolvedValue([]);
-		vi.mocked(client.createProject).mockReset().mockResolvedValue({ id: "p1", name: "new", path: "/tmp", description: "", createdAt: "", updatedAt: "" });
-		vi.mocked(client.updateProject).mockReset().mockResolvedValue({ id: "p1", name: "new", path: "/tmp", description: "", createdAt: "", updatedAt: "" });
+		vi.mocked(client.createProject).mockReset().mockResolvedValue({
+			id: "p1",
+			name: "new",
+			path: "/tmp",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "",
+			status: "stopped",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		});
+		vi.mocked(client.updateProject).mockReset().mockResolvedValue({
+			id: "p1",
+			name: "new",
+			path: "/tmp",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "",
+			status: "stopped",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		});
 		vi.mocked(client.deleteProject).mockReset().mockResolvedValue(undefined);
 	});
 
@@ -778,7 +814,25 @@ describe("Projects view", () => {
 	test("creates a project and shows it in list", async () => {
 		vi.mocked(client.listProjects)
 			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{ id: "p1", name: "wmux-dev", path: "/tmp/wmux", description: "", createdAt: "", updatedAt: "" }]);
+			.mockResolvedValueOnce([{
+				id: "p1",
+				name: "wmux-dev",
+				path: "/tmp/wmux",
+				description: "",
+				createdAt: "",
+				updatedAt: "",
+				sessionName: "",
+				status: "stopped",
+				workdir: "",
+				layoutJson: "{}",
+				detailsJson: "{}",
+				progressJson: "{}",
+				aiHtml: "",
+				aiStatus: "idle",
+				aiError: "",
+				lastSyncedAt: null,
+				schemaVersion: 1,
+			}]);
 
 		render(<TestWrapper><Sidebar /></TestWrapper>);
 		fireEvent.click(screen.getByTestId("open-projects-button"));

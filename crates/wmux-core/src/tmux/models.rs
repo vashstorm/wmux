@@ -52,6 +52,8 @@ pub struct Window {
     pub attention_state: AttentionState,
     pub attention_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_layout: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub intelligence_app: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intelligence_status: Option<String>,
@@ -136,6 +138,7 @@ impl Window {
             active_pane_title,
             attention_state: AttentionState::None,
             attention_count: 0,
+            window_layout: None,
             intelligence_app: None,
             intelligence_status: None,
             intelligence_summary: None,
@@ -146,6 +149,11 @@ impl Window {
             intelligence_error: None,
             intelligence_app_counts: None,
         }
+    }
+
+    pub(crate) fn with_layout(mut self, layout: String) -> Self {
+        self.window_layout = Some(layout);
+        self
     }
 }
 

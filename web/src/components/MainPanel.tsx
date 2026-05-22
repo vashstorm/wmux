@@ -4,6 +4,7 @@ import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
 import { AiEventDetail } from "./AiEventDetail.js";
+import { ProjectDashboard } from "./ProjectDashboard.js";
 import { listPanes, listWindows, type AiUsageEvent } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 
@@ -65,6 +66,7 @@ export function MainPanel() {
 	const {
 		selectedPane,
 		selectedAiEvent,
+		selectedProject,
 		setSelectedAiEvent,
 		sessions,
 		windows,
@@ -311,9 +313,11 @@ export function MainPanel() {
 				</Box>
 			</header>
 
-			<main className={`main-content${hasSelectedPane ? " has-workspace" : " is-empty"}`}>
+			<main className={`main-content${hasSelectedPane || selectedProject ? " has-workspace" : " is-empty"}`}>
 				{selectedAiEvent ? (
 					<AiEventDetail event={selectedAiEvent} onClose={() => setSelectedAiEvent(null)} />
+				) : selectedProject ? (
+					<ProjectDashboard />
 				) : hasSelectedPane ? (
 					<div className="main-workspace">
 						<WindowTabs

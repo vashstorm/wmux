@@ -81,6 +81,80 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
             .context("add response_json column")?;
     }
 
+    // Add new columns to projects table
+    let projects_columns: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info('projects')")
+            .fetch_all(&mut *tx)
+            .await
+            .context("check projects columns")?;
+
+    if !projects_columns.contains(&"session_name".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN session_name TEXT NOT NULL DEFAULT ''")
+            .execute(&mut *tx)
+            .await
+            .context("add session_name column")?;
+    }
+    if !projects_columns.contains(&"status".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN status TEXT NOT NULL DEFAULT 'stopped'")
+            .execute(&mut *tx)
+            .await
+            .context("add status column")?;
+    }
+    if !projects_columns.contains(&"workdir".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN workdir TEXT NOT NULL DEFAULT ''")
+            .execute(&mut *tx)
+            .await
+            .context("add workdir column")?;
+    }
+    if !projects_columns.contains(&"layout_json".to_string()) {
+        sqlx::query(r#"ALTER TABLE projects ADD COLUMN layout_json TEXT NOT NULL DEFAULT '{"schemaVersion":1,"windows":[]}'"#)
+            .execute(&mut *tx)
+            .await
+            .context("add layout_json column")?;
+    }
+    if !projects_columns.contains(&"details_json".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN details_json TEXT NOT NULL DEFAULT '{}'")
+            .execute(&mut *tx)
+            .await
+            .context("add details_json column")?;
+    }
+    if !projects_columns.contains(&"progress_json".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN progress_json TEXT NOT NULL DEFAULT '{}'")
+            .execute(&mut *tx)
+            .await
+            .context("add progress_json column")?;
+    }
+    if !projects_columns.contains(&"ai_html".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN ai_html TEXT NOT NULL DEFAULT ''")
+            .execute(&mut *tx)
+            .await
+            .context("add ai_html column")?;
+    }
+    if !projects_columns.contains(&"ai_status".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN ai_status TEXT NOT NULL DEFAULT 'idle'")
+            .execute(&mut *tx)
+            .await
+            .context("add ai_status column")?;
+    }
+    if !projects_columns.contains(&"ai_error".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN ai_error TEXT NOT NULL DEFAULT ''")
+            .execute(&mut *tx)
+            .await
+            .context("add ai_error column")?;
+    }
+    if !projects_columns.contains(&"last_synced_at".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN last_synced_at TEXT")
+            .execute(&mut *tx)
+            .await
+            .context("add last_synced_at column")?;
+    }
+    if !projects_columns.contains(&"schema_version".to_string()) {
+        sqlx::query("ALTER TABLE projects ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1")
+            .execute(&mut *tx)
+            .await
+            .context("add schema_version column")?;
+    }
+
     tx.commit().await.context("failed to commit migration")?;
 
     Ok(())
@@ -130,7 +204,7 @@ mod tests {
                 .await
                 .expect("get projects columns");
 
-        assert_eq!(projects_columns.len(), 6);
+        assert_eq!(projects_columns.len(), 17);
         assert_eq!(projects_columns[0].0, "id");
         assert_eq!(projects_columns[0].1, "TEXT");
         assert_eq!(projects_columns[1].0, "name");
@@ -143,6 +217,28 @@ mod tests {
         assert_eq!(projects_columns[4].1, "TEXT");
         assert_eq!(projects_columns[5].0, "updated_at");
         assert_eq!(projects_columns[5].1, "TEXT");
+        assert_eq!(projects_columns[6].0, "session_name");
+        assert_eq!(projects_columns[6].1, "TEXT");
+        assert_eq!(projects_columns[7].0, "status");
+        assert_eq!(projects_columns[7].1, "TEXT");
+        assert_eq!(projects_columns[8].0, "workdir");
+        assert_eq!(projects_columns[8].1, "TEXT");
+        assert_eq!(projects_columns[9].0, "layout_json");
+        assert_eq!(projects_columns[9].1, "TEXT");
+        assert_eq!(projects_columns[10].0, "details_json");
+        assert_eq!(projects_columns[10].1, "TEXT");
+        assert_eq!(projects_columns[11].0, "progress_json");
+        assert_eq!(projects_columns[11].1, "TEXT");
+        assert_eq!(projects_columns[12].0, "ai_html");
+        assert_eq!(projects_columns[12].1, "TEXT");
+        assert_eq!(projects_columns[13].0, "ai_status");
+        assert_eq!(projects_columns[13].1, "TEXT");
+        assert_eq!(projects_columns[14].0, "ai_error");
+        assert_eq!(projects_columns[14].1, "TEXT");
+        assert_eq!(projects_columns[15].0, "last_synced_at");
+        assert_eq!(projects_columns[15].1, "TEXT");
+        assert_eq!(projects_columns[16].0, "schema_version");
+        assert_eq!(projects_columns[16].1, "INTEGER");
 
         let events_columns: Vec<(String, String)> = sqlx::query_as(
             "SELECT name, type FROM pragma_table_info('ai_usage_events') ORDER BY cid",

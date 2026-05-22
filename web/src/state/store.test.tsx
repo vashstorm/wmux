@@ -709,3 +709,159 @@ describe("UISettings uiScaleStep", () => {
 		expect(stored.terminalFontWeight).toBe("bold");
 	});
 });
+
+describe("selection state exclusivity", () => {
+	const mockProject = {
+		id: "p1",
+		name: "Test Project",
+		path: "/tmp",
+		description: "test",
+		createdAt: "2024-01-01T00:00:00Z",
+		updatedAt: "2024-01-01T00:00:00Z",
+		sessionName: "test-project",
+		status: "stopped",
+		workdir: "/tmp",
+		layoutJson: "{}",
+		detailsJson: "{}",
+		progressJson: "{}",
+		aiHtml: "",
+		aiStatus: "idle",
+		aiError: "",
+		lastSyncedAt: null,
+		schemaVersion: 1,
+	};
+
+	const mockAiEvent = {
+		id: "ai1",
+		projectId: null,
+		provider: "openai",
+		model: "gpt-4",
+		targetName: "conn1",
+		sessionName: "session1",
+		status: "success",
+		durationMs: 1000,
+		promptTokens: 100,
+		completionTokens: 50,
+		totalTokens: 150,
+		estimatedCost: 0.01,
+		errorMessage: null,
+		windowNumber: null,
+		responseJson: null,
+		createdAt: "2024-01-01T00:00:00Z",
+	};
+
+	function TestSelectionComponent() {
+		const state = useAppState();
+		return (
+			<div>
+				<button
+					data-testid="set-project"
+					onClick={() => state.setSelectedProject(mockProject)}
+				>
+					Set Project
+				</button>
+				<button
+					data-testid="set-pane"
+					onClick={() => state.setSelectedPane({ targetName: "conn1", session: "s1", window: "w1", pane: "p1" })}
+				>
+					Set Pane
+				</button>
+				<button
+					data-testid="set-ai-event"
+					onClick={() => state.setSelectedAiEvent(mockAiEvent)}
+				>
+					Set AI Event
+				</button>
+				<button
+					data-testid="clear-project"
+					onClick={() => state.setSelectedProject(null)}
+				>
+					Clear Project
+				</button>
+				<span data-testid="selected-project">{state.selectedProject?.id ?? "null"}</span>
+				<span data-testid="selected-pane">{state.selectedPane?.pane ?? "null"}</span>
+				<span data-testid="selected-ai-event">{state.selectedAiEvent?.id ?? "null"}</span>
+			</div>
+		);
+	}
+
+	function renderWithProvider() {
+		return render(
+			<AppProvider>
+				<TestSelectionComponent />
+			</AppProvider>,
+		);
+	}
+
+	test("setSelectedProject clears selectedPane and selectedAiEvent", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-pane"));
+		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-ai-event"));
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-project"));
+		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+	});
+
+	test("setSelectedPane clears selectedProject and selectedAiEvent", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-project"));
+		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-ai-event"));
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-pane"));
+		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+	});
+
+	test("setSelectedAiEvent clears selectedProject and selectedPane", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-project"));
+		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-pane"));
+		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+
+		fireEvent.click(screen.getByTestId("set-ai-event"));
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+	});
+
+	test("clearing selection with null does not affect other selections", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-pane"));
+		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
+
+		fireEvent.click(screen.getByTestId("clear-project"));
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+	});
+
+	test("default state has null for all selections", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("selected-project").textContent).toBe("null");
+		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
+		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
+	});
+});

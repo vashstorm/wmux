@@ -95,6 +95,9 @@ pub fn router(state: AppState) -> Router {
                 .put(projects::update)
                 .delete(projects::delete),
         )
+        .route("/projects/{id}/launch", post(projects::launch))
+        .route("/projects/{id}/sync-from-tmux", post(projects::sync_from_tmux))
+        .route("/projects/{id}/generate-ai-html", post(projects::generate_ai_html))
         .route(
             "/logs/errors",
             get(logs::get_error_logs).delete(logs::clear_error_logs),
@@ -372,6 +375,89 @@ mod tests {
             body["intelligence"]["providers"][0]["apiKeyConfigured"],
             true
         );
+        assert!(!body.to_string().contains("secret-key"));
+    }
+
+    #[tokio::test]
+    async fn config_redacts_provider_api_key() {
+        let (app, _dir, _config_path) = test_app(base_config());
+
+        let response = app
+            .oneshot(request("GET", "/api/config", None))
+            .await
+            .expect("response");
+        let body = json_body(response).await;
+
+        // Verify apiKeyConfigured is true when key exists
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKeyConfigured"],
+            true
+        );
+
+        // Verify response does not contain raw secret key
+        assert!(!body.to_string().contains("secret-key"));
+
+        // Verify apiKey field is absent or empty in response
+        let provider = &body["intelligence"]["providers"][0];
+        assert!(
+            provider.get("apiKey").is_none() || provider["apiKey"].as_str() == Some(""),
+            "apiKey should be absent or empty in response"
+        );
+    }
+
+    #[tokio::test]
+    async fn config_update_preserves_key_when_blank() {
+        let (app, _dir, _config_path) = test_app(base_config());
+
+        // PUT config with blank apiKey - should preserve existing key
+        let payload = json!({
+            "schemaVersion": 1,
+            "server": { "bind": "127.0.0.1:0" },
+            "auth": { "token": TOKEN },
+            "tmux": { "path": "tmux" },
+            "connections": [],
+            "ui": { "theme": "dark" },
+            "intelligence": {
+                "enabled": true,
+                "activeProvider": "openai",
+                "providers": [
+                    {
+                        "name": "openai",
+                        "provider": "openai",
+                        "model": "test-model",
+                        "apiKey": "",  // Blank key should preserve existing
+                        "baseURL": "http://127.0.0.1:1"
+                    }
+                ],
+                "maxBytes": 20000,
+                "timeoutSec": 30,
+                "minSessionIntervalSec": 60,
+                "maxConcurrency": 3,
+                "cacheTTLSec": 300
+            }
+        });
+
+        let put_response = app
+            .clone()
+            .oneshot(request("PUT", "/api/config", Some(payload)))
+            .await
+            .expect("PUT response");
+        assert!(put_response.status().is_success());
+
+        // GET config and verify key was preserved (apiKeyConfigured: true)
+        let get_response = app
+            .oneshot(request("GET", "/api/config", None))
+            .await
+            .expect("GET response");
+        let body = json_body(get_response).await;
+
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKeyConfigured"],
+            true,
+            "apiKey should be preserved when blank was sent"
+        );
+
+        // Verify response still does not contain raw key
         assert!(!body.to_string().contains("secret-key"));
     }
 
@@ -900,5 +986,124 @@ mod tests {
         assert!(ids.contains(&"new-window-1"));
         assert!(ids.contains(&"only-window-2"));
         assert!(!ids.contains(&"old-window-1"));
+    }
+
+    #[tokio::test]
+    async fn project_launch_not_found_returns_404() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let resp = app
+            .oneshot(request("POST", "/api/projects/nonexistent-id/launch", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = json_body(resp).await;
+        assert_eq!(body["error"]["code"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn project_sync_from_tmux_not_found_returns_404() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let resp = app
+            .oneshot(request("POST", "/api/projects/nonexistent-id/sync-from-tmux", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = json_body(resp).await;
+        assert_eq!(body["error"]["code"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn project_generate_ai_html_not_found_returns_404() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let resp = app
+            .oneshot(request("POST", "/api/projects/nonexistent-id/generate-ai-html", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = json_body(resp).await;
+        assert_eq!(body["error"]["code"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn project_generate_ai_html_provider_not_configured_returns_400() {
+        let (app, _dir) = test_app_with_storage().await;
+
+        let create_resp = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({
+                    "name": "test-ai-project",
+                    "path": "/tmp/test",
+                    "description": "desc"
+                })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(create_resp.status(), StatusCode::CREATED);
+        let created = json_body(create_resp).await;
+        let id = created["id"].as_str().unwrap().to_string();
+
+        let config_without_provider = json!({
+            "schemaVersion": 1,
+            "server": { "bind": "127.0.0.1:0" },
+            "auth": { "token": TOKEN },
+            "tmux": { "path": "tmux" },
+            "connections": [],
+            "ui": { "theme": "dark" },
+            "intelligence": {
+                "enabled": false,
+                "activeProvider": "",
+                "providers": []
+            }
+        });
+
+        let (app_no_provider, dir2) = test_app_with_storage().await;
+        let config_path2 = dir2.path().join("config.jsonc");
+        std::fs::write(
+            &config_path2,
+            serde_json::to_string_pretty(&config_without_provider).expect("serialize config"),
+        )
+        .expect("write config");
+
+        let store = wmux_core::config::Config::load(&config_path2).expect("load config");
+        let state = AppState::with_storage(
+            store,
+            dir2.path().join("assets"),
+            wmux_core::logging::LoggingHandle::empty(),
+            &config_path2,
+        )
+        .await
+        .expect("create state");
+        let app_no_provider = router(state);
+
+        let create_resp2 = app_no_provider
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/projects",
+                Some(json!({
+                    "name": "test-no-provider",
+                    "path": "/tmp/test",
+                    "description": "desc"
+                })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(create_resp2.status(), StatusCode::CREATED);
+        let created2 = json_body(create_resp2).await;
+        let id2 = created2["id"].as_str().unwrap().to_string();
+
+        let resp = app_no_provider
+            .oneshot(request("POST", &format!("/api/projects/{}/generate-ai-html", id2), None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = json_body(resp).await;
+        assert_eq!(body["error"]["code"], "bad_request");
     }
 }

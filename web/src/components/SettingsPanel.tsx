@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
-import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Key as KeyIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
+import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -211,14 +211,15 @@ export function SettingsPanel() {
 		);
 
 		const providers = formState.intelligenceProviders.map((p) => {
-			const result: IntelligenceProviderConfig = {
+			const result: IntelligenceProviderConfig & { apiKey?: string } = {
 				name: p.name,
 				provider: p.provider,
 				model: p.model,
 				baseURL: p.baseURL,
 			};
-			if (p.apiKey) {
-				result.apiKey = p.apiKey;
+			const storedKey = (p as IntelligenceProviderConfig & { apiKey?: string }).apiKey;
+			if (storedKey) {
+				result.apiKey = storedKey;
 			}
 			return result;
 		});
@@ -602,7 +603,7 @@ export function SettingsPanel() {
 								return;
 							}
 
-							const updatedProvider: IntelligenceProviderConfig = {
+							const updatedProvider: IntelligenceProviderConfig & { apiKey?: string } = {
 								name: editor.name.trim(),
 								provider: editor.provider,
 								model: editor.model.trim(),
@@ -938,6 +939,9 @@ export function SettingsPanel() {
 												}
 												label="Enable AI Intelligence"
 											/>
+											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, mb: 2 }} data-testid="intelligence-projects-context">
+												Projects use the active AI provider to generate AI-powered HTML summaries for your project dashboard.
+											</Typography>
 										</Box>
 
 										<Box>
@@ -1019,7 +1023,14 @@ export function SettingsPanel() {
 																			/>
 																			<Typography className="intelligence-provider-model" component="span" variant="caption" color="text.secondary">{provider.model}</Typography>
 																			{provider.apiKeyConfigured && (
-																				<KeyIcon className="intelligence-provider-key-status" titleAccess="API key configured" fontSize="small" color="action" />
+																				<Chip
+																					className="intelligence-provider-key-configured"
+																					data-testid={`provider-key-configured-${provider.name}`}
+																					label="Configured"
+																					size="small"
+																					color="success"
+																					variant="outlined"
+																				/>
 																			)}
 																		</Box>
 																	</Box>

@@ -1724,3 +1724,176 @@ describe("SettingsPanel uiScaleStep", () => {
 		expect(valueLabel).toHaveTextContent("-1");
 	});
 });
+
+describe("SettingsPanel AI project context and API key chip", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	function navigateToIntelligenceTab() {
+		const intelligenceNavButton = screen.getByRole("button", { name: /AI/i });
+		fireEvent.click(intelligenceNavButton);
+	}
+
+	test("API key 'Configured' chip renders for provider with apiKeyConfigured", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "my-provider",
+				providers: [
+					{ name: "my-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const configuredChip = screen.getByTestId("provider-key-configured-my-provider");
+		expect(configuredChip).toBeInTheDocument();
+		expect(configuredChip).toHaveTextContent("Configured");
+	});
+
+	test("No 'Configured' chip when apiKeyConfigured is false", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "no-key-provider",
+				providers: [
+					{ name: "no-key-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: false },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		expect(screen.queryByTestId("provider-key-configured-no-key-provider")).not.toBeInTheDocument();
+	});
+
+	test("Raw API key text never appears in DOM", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "secure-provider",
+				providers: [
+					{ name: "secure-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const panelContent = screen.getByTestId("settings-panel").textContent;
+		expect(panelContent).not.toMatch(/sk-[a-zA-Z0-9]{20,}/);
+		expect(panelContent).not.toMatch(/api[_-]?key[_-]?:/i);
+		expect(panelContent).not.toContain("sk-test-key");
+		expect(screen.getByTestId("provider-key-configured-secure-provider")).toBeInTheDocument();
+	});
+
+	test("Project AI context explanatory text is displayed", async () => {
+		mockGetConfig.mockResolvedValue(defaultConfig);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const contextText = screen.getByTestId("intelligence-projects-context");
+		expect(contextText).toBeInTheDocument();
+		expect(contextText).toHaveTextContent("Projects use the active AI provider to generate AI-powered HTML summaries for your project dashboard.");
+	});
+
+	test("API key placeholder shows correct text for configured provider", async () => {
+		const configWithProvider = {
+			...defaultConfig,
+			intelligence: {
+				...defaultConfig.intelligence,
+				enabled: true,
+				activeProvider: "configured-provider",
+				providers: [
+					{ name: "configured-provider", provider: "openai", model: "gpt-4", apiKeyConfigured: true },
+				],
+			},
+		};
+		mockGetConfig.mockResolvedValue(configWithProvider);
+		mockListConnectionHealth.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				{enableSettingsPanel()}
+				<SettingsPanel />
+			</TestWrapper>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+		});
+
+		navigateToIntelligenceTab();
+
+		const editBtn = screen.getByTestId("provider-edit-configured-provider");
+		fireEvent.click(editBtn);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("intelligence-provider-editor")).toBeInTheDocument();
+		});
+
+		const apiKeyInput = screen.getByTestId("provider-editor-api-key-input") as HTMLInputElement;
+		expect(apiKeyInput.value).toBe("");
+		expect(apiKeyInput.placeholder).toContain("leave blank to keep existing");
+		expect(apiKeyInput.placeholder).toContain("••••••••");
+	});
+});

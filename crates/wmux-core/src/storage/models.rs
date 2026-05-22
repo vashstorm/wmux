@@ -10,6 +10,27 @@ pub struct Project {
     pub path: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub session_name: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub workdir: String,
+    #[serde(default)]
+    pub layout_json: String,
+    #[serde(default)]
+    pub details_json: String,
+    #[serde(default)]
+    pub progress_json: String,
+    #[serde(default)]
+    pub ai_html: String,
+    #[serde(default)]
+    pub ai_status: String,
+    #[serde(default)]
+    pub ai_error: String,
+    pub last_synced_at: Option<String>,
+    #[serde(default)]
+    pub schema_version: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -22,6 +43,16 @@ pub struct NewProject {
     pub path: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub session_name: Option<String>,
+    #[serde(default)]
+    pub workdir: Option<String>,
+    #[serde(default)]
+    pub layout_json: Option<String>,
+    #[serde(default)]
+    pub details_json: Option<String>,
+    #[serde(default)]
+    pub progress_json: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +64,42 @@ pub struct UpdateProject {
     pub path: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub session_name: Option<String>,
+    #[serde(default)]
+    pub workdir: Option<String>,
+    #[serde(default)]
+    pub layout_json: Option<String>,
+    #[serde(default)]
+    pub details_json: Option<String>,
+    #[serde(default)]
+    pub progress_json: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLayout {
+    pub schema_version: u32,
+    pub windows: Vec<ProjectLayoutWindow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLayoutWindow {
+    pub name: String,
+    pub index: u32,
+    pub active: bool,
+    pub panes: Vec<ProjectLayoutPane>,
+    pub window_layout: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectLayoutPane {
+    pub index: u32,
+    pub active: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]

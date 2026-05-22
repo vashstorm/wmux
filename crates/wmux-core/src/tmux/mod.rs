@@ -223,6 +223,11 @@ impl<R: CommandRunner> Adapter<R> {
         Ok(truncate_to_bytes(output, max_bytes as usize))
     }
 
+    pub async fn get_window_layout(&self, target: &str) -> Result<String> {
+        require_value("window target", target)?;
+        self.display_formatted(target, "#{window_layout}").await
+    }
+
     async fn run_args(&self, args: &[String]) -> Result<String> {
         let args = args.iter().map(String::as_str).collect::<Vec<_>>();
         self.run_raw(args.as_slice()).await

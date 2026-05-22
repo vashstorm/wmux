@@ -134,6 +134,8 @@ describe("MainPanel", () => {
 	test("keeps the selected window when tmux active window changes externally", async () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
 			},
@@ -156,6 +158,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -223,6 +226,8 @@ describe("MainPanel", () => {
 				...selectedPane,
 				pane: "%1",
 			},
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
 			},
@@ -245,6 +250,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -315,6 +321,8 @@ describe("MainPanel", () => {
 	test("renders title as summary without session or app name", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
 			},
@@ -343,6 +351,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -365,6 +374,8 @@ describe("MainPanel", () => {
 	test("renders the status segment without truncation", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
 			},
@@ -393,6 +404,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -414,6 +426,8 @@ describe("MainPanel", () => {
 	test("updates title when selected window changes", () => {
 		const mockState = {
 			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
 			},
@@ -457,6 +471,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -502,6 +517,8 @@ describe("MainPanel", () => {
 		vi.mocked(listPanes).mockReturnValue(pendingListPanes);
 		vi.mocked(useAppState).mockImplementation(() => ({
 			selectedPane: currentSelectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Session fallback" }],
 			},
@@ -535,6 +552,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane: setSelectedPaneState,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -577,6 +595,8 @@ describe("MainPanel", () => {
 				window: "@2",
 				pane: "%3",
 			},
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "wmux", intelligenceApp: "opencode", intelligenceSummary: "OpenCode CLI 已启动" }],
 			},
@@ -606,6 +626,7 @@ describe("MainPanel", () => {
 				},
 			},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -631,11 +652,14 @@ describe("MainPanel", () => {
 				targetName: "conn-1",
 				session: "solo",
 			},
+			selectedAiEvent: null,
+			selectedProject: null,
 			sessions: {
 				"conn-1": [{ name: "solo" }],
 			},
 			windows: {},
 			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
 			setWindows,
 			setPanes,
 			setError,
@@ -686,6 +710,7 @@ describe("MainPanel", () => {
 		vi.mocked(useAppState).mockReturnValue({
 			selectedPane: null,
 			selectedAiEvent: mockEvent,
+			selectedProject: null,
 			setSelectedAiEvent: vi.fn(),
 			sessions: {},
 			windows: {},
@@ -707,5 +732,55 @@ describe("MainPanel", () => {
 		expect(screen.getByTestId("main-title-app").textContent).toBe("zsh");
 		expect(screen.getByTestId("main-title-status").textContent).toBe("none");
 		expect(screen.getByTestId("main-title-summary").textContent).toBe("活跃的zsh shell在虚拟环境中");
+	});
+
+	test("renders ProjectDashboard when selectedProject is active", () => {
+		const mockProject = {
+			id: "proj-1",
+			name: "My Project",
+			path: "/path/to/project",
+			status: "idle",
+			sessionName: "my-session",
+			workdir: "/path/to/project",
+			description: "A test project",
+			createdAt: "2026-05-22T10:00:00Z",
+			updatedAt: "2026-05-22T10:00:00Z",
+			lastSyncedAt: null,
+			aiHtml: null,
+			aiStatus: null,
+			aiError: null,
+			layoutJson: null,
+			detailsJson: null,
+			progressJson: null,
+			schemaVersion: null,
+		};
+
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: null,
+			selectedAiEvent: null,
+			selectedProject: mockProject,
+			setSelectedAiEvent: vi.fn(),
+			sessions: {},
+			windows: {},
+			setSelectedPane,
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expect(screen.getByTestId("project-dashboard")).toBeInTheDocument();
+		expect(screen.getByTestId("project-dashboard-title").textContent).toBe("My Project");
+		expect(screen.getByTestId("project-launch-button")).toBeInTheDocument();
+		expect(screen.getByTestId("project-sync-button")).toBeInTheDocument();
+		expect(screen.getByTestId("project-ai-generate-button")).toBeInTheDocument();
 	});
 });

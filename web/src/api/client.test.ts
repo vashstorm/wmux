@@ -22,6 +22,9 @@ import {
 	getProject,
 	updateProject,
 	deleteProject,
+	launchProject,
+	syncProjectFromTmux,
+	generateProjectAiHtml,
 	listAiStats,
 	cleanupAiStats,
 } from "./client.js";
@@ -624,6 +627,184 @@ describe("api client", () => {
 				expect(err).toBeInstanceOf(ApiError);
 				expect((err as ApiError).status).toBe(409);
 			}
+		});
+
+		test("launchProject POSTs to launch endpoint and returns ProjectActionResponse", async () => {
+			mockJsonResponse(200, {
+				project: {
+					id: "a1",
+					name: "proj",
+					path: "/tmp",
+					description: "",
+					createdAt: "2024-01-01T00:00:00Z",
+					updatedAt: "2024-01-01T00:00:00Z",
+					sessionName: "proj",
+					status: "active",
+					workdir: "",
+					layoutJson: "{}",
+					detailsJson: "{}",
+					progressJson: "{}",
+					aiHtml: "",
+					aiStatus: "idle",
+					aiError: "",
+					lastSyncedAt: "2024-01-01T00:00:00Z",
+					schemaVersion: 1,
+				},
+				operation: "launch",
+			});
+			const result = await launchProject("a1");
+			expect(result.project.id).toBe("a1");
+			expect(result.operation).toBe("launch");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/projects/a1/launch");
+			expect(call[1]?.method).toBe("POST");
+		});
+
+		test("launchProject URL encodes id", async () => {
+			mockJsonResponse(200, {
+				project: {
+					id: "proj#1",
+					name: "proj",
+					path: "",
+					description: "",
+					createdAt: "",
+					updatedAt: "",
+					sessionName: "",
+					status: "",
+					workdir: "",
+					layoutJson: "",
+					detailsJson: "",
+					progressJson: "",
+					aiHtml: "",
+					aiStatus: "",
+					aiError: "",
+					lastSyncedAt: null,
+					schemaVersion: 1,
+				},
+				operation: "launch",
+			});
+			await launchProject("proj#1");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain(encodeURIComponent("proj#1"));
+		});
+
+		test("syncProjectFromTmux POSTs to sync endpoint and returns ProjectActionResponse", async () => {
+			mockJsonResponse(200, {
+				project: {
+					id: "a1",
+					name: "proj",
+					path: "/tmp",
+					description: "",
+					createdAt: "2024-01-01T00:00:00Z",
+					updatedAt: "2024-01-01T00:00:00Z",
+					sessionName: "proj",
+					status: "active",
+					workdir: "",
+					layoutJson: '{"windows":[]}',
+					detailsJson: "{}",
+					progressJson: "{}",
+					aiHtml: "",
+					aiStatus: "idle",
+					aiError: "",
+					lastSyncedAt: "2024-01-01T00:00:00Z",
+					schemaVersion: 1,
+				},
+				operation: "sync",
+			});
+			const result = await syncProjectFromTmux("a1");
+			expect(result.project.id).toBe("a1");
+			expect(result.operation).toBe("sync");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/projects/a1/sync-from-tmux");
+			expect(call[1]?.method).toBe("POST");
+		});
+
+		test("syncProjectFromTmux URL encodes id", async () => {
+			mockJsonResponse(200, {
+				project: {
+					id: "proj#1",
+					name: "proj",
+					path: "",
+					description: "",
+					createdAt: "",
+					updatedAt: "",
+					sessionName: "",
+					status: "",
+					workdir: "",
+					layoutJson: "",
+					detailsJson: "",
+					progressJson: "",
+					aiHtml: "",
+					aiStatus: "",
+					aiError: "",
+					lastSyncedAt: null,
+					schemaVersion: 1,
+				},
+				operation: "sync",
+			});
+			await syncProjectFromTmux("proj#1");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain(encodeURIComponent("proj#1"));
+		});
+
+		test("generateProjectAiHtml POSTs to generate endpoint and returns Project", async () => {
+			mockJsonResponse(200, {
+				id: "a1",
+				name: "proj",
+				path: "/tmp",
+				description: "",
+				createdAt: "2024-01-01T00:00:00Z",
+				updatedAt: "2024-01-01T00:00:00Z",
+				sessionName: "proj",
+				status: "active",
+				workdir: "",
+				layoutJson: "{}",
+				detailsJson: "{}",
+				progressJson: "{}",
+				aiHtml: "<p>Summary</p>",
+				aiStatus: "completed",
+				aiError: "",
+				lastSyncedAt: "2024-01-01T00:00:00Z",
+				schemaVersion: 1,
+			});
+			const result = await generateProjectAiHtml("a1");
+			expect(result.id).toBe("a1");
+			expect(result.aiHtml).toBe("<p>Summary</p>");
+			expect(result.aiStatus).toBe("completed");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/projects/a1/generate-ai-html");
+			expect(call[1]?.method).toBe("POST");
+		});
+
+		test("generateProjectAiHtml URL encodes id", async () => {
+			mockJsonResponse(200, {
+				id: "proj#1",
+				name: "proj",
+				path: "",
+				description: "",
+				createdAt: "",
+				updatedAt: "",
+				sessionName: "",
+				status: "",
+				workdir: "",
+				layoutJson: "",
+				detailsJson: "",
+				progressJson: "",
+				aiHtml: "",
+				aiStatus: "",
+				aiError: "",
+				lastSyncedAt: null,
+				schemaVersion: 1,
+			});
+			await generateProjectAiHtml("proj#1");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain(encodeURIComponent("proj#1"));
 		});
 	});
 
