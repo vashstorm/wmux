@@ -57,6 +57,8 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-bounce: 350ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
   /* --- Z-index scale --- */
   --z-base: 0;
@@ -94,6 +96,7 @@
   --color-accent-hover: #3d57d6;
   --color-accent-subtle: rgba(79, 107, 237, 0.08);
   --color-accent-glow: 0 0 18px rgba(79, 107, 237, 0.16);
+  --color-accent-gradient: linear-gradient(135deg, #4f6bed 0%, #7c3aed 100%);
 
   /* Text */
   --color-text: #0f172a;
@@ -103,6 +106,8 @@
   /* Glass / highlight */
   --color-glass-highlight: rgba(255, 255, 255, 0.8);
   --color-glass-highlight-border: rgba(79, 107, 237, 0.18);
+  --color-glass-surface: rgba(255, 255, 255, 0.6);
+  --color-glass-blur: blur(12px) saturate(180%);
 
   /* Inputs */
   --color-input-bg: #ffffff;
@@ -120,11 +125,23 @@
   --color-online: #10b981;
   --color-offline: #ef4444;
 
+  /* Status glows */
+  --glow-accent: 0 0 20px rgba(79, 107, 237, 0.25), 0 0 40px rgba(79, 107, 237, 0.1);
+  --glow-success: 0 0 16px rgba(5, 150, 105, 0.25);
+  --glow-warning: 0 0 16px rgba(217, 119, 6, 0.25);
+  --glow-danger: 0 0 16px rgba(220, 38, 38, 0.25);
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
   --color-shadow-glow: 0 0 12px rgba(79, 107, 237, 0.18);
+
+  /* Inner shadow (for inset depth) */
+  --shadow-inner: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-header-bottom: 0 1px 0 rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-footer-top: 0 -1px 0 rgba(0, 0, 0, 0.06), 0 -2px 8px rgba(0, 0, 0, 0.04);
 
   /* Session card */
   --color-session-card-bg: #ffffff;
@@ -132,6 +149,7 @@
   --color-session-card-hover: #f7f8fb;
   --color-session-card-selected: rgba(79, 107, 237, 0.06);
   --color-session-card-selected-border: rgba(79, 107, 237, 0.24);
+  --color-session-card-selected-glow: 0 0 0 3px rgba(79, 107, 237, 0.12), var(--shadow-sm);
 }
 
 /* ============================================================
@@ -152,6 +170,7 @@
   --color-accent-hover: #5870ea;
   --color-accent-subtle: rgba(107, 130, 245, 0.14);
   --color-accent-glow: 0 0 20px rgba(107, 130, 245, 0.22);
+  --color-accent-gradient: linear-gradient(135deg, #6b82f5 0%, #a78bfa 100%);
 
   /* Text */
   --color-text: #f1f5f9;
@@ -161,6 +180,8 @@
   /* Glass / highlight */
   --color-glass-highlight: rgba(255, 255, 255, 0.04);
   --color-glass-highlight-border: rgba(107, 130, 245, 0.22);
+  --color-glass-surface: rgba(255, 255, 255, 0.03);
+  --color-glass-blur: blur(12px) saturate(160%);
 
   /* Inputs */
   --color-input-bg: #1a202b;
@@ -178,11 +199,23 @@
   --color-online: #10b981;
   --color-offline: #ef4444;
 
+  /* Status glows */
+  --glow-accent: 0 0 24px rgba(107, 130, 245, 0.35), 0 0 48px rgba(107, 130, 245, 0.15);
+  --glow-success: 0 0 18px rgba(16, 185, 129, 0.3);
+  --glow-warning: 0 0 18px rgba(245, 158, 11, 0.3);
+  --glow-danger: 0 0 18px rgba(239, 68, 68, 0.3);
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5), 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.4);
   --color-shadow-glow: 0 0 12px rgba(107, 130, 245, 0.26);
+
+  /* Inner shadow (for inset depth) */
+  --shadow-inner: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-header-bottom: 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 12px rgba(0, 0, 0, 0.2);
+  --shadow-footer-top: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 -2px 12px rgba(0, 0, 0, 0.2);
 
   /* Session card */
   --color-session-card-bg: #1a202b;
@@ -190,4 +223,5 @@
   --color-session-card-hover: #212836;
   --color-session-card-selected: rgba(107, 130, 245, 0.1);
   --color-session-card-selected-border: rgba(107, 130, 245, 0.28);
+  --color-session-card-selected-glow: 0 0 0 3px rgba(107, 130, 245, 0.18), var(--shadow-sm);
 }

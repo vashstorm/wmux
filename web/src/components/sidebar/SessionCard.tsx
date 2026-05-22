@@ -103,6 +103,35 @@ export function SessionCard({
 			? INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]
 			: undefined;
 
+	// Determine border/glow overrides from attention or intelligence state
+	const isExplicit = session.attentionState === "explicit"
+		&& session.intelligenceStatus !== "waiting_confirm"
+		&& session.intelligenceStatus !== "blocked";
+	const isAttentionSoft = session.attentionState === "attention"
+		&& !isSelected
+		&& session.intelligenceStatus !== "waiting_confirm"
+		&& session.intelligenceStatus !== "blocked";
+	const isWaitingConfirm = session.intelligenceStatus === "waiting_confirm";
+	const isBlocked = session.intelligenceStatus === "blocked";
+
+	let borderColor = isSelected
+		? "var(--color-session-card-selected-border)"
+		: "var(--color-session-card-border)";
+	let boxShadow = isSelected ? "var(--color-session-card-selected-glow)" : "none";
+
+	if (isExplicit) {
+		borderColor = "var(--color-attention-explicit)";
+		boxShadow = "0 0 0 1px var(--color-attention-explicit), var(--glow-danger)";
+	} else if (isWaitingConfirm) {
+		borderColor = "#b45309";
+		boxShadow = "0 0 0 1px #b45309, 0 0 12px rgba(180, 83, 9, 0.25)";
+	} else if (isBlocked) {
+		borderColor = "#be123c";
+		boxShadow = "0 0 0 1px #be123c, var(--glow-danger)";
+	} else if (isAttentionSoft) {
+		borderColor = "var(--color-attention)";
+	}
+
 	return (
 		<Box
 			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${session.intelligenceStatus === "waiting_confirm" ? " is-waiting-confirm" : ""}${session.intelligenceStatus === "blocked" ? " is-blocked" : ""}${isSelected ? " is-selected" : ""}`}
@@ -111,37 +140,30 @@ export function SessionCard({
 				width: "100%",
 				borderRadius: "var(--radius-md)",
 				border: "1px solid",
-				borderColor: isSelected
-					? "var(--color-session-card-selected-border)"
-					: "var(--color-session-card-border)",
+				borderColor,
 				bgcolor: isSelected
 					? "var(--color-session-card-selected)"
 					: "var(--color-session-card-bg)",
-				transition: "border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base)",
-				boxShadow: isSelected
-					? "0 0 0 1px var(--color-session-card-selected-border), var(--shadow-sm)"
-					: "none",
+				transition: "border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base)",
+				boxShadow,
 				position: "relative",
 				overflow: "hidden",
-				...(session.attentionState === "explicit" && session.intelligenceStatus !== "waiting_confirm" && session.intelligenceStatus !== "blocked" && {
-					borderColor: "var(--color-attention-explicit)",
-					boxShadow: "0 0 0 1px var(--color-attention-explicit)",
-				}),
-				...(session.attentionState === "attention" && !isSelected && session.intelligenceStatus !== "waiting_confirm" && session.intelligenceStatus !== "blocked" && {
-					borderColor: "var(--color-attention)",
-				}),
-				...(session.intelligenceStatus === "waiting_confirm" && {
-					borderColor: "#7c2d12",
-					boxShadow: "0 0 0 1px #7c2d12",
-				}),
-				...(session.intelligenceStatus === "blocked" && {
-					borderColor: "#be123c",
-					boxShadow: "0 0 0 1px #be123c",
-				}),
+				"&:hover": {
+					transform: "translateY(-1px)",
+					boxShadow: isSelected
+						? "var(--color-session-card-selected-glow)"
+						: "var(--shadow-md)",
+				},
 			}}
 		>
 			{isRenaming ? (
-				<Box className="session-card-rename" sx={{ p: "var(--spacing-sm)" }}>
+				<Box
+					className="session-card-rename"
+					sx={{
+						p: "var(--spacing-sm)",
+						animation: "fadeIn 150ms ease",
+					}}
+				>
 					<TextField
 						fullWidth
 						size="small"
@@ -160,6 +182,7 @@ export function SessionCard({
 								color: "text.primary",
 								border: "1px solid",
 								borderColor: "primary.main",
+								boxShadow: "0 0 0 3px var(--color-accent-subtle)",
 								"& fieldset": { border: "none" },
 							},
 						}}
@@ -258,7 +281,12 @@ export function SessionCard({
 											data-testid={`rename-session-${sname}`}
 											sx={{
 												color: "text.secondary",
-												"&:hover": { bgcolor: "action.hover", color: "text.primary" },
+												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+												"&:hover": {
+													bgcolor: "action.hover",
+													color: "text.primary",
+													transform: "scale(1.1) rotate(-5deg)",
+												},
 											}}
 										/>
 										<SidebarIconButton
@@ -272,7 +300,12 @@ export function SessionCard({
 											data-testid={`kill-session-${sname}`}
 											sx={{
 												color: "text.secondary",
-												"&:hover": { bgcolor: "error.main", color: "common.white" },
+												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+												"&:hover": {
+													bgcolor: "error.main",
+													color: "common.white",
+													transform: "scale(1.1)",
+												},
 											}}
 										/>
 									</Stack>
@@ -289,6 +322,7 @@ export function SessionCard({
 									width: "100%",
 									m: 0,
 									p: 0,
+									gap: "3px",
 								}}
 							>
 								{hasAttention && typeof session.attentionCount === "number" && session.attentionCount > 0 && (

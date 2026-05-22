@@ -1,7 +1,6 @@
-import { Badge, Box } from "@mui/material";
+import { Badge, Box, Divider } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DescriptionIcon from "@mui/icons-material/Description";
-import { alpha } from "@mui/material/styles";
 import { SidebarIconButton } from "./SidebarIconButton.js";
 
 interface SidebarFooterProps {
@@ -24,13 +23,16 @@ export function SidebarFooter({
         display: "flex",
         alignItems: "center",
         px: "var(--spacing-md)",
-        borderTop: 1,
+        borderTop: "1px solid",
         borderColor: "divider",
         flexShrink: 0,
         justifyContent: "flex-end",
-        gap: 1,
+        gap: 0.5,
+        boxShadow: "var(--shadow-footer-top)",
         background: (theme) =>
-          `linear-gradient(to top, ${alpha(theme.palette.common.white, theme.palette.mode === "dark" ? 0.04 : 0.8)}, transparent)`,
+          theme.palette.mode === "dark"
+            ? "linear-gradient(to top, rgba(255,255,255,0.03) 0%, transparent 100%)"
+            : "linear-gradient(to top, rgba(255,255,255,0.9) 0%, transparent 100%)",
       }}
     >
       <SidebarIconButton
@@ -39,7 +41,14 @@ export function SidebarFooter({
         data-testid="open-settings-button"
         aria-label="Settings"
         title="Settings"
-        sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+        sx={{
+          color: "text.secondary",
+          transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+          "&:hover": {
+            color: "primary.main",
+            transform: "rotate(30deg)",
+          },
+        }}
       />
       <Badge
         badgeContent={errorLogCount > 0 ? (errorLogCount > 99 ? "99+" : errorLogCount) : undefined}
@@ -49,11 +58,15 @@ export function SidebarFooter({
           "& .MuiBadge-badge": {
             bgcolor: "error.main",
             color: "#fff",
-            border: (theme) => `1px solid ${theme.palette.background.paper}`,
+            border: (theme) => `1.5px solid ${theme.palette.background.paper}`,
             fontSize: "var(--font-size-2xs)",
             fontWeight: 700,
             minWidth: 16,
             height: 16,
+            boxShadow: (theme) =>
+              errorLogCount > 0
+                ? `0 0 8px ${theme.palette.error.main}66`
+                : "none",
           },
         }}
       >
@@ -64,10 +77,22 @@ export function SidebarFooter({
           data-testid="open-error-logs-button"
           aria-label={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
           title={errorLogCount > 0 ? `Logs (${errorLogCount})` : "Logs"}
-          sx={{ color: "text.secondary", "&:hover": { color: "primary.main" } }}
+          sx={{
+            color: errorLogCount > 0 ? "error.main" : "text.secondary",
+            transition: "color var(--transition-fast), transform var(--transition-fast)",
+            "&:hover": {
+              color: "primary.main",
+              transform: "scale(1.05)",
+            },
+          }}
         />
       </Badge>
-      {themeToggle}
+      {themeToggle && (
+        <>
+          <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 0.5 }} />
+          {themeToggle}
+        </>
+      )}
     </Box>
   );
 }

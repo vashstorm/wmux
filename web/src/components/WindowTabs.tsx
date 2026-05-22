@@ -374,9 +374,13 @@ export function WindowTabs({
 			paddingX: 2,
 			paddingTop: 1.25,
 			paddingBottom: 1,
-			backgroundColor: "background.default",
+			background: (theme) =>
+				theme.palette.mode === "dark"
+					? "linear-gradient(to bottom, rgba(20,26,34,0.95) 0%, rgba(13,17,23,0.98) 100%)"
+					: "linear-gradient(to bottom, rgba(255,255,255,0.98) 0%, rgba(247,248,251,0.95) 100%)",
 			borderBottom: "1px solid",
 			borderColor: "divider",
+			boxShadow: "var(--shadow-header-bottom)",
 			overflowX: "auto",
 			flexShrink: 0,
 		}}>
@@ -449,13 +453,19 @@ export function WindowTabs({
 								borderColor: isActive ? statusTone.color : statusTone.softBorderColor,
 								color: isActive ? statusTone.color : "text.secondary",
 								fontWeight: isActive ? 600 : 500,
+								transform: isActive ? "translateY(-1px)" : "translateY(0)",
 								boxShadow: isActive
-									? (theme) => `0 0 0 1px ${statusTone.name === "none" ? `${theme.palette.primary.main}33` : statusTone.softBorderColor}, ${theme.palette.mode === "dark" ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)"}`
+									? (theme) => [
+											`0 0 0 1px ${statusTone.name === "none" ? `${theme.palette.primary.main}33` : statusTone.softBorderColor}`,
+											theme.palette.mode === "dark" ? "0 4px 12px rgba(0,0,0,0.4)" : "0 4px 12px rgba(0,0,0,0.08)",
+											statusTone.name !== "none" ? `0 0 16px ${statusTone.softBorderColor}` : "",
+										].filter(Boolean).join(", ")
 									: "none",
-								transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
+								transition: "all var(--transition-base)",
 								"&:hover": {
 									backgroundColor: isActive ? statusTone.selectedBackgroundColor : "action.hover",
 									borderColor: statusTone.color,
+									transform: "translateY(-1px)",
 								},
 								"&::before": isActive
 									? {
@@ -489,8 +499,10 @@ export function WindowTabs({
 											fontWeight: 700,
 											lineHeight: 1,
 											borderRadius: "999px",
-											backgroundColor: isActive ? statusTone.color : "action.hover",
+											backgroundColor: isActive ? statusTone.color : "action.disabledBackground",
 											color: isActive ? "primary.contrastText" : "text.secondary",
+											border: isActive ? "none" : "1px solid",
+											borderColor: isActive ? "transparent" : "divider",
 											"& .MuiChip-label": {
 												paddingLeft: "5px",
 												paddingRight: "5px",

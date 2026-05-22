@@ -116,33 +116,49 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								height,
 								backgroundColor: selectedPane ? "transparent" : undefined,
 							}}
-								sx={{
-									border: "1.5px solid",
-									borderColor: isActive ? "primary.main" : "divider",
-									borderRadius: 1.5,
-									backgroundColor: isActive ? "action.selected" : "background.paper",
-									cursor: "pointer",
-									overflow: "hidden",
-									transition: "all 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-									boxShadow: isActive
+							sx={{
+								border: "1.5px solid",
+								borderColor: isActive ? "primary.main" : "divider",
+								borderRadius: 1.5,
+								backgroundColor: isActive ? "action.selected" : "background.paper",
+								cursor: "pointer",
+								overflow: "hidden",
+								transition: "all var(--transition-base)",
+								boxShadow: isActive
 									? (theme) => `0 0 0 1px ${theme.palette.primary.main}22, inset 0 0 20px ${theme.palette.primary.main}08`
 									: "none",
-									"&:hover": {
-									borderColor: isActive ? "primary.main" : "primary.light",
-									backgroundColor: isActive ? "action.selected" : "action.hover",
-									},
-								}}
-								onClick={() => onSelectPane(pane.id)}
+								"&:hover": {
+								borderColor: isActive ? "primary.main" : "primary.light",
+								backgroundColor: isActive ? "action.selected" : "action.hover",
+								transform: "translateY(-1px)",
+								boxShadow: isActive
+									? (theme) => `0 0 0 1px ${theme.palette.primary.main}22, inset 0 0 20px ${theme.palette.primary.main}08, var(--shadow-md)`
+									: "var(--shadow-sm)",
+								},
+							}}
+							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}
 						>
 							{(isAttention || isAttentionExplicit) && (
 								<Box className="pane-box-attention-indicator" sx={{
 									position: "absolute",
-									top: 4,
-									right: 4,
+									top: 6,
+									right: 6,
 									zIndex: 2,
 								}}>
-									<span className="attention-badge" />
+									<Box
+										component="span"
+										className="attention-badge"
+										sx={{
+											display: "block",
+											width: 8,
+											height: 8,
+											borderRadius: "50%",
+											backgroundColor: isAttentionExplicit ? "var(--color-attention-explicit)" : "var(--color-attention)",
+											animation: "pulseDot 1.5s ease-in-out infinite",
+											boxShadow: isAttentionExplicit ? "0 0 6px var(--color-attention-explicit)" : "0 0 6px var(--color-attention)",
+										}}
+									/>
 								</Box>
 							)}
 							{!isActive && (
@@ -154,7 +170,7 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 									onSelectPane(pane.id);
 									}}
 								>
-									{pane.title}
+									<span className="pane-box-label-text">{pane.title}</span>
 								</button>
 							)}
 						</Box>

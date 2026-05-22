@@ -1712,19 +1712,43 @@
 }
 
 .pane-box-label {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
 	padding: var(--spacing-xs) var(--spacing-sm);
 	font-size: var(--font-size-xs);
+	font-weight: var(--font-weight-medium);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	flex-shrink: 0;
-	align-self: flex-start;
 	font-family: inherit;
 	cursor: pointer;
 	pointer-events: auto;
+	background: var(--color-glass-surface);
+	backdrop-filter: blur(8px) saturate(140%);
+	-webkit-backdrop-filter: blur(8px) saturate(140%);
+	border-top: 1px solid var(--color-surface-border);
+	color: var(--color-text-muted);
+	transition: color var(--transition-fast), background-color var(--transition-fast);
+	text-align: center;
+}
+
+.pane-box-label:hover {
+	color: var(--color-text);
+	background: var(--color-glass-highlight);
+}
+
+.pane-box-label-text {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .pane-box.is-active .pane-box-label {
+	display: none;
 }
 
 .pane-box-terminal {

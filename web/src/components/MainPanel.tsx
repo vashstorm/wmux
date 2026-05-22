@@ -268,7 +268,7 @@ export function MainPanel() {
 
 	return (
 		<div className="main-panel">
-			<header className="main-header">
+			<header className="main-header" style={{ boxShadow: "var(--shadow-header-bottom)" }}>
 				<Box component="h1" className="main-header-title" data-testid="main-title" sx={{
 					fontFamily: "var(--font-display)",
 					fontSize: "var(--font-size-xl)",
@@ -339,10 +339,11 @@ export function MainPanel() {
 						gap: 2.5,
 						padding: 5,
 						minHeight: 280,
+						animation: "fadeSlideUp 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
 					}}>
 						<Box className="empty-state-icon" aria-hidden="true" sx={{
-							width: 64,
-							height: 64,
+							width: 80,
+							height: 80,
 							borderRadius: "50%",
 							display: "flex",
 							alignItems: "center",
@@ -350,10 +351,17 @@ export function MainPanel() {
 							bgcolor: "var(--color-accent-subtle)",
 							color: "primary.main",
 							mb: 0.5,
+							boxShadow: "var(--glow-accent), var(--color-accent-glow)",
+							background: (theme) =>
+								theme.palette.mode === "dark"
+									? "radial-gradient(circle at 30% 30%, rgba(107,130,245,0.2) 0%, rgba(107,130,245,0.08) 100%)"
+									: "radial-gradient(circle at 30% 30%, rgba(79,107,237,0.12) 0%, rgba(79,107,237,0.04) 100%)",
+							border: "1px solid",
+							borderColor: "var(--color-accent-subtle)",
 						}}>
 							<svg
-								width="28"
-								height="28"
+								width="40"
+								height="40"
 								viewBox="0 0 24 24"
 								fill="none"
 								xmlns="http://www.w3.org/2000/svg"
@@ -367,7 +375,10 @@ export function MainPanel() {
 						<Typography className="empty-state-title" sx={{
 							fontSize: "var(--font-size-xl)",
 							fontWeight: 700,
-							color: "text.primary",
+							background: "var(--color-accent-gradient)",
+							WebkitBackgroundClip: "text",
+							WebkitTextFillColor: "transparent",
+							backgroundClip: "text",
 							letterSpacing: "0",
 						}}>
 							Select a session

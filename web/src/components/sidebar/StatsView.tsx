@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, IconButton, List, ListItem, Chip, Stack, Switch, FormControlLabel, Tooltip } from "@mui/material";
+import { Box, Typography, IconButton, List, ListItem, Stack, Switch, FormControlLabel, Tooltip } from "@mui/material";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { cleanupAiStats, listAiStats } from "../../api/client.js";
@@ -174,11 +174,41 @@ export function StatsView() {
 			)}
 
 			{summary && (
-				<Box data-testid="stats-summary" sx={{ mb: 1, p: 1, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
-					<Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 0.5 }}>
-						<Chip label={`${summary.totalSuccess} ✓`} size="small" color="success" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.meta, height: 24 }} />
-						<Chip label={`${summary.totalError} ✗`} size="small" color="error" variant="outlined" sx={{ fontSize: STATS_FONT_SIZE.meta, height: 24 }} />
-					</Stack>
+				<Box data-testid="stats-summary" sx={{ mb: 1.5 }}>
+					<Box sx={{
+						display: "grid",
+						gridTemplateColumns: "1fr 1fr",
+						gap: 1,
+					}}>
+						<Box sx={{
+							p: 1.5,
+							borderRadius: "var(--radius-md)",
+							bgcolor: "background.default",
+							border: "1px solid",
+							borderColor: "success.main",
+							borderLeftWidth: 3,
+							textAlign: "center",
+						}}>
+							<Typography sx={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "success.main", lineHeight: 1 }}>
+								{summary.totalSuccess}
+							</Typography>
+							<Typography sx={{ fontSize: "var(--font-size-xs)", color: "text.secondary", mt: 0.25 }}>Success</Typography>
+						</Box>
+						<Box sx={{
+							p: 1.5,
+							borderRadius: "var(--radius-md)",
+							bgcolor: "background.default",
+							border: "1px solid",
+							borderColor: "error.main",
+							borderLeftWidth: 3,
+							textAlign: "center",
+						}}>
+							<Typography sx={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "error.main", lineHeight: 1 }}>
+								{summary.totalError}
+							</Typography>
+							<Typography sx={{ fontSize: "var(--font-size-xs)", color: "text.secondary", mt: 0.25 }}>Errors</Typography>
+						</Box>
+					</Box>
 				</Box>
 			)}
 
@@ -194,45 +224,49 @@ export function StatsView() {
 							onClick={() => setSelectedAiEvent(event)}
 							data-testid={`stats-event-${event.id}`}
 							sx={{
-								px: 1,
-								py: 0.75,
+								px: 0,
+								py: 0.5,
 								borderRadius: "var(--radius-sm)",
 								cursor: "pointer",
 								bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
 								"&:hover": { bgcolor: "action.hover" },
 								transition: "background-color 0.15s",
+								overflow: "hidden",
 							}}
 						>
 							<Stack direction="row" spacing={1} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
+								{/* Left accent bar */}
 								<Box
 									sx={{
-										width: 7,
-										height: 7,
-										borderRadius: "50%",
-										bgcolor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
+										width: 3,
+										borderRadius: "var(--radius-full)",
+										alignSelf: "stretch",
+										minHeight: 28,
 										flexShrink: 0,
+										backgroundColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
+										opacity: 0.7,
 									}}
 								/>
-								<Typography
-									variant="body2"
-									sx={{
-										fontSize: STATS_FONT_SIZE.body,
-										fontWeight: "var(--font-weight-medium)",
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										minWidth: 0,
-										flex: 1,
-									}}
-									title={`${event.sessionName} ${getAiSummary(event.responseJson) ?? ""}`}
-								>
-									{event.sessionName}
-								</Typography>
-								{event.windowNumber != null && (
-									<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta, flexShrink: 0 }}>
-										W{event.windowNumber}
+								<Box sx={{ flex: 1, minWidth: 0, py: 0.25, pr: 1 }}>
+									<Typography
+										variant="body2"
+										sx={{
+											fontSize: STATS_FONT_SIZE.body,
+											fontWeight: "var(--font-weight-medium)",
+											whiteSpace: "nowrap",
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+										}}
+										title={`${event.sessionName} ${getAiSummary(event.responseJson) ?? ""}`}
+									>
+										{event.sessionName}
 									</Typography>
-								)}
+									{event.windowNumber != null && (
+										<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta }}>
+											W{event.windowNumber}
+										</Typography>
+									)}
+								</Box>
 							</Stack>
 						</ListItem>
 					))}

@@ -837,7 +837,7 @@ describe("Projects view", () => {
 			const statsView = screen.getByTestId("stats-view");
 			expect(within(statsView).getByTestId("stats-event-e1")).toBeInTheDocument();
 			expect(within(statsView).getByText("sess1")).toBeInTheDocument();
-			expect(within(statsView).getByText("1 ✓")).toBeInTheDocument();
+			expect(within(statsView).getByTestId("stats-summary")).toBeInTheDocument();
 		});
 	});
 
