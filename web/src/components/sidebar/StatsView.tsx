@@ -241,13 +241,23 @@ export function StatsView() {
 										width: 3,
 										borderRadius: "var(--radius-full)",
 										alignSelf: "stretch",
-										minHeight: 28,
+										minHeight: 16,
 										flexShrink: 0,
 										backgroundColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
 										opacity: 0.7,
 									}}
 								/>
-								<Box sx={{ flex: 1, minWidth: 0, py: 0.25, pr: 1 }}>
+								<Stack
+									direction="row"
+									sx={{
+										flex: 1,
+										minWidth: 0,
+										alignItems: "center",
+										justifyContent: "space-between",
+										py: 0.25,
+										pr: 1,
+									}}
+								>
 									<Typography
 										variant="body2"
 										sx={{
@@ -262,11 +272,24 @@ export function StatsView() {
 										{event.sessionName}
 									</Typography>
 									{event.windowNumber != null && (
-										<Typography variant="caption" color="text.secondary" sx={{ fontSize: STATS_FONT_SIZE.meta }}>
+										<Typography
+											variant="caption"
+											color="text.secondary"
+											sx={{
+												fontSize: STATS_FONT_SIZE.meta,
+												fontWeight: "var(--font-weight-medium)",
+												bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
+												px: 0.75,
+												py: 0.1,
+												borderRadius: "var(--radius-sm)",
+												flexShrink: 0,
+												ml: 1,
+											}}
+										>
 											W{event.windowNumber}
 										</Typography>
 									)}
-								</Box>
+								</Stack>
 							</Stack>
 						</ListItem>
 					))}

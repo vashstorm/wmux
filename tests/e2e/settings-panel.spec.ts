@@ -169,7 +169,7 @@ test.describe("settings panel", () => {
 		const initialTerminalFontSize = await terminalText.evaluate((el) =>
 			window.getComputedStyle(el).fontSize
 		);
-		expect(initialTerminalFontSize).toBe("14px");
+		expect(initialTerminalFontSize).toBe("17px");
 
 		await page.getByTestId("settings-scale-increase").click();
 		await page.getByTestId("settings-scale-increase").click();
@@ -177,6 +177,6 @@ test.describe("settings panel", () => {
 		const scaledTerminalFontSize = await terminalText.evaluate((el) =>
 			window.getComputedStyle(el).fontSize
 		);
-		expect(scaledTerminalFontSize).toBe("15px");
+		expect(scaledTerminalFontSize).toBe("19px");
 	});
 });

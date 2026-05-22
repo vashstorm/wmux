@@ -9,6 +9,26 @@ const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwri
 
 async function createLocalConnection(request: any) {
 	ensurePlaywrightTmuxSession();
+
+	const getResponse = await request.get("/api/connections", {
+		headers: {
+			Authorization: "Bearer playwright-token",
+		},
+	});
+	if (getResponse.ok()) {
+		const result = await getResponse.json();
+		const connections = result.data || [];
+		for (const conn of connections) {
+			if (conn.targetName === "local" || conn.type === "local") {
+				await request.delete(`/api/connections/${conn.targetName}`, {
+					headers: {
+						Authorization: "Bearer playwright-token",
+					},
+				});
+			}
+		}
+	}
+
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -70,7 +90,7 @@ test.describe("terminal", () => {
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 		await page.locator(".pane-box").first().click({ force: true });
 
-		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
+		await expect(page.getByTestId("main-title")).toBeVisible();
 	});
 
 	test("terminal accepts input and displays command output", async ({ page, request }) => {

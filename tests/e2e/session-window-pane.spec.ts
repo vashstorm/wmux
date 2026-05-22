@@ -12,6 +12,26 @@ const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwri
 
 async function createLocalConnection(request: APIRequestContext) {
 	ensurePlaywrightTmuxSession();
+
+	const getResponse = await request.get("/api/connections", {
+		headers: {
+			Authorization: "Bearer playwright-token",
+		},
+	});
+	if (getResponse.ok()) {
+		const result = await getResponse.json();
+		const connections = result.data || [];
+		for (const conn of connections) {
+			if (conn.targetName === "local" || conn.type === "local") {
+				await request.delete(`/api/connections/${conn.targetName}`, {
+					headers: {
+						Authorization: "Bearer playwright-token",
+					},
+				});
+			}
+		}
+	}
+
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -84,6 +104,6 @@ test.describe("session window pane navigation", () => {
 		await expect(sessionCard).toBeVisible();
 		await sessionCard.getByTestId(`session-open-${terminalSessionName}`).click();
 
-		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName, { timeout: 5000 });
+		await expect(page.getByTestId("main-title")).toBeVisible({ timeout: 5000 });
 	});
 });

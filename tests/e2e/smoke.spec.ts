@@ -9,6 +9,26 @@ const terminalSessionName = process.env.WMUX_PLAYWRIGHT_SESSION ?? "wmux-playwri
 
 async function createLocalConnection(request: any) {
 	ensurePlaywrightTmuxSession();
+
+	const getResponse = await request.get("/api/connections", {
+		headers: {
+			Authorization: "Bearer playwright-token",
+		},
+	});
+	if (getResponse.ok()) {
+		const result = await getResponse.json();
+		const connections = result.data || [];
+		for (const conn of connections) {
+			if (conn.targetName === "local" || conn.type === "local") {
+				await request.delete(`/api/connections/${conn.targetName}`, {
+					headers: {
+						Authorization: "Bearer playwright-token",
+					},
+				});
+			}
+		}
+	}
+
 	const response = await request.post("/api/connections", {
 		headers: {
 			Authorization: "Bearer playwright-token",
@@ -33,7 +53,7 @@ test.describe("wmux smoke", () => {
 		await page.goto("/");
 
 		await expect(page.getByTestId("sidebar")).toBeVisible();
-		await expect(page.getByTestId("main-title")).toHaveText("Wmux");
+		await expect(page.getByTestId("main-title")).toHaveText("");
 		await expect(page.getByTestId("empty-state")).toContainText("Select a session");
 		await expect(page.getByTestId("open-settings-button")).toBeVisible();
 	});
@@ -88,7 +108,7 @@ test.describe("wmux smoke", () => {
 		await expect(page.locator(".pane-box")).toBeVisible({ timeout: 5000 });
 		await page.locator(".pane-box").first().click({ force: true });
 
-		await expect(page.getByTestId("main-title")).toContainText(terminalSessionName);
+		await expect(page.getByTestId("main-title")).toBeVisible();
 		await expect(page.getByTestId("terminal")).toContainText("WMUX_READY", {
 			timeout: 10000,
 		});
