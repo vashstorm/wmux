@@ -4,7 +4,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SyncIcon from "@mui/icons-material/Sync";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { useAppState } from "../state/store.js";
-import { launchProject, syncProjectFromTmux, generateProjectAiHtml, getProject } from "../api/client.js";
+import { launchProject, syncProjectFromTmux, generateProjectAiHtml, getProject, listWindows, listPanes } from "../api/client.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { ApiError } from "../api/errors.js";
 
@@ -83,7 +83,14 @@ function tryParseJson<T>(jsonString: string | null): T | null {
 }
 
 export function ProjectDashboard() {
-	const { selectedProject, setSelectedProject } = useAppState();
+	const {
+		selectedProject,
+		setSelectedProject,
+		selectedTargetName,
+		setSelectedPane,
+		setWindows,
+		setPanes,
+	} = useAppState();
 	const [actionLoading, setActionLoading] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 
@@ -104,12 +111,52 @@ export function ProjectDashboard() {
 		try {
 			await launchProject(selectedProject.id);
 			await refreshProject();
+
+			const targetName = selectedTargetName ?? "local";
+			const sessionName = selectedProject.sessionName;
+
+			if (sessionName) {
+				try {
+					const windowsResponse = await listWindows(targetName, sessionName);
+					const windows = windowsResponse?.data ?? [];
+
+					if (windows.length === 0) {
+						setSelectedPane({ targetName, session: sessionName });
+						setSelectedProject(null);
+						return;
+					}
+
+					const initialWindow = windows[0];
+					if (initialWindow) {
+						const initialWindowID = initialWindow.ID;
+						const panesResponse = await listPanes(targetName, sessionName, initialWindowID);
+						const panes = panesResponse?.data ?? [];
+
+						setWindows(targetName, sessionName, windows);
+						setPanes(targetName, sessionName, initialWindowID, panes);
+
+						const initialPane = panes[0];
+						setSelectedPane({
+							targetName,
+							session: sessionName,
+							window: initialWindowID,
+							pane: initialPane?.ID,
+						});
+					} else {
+						setSelectedPane({ targetName, session: sessionName });
+					}
+					setSelectedProject(null);
+				} catch {
+					setSelectedPane({ targetName, session: sessionName });
+					setSelectedProject(null);
+				}
+			}
 		} catch (err) {
 			setActionError(err instanceof ApiError ? err.message : "Failed to launch project");
 		} finally {
 			setActionLoading(null);
 		}
-	}, [selectedProject, refreshProject]);
+	}, [selectedProject, refreshProject, selectedTargetName, setSelectedPane, setSelectedProject, setWindows, setPanes]);
 
 	const handleSync = useCallback(async () => {
 		if (!selectedProject) return;

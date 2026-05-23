@@ -113,22 +113,34 @@ describe("ProjectDashboard", () => {
 		expect(screen.getByText("Test description")).toBeInTheDocument();
 	});
 
-	test("launch button calls launchProject API", async () => {
+	test("launch button calls launchProject API and navigates to session", async () => {
 		const updatedProject = makeProject({ status: "running" });
 		mockLaunchProject.mockResolvedValue({ project: updatedProject, operation: "launch" });
 		mockGetProject.mockResolvedValue(updatedProject);
+
+		function SelectedProjectChecker() {
+			const { selectedProject } = useAppState();
+			return <span data-testid="selected-project-state">{selectedProject ? selectedProject.name : "no-project"}</span>;
+		}
 
 		render(
 			<TestWrapper>
 				{enableProject(makeProject())}
 				<ProjectDashboard />
+				<SelectedProjectChecker />
 			</TestWrapper>,
 		);
+
+		expect(screen.getByTestId("selected-project-state")).toHaveTextContent("Test Project");
 
 		fireEvent.click(screen.getByTestId("project-launch-button"));
 
 		await waitFor(() => {
 			expect(mockLaunchProject).toHaveBeenCalledWith("proj-1");
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("selected-project-state")).toHaveTextContent("no-project");
 		});
 	});
 

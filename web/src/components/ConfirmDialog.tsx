@@ -20,8 +20,9 @@ export function ConfirmDialog() {
 						</Button>
 						<Button
 							onClick={() => {
-								confirmDialog.onConfirm();
+								const cb = confirmDialog.onConfirm;
 								setConfirmDialog(null);
+								cb();
 							}}
 							color={confirmDialog.confirmVariant === "danger" ? "error" : "primary"}
 							data-testid="confirm-dialog-confirm"

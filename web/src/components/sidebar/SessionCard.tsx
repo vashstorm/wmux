@@ -10,6 +10,10 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
+import FolderIcon from "@mui/icons-material/Folder";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import { alpha } from "@mui/material/styles";
 import type { SessionInfoData } from "../../api/client.js";
 import { SidebarIconButton } from "./SidebarIconButton.js";
 
@@ -21,6 +25,7 @@ interface SessionCardProps {
 	onKill: (sessionName: string) => void;
 	onSubmitRename: (sessionName: string, newName: string) => Promise<void>;
 	onBuildProject: (sessionName: string) => void;
+	hasProject?: boolean;
 }
 
 export function SessionCard({
@@ -31,6 +36,7 @@ export function SessionCard({
 	onKill,
 	onSubmitRename,
 	onBuildProject,
+	hasProject = false,
 }: SessionCardProps) {
 	const sname = session.name ?? "";
 	const [isRenaming, setIsRenaming] = useState(false);
@@ -202,28 +208,38 @@ export function SessionCard({
 							},
 						}}
 					>
-						<Typography
-							component="span"
+						<Box
+							className="session-card-icon"
 							sx={{
-								fontFamily: "var(--font-mono)",
-								fontSize: "9px",
-								color: isSelected
-									? "var(--color-accent)"
-									: "var(--color-text-disabled)",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								width: 20,
+								height: 20,
+								borderRadius: "4px",
+								bgcolor: hasProject
+									? (theme) => alpha(theme.palette.primary.main, 0.15)
+									: (theme) => alpha(theme.palette.text.disabled, 0.05),
+								color: hasProject
+									? "primary.main"
+									: "text.secondary",
 								flexShrink: 0,
-								lineHeight: 1,
-								transition: "color var(--transition-base)",
-								userSelect: "none",
-								"& ~ *": {},
+								transition: "all var(--transition-base)",
 								".session-card:hover &": {
-									color: isSelected
-										? "var(--color-accent)"
-										: "var(--color-text-muted)",
+									bgcolor: hasProject
+										? (theme) => alpha(theme.palette.primary.main, 0.25)
+										: (theme) => alpha(theme.palette.text.secondary, 0.1),
+									color: hasProject ? "primary.main" : "text.primary",
+									transform: "scale(1.08)",
 								},
 							}}
 						>
-							❯
-						</Typography>
+							{hasProject ? (
+								<FolderIcon data-testid="session-icon-project" sx={{ fontSize: 13 }} />
+							) : (
+								<TerminalIcon data-testid="session-icon-terminal" sx={{ fontSize: 13 }} />
+							)}
+						</Box>
 						<Tooltip
 							title={isNameOverflowing ? sname : ""}
 							placement="top-start"
@@ -342,14 +358,14 @@ export function SessionCard({
 					>
 						<SidebarIconButton
 							className="session-action-btn"
-							icon={CreateNewFolderIcon}
+							icon={hasProject ? FolderOpenIcon : CreateNewFolderIcon}
 							variant="row"
 							onClick={(e) => { e.stopPropagation(); onBuildProject(sname); }}
-							aria-label={`Build project from ${sname}`}
-							title="Build project"
+							aria-label={hasProject ? `Open project from ${sname}` : `Build project from ${sname}`}
+							title={hasProject ? "Open project" : "Build project"}
 							data-testid={`build-project-${sname}`}
 							sx={{
-								color: "text.disabled",
+								color: hasProject ? "primary.main" : "text.disabled",
 								width: 24,
 								height: 24,
 								"& .MuiSvgIcon-root": { fontSize: "14px" },

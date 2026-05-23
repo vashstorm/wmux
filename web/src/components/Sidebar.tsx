@@ -21,6 +21,7 @@ import {
 	fetchErrorLogs,
 	listProjects,
 	createProject,
+	type Project,
 } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
@@ -68,6 +69,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 	const [newSessionName, setNewSessionName] = useState("");
 	const [showNewSessionForm, setShowNewSessionForm] = useState(false);
 	const [activeView, setActiveView] = useState<"projects" | "session" | "stats">("session");
+	const [projects, setProjects] = useState<Project[]>([]);
 	const prevSelectedRef = useRef<string | null>(null);
 
 	const refreshErrorLogBadge = useCallback(async () => {
@@ -122,8 +124,12 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 
 	const loadSessionsForTarget = useCallback(async (targetName: string) => {
 		try {
-			const response = await listSessions(targetName);
-			setSessions(targetName, response.data ?? []);
+			const [sessionsResponse, projectsResponse] = await Promise.all([
+				Promise.resolve(listSessions(targetName)).catch(() => null),
+				Promise.resolve(listProjects()).catch(() => [] as Project[]),
+			]);
+			setSessions(targetName, sessionsResponse?.data ?? []);
+			setProjects(projectsResponse ?? []);
 		} catch (err) {
 			if (isApiError(err)) {
 				if (err.code !== "connection_failed" && err.code !== "unknown_error") {
@@ -272,8 +278,12 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 		if (!selectedTargetName) return;
 		const targetName = selectedTargetName;
 		try {
-			const response = await listSessions(targetName);
-			setSessions(targetName, response.data ?? []);
+			const [sessionsResponse, projectsResponse] = await Promise.all([
+				Promise.resolve(listSessions(targetName)).catch(() => null),
+				Promise.resolve(listProjects()).catch(() => [] as Project[]),
+			]);
+			setSessions(targetName, sessionsResponse?.data ?? []);
+			setProjects(projectsResponse ?? []);
 		} catch (err) {
 			if (isApiError(err)) {
 				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
@@ -329,14 +339,40 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 				setSelectedProject(matched);
 				setActiveView("projects");
 			} else {
-				const newProj = await createProject({
-					name: sessionName,
-					sessionName: sessionName,
-					path: "",
-					description: `Imported from active session ${sessionName}`,
+				showConfirm({
+					title: "Associate Project (Step 1/2)",
+					message: `Do you want to create a new project associated with session "${sessionName}"?`,
+					confirmText: "Continue",
+					confirmVariant: "primary",
+					onConfirm: () => {
+						showConfirm({
+							title: "Confirm Association (Step 2/2)",
+							message: `Please confirm that you want to proceed with creating and associating the project "${sessionName}".`,
+							confirmText: "Create Project",
+							confirmVariant: "primary",
+							onConfirm: async () => {
+								try {
+									const newProj = await createProject({
+										name: sessionName,
+										sessionName: sessionName,
+										path: "",
+										description: `Imported from active session ${sessionName}`,
+									});
+									const updatedProjects = await listProjects().catch(() => [] as Project[]);
+									setProjects(updatedProjects);
+									setSelectedProject(newProj);
+									setActiveView("projects");
+								} catch (err) {
+									if (isApiError(err)) {
+										setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
+									} else {
+										setError({ code: "unknown_error", message: err instanceof Error ? err.message : "Failed to build project" });
+									}
+								}
+							},
+						});
+					},
 				});
-				setSelectedProject(newProj);
-				setActiveView("projects");
 			}
 		} catch (err) {
 			if (isApiError(err)) {
@@ -492,6 +528,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 											onKill={handleKillSession}
 											onSubmitRename={handleSubmitRename}
 											onBuildProject={handleBuildProject}
+											hasProject={projects.some((p) => p.sessionName === session.name || p.name === session.name)}
 										/>
 									))}
 								</List>

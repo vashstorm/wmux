@@ -519,16 +519,17 @@ describe("Projects view", () => {
 	});
 
 	test("creates a project and shows it in list", async () => {
-		vi.mocked(client.listProjects)
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([{
+		let projectsList: any[] = [];
+		vi.mocked(client.listProjects).mockImplementation(async () => projectsList);
+		vi.mocked(client.createProject).mockImplementation(async (data) => {
+			const p = {
 				id: "p1",
-				name: "wmux-dev",
-				path: "/tmp/wmux",
-				description: "",
+				name: data.name,
+				path: data.path ?? "",
+				description: data.description ?? "",
 				createdAt: "",
 				updatedAt: "",
-				sessionName: "",
+				sessionName: data.sessionName ?? "",
 				status: "stopped",
 				workdir: "",
 				layoutJson: "{}",
@@ -539,7 +540,10 @@ describe("Projects view", () => {
 				aiError: "",
 				lastSyncedAt: null,
 				schemaVersion: 1,
-			}]);
+			};
+			projectsList = [p];
+			return p;
+		});
 
 		render(<TestWrapper><Sidebar /></TestWrapper>);
 		fireEvent.click(screen.getByTestId("open-projects-button"));
@@ -760,6 +764,150 @@ describe("Projects view", () => {
 
 		await waitFor(() => {
 			expect(screen.getByTestId("stats-last-refreshed")).toBeInTheDocument();
+		});
+	});
+});
+
+describe("Session Card Icons and Association Confirmation", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
+	});
+
+	test("renders terminal icon when session has no associated project", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+		mockListProjects.mockResolvedValue([]);
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-icon-terminal")).toBeInTheDocument();
+			expect(screen.queryByTestId("session-icon-project")).not.toBeInTheDocument();
+			const buildBtn = screen.getByTestId("build-project-session1");
+			expect(buildBtn).toHaveAttribute("aria-label", "Build project from session1");
+			expect(buildBtn).toHaveAttribute("title", "Build project");
+		});
+	});
+
+	test("renders folder icon when session has an associated project", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+		mockListProjects.mockResolvedValue([{
+			id: "p1",
+			name: "session1",
+			path: "",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "session1",
+			status: "stopped",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		}]);
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+			</TestWrapper>
+		);
+
+		await waitFor(() => {
+			expect(screen.getByTestId("session-icon-project")).toBeInTheDocument();
+			expect(screen.queryByTestId("session-icon-terminal")).not.toBeInTheDocument();
+			const buildBtn = screen.getByTestId("build-project-session1");
+			expect(buildBtn).toHaveAttribute("aria-label", "Open project from session1");
+			expect(buildBtn).toHaveAttribute("title", "Open project");
+		});
+	});
+
+	test("launches two-step confirmation dialog when creating a project from a session card", async () => {
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+		mockListProjects.mockResolvedValue([]);
+		mockCreateProject.mockResolvedValue({
+			id: "p1",
+			name: "session1",
+			path: "",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "session1",
+			status: "stopped",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		});
+
+		render(
+			<TestWrapper>
+				<Sidebar />
+				<ConfirmDialog />
+			</TestWrapper>
+		);
+
+		// Wait for session card to render
+		await waitFor(() => expect(screen.getByTestId("session-card-session1")).toBeInTheDocument());
+
+		// Click the "Build project" button
+		const buildButton = screen.getByTestId("build-project-session1");
+		fireEvent.click(buildButton);
+
+		// Assert first confirmation dialog is shown
+		await waitFor(() => {
+			expect(screen.getByText("Associate Project (Step 1/2)")).toBeInTheDocument();
+		});
+
+		// Click "Continue" to open the second step
+		const continueButton = screen.getByTestId("confirm-dialog-confirm");
+		fireEvent.click(continueButton);
+
+		// Assert second confirmation dialog is shown
+		await waitFor(() => {
+			expect(screen.getByText("Confirm Association (Step 2/2)")).toBeInTheDocument();
+		});
+
+		// Click "Create Project" to complete the creation
+		const confirmButton = screen.getByTestId("confirm-dialog-confirm");
+		fireEvent.click(confirmButton);
+
+		// Verify project creation was called and view was switched to projects
+		await waitFor(() => {
+			expect(mockCreateProject).toHaveBeenCalledWith({
+				name: "session1",
+				sessionName: "session1",
+				path: "",
+				description: "Imported from active session session1",
+			});
+			expect(screen.getByTestId("projects-view")).toBeInTheDocument();
 		});
 	});
 });
