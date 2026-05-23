@@ -41,10 +41,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* --- Focus styles --- */
 :focus-visible {
-	outline: 2px solid var(--color-accent);
+	outline: 2px solid transparent;
 	outline-offset: 2px;
-	box-shadow: 0 0 0 4px var(--color-accent-subtle);
-	border-radius: 2px;
 }
 
 /* --- Scrollbar styling --- */
@@ -61,12 +59,6 @@ h1, h2, h3, h4, h5, h6 {
 	border-radius: var(--radius-full);
 	border: 1px solid transparent;
 	background-clip: padding-box;
-	background-color: var(--color-surface-border-hover);
-	transition: background-color var(--transition-fast);
-}
-
-::-webkit-scrollbar-thumb:hover {
-	background-color: var(--color-accent-subtle);
 }
 
 /* --- Button reset --- */
@@ -124,24 +116,4 @@ a {
 	}
 }
 
-/* --- Entry animations --- */
-@keyframes fadeSlideUp {
-	from {
-		opacity: 0;
-		transform: translateY(16px) scale(0.97);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-	}
-}
 
-@keyframes fadeIn {
-	from { opacity: 0; }
-	to { opacity: 1; }
-}
-
-@keyframes pulseDot {
-	0%, 100% { transform: scale(1); opacity: 1; }
-	50% { transform: scale(1.4); opacity: 0.7; }
-}

@@ -375,8 +375,8 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 				sx={{
 					flex: 1,
 					overflowY: "auto",
-					px: "var(--spacing-md)",
-					py: "var(--spacing-sm)",
+					px: "var(--spacing-lg)",
+					py: "var(--spacing-md)",
 					scrollbarGutter: "stable",
 				}}
 			>
@@ -397,7 +397,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 							/>
 						</Collapse>
 
-						<Box className="sidebar-sessions-section" sx={{ px: "var(--spacing-sm)" }}>
+						<Box className="sidebar-sessions-section" sx={{ px: 0 }}>
 							<Stack
 								direction="row"
 								spacing={1}

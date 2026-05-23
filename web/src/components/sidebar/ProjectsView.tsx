@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Box, Typography, IconButton, TextField, Button, List, ListItem, ListItemText, Stack, Collapse, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Checkbox } from "@mui/material";
+import { Box, Typography, IconButton, TextField, Button, Stack, Collapse, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, FormControlLabel, Checkbox } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import { useAppState } from "../../state/store.js";
 import { listProjects, createProject, updateProject, deleteProject, getProject } from "../../api/client.js";
 import type { Project, NewProject } from "../../api/client.js";
@@ -159,38 +160,147 @@ export function ProjectsView() {
 			) : projects.length === 0 ? (
 				<Typography variant="body2" color="text.secondary" data-testid="projects-empty" sx={{ textAlign: "center", py: 2 }}>No projects yet</Typography>
 			) : (
-				<List disablePadding dense>
-					{projects.map((project) => (
-						<ListItem
-							key={project.id}
-							data-testid={`project-item-${project.id}`}
-							onClick={() => handleSelect(project)}
-							sx={{
-								px: 1,
-								py: 0.5,
-								borderRadius: "var(--radius-sm)",
-								cursor: "pointer",
-								bgcolor: selectedProject?.id === project.id ? "primary.main" : "transparent",
-								color: selectedProject?.id === project.id ? "primary.contrastText" : "inherit",
-								"&:hover": { bgcolor: selectedProject?.id === project.id ? "primary.dark" : "action.hover" },
-								borderLeft: selectedProject?.id === project.id ? "3px solid" : "3px solid transparent",
-								borderColor: selectedProject?.id === project.id ? "primary.light" : "transparent",
-							}}
-							secondaryAction={
-								<Stack direction="row" spacing={0.25}>
-									<IconButton size="small" onClick={(e) => { e.stopPropagation(); startEdit(project); }} data-testid={`project-edit-${project.id}`} aria-label="Edit"><EditIcon fontSize="small" /></IconButton>
-									<IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteClick(project); }} data-testid={`project-delete-${project.id}`} aria-label="Delete"><DeleteIcon fontSize="small" /></IconButton>
+				<Stack spacing={0.5} sx={{ mt: 0.5 }}>
+					{projects.map((project) => {
+						const isSelected = selectedProject?.id === project.id;
+						return (
+							<Box
+								key={project.id}
+								data-testid={`project-item-${project.id}`}
+								onClick={() => handleSelect(project)}
+								sx={{
+									position: "relative",
+									display: "flex",
+									alignItems: "center",
+									gap: 1.25,
+									px: 1.25,
+									py: 1,
+									borderRadius: "var(--radius-sm)",
+									cursor: "pointer",
+									border: "1px solid",
+									borderColor: isSelected ? "var(--color-glass-highlight-border)" : "transparent",
+									bgcolor: isSelected ? "var(--color-accent-subtle)" : "transparent",
+									borderLeft: isSelected ? "3px solid var(--color-accent)" : "3px solid transparent",
+									transition: "all var(--transition-base)",
+									"&:hover": {
+										bgcolor: isSelected ? "var(--color-accent-subtle)" : "var(--color-surface)",
+										borderColor: isSelected ? "var(--color-glass-highlight-border)" : "var(--color-surface-border)",
+										transform: "translateX(2px)",
+										"& .project-actions": { opacity: 1, pointerEvents: "auto" },
+									},
+									"&:hover .project-icon": {
+										transform: "scale(1.08)",
+									},
+								}}
+							>
+								{/* Folder icon avatar */}
+								<Box
+									className="project-icon"
+									sx={{
+										width: 32,
+										height: 32,
+										borderRadius: "var(--radius-sm)",
+										background: isSelected ? "var(--color-accent-gradient)" : "var(--color-surface)",
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										flexShrink: 0,
+										transition: "transform var(--transition-fast), background var(--transition-base)",
+										boxShadow: isSelected ? "var(--glow-accent)" : "none",
+									}}
+								>
+									<FolderOpenIcon
+										sx={{
+											fontSize: 16,
+											color: isSelected ? "#fff" : "var(--color-text-muted)",
+											transition: "color var(--transition-base)",
+										}}
+									/>
+								</Box>
+
+								{/* Text */}
+								<Box sx={{ flex: 1, minWidth: 0, pr: 6 }}>
+									<Typography
+										sx={{
+											fontSize: "var(--font-size-sm)",
+											fontWeight: isSelected ? "var(--font-weight-semibold)" : "var(--font-weight-medium)",
+											color: isSelected ? "var(--color-accent)" : "var(--color-text)",
+											lineHeight: 1.3,
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											whiteSpace: "nowrap",
+											transition: "color var(--transition-base)",
+										}}
+									>
+										{project.name}
+									</Typography>
+									{(project.path || project.description) && (
+										<Typography
+											sx={{
+												fontSize: "var(--font-size-2xs)",
+												color: "var(--color-text-muted)",
+												lineHeight: 1.3,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+												mt: 0.25,
+											}}
+										>
+											{project.path || project.description}
+										</Typography>
+									)}
+								</Box>
+
+								{/* Action buttons (visible on hover) */}
+								<Stack
+									className="project-actions"
+									direction="row"
+									spacing={0.25}
+									sx={{
+										position: "absolute",
+										right: 8,
+										opacity: 0,
+										pointerEvents: "none",
+										transition: "opacity var(--transition-fast)",
+									}}
+								>
+									<IconButton
+										size="small"
+										onClick={(e) => { e.stopPropagation(); startEdit(project); }}
+										data-testid={`project-edit-${project.id}`}
+										aria-label="Edit"
+										sx={{
+											width: 24,
+											height: 24,
+											borderRadius: "var(--radius-sm)",
+											color: "var(--color-text-muted)",
+											"&:hover": { bgcolor: "var(--color-surface-hover)", color: "var(--color-accent)" },
+										}}
+									>
+										<EditIcon sx={{ fontSize: 13 }} />
+									</IconButton>
+									<IconButton
+										size="small"
+										onClick={(e) => { e.stopPropagation(); handleDeleteClick(project); }}
+										data-testid={`project-delete-${project.id}`}
+										aria-label="Delete"
+										sx={{
+											width: 24,
+											height: 24,
+											borderRadius: "var(--radius-sm)",
+											color: "var(--color-text-muted)",
+											"&:hover": { bgcolor: "rgba(239,68,68,0.12)", color: "var(--color-danger)" },
+										}}
+									>
+										<DeleteIcon sx={{ fontSize: 13 }} />
+									</IconButton>
 								</Stack>
-							}
-						>
-							<ListItemText
-							primary={project.name}
-							secondary={project.path || project.description || undefined}
-						/>
-						</ListItem>
-					))}
-				</List>
+							</Box>
+						);
+					})}
+				</Stack>
 			)}
+
 
 			<Dialog
 				open={deleteDialogOpen}

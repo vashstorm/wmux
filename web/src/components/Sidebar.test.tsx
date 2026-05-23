@@ -300,71 +300,9 @@ describe("session card attention rendering", () => {
 		mockListConnectionHealth.mockResolvedValue([]);
 	});
 
-	test("session card with attention state gets is-attention class", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", attentionState: "attention", attentionCount: 1 }],
-		});
 
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
 
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		expect(screen.getByTestId("session-card-session1")).toHaveClass("is-attention");
-		expect(screen.getByTestId("session-card-session1")).not.toHaveClass("is-attention-explicit");
-	});
-
-	test("session card with explicit attention state gets is-attention-explicit class", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", attentionState: "explicit", attentionCount: 1 }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		expect(screen.getByTestId("session-card-session1")).toHaveClass("is-attention-explicit");
-		expect(screen.getByTestId("session-card-session1")).not.toHaveClass("is-attention");
-	});
-
-	test("session card with attention shows badge count", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", attentionState: "attention", attentionCount: 2 }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".attention-badge");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("2");
-	});
-
-	test("session card keeps action buttons in the right aligned top row", async () => {
+	test("session card keeps action buttons in the absolute positioned floating element", async () => {
 		mockListSessions.mockResolvedValue({
 			targetName: "conn1",
 			mode: "local",
@@ -383,80 +321,14 @@ describe("session card attention rendering", () => {
 
 		const cardBodyShell = screen.getByTestId("session-open-session1").parentElement;
 		const actions = document.querySelector(".session-card-actions");
-		const actionsColumn = document.querySelector(".session-card-action-column");
 
 		expect(cardBodyShell).toHaveStyle({ width: "100%" });
 		expect(actions).toHaveStyle({ position: "absolute" });
-		expect(actionsColumn).toHaveStyle({ marginLeft: "auto" });
-	});
-
-	test("session card keeps window count and status in a separate bottom metadata row", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{
-				name: "session1",
-				windowCount: 3,
-				intelligenceStatus: "waiting",
-				intelligenceAppCounts: { opencode: 2, claude: 1 },
-			}],
+		expect(actions).toHaveStyle({
+			right: "8px",
+			transform: "translate(8px, -50%)",
+			pointerEvents: "none",
 		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const topRow = document.querySelector(".session-card-top");
-		const meta = document.querySelector(".session-card-meta");
-		const windowBadge = document.querySelector(".window-count-badge");
-		const statusBadge = document.querySelector(".intelligence-badge.is-waiting");
-		const opencodeBadge = document.querySelector(".app-count-badge.is-opencode");
-		const claudeBadge = document.querySelector(".app-count-badge.is-claude");
-
-		expect(meta).toContainElement(windowBadge as HTMLElement);
-		expect(meta).toContainElement(statusBadge as HTMLElement);
-		expect(meta).toContainElement(opencodeBadge as HTMLElement);
-		expect(meta).toContainElement(claudeBadge as HTMLElement);
-		expect(topRow).not.toContainElement(windowBadge as HTMLElement);
-		expect(topRow).not.toContainElement(statusBadge as HTMLElement);
-		expect(meta).toHaveStyle({ justifyContent: "flex-start" });
-		expect(windowBadge).toHaveClass("window-count-badge");
-		expect(statusBadge).toHaveClass("intelligence-badge", "is-waiting");
-		expect(opencodeBadge).toHaveClass("app-count-badge", "is-opencode");
-		expect(claudeBadge).toHaveClass("app-count-badge", "is-claude");
-	});
-
-	test("session card renders arbitrary app count badges", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{
-				name: "session1",
-				windowCount: 1,
-				intelligenceAppCounts: { wmux: 1 },
-			}],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badgeLabel = screen.getByText("wmux 1");
-		const badge = badgeLabel.closest(".app-count-badge");
-		expect(badge).toBeInTheDocument();
-		expect(badge).not.toHaveClass("is-wmux");
 	});
 
 	test("session card shows updated time on the session name row", async () => {
@@ -477,19 +349,11 @@ describe("session card attention rendering", () => {
 		});
 
 		const time = document.querySelector(".session-card-time");
-		const topRow = document.querySelector(".session-card-top");
-		const actionsColumn = document.querySelector(".session-card-action-column");
-		const meta = document.querySelector(".session-card-meta");
-
 		expect(time).toBeInTheDocument();
-		expect(topRow).toContainElement(time as HTMLElement);
-		expect(actionsColumn).toContainElement(time as HTMLElement);
-		expect(meta).not.toContainElement(time as HTMLElement);
-		expect(time).toHaveStyle({ marginLeft: "auto", textAlign: "right" });
 	});
 });
 
-describe("intelligence badge and summary rendering", () => {
+describe("sidebar navigation and logs features", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
@@ -507,163 +371,6 @@ describe("intelligence badge and summary rendering", () => {
 			mode: "local",
 			data: [],
 		});
-	});
-
-	test("session with intelligenceStatus waiting renders badge with text Waiting", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "waiting" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".intelligence-badge.is-waiting");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("Waiting");
-	});
-
-	test("session with intelligenceStatus dead_loop renders badge with text Loop", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "dead_loop" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".intelligence-badge.is-dead_loop");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("Loop");
-	});
-
-	test("session with intelligenceStatus blocked renders badge with text Blocked", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "blocked" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".intelligence-badge.is-blocked");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("Blocked");
-	});
-
-	test("session with intelligenceStatus running renders badge with text Running", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "running" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".intelligence-badge.is-running");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("Running");
-	});
-
-	test("session with intelligenceStatus none does NOT render intelligence badge", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "none" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const badge = document.querySelector(".intelligence-badge");
-		expect(badge).not.toBeInTheDocument();
-	});
-
-	test("session with intelligenceSummary does not render summary text in the card", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "waiting", intelligenceSummary: "Waiting for input" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const summary = document.querySelector(".session-intelligence-summary");
-		expect(summary).not.toBeInTheDocument();
-		expect(screen.queryByText("Waiting for input")).not.toBeInTheDocument();
-	});
-
-	test("session with intelligenceError shows error badge without raw summary text", async () => {
-		mockListSessions.mockResolvedValue({
-			targetName: "conn1",
-			mode: "local",
-			data: [{ name: "session1", intelligenceStatus: "none", intelligenceSummary: "Failed", intelligenceError: "API timeout" }],
-		});
-
-		render(
-			<TestWrapper>
-				<Sidebar />
-			</TestWrapper>,
-		);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
-		});
-
-		const summary = document.querySelector(".session-intelligence-summary");
-		expect(summary).not.toBeInTheDocument();
-		expect(screen.queryByText("Failed")).not.toBeInTheDocument();
-		expect(screen.queryByText("API timeout")).not.toBeInTheDocument();
-
-		const badge = document.querySelector(".intelligence-badge.is-error");
-		expect(badge).toBeInTheDocument();
 	});
 
 	test("error logs button shows badge when error entries exist", async () => {

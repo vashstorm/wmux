@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Box, Typography } from "@mui/material";
+import TerminalIcon from "@mui/icons-material/Terminal";
 import { Terminal } from "./Terminal.js";
 import type { PaneData, SelectedPane } from "../state/store.js";
 
@@ -57,17 +58,74 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 		return (
 			<Box className="pane-canvas-empty" data-testid="pane-canvas-empty" sx={{
 				display: "flex",
+				flexDirection: "column",
 				alignItems: "center",
 				justifyContent: "center",
-				padding: 3,
-				minHeight: 120,
+				padding: "var(--spacing-xl)",
+				minHeight: 280,
+				height: "100%",
+				background: "var(--color-background)",
 			}}>
-				<Typography className="pane-canvas-empty-text" sx={{
-					color: "text.disabled",
-					fontSize: "var(--font-size-sm)",
+				<Box className="pane-canvas-empty-card" sx={{
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "center",
+					justifyContent: "center",
+					padding: "var(--spacing-xl)",
+					borderRadius: "var(--radius-lg)",
+					background: "var(--color-glass-surface)",
+					border: "1px solid var(--color-panel-border)",
+					backdropFilter: "var(--color-glass-blur)",
+					WebkitBackdropFilter: "var(--color-glass-blur)",
+					boxShadow: "var(--shadow-md)",
+					maxWidth: 400,
+					textAlign: "center",
+					transition: "transform var(--transition-base), box-shadow var(--transition-base)",
+					"&:hover": {
+						transform: "translateY(-2px)",
+						boxShadow: "var(--shadow-lg), var(--color-accent-glow)",
+						borderColor: "var(--color-accent-subtle)",
+					}
 				}}>
-					No panes loaded
-				</Typography>
+					<Box sx={{
+						width: 56,
+						height: 56,
+						borderRadius: "50%",
+						background: "var(--color-accent-subtle)",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						marginBottom: "var(--spacing-md)",
+						boxShadow: "0 0 16px var(--color-accent-subtle)",
+						color: "var(--color-accent)",
+					}}>
+						<TerminalIcon sx={{ fontSize: 28 }} />
+					</Box>
+					<Typography variant="h6" className="pane-canvas-empty-title" sx={{
+						fontWeight: "var(--font-weight-semibold)",
+						color: "var(--color-text)",
+						marginBottom: "var(--spacing-xs)",
+						fontSize: "var(--font-size-md)",
+					}}>
+						No Active Panes
+					</Typography>
+					<Typography className="pane-canvas-empty-text" sx={{
+						color: "var(--color-text-muted)",
+						fontWeight: "var(--font-weight-medium)",
+						fontSize: "var(--font-size-sm)",
+						lineHeight: "var(--line-height-normal)",
+					}}>
+						No panes loaded
+					</Typography>
+					<Typography className="pane-canvas-empty-subtext" sx={{
+						color: "var(--color-text-disabled)",
+						fontSize: "var(--font-size-xs)",
+						lineHeight: "var(--line-height-normal)",
+						marginTop: "var(--spacing-xs)",
+					}}>
+						Select a tmux window or session to view active terminal layouts.
+					</Typography>
+				</Box>
 			</Box>
 		);
 	}
@@ -115,26 +173,6 @@ export function PaneCanvas({ panes, selectedPaneId, onSelectPane, selectedPane, 
 								width,
 								height,
 								backgroundColor: selectedPane ? "transparent" : undefined,
-							}}
-							sx={{
-								border: "1.5px solid",
-								borderColor: isActive ? "primary.main" : "divider",
-								borderRadius: 1.5,
-								backgroundColor: isActive ? "action.selected" : "background.paper",
-								cursor: "pointer",
-								overflow: "hidden",
-								transition: "all var(--transition-base)",
-								boxShadow: isActive
-									? (theme) => `0 0 0 1px ${theme.palette.primary.main}22, inset 0 0 20px ${theme.palette.primary.main}08`
-									: "none",
-								"&:hover": {
-								borderColor: isActive ? "primary.main" : "primary.light",
-								backgroundColor: isActive ? "action.selected" : "action.hover",
-								transform: "translateY(-1px)",
-								boxShadow: isActive
-									? (theme) => `0 0 0 1px ${theme.palette.primary.main}22, inset 0 0 20px ${theme.palette.primary.main}08, var(--shadow-md)`
-									: "var(--shadow-sm)",
-								},
 							}}
 							onClick={() => onSelectPane(pane.id)}
 							title={pane.title}

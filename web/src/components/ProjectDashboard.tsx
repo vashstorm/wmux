@@ -18,7 +18,7 @@ const DETAIL_FONT_SIZE = {
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
 	return (
-		<Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2, py: 0.5 }}>
+		<Box className="project-detail-row" sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 2, py: 0.5 }}>
 			<Typography variant="caption" sx={{ color: "text.secondary", fontSize: DETAIL_FONT_SIZE.label, flexShrink: 0, minWidth: 100 }}>
 				{label}
 			</Typography>
@@ -164,6 +164,7 @@ export function ProjectDashboard() {
 	return (
 		<Box
 			data-testid="project-dashboard"
+			className="project-dashboard"
 			sx={{
 				display: "flex",
 				flexDirection: "column",
@@ -171,7 +172,7 @@ export function ProjectDashboard() {
 				overflow: "hidden",
 			}}
 		>
-			<Box sx={{
+			<Box className="project-dashboard-header" sx={{
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "space-between",
@@ -202,11 +203,12 @@ export function ProjectDashboard() {
 				</Box>
 			</Box>
 
-			<Box sx={{ flex: 1, overflowY: "auto", px: "var(--spacing-lg)", py: "var(--spacing-md)" }}>
-				<Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+			<Box className="project-dashboard-body" sx={{ flex: 1, overflowY: "auto", px: "var(--spacing-lg)", py: "var(--spacing-md)" }}>
+				<Stack className="project-dashboard-actions" direction="row" spacing={1.5} sx={{ mb: 2.5 }}>
 					<Button
 						size="small"
 						variant="contained"
+						className="project-dashboard-btn project-dashboard-btn-primary"
 						startIcon={actionLoading === "launch" ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
 						disabled={actionLoading !== null}
 						onClick={handleLaunch}
@@ -217,6 +219,7 @@ export function ProjectDashboard() {
 					<Button
 						size="small"
 						variant="outlined"
+						className="project-dashboard-btn project-dashboard-btn-secondary"
 						startIcon={actionLoading === "sync" ? <CircularProgress size={16} color="inherit" /> : <SyncIcon fontSize="small" />}
 						disabled={actionLoading !== null}
 						onClick={handleSync}
@@ -227,6 +230,7 @@ export function ProjectDashboard() {
 					<Button
 						size="small"
 						variant="outlined"
+						className="project-dashboard-btn project-dashboard-btn-secondary"
 						startIcon={actionLoading === "ai-generate" ? <CircularProgress size={16} color="inherit" /> : <AutoFixHighIcon fontSize="small" />}
 						disabled={actionLoading !== null}
 						onClick={handleAiGenerate}
@@ -245,7 +249,7 @@ export function ProjectDashboard() {
 				<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 					Project Info
 				</Typography>
-				<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
+				<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
 					<DetailRow label="Name" value={selectedProject.name} />
 					<DetailRow label="Session" value={selectedProject.sessionName} />
 					<DetailRow label="Status" value={selectedProject.status} />
@@ -262,7 +266,7 @@ export function ProjectDashboard() {
 						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 							Layout
 						</Typography>
-						<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
+						<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
 							<DetailRow label="Summary" value={layoutSummary} />
 						</Paper>
 					</>
@@ -273,7 +277,7 @@ export function ProjectDashboard() {
 						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 							Details
 						</Typography>
-						<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
+						<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
 							<DetailRow label="Summary" value={detailsSummary} />
 						</Paper>
 					</>
@@ -284,7 +288,7 @@ export function ProjectDashboard() {
 						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 							Progress
 						</Typography>
-						<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
+						<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderColor: "divider" }}>
 							<DetailRow label="Percent" value={`${progressValue}%`} />
 						</Paper>
 					</>
@@ -297,20 +301,20 @@ export function ProjectDashboard() {
 				</Typography>
 
 				{selectedProject.aiStatus === "generating" ? (
-					<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 3, bgcolor: "background.default", borderColor: "divider", textAlign: "center" }}>
+					<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 3, bgcolor: "background.default", borderColor: "divider", textAlign: "center" }}>
 						<CircularProgress size={24} sx={{ mb: 1 }} />
 						<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
 							Generating AI content...
 						</Typography>
 					</Paper>
 				) : selectedProject.aiStatus === "error" ? (
-					<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 2, bgcolor: "error.main", color: "error.contrastText", borderColor: "error.dark" }}>
+					<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 2, bgcolor: "error.main", color: "error.contrastText", borderColor: "error.dark" }}>
 						<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
 							{selectedProject.aiError || "AI generation failed"}
 						</Typography>
 					</Paper>
 				) : !selectedProject.aiHtml ? (
-					<Paper variant="outlined" sx={{ mt: 0.5, mb: 2, p: 2, bgcolor: "background.default", borderColor: "divider" }}>
+					<Paper variant="outlined" className="project-dashboard-card" sx={{ mt: 0.5, mb: 2, p: 2, bgcolor: "background.default", borderColor: "divider" }}>
 						<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body, textAlign: "center" }}>
 							No AI-generated content yet. Click &ldquo;Generate AI HTML&rdquo; to start.
 						</Typography>
@@ -318,6 +322,7 @@ export function ProjectDashboard() {
 				) : (
 					<Paper
 						data-testid="project-ai-html"
+						className="project-dashboard-card project-dashboard-ai-frame"
 						variant="outlined"
 						sx={{
 							mt: 0.5,

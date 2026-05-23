@@ -1,47 +1,17 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
 	Box,
 	Stack,
-	Chip,
 	Typography,
 	TextField,
 	ListItemButton,
+	Tooltip,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolder";
 import type { SessionInfoData } from "../../api/client.js";
 import { SidebarIconButton } from "./SidebarIconButton.js";
-
-const INTELLIGENCE_STATUS_LABELS: Record<string, string> = {
-	waiting: "Waiting",
-	dead_loop: "Loop",
-	blocked: "Blocked",
-	waiting_confirm: "Confirm",
-	waiting_idle: "Idle",
-	running: "Running",
-};
-
-const KNOWN_APP_BADGE_ORDER = ["claude", "codex", "opencode", "zsh"] as const;
-const KNOWN_APP_BADGES = new Set<string>(KNOWN_APP_BADGE_ORDER);
-
-function getAppBadgeEntries(appCounts: Record<string, number> | undefined): Array<[string, number]> {
-	if (!appCounts) {
-		return [];
-	}
-
-	return Object.entries(appCounts)
-		.map(([app, count]) => [app.trim().toLowerCase(), count] as [string, number])
-		.filter(([app, count]) => app.length > 0 && typeof count === "number" && count > 0)
-		.sort(([left], [right]) => {
-			const leftKnownIndex = KNOWN_APP_BADGE_ORDER.indexOf(left as (typeof KNOWN_APP_BADGE_ORDER)[number]);
-			const rightKnownIndex = KNOWN_APP_BADGE_ORDER.indexOf(right as (typeof KNOWN_APP_BADGE_ORDER)[number]);
-			if (leftKnownIndex >= 0 && rightKnownIndex >= 0) return leftKnownIndex - rightKnownIndex;
-			if (leftKnownIndex >= 0) return -1;
-			if (rightKnownIndex >= 0) return 1;
-			return left.localeCompare(right);
-		});
-}
 
 interface SessionCardProps {
 	session: SessionInfoData;
@@ -65,6 +35,8 @@ export function SessionCard({
 	const sname = session.name ?? "";
 	const [isRenaming, setIsRenaming] = useState(false);
 	const [renameValue, setRenameValue] = useState("");
+	const nameRef = useRef<HTMLSpanElement | null>(null);
+	const [isNameOverflowing, setIsNameOverflowing] = useState(false);
 
 	if (!sname) return null;
 
@@ -94,68 +66,70 @@ export function SessionCard({
 		}
 	};
 
-	const hasAttention = session.attentionState === "attention" || session.attentionState === "explicit";
-	const hasIntelligence =
-		(session.intelligenceStatus && session.intelligenceStatus !== "none" && INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]) ||
-		session.intelligenceError;
-	const appBadgeEntries = getAppBadgeEntries(session.intelligenceAppCounts);
-	const intelligenceBadgeClass = session.intelligenceError ? "error" : session.intelligenceStatus;
-	const intelligenceBadgeLabel = session.intelligenceError
-		? "Error"
-		: session.intelligenceStatus
-			? INTELLIGENCE_STATUS_LABELS[session.intelligenceStatus]
-			: undefined;
-
-	// Determine border/glow overrides from attention or intelligence state
-	const isExplicit = session.attentionState === "explicit"
-		&& session.intelligenceStatus !== "waiting_confirm"
-		&& session.intelligenceStatus !== "blocked";
-	const isAttentionSoft = session.attentionState === "attention"
-		&& !isSelected
-		&& session.intelligenceStatus !== "waiting_confirm"
-		&& session.intelligenceStatus !== "blocked";
-	const isWaitingConfirm = session.intelligenceStatus === "waiting_confirm";
-	const isBlocked = session.intelligenceStatus === "blocked";
-
-	let borderColor = isSelected
-		? "var(--color-session-card-selected-border)"
-		: "var(--color-session-card-border)";
-	let boxShadow = isSelected ? "var(--color-session-card-selected-glow)" : "none";
-
-	if (isExplicit) {
-		borderColor = "var(--color-attention-explicit)";
-		boxShadow = "0 0 0 1px var(--color-attention-explicit), var(--glow-danger)";
-	} else if (isWaitingConfirm) {
-		borderColor = "#b45309";
-		boxShadow = "0 0 0 1px #b45309, 0 0 12px rgba(180, 83, 9, 0.25)";
-	} else if (isBlocked) {
-		borderColor = "#be123c";
-		boxShadow = "0 0 0 1px #be123c, var(--glow-danger)";
-	} else if (isAttentionSoft) {
-		borderColor = "var(--color-attention)";
-	}
+	const updateNameOverflow = () => {
+		const nameElement = nameRef.current;
+		if (!nameElement) return;
+		setIsNameOverflowing(nameElement.scrollWidth > nameElement.clientWidth + 1);
+	};
 
 	return (
 		<Box
-			className={`session-card${session.attentionState === "explicit" ? " is-attention-explicit" : ""}${session.attentionState === "attention" ? " is-attention" : ""}${session.intelligenceStatus === "waiting_confirm" ? " is-waiting-confirm" : ""}${session.intelligenceStatus === "blocked" ? " is-blocked" : ""}${isSelected ? " is-selected" : ""}`}
+			className={`session-card${isSelected ? " is-selected" : ""}`}
 			data-testid={`session-card-${sname}`}
 			sx={{
 				width: "100%",
 				borderRadius: "var(--radius-md)",
 				border: "1px solid",
-				borderColor,
+				borderColor: isSelected
+					? "var(--color-session-card-selected-border)"
+					: "var(--color-session-card-border)",
 				bgcolor: isSelected
 					? "var(--color-session-card-selected)"
 					: "var(--color-session-card-bg)",
-				transition: "border-color var(--transition-base), background-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base)",
-				boxShadow,
+				backgroundImage: isSelected
+					? "linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 60%)"
+					: "none",
+				boxShadow: isSelected
+					? "var(--color-session-card-selected-glow)"
+					: "none",
+				transition: [
+					"border-color var(--transition-base)",
+					"background-color var(--transition-base)",
+					"box-shadow var(--transition-base)",
+					"transform var(--transition-base)",
+				].join(", "),
 				position: "relative",
 				overflow: "hidden",
+				// Left accent indicator bar
+				"&::before": {
+					content: '""',
+					position: "absolute",
+					left: 0,
+					top: "18%",
+					bottom: "18%",
+					width: "2px",
+					borderRadius: "0 2px 2px 0",
+					bgcolor: isSelected ? "var(--color-accent)" : "transparent",
+					transition: [
+						"background-color var(--transition-base)",
+						"top var(--transition-spring)",
+						"bottom var(--transition-spring)",
+					].join(", "),
+				},
+				"&:hover::before": {
+					bgcolor: isSelected
+						? "var(--color-accent)"
+						: "var(--color-surface-border-hover)",
+					top: "8%",
+					bottom: "8%",
+				},
 				"&:hover": {
-					transform: "translateY(-1px)",
+					borderColor: isSelected
+						? "var(--color-session-card-selected-border)"
+						: "var(--color-surface-border-hover)",
 					boxShadow: isSelected
 						? "var(--color-session-card-selected-glow)"
-						: "var(--shadow-md)",
+						: "var(--shadow-sm)",
 				},
 			}}
 		>
@@ -182,6 +156,7 @@ export function SessionCard({
 								bgcolor: "background.paper",
 								borderRadius: "var(--radius-sm)",
 								fontSize: "var(--font-size-xs)",
+								fontFamily: "var(--font-mono)",
 								color: "text.primary",
 								border: "1px solid",
 								borderColor: "primary.main",
@@ -198,200 +173,239 @@ export function SessionCard({
 					data-testid={`session-open-${sname}`}
 					selected={isSelected}
 					sx={{
-						flexDirection: "column",
-						alignItems: "stretch",
-						gap: "3px",
-						py: "6px",
-						px: "12px",
+						flexDirection: "row",
+						alignItems: "center",
+						gap: "6px",
+						py: "7px",
+						pl: "16px",
+						pr: "12px",
 						minWidth: 0,
 						borderRadius: "var(--radius-md)",
 						bgcolor: "transparent",
 						transition: "background-color var(--transition-fast)",
 						"&.Mui-selected": { bgcolor: "transparent" },
-						"&.Mui-selected:hover": { bgcolor: "action.hover" },
-						"&:hover": { bgcolor: "action.hover" },
+						"&.Mui-selected:hover": { bgcolor: "transparent" },
+						"&:hover": { bgcolor: "transparent" },
 					}}
 				>
-						<Box className="session-card-name-group">
-							<Stack
-								direction="row"
-								spacing={0.5}
-								className="session-card-top"
-								sx={{ alignItems: "center", justifyContent: "space-between", minWidth: 0 }}
-							>
-								<Stack direction="row" spacing={0.5} sx={{ alignItems: "center", minWidth: 0, flex: 1 }}>
-									<Typography
-										className="session-card-name"
-										variant="body2"
-										title={sname}
-										sx={{
-											fontSize: "var(--font-size-base)",
-											fontWeight: "var(--font-weight-bold)",
-											color: "text.primary",
-											whiteSpace: "nowrap",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-											lineHeight: 1.2,
-										}}
-										noWrap
-									>
-										{sname}
-									</Typography>
-								</Stack>
-								<Stack
-									className="session-card-action-column"
-									sx={{ alignItems: "flex-end", flexShrink: 0, ml: "auto" }}
-								>
-									{session.intelligenceUpdatedAt && (
-										<Typography
-											className="session-card-time"
-											variant="caption"
-											sx={{
-												fontSize: "var(--font-size-xs)",
-												color: "text.secondary",
-												ml: "auto",
-												textAlign: "right",
-												flexShrink: 0,
-												opacity: 0.65,
-												fontWeight: 500,
-												lineHeight: "18px",
-												transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-												".session-card:hover &": { opacity: 0 },
-											}}
-										>
-											{formatRelativeTime(session.intelligenceUpdatedAt)}
-										</Typography>
-									)}
-									<Stack
-										direction="row"
-										spacing={0.5}
-										className="session-card-actions"
-										sx={{
-											alignItems: "center",
-											position: "absolute",
-											opacity: 0,
-											transition: "opacity 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-											".session-card:hover &": { opacity: 1 },
-										}}
-									>
-										<SidebarIconButton
-											className="session-action-btn"
-											icon={CreateNewFolderIcon}
-											variant="row"
-											onClick={(e) => { e.stopPropagation(); onBuildProject(sname); }}
-											aria-label={`Build project from ${sname}`}
-											title="Build project"
-											data-testid={`build-project-${sname}`}
-											sx={{
-												color: "text.secondary",
-												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
-												"&:hover": {
-													bgcolor: "action.hover",
-													color: "primary.main",
-													transform: "scale(1.1)",
-												},
-											}}
-										/>
-										<SidebarIconButton
-											className="session-action-btn"
-											icon={EditIcon}
-											variant="row"
-											onClick={(e) => { e.stopPropagation(); handleStartRename(); }}
-											aria-label={`Rename ${sname}`}
-											title="Rename"
-											data-testid={`rename-session-${sname}`}
-											sx={{
-												color: "text.secondary",
-												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
-												"&:hover": {
-													bgcolor: "action.hover",
-													color: "text.primary",
-													transform: "scale(1.1) rotate(-5deg)",
-												},
-											}}
-										/>
-										<SidebarIconButton
-											className="session-action-btn session-action-danger"
-											icon={DeleteIcon}
-											variant="row"
-											danger
-											onClick={(e) => { e.stopPropagation(); onKill(sname); }}
-											aria-label={`Kill ${sname}`}
-											title="Kill session"
-											data-testid={`kill-session-${sname}`}
-											sx={{
-												color: "text.secondary",
-												transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
-												"&:hover": {
-													bgcolor: "error.main",
-													color: "common.white",
-													transform: "scale(1.1)",
-												},
-											}}
-										/>
-									</Stack>
-								</Stack>
-							</Stack>
-							<Box
-								className="session-card-meta"
+					{/* Prompt glyph + name */}
+					<Box
+						sx={{
+							flex: 1,
+							minWidth: 0,
+							display: "flex",
+							alignItems: "center",
+							gap: "5px",
+							transition: "padding-right var(--transition-spring)",
+							".session-card:hover &": {
+								paddingRight: "90px",
+							},
+						}}
+					>
+						<Typography
+							component="span"
+							sx={{
+								fontFamily: "var(--font-mono)",
+								fontSize: "9px",
+								color: isSelected
+									? "var(--color-accent)"
+									: "var(--color-text-disabled)",
+								flexShrink: 0,
+								lineHeight: 1,
+								transition: "color var(--transition-base)",
+								userSelect: "none",
+								"& ~ *": {},
+								".session-card:hover &": {
+									color: isSelected
+										? "var(--color-accent)"
+										: "var(--color-text-muted)",
+								},
+							}}
+						>
+							❯
+						</Typography>
+						<Tooltip
+							title={isNameOverflowing ? sname : ""}
+							placement="top-start"
+							enterDelay={800}
+							disableInteractive
+							arrow
+							slotProps={{
+								popper: {
+									modifiers: [
+										{
+											name: "preventOverflow",
+											options: {
+												boundary: "viewport",
+												padding: 8,
+											},
+										},
+									],
+								},
+								tooltip: {
+									sx: {
+										maxWidth: "min(260px, calc(100vw - 16px))",
+										overflowWrap: "anywhere",
+									},
+								},
+							}}
+						>
+							<Typography
+								ref={nameRef}
+								className="session-card-name"
+								variant="body2"
+								onMouseEnter={updateNameOverflow}
+								onFocus={updateNameOverflow}
 								sx={{
-									display: "flex",
-									alignItems: "center",
-									flexWrap: "wrap",
-									justifyContent: "flex-start",
-									minHeight: "18px",
-									width: "100%",
-									m: 0,
-									p: 0,
-									gap: "3px",
+									fontFamily: "var(--font-mono)",
+									fontSize: "var(--font-size-xs)",
+									fontWeight: isSelected
+										? "var(--font-weight-semibold)"
+										: "var(--font-weight-normal)",
+									color: isSelected ? "text.primary" : "text.secondary",
+									whiteSpace: "nowrap",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									lineHeight: 1.4,
+									flex: 1,
+									minWidth: 0,
+									transition: "color var(--transition-base), font-weight var(--transition-base)",
+									".session-card:hover &": {
+										color: "text.primary",
+									},
 								}}
+								noWrap
 							>
-								{hasAttention && typeof session.attentionCount === "number" && session.attentionCount > 0 && (
-									<Chip
-										label={session.attentionCount}
-										size="small"
-										className={`attention-badge${session.attentionState === "attention" ? " is-soft" : ""}`}
-										sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
-									/>
-								)}
-								{typeof session.windowCount === "number" && session.windowCount > 0 && (
-									<Chip
-										label={`${session.windowCount} w`}
-										size="small"
-										className="window-count-badge"
-										sx={{
-											fontSize: "var(--font-size-xs)",
-											fontWeight: "var(--font-weight-semibold)",
-											minHeight: 18,
-											height: 18,
-											minWidth: 18,
-										}}
-									/>
-								)}
-								{hasIntelligence && intelligenceBadgeClass && intelligenceBadgeLabel && (
-									<Chip
-										label={intelligenceBadgeLabel}
-										size="small"
-										className={`intelligence-badge is-${intelligenceBadgeClass}`}
-										sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
-									/>
-								)}
-
-								{appBadgeEntries.map(([app, count]) => {
-									const appClass = KNOWN_APP_BADGES.has(app) ? ` is-${app}` : "";
-									return (
-										<Chip
-											key={app}
-											label={`${app} ${count}`}
-											size="small"
-											className={`app-count-badge${appClass}`}
-											sx={{ fontSize: "var(--font-size-xs)", minHeight: 18, height: 18 }}
-										/>
-									);
-								})}
-							</Box>
-						</Box>
-					</ListItemButton>
+								{sname}
+							</Typography>
+						</Tooltip>
+					</Box>
+ 
+					{/* Compact timestamp */}
+					{session.intelligenceUpdatedAt && (
+						<Typography
+							className="session-card-time"
+							component="span"
+							sx={{
+								flexShrink: 0,
+								fontSize: "var(--font-size-2xs)",
+								color: "text.disabled",
+								fontWeight: 500,
+								fontVariantNumeric: "tabular-nums",
+								letterSpacing: "0.01em",
+								lineHeight: 1,
+								transition: "opacity var(--transition-base)",
+								".session-card:hover &": { opacity: 0 },
+							}}
+						>
+							{formatRelativeTime(session.intelligenceUpdatedAt)}
+						</Typography>
+					)}
+ 
+					{/* Hover action buttons — slide in from right */}
+					<Stack
+						direction="row"
+						className="session-card-actions"
+						sx={{
+							alignItems: "center",
+							position: "absolute",
+							right: "8px",
+							top: "50%",
+							transform: "translate(8px, -50%)",
+							opacity: 0,
+							pointerEvents: "none",
+							transition: "opacity var(--transition-base), transform var(--transition-spring)",
+							".session-card:hover &": {
+								opacity: 1,
+								transform: "translate(0, -50%)",
+								pointerEvents: "auto",
+							},
+							display: "flex",
+							gap: "2px",
+							maxWidth: "calc(100% - 16px)",
+							bgcolor: (theme) =>
+								theme.palette.mode === "dark"
+									? "rgba(20, 26, 38, 0.92)"
+									: "rgba(255, 255, 255, 0.92)",
+							backdropFilter: "blur(12px) saturate(160%)",
+							pl: "4px",
+							pr: "4px",
+							py: "3px",
+							borderRadius: "var(--radius-sm)",
+							border: "1px solid",
+							borderColor: "divider",
+							boxShadow: (theme) =>
+								theme.palette.mode === "dark"
+									? "0 4px 12px rgba(0,0,0,0.4)"
+									: "0 4px 12px rgba(0,0,0,0.08)",
+						}}
+					>
+						<SidebarIconButton
+							className="session-action-btn"
+							icon={CreateNewFolderIcon}
+							variant="row"
+							onClick={(e) => { e.stopPropagation(); onBuildProject(sname); }}
+							aria-label={`Build project from ${sname}`}
+							title="Build project"
+							data-testid={`build-project-${sname}`}
+							sx={{
+								color: "text.disabled",
+								width: 24,
+								height: 24,
+								"& .MuiSvgIcon-root": { fontSize: "14px" },
+								transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+								"&:hover": {
+									bgcolor: "action.hover",
+									color: "primary.main",
+									transform: "scale(1.2)",
+								},
+							}}
+						/>
+						<SidebarIconButton
+							className="session-action-btn"
+							icon={EditIcon}
+							variant="row"
+							onClick={(e) => { e.stopPropagation(); handleStartRename(); }}
+							aria-label={`Rename ${sname}`}
+							title="Rename"
+							data-testid={`rename-session-${sname}`}
+							sx={{
+								color: "text.disabled",
+								width: 24,
+								height: 24,
+								"& .MuiSvgIcon-root": { fontSize: "14px" },
+								transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+								"&:hover": {
+									bgcolor: "action.hover",
+									color: "text.primary",
+									transform: "scale(1.2) rotate(-8deg)",
+								},
+							}}
+						/>
+						<SidebarIconButton
+							className="session-action-btn session-action-danger"
+							icon={DeleteIcon}
+							variant="row"
+							danger
+							onClick={(e) => { e.stopPropagation(); onKill(sname); }}
+							aria-label={`Kill ${sname}`}
+							title="Kill session"
+							data-testid={`kill-session-${sname}`}
+							sx={{
+								color: "text.disabled",
+								width: 24,
+								height: 24,
+								"& .MuiSvgIcon-root": { fontSize: "14px" },
+								transition: "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+								"&:hover": {
+									bgcolor: "error.main",
+									color: "common.white",
+									transform: "scale(1.2)",
+								},
+							}}
+						/>
+					</Stack>
+				</ListItemButton>
 			)}
 		</Box>
 	);
@@ -406,9 +420,9 @@ function formatRelativeTime(dateStr: string): string {
 	const diffHour = Math.floor(diffMin / 60);
 	const diffDay = Math.floor(diffHour / 24);
 
-	if (diffSec < 60) return "just now";
-	if (diffMin < 60) return `${diffMin}m ago`;
-	if (diffHour < 24) return `${diffHour}h ago`;
-	if (diffDay < 7) return `${diffDay}d ago`;
+	if (diffSec < 60) return "now";
+	if (diffMin < 60) return `${diffMin}m`;
+	if (diffHour < 24) return `${diffHour}h`;
+	if (diffDay < 7) return `${diffDay}d`;
 	return date.toLocaleDateString();
 }

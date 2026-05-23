@@ -927,17 +927,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ai_stats_cleanup_route_keeps_latest_event_per_window() {
+    async fn ai_stats_cleanup_route_deletes_older_than_5_min() {
         let (app, dir) = test_app_with_storage().await;
         let db_path = dir.path().join("runtime/data/wmux.db");
         let pool = wmux_core::storage::db::create_pool(&db_path)
             .await
             .expect("create pool");
 
-        for (id, window, created_at) in [
-            ("old-window-1", 1_i64, "2024-01-01T00:00:00Z"),
-            ("new-window-1", 1_i64, "2024-01-02T00:00:00Z"),
-            ("only-window-2", 2_i64, "2024-01-01T00:00:00Z"),
+        let now = time::OffsetDateTime::now_utc();
+        let old = (now - time::Duration::minutes(10))
+            .format(&time::format_description::well_known::Rfc3339)
+            .expect("RFC3339 format is infallible");
+        let recent = (now - time::Duration::minutes(1))
+            .format(&time::format_description::well_known::Rfc3339)
+            .expect("RFC3339 format is infallible");
+
+        for (id, created_at) in [
+            ("old-1", old.as_str()),
+            ("old-2", old.as_str()),
+            ("recent-1", recent.as_str()),
         ] {
             sqlx::query(
                 "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -955,7 +963,7 @@ mod tests {
             .bind(None::<i64>)
             .bind(None::<f64>)
             .bind(None::<String>)
-            .bind(window)
+            .bind(Some(1_i64))
             .bind(None::<String>)
             .bind(created_at)
             .execute(&pool)
@@ -969,7 +977,7 @@ mod tests {
             .await
             .expect("response");
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(json_body(resp).await["deleted"], 1);
+        assert_eq!(json_body(resp).await["deleted"], 2);
 
         let stats = app
             .oneshot(request("GET", "/api/ai/stats?limit=10", None))
@@ -983,9 +991,9 @@ mod tests {
             .filter_map(|event| event["id"].as_str())
             .collect();
 
-        assert!(ids.contains(&"new-window-1"));
-        assert!(ids.contains(&"only-window-2"));
-        assert!(!ids.contains(&"old-window-1"));
+        assert!(ids.contains(&"recent-1"));
+        assert!(!ids.contains(&"old-1"));
+        assert!(!ids.contains(&"old-2"));
     }
 
     #[tokio::test]

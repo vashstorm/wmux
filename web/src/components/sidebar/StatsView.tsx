@@ -107,7 +107,7 @@ export function StatsView() {
 	const handleCleanup = useCallback(() => {
 		showConfirm({
 			title: "Clean AI Usage Logs",
-			message: "This will keep only the latest record for each target, session, and window. Older AI usage records will be permanently deleted.",
+			message: "This will delete all AI usage records older than 5 minutes. Records within the last 5 minutes will be kept.",
 			confirmText: "Clean",
 			confirmVariant: "danger",
 			onConfirm: () => {
@@ -138,7 +138,7 @@ export function StatsView() {
 					<IconButton size="small" onClick={handleManualRefresh} data-testid="stats-refresh-button" aria-label="Refresh stats" disabled={loading}>
 						<RefreshIcon fontSize="small" />
 					</IconButton>
-					<Tooltip title="Keep latest record per window">
+					<Tooltip title="Delete records older than 5 min">
 						<span>
 							<IconButton
 								size="small"
@@ -181,13 +181,20 @@ export function StatsView() {
 						gap: 1,
 					}}>
 						<Box sx={{
-							p: 1.5,
+							p: 2,
 							borderRadius: "var(--radius-md)",
-							bgcolor: "background.default",
+							bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.06)" : "rgba(16, 185, 129, 0.04)",
 							border: "1px solid",
-							borderColor: "success.main",
-							borderLeftWidth: 3,
+							borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(16, 185, 129, 0.2)" : "rgba(16, 185, 129, 0.15)",
 							textAlign: "center",
+							boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.25)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
+							backdropFilter: "blur(8px)",
+							transition: "all var(--transition-base)",
+							"&:hover": {
+								borderColor: "success.main",
+								boxShadow: "var(--glow-success)",
+								transform: "translateY(-1px)",
+							}
 						}}>
 							<Typography sx={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "success.main", lineHeight: 1 }}>
 								{summary.totalSuccess}
@@ -195,13 +202,20 @@ export function StatsView() {
 							<Typography sx={{ fontSize: "var(--font-size-xs)", color: "text.secondary", mt: 0.25 }}>Success</Typography>
 						</Box>
 						<Box sx={{
-							p: 1.5,
+							p: 2,
 							borderRadius: "var(--radius-md)",
-							bgcolor: "background.default",
+							bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.06)" : "rgba(239, 68, 68, 0.04)",
 							border: "1px solid",
-							borderColor: "error.main",
-							borderLeftWidth: 3,
+							borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.15)",
 							textAlign: "center",
+							boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.25)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
+							backdropFilter: "blur(8px)",
+							transition: "all var(--transition-base)",
+							"&:hover": {
+								borderColor: "error.main",
+								boxShadow: "var(--glow-danger)",
+								transform: "translateY(-1px)",
+							}
 						}}>
 							<Typography sx={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "error.main", lineHeight: 1 }}>
 								{summary.totalError}
@@ -224,8 +238,9 @@ export function StatsView() {
 							onClick={() => setSelectedAiEvent(event)}
 							data-testid={`stats-event-${event.id}`}
 							sx={{
-								px: 0,
-								py: 0.5,
+								px: 1,
+								py: 1,
+								my: 0.5,
 								borderRadius: "var(--radius-sm)",
 								cursor: "pointer",
 								bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
@@ -234,17 +249,34 @@ export function StatsView() {
 								overflow: "hidden",
 							}}
 						>
-							<Stack direction="row" spacing={1} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
-								{/* Left accent bar */}
+							<Stack direction="row" spacing={1.5} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
+								{/* Glowing status dot */}
 								<Box
 									sx={{
-										width: 3,
-										borderRadius: "var(--radius-full)",
-										alignSelf: "stretch",
-										minHeight: 16,
+										width: 8,
+										height: 8,
+										borderRadius: "50%",
 										flexShrink: 0,
 										backgroundColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
-										opacity: 0.7,
+										boxShadow: event.status === "success" 
+											? "0 0 8px var(--color-success)" 
+											: event.status === "error" 
+												? "0 0 8px var(--color-danger)" 
+												: "none",
+										position: "relative",
+										"&::after": {
+											content: '""',
+											position: "absolute",
+											top: -2,
+											left: -2,
+											right: -2,
+											bottom: -2,
+											borderRadius: "50%",
+											border: "1px solid",
+											borderColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "transparent",
+											opacity: 0.4,
+											animation: event.status === "success" || event.status === "error" ? "pulse 2s infinite ease-in-out" : "none",
+										}
 									}}
 								/>
 								<Stack

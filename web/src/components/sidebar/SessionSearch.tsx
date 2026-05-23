@@ -11,9 +11,10 @@ export function SessionSearch({ value, onChange }: SessionSearchProps) {
   return (
     <Box
       sx={{
-        py: "var(--spacing-sm)",
-        px: "var(--spacing-md)",
-        mx: "calc(-1 * var(--spacing-md))",
+        py: "var(--spacing-md)",
+        px: "var(--spacing-lg)",
+        mx: "calc(-1 * var(--spacing-lg))",
+        mb: "var(--spacing-md)",
         display: "flex",
         alignItems: "center",
         borderBottom: 1,

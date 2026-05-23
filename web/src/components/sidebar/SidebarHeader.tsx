@@ -23,10 +23,10 @@ export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) 
 		<Box
 			className="sidebar-header"
 			sx={{
-				minHeight: "var(--app-shell-header-height, 42px)",
+				minHeight: 48,
 				display: "flex",
 				alignItems: "center",
-				px: "var(--spacing-md)",
+				px: "var(--spacing-lg)",
 				borderBottom: "1px solid",
 				borderColor: "divider",
 				boxShadow: "var(--shadow-header-bottom)",

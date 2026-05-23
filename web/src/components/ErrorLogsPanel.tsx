@@ -93,8 +93,19 @@ export function ErrorLogsPanel() {
 	};
 
 	return (
-		<Dialog open={showErrorLogsPanel} onClose={closePanel} fullWidth maxWidth="md" data-testid="error-logs-panel">
-			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 2 }}>
+		<Dialog
+			open={showErrorLogsPanel}
+			onClose={closePanel}
+			fullWidth
+			maxWidth="md"
+			data-testid="error-logs-panel"
+			slotProps={{
+				paper: {
+					className: "error-logs-panel"
+				}
+			}}
+		>
+			<DialogTitle className="error-logs-panel-header" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 2 }}>
 				<Box>
 					<Typography variant="h6" component="span" id="error-logs-title" sx={{ fontSize: ERROR_LOGS_FONT_SIZE.title }}>Error Logs</Typography>
 					<Typography variant="body2" color="text.secondary" sx={{ display: "block", fontSize: ERROR_LOGS_FONT_SIZE.subtitle }}>Recent backend error entries</Typography>
@@ -103,7 +114,7 @@ export function ErrorLogsPanel() {
 					<CloseIcon />
 				</IconButton>
 			</DialogTitle>
-			<DialogContent dividers sx={{ minHeight: 300, maxHeight: 600, overflow: "auto" }}>
+			<DialogContent dividers className="error-logs-panel-body" sx={{ minHeight: 300, maxHeight: 600, overflow: "auto" }}>
 				{logEnabled && logPath && (
 					<Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: ERROR_LOGS_FONT_SIZE.body }} data-testid="error-logs-path">
 						Reading from <code>{logPath}</code>
@@ -131,7 +142,8 @@ export function ErrorLogsPanel() {
 						)}
 						<Paper
 							variant="outlined"
-							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "var(--font-mono)", fontSize: ERROR_LOGS_FONT_SIZE.code, bgcolor: "action.hover" }}
+							className="error-logs-content"
+							sx={{ p: 1, maxHeight: 400, overflow: "auto", fontFamily: "var(--font-mono)", fontSize: ERROR_LOGS_FONT_SIZE.code }}
 							data-testid="error-logs-content"
 						>
 							{logLines.map((line, index) => (
@@ -148,8 +160,8 @@ export function ErrorLogsPanel() {
 					</>
 				)}
 			</DialogContent>
-			<DialogActions>
-				<Stack direction="row" spacing={1} sx={{ mr: "auto" }}>
+			<DialogActions className="error-logs-panel-footer">
+				<Stack direction="row" spacing={1} className="error-logs-toolbar" sx={{ mr: "auto" }}>
 					<Button
 						startIcon={<RefreshIcon />}
 						onClick={() => void fetchLogsf()}

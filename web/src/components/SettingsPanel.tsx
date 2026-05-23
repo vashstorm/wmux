@@ -655,10 +655,15 @@ export function SettingsPanel() {
 			maxWidth="md"
 			fullWidth
 			data-testid="settings-panel"
+			slotProps={{
+				paper: {
+					className: "settings-panel"
+				}
+			}}
 		>
-			<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 3 }}>
-				<Box>
-					<Typography variant="h6" component="h3">Settings</Typography>
+			<DialogTitle className="settings-panel-header" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 3 }}>
+				<Box className="settings-panel-header-title">
+					<Typography variant="h6" component="h3" className="form-title">Settings</Typography>
 				</Box>
 				<IconButton
 					onClick={closePanel}
@@ -670,32 +675,30 @@ export function SettingsPanel() {
 			</DialogTitle>
 
 			{isLoading || !formState ? (
-				<DialogContent>
+				<DialogContent className="settings-panel-loading">
 					<Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "200px", gap: 2 }}>
 						<CircularProgress size={40} />
 						<Typography variant="body2" color="text.secondary">Loading settings...</Typography>
 					</Box>
 				</DialogContent>
 			) : (
-				<Box sx={{ display: "flex", height: "72vh", minHeight: 560, overflow: "hidden" }}>
+				<Box className="settings-panel-body" sx={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
 					<Box
 						role="complementary"
+						className="settings-sidebar"
 						sx={{
 							width: 232,
-							borderRight: 1,
-							borderColor: "divider",
 							p: 1.5,
 							display: "flex",
 							flexDirection: "column",
-							bgcolor: "action.hover",
 						}}
 					>
-						<Box sx={{ px: 1, py: 1.25 }}>
+						<Box className="settings-sidebar-header" sx={{ px: 1, py: 1.25 }}>
 							<Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase", letterSpacing: 0 }}>
 								Workspace
 							</Typography>
 						</Box>
-						<List component="nav" aria-label="Settings sections" data-testid="settings-nav" disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+						<List component="nav" aria-label="Settings sections" className="settings-nav" data-testid="settings-nav" disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
 							{SETTINGS_SECTIONS.map((item) => {
 								const SectionIcon = item.icon;
 								const selected = activeTab === item.key;
@@ -704,22 +707,21 @@ export function SettingsPanel() {
 										key={item.key}
 										selected={selected}
 										onClick={() => flushSync(() => setActiveTab(item.key))}
+										className={`settings-nav-item ${selected ? "is-active" : ""}`}
 										sx={{
-											minHeight: 44,
-											px: 1.25,
-											py: 1,
-											gap: 1.25,
-											border: 1,
-											borderColor: selected ? "primary.main" : "transparent",
-											bgcolor: selected ? "action.selected" : "transparent",
+											flex: "0 0 auto",
+											minHeight: 36,
+											px: 1,
+											py: 0.625,
+											gap: 1,
 										}}
 									>
-										<SectionIcon sx={{ fontSize: 18, color: selected ? "primary.main" : "text.secondary", flexShrink: 0 }} />
+										<SectionIcon className="nav-icon" sx={{ fontSize: 16, flexShrink: 0 }} />
 										<Box sx={{ minWidth: 0 }}>
-											<Typography variant="body2" sx={{ fontWeight: selected ? 700 : 600, lineHeight: 1.2 }}>
+											<Typography variant="body2" sx={{ fontSize: "var(--font-size-sm)", fontWeight: selected ? 700 : 600, lineHeight: 1.2 }}>
 												{item.label}
 											</Typography>
-											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25, lineHeight: 1.25 }}>
+											<Typography variant="caption" color="text.secondary" className="settings-panel-subtitle" sx={{ display: "block", mt: 0.125, lineHeight: 1.2 }}>
 												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : formState.intelligenceEnabled ? "Enabled" : "Disabled"}
 											</Typography>
 										</Box>
@@ -728,16 +730,16 @@ export function SettingsPanel() {
 							})}
 						</List>
 
-						<Box sx={{ mt: "auto", p: 1 }}>
-							<Typography variant="caption" color="text.secondary">wmux v{window.performance ? "0.1.0" : "dev"}</Typography>
+						<Box className="settings-sidebar-footer" sx={{ mt: "auto", p: 1 }}>
+							<Typography variant="caption" color="text.secondary" className="version-info">wmux v{window.performance ? "0.1.0" : "dev"}</Typography>
 						</Box>
 					</Box>
 
-					<Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+					<Box className="settings-main" sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 						<form className="settings-form" onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-							<Box sx={{ flex: 1, overflow: "auto", px: 3, py: 2.5 }} ref={scrollContainerRef}>
+							<Box className="settings-content-scroll" sx={{ flex: 1, overflow: "auto" }} ref={scrollContainerRef}>
 								{activeTab === "general" && (
-									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Server Configuration</Typography>
 											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
@@ -816,7 +818,7 @@ export function SettingsPanel() {
 								)}
 
 								{activeTab === "connections" && (
-									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 										<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Managed Connections</Typography>
 											<Button
@@ -921,7 +923,7 @@ export function SettingsPanel() {
 								)}
 
 								{activeTab === "intelligence" && (
-									<Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>AI Intelligence</Typography>
 											<FormControlLabel
@@ -1201,7 +1203,7 @@ export function SettingsPanel() {
 								)}
 
 								{activeTab === "typography" && (
-									<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Typography</Typography>
 											<Box

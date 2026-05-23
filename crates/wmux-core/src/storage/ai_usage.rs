@@ -137,48 +137,21 @@ impl AiUsageRepository {
         &self,
         project_id: Option<&str>,
     ) -> Result<u64, sqlx::Error> {
+        let cutoff = (OffsetDateTime::now_utc() - time::Duration::minutes(5))
+            .format(&Rfc3339)
+            .expect("RFC3339 format is infallible");
+
         let result = if let Some(pid) = project_id {
-            sqlx::query(
-                r#"
-                DELETE FROM ai_usage_events AS old
-                WHERE old.project_id = ?
-                  AND EXISTS (
-                    SELECT 1
-                    FROM ai_usage_events AS newer
-                    WHERE newer.project_id = old.project_id
-                      AND newer.target_name = old.target_name
-                      AND newer.session_name = old.session_name
-                      AND newer.window_number IS old.window_number
-                      AND (
-                        newer.created_at > old.created_at
-                        OR (newer.created_at = old.created_at AND newer.rowid > old.rowid)
-                      )
-                  )
-                "#,
-            )
-            .bind(pid)
-            .execute(&self.pool)
-            .await?
+            sqlx::query("DELETE FROM ai_usage_events WHERE project_id = ? AND created_at < ?")
+                .bind(pid)
+                .bind(&cutoff)
+                .execute(&self.pool)
+                .await?
         } else {
-            sqlx::query(
-                r#"
-                DELETE FROM ai_usage_events AS old
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM ai_usage_events AS newer
-                    WHERE newer.project_id IS old.project_id
-                      AND newer.target_name = old.target_name
-                      AND newer.session_name = old.session_name
-                      AND newer.window_number IS old.window_number
-                      AND (
-                        newer.created_at > old.created_at
-                        OR (newer.created_at = old.created_at AND newer.rowid > old.rowid)
-                      )
-                )
-                "#,
-            )
-            .execute(&self.pool)
-            .await?
+            sqlx::query("DELETE FROM ai_usage_events WHERE created_at < ?")
+                .bind(&cutoff)
+                .execute(&self.pool)
+                .await?
         };
 
         Ok(result.rows_affected())
@@ -392,60 +365,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ai_usage_delete_stale_window_events_keeps_latest_per_window() {
+    async fn ai_usage_delete_stale_window_events_deletes_older_than_5_min() {
         let (pool, _dir) = setup_test_db().await;
         let repo = AiUsageRepository::new(pool);
 
-        for (id, target, session, window, created_at) in [
-            (
-                "old-window-1",
-                "local",
-                "session-a",
-                Some(1_i64),
-                "2024-01-01T00:00:00Z",
-            ),
-            (
-                "new-window-1",
-                "local",
-                "session-a",
-                Some(1_i64),
-                "2024-01-02T00:00:00Z",
-            ),
-            (
-                "old-window-2",
-                "local",
-                "session-a",
-                Some(2_i64),
-                "2024-01-01T00:00:00Z",
-            ),
-            (
-                "new-window-2",
-                "local",
-                "session-a",
-                Some(2_i64),
-                "2024-01-03T00:00:00Z",
-            ),
-            (
-                "same-number-other-session",
-                "local",
-                "session-b",
-                Some(1_i64),
-                "2024-01-01T00:00:00Z",
-            ),
-            (
-                "old-null-window",
-                "local",
-                "session-a",
-                None,
-                "2024-01-01T00:00:00Z",
-            ),
-            (
-                "new-null-window",
-                "local",
-                "session-a",
-                None,
-                "2024-01-04T00:00:00Z",
-            ),
+        let now = OffsetDateTime::now_utc();
+        let old = (now - time::Duration::minutes(10))
+            .format(&Rfc3339)
+            .expect("RFC3339 format is infallible");
+        let recent = (now - time::Duration::minutes(1))
+            .format(&Rfc3339)
+            .expect("RFC3339 format is infallible");
+
+        for (id, created_at) in [
+            ("old-1", old.as_str()),
+            ("old-2", old.as_str()),
+            ("old-3", old.as_str()),
+            ("recent-1", recent.as_str()),
+            ("recent-2", recent.as_str()),
         ] {
             sqlx::query(
                 "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -454,8 +391,8 @@ mod tests {
             .bind(None::<String>)
             .bind("test")
             .bind("model")
-            .bind(target)
-            .bind(session)
+            .bind("local")
+            .bind("session-a")
             .bind("success")
             .bind(0)
             .bind(None::<i64>)
@@ -463,7 +400,7 @@ mod tests {
             .bind(None::<i64>)
             .bind(None::<f64>)
             .bind(None::<String>)
-            .bind(window)
+            .bind(Some(1_i64))
             .bind(None::<String>)
             .bind(created_at)
             .execute(&repo.pool)
@@ -480,13 +417,11 @@ mod tests {
         let remaining = repo.list(20, None).await.expect("list remaining");
         let ids: Vec<&str> = remaining.iter().map(|event| event.id.as_str()).collect();
 
-        assert!(ids.contains(&"new-window-1"));
-        assert!(ids.contains(&"new-window-2"));
-        assert!(ids.contains(&"same-number-other-session"));
-        assert!(ids.contains(&"new-null-window"));
-        assert!(!ids.contains(&"old-window-1"));
-        assert!(!ids.contains(&"old-window-2"));
-        assert!(!ids.contains(&"old-null-window"));
+        assert!(ids.contains(&"recent-1"));
+        assert!(ids.contains(&"recent-2"));
+        assert!(!ids.contains(&"old-1"));
+        assert!(!ids.contains(&"old-2"));
+        assert!(!ids.contains(&"old-3"));
     }
 
     #[tokio::test]
@@ -509,11 +444,19 @@ mod tests {
             .expect("insert project");
         }
 
+        let now = OffsetDateTime::now_utc();
+        let old = (now - time::Duration::minutes(10))
+            .format(&Rfc3339)
+            .expect("RFC3339 format is infallible");
+        let recent = (now - time::Duration::minutes(1))
+            .format(&Rfc3339)
+            .expect("RFC3339 format is infallible");
+
         for (id, project, created_at) in [
-            ("a-old", "project-A", "2024-01-01T00:00:00Z"),
-            ("a-new", "project-A", "2024-01-02T00:00:00Z"),
-            ("b-old", "project-B", "2024-01-01T00:00:00Z"),
-            ("b-new", "project-B", "2024-01-02T00:00:00Z"),
+            ("a-old", "project-A", old.as_str()),
+            ("a-new", "project-A", recent.as_str()),
+            ("b-old", "project-B", old.as_str()),
+            ("b-new", "project-B", recent.as_str()),
         ] {
             sqlx::query(
                 "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"

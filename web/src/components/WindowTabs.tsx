@@ -1,5 +1,5 @@
 import type { ElementType } from "react";
-import { Box, Tabs, Tab, Stack, Typography, Chip, keyframes } from "@mui/material";
+import { Box, Tabs, Tab, Stack, Typography, keyframes } from "@mui/material";
 import SvgIcon, { type SvgIconProps } from "@mui/material/SvgIcon";
 import CodeIcon from "@mui/icons-material/Code";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
@@ -356,32 +356,38 @@ export function WindowTabs({
 	const tabSxBase = {
 		minHeight: 34,
 		height: 34,
-		padding: "0 12px",
+		padding: "0 13px",
 		textTransform: "none" as const,
-		borderRadius: "var(--radius-sm)",
+		borderRadius: "8px",
 		gap: 1,
 		flexDirection: "row" as const,
 		flexShrink: 0,
 		minWidth: "auto",
-		overflow: "hidden",
+		overflow: "visible",
 	};
 
 	return (
 		<Box className="window-tabs" data-testid="window-tabs" sx={{
 			display: "flex",
 			alignItems: "center",
-			gap: 1.25,
-			paddingX: 2,
-			paddingTop: 1.25,
-			paddingBottom: 1,
+			minHeight: 52,
+			paddingX: "var(--spacing-lg)",
+			paddingY: 0,
 			background: (theme) =>
 				theme.palette.mode === "dark"
-					? "linear-gradient(to bottom, rgba(20,26,34,0.95) 0%, rgba(13,17,23,0.98) 100%)"
-					: "linear-gradient(to bottom, rgba(255,255,255,0.98) 0%, rgba(247,248,251,0.95) 100%)",
+					? "rgba(13, 17, 23, 0.85)"
+					: "rgba(250, 251, 253, 0.92)",
+			backdropFilter: "blur(16px) saturate(180%)",
+			WebkitBackdropFilter: "blur(16px) saturate(180%)",
 			borderBottom: "1px solid",
-			borderColor: "divider",
-			boxShadow: "var(--shadow-header-bottom)",
-			overflowX: "auto",
+			borderColor: (theme) =>
+				theme.palette.mode === "dark"
+					? "rgba(255,255,255,0.06)"
+					: "rgba(0,0,0,0.07)",
+			boxShadow: (theme) =>
+				theme.palette.mode === "dark"
+					? "0 1px 0 rgba(255,255,255,0.04), 0 4px 16px rgba(0,0,0,0.28)"
+					: "0 1px 0 rgba(0,0,0,0.05), 0 2px 12px rgba(0,0,0,0.05)",
 			flexShrink: 0,
 		}}>
 			<Tabs
@@ -395,14 +401,14 @@ export function WindowTabs({
 					overflow: "hidden",
 					"& .MuiTabs-scroller": {
 						overflow: "auto hidden !important",
-						paddingTop: 0.5,
-						paddingBottom: 0.5,
+						paddingTop: "9px",
+						paddingBottom: "9px",
 					},
 					"& .MuiTabs-indicator": {
 						display: "none",
 					},
 					"& .MuiTabs-flexContainer": {
-						gap: 1.75,
+						gap: "6px",
 						alignItems: "center",
 					},
 				}}
@@ -420,6 +426,7 @@ export function WindowTabs({
 					const appConfig = getAppIconConfig(appName);
 					const AppIcon = appConfig?.Icon;
 					const statusTone = getStatusTone(window);
+					const hasNonDefaultStatus = statusTone.name !== "none";
 					const tabClasses = [
 						"window-tab",
 						isActive && "is-active",
@@ -444,39 +451,70 @@ export function WindowTabs({
 							sx={{
 								...tabSxBase,
 								position: "relative",
-								maxWidth: isActive ? 280 : 180,
-								marginRight: index === windows.length - 1 ? 0 : 1,
-								backgroundColor: isActive
-									? statusTone.selectedBackgroundColor
-									: statusTone.backgroundColor,
+								maxWidth: isActive ? 260 : 160,
+								marginRight: 0,
+								/* Active tab: filled background with subtle gradient */
+								background: isActive
+									? (theme) => hasNonDefaultStatus
+										? statusTone.selectedBackgroundColor
+										: theme.palette.mode === "dark"
+											? "rgba(107, 130, 245, 0.14)"
+											: "rgba(255, 255, 255, 0.95)"
+									: "transparent",
 								border: "1px solid",
-								borderColor: isActive ? statusTone.color : statusTone.softBorderColor,
-								color: isActive ? statusTone.color : "text.secondary",
-								fontWeight: isActive ? 600 : 500,
-								transform: isActive ? "translateY(-1px)" : "translateY(0)",
+								borderColor: isActive
+									? (theme) => hasNonDefaultStatus
+										? statusTone.softBorderColor
+										: theme.palette.mode === "dark"
+											? "rgba(107, 130, 245, 0.32)"
+											: "rgba(79, 107, 237, 0.22)"
+									: "transparent",
+								color: isActive
+									? hasNonDefaultStatus ? statusTone.color : "primary.main"
+									: "text.secondary",
+								fontWeight: isActive ? 600 : 400,
+								transform: isActive ? "translateY(-1px)" : "none",
 								boxShadow: isActive
-									? (theme) => [
-											`0 0 0 1px ${statusTone.name === "none" ? `${theme.palette.primary.main}33` : statusTone.softBorderColor}`,
-											theme.palette.mode === "dark" ? "0 4px 12px rgba(0,0,0,0.4)" : "0 4px 12px rgba(0,0,0,0.08)",
-											statusTone.name !== "none" ? `0 0 16px ${statusTone.softBorderColor}` : "",
-										].filter(Boolean).join(", ")
+									? (theme) => hasNonDefaultStatus
+										? [
+												`0 2px 12px ${statusTone.softBorderColor}`,
+												theme.palette.mode === "dark" ? "0 4px 16px rgba(0,0,0,0.5)" : "0 2px 8px rgba(0,0,0,0.10)",
+											].join(", ")
+										: theme.palette.mode === "dark"
+											? "0 2px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(107,130,245,0.2)"
+											: "0 2px 8px rgba(0,0,0,0.10), 0 0 0 1px rgba(79,107,237,0.14)"
 									: "none",
-								transition: "all var(--transition-base)",
+								transition: "all 180ms cubic-bezier(0.34, 1.56, 0.64, 1)",
 								"&:hover": {
-									backgroundColor: isActive ? statusTone.selectedBackgroundColor : "action.hover",
-									borderColor: statusTone.color,
+									background: isActive
+										? undefined
+										: (theme) => theme.palette.mode === "dark"
+											? "rgba(255,255,255,0.05)"
+											: "rgba(0,0,0,0.04)",
+									borderColor: hasNonDefaultStatus
+										? statusTone.softBorderColor
+										: (theme) => theme.palette.mode === "dark"
+											? "rgba(107,130,245,0.22)"
+											: "rgba(79,107,237,0.16)",
 									transform: "translateY(-1px)",
+									color: isActive ? undefined : "text.primary",
 								},
-								"&::before": isActive
+								/* Top-edge accent stripe for active tab */
+								"&::after": isActive
 									? {
 											content: "\"\"",
 											position: "absolute",
-											left: 0,
-											top: "18%",
-											bottom: "18%",
-											width: "3px",
-											borderRadius: "0 6px 6px 0",
-											backgroundColor: statusTone.color,
+											top: -1,
+											left: "20%",
+											right: "20%",
+											height: "2px",
+											borderRadius: "0 0 3px 3px",
+											background: hasNonDefaultStatus
+												? statusTone.color
+												: "linear-gradient(90deg, #4f6bed, #7c3aed)",
+											boxShadow: hasNonDefaultStatus
+												? `0 0 8px ${statusTone.softBorderColor}`
+												: "0 0 8px rgba(107,130,245,0.5)",
 										}
 									: {},
 							}}
@@ -487,28 +525,38 @@ export function WindowTabs({
 									data-testid={`window-tab-content-${window.id}`}
 									sx={{ alignItems: "center", minWidth: 0, maxWidth: "100%" }}
 								>
-									<Chip
-										label={window.index}
-										size="small"
+									<Box
+										component="span"
 										className="window-tab-index"
 										sx={{
-											height: 20,
-											minWidth: 20,
-											maxWidth: 20,
+											display: "inline-flex",
+											alignItems: "center",
+											justifyContent: "center",
+											width: 17,
+											height: 17,
+											minWidth: 17,
+											flex: "0 0 17px",
 											fontSize: "var(--font-size-2xs)",
 											fontWeight: 700,
 											lineHeight: 1,
-											borderRadius: "999px",
-											backgroundColor: isActive ? statusTone.color : "action.disabledBackground",
-											color: isActive ? "primary.contrastText" : "text.secondary",
+											borderRadius: "50%",
+											background: isActive
+												? hasNonDefaultStatus
+													? statusTone.color
+													: "linear-gradient(135deg, #4f6bed, #7c3aed)"
+												: undefined,
+											backgroundColor: isActive ? undefined : "action.disabledBackground",
+											color: isActive ? "#fff" : "text.disabled",
 											border: isActive ? "none" : "1px solid",
 											borderColor: isActive ? "transparent" : "divider",
-											"& .MuiChip-label": {
-												paddingLeft: "5px",
-												paddingRight: "5px",
-											},
+											boxShadow: isActive && !hasNonDefaultStatus
+												? "0 0 6px rgba(107,130,245,0.45)"
+												: "none",
+											transition: "all 180ms cubic-bezier(0.34, 1.56, 0.64, 1)",
 										}}
-									/>
+									>
+										{window.index}
+									</Box>
 									{appConfig && AppIcon && (
 										<Box
 											component="span"
@@ -524,8 +572,10 @@ export function WindowTabs({
 												height: 20,
 												borderRadius: "6px",
 												color: appConfig.color,
-												backgroundColor: appConfig.backgroundColor,
+												backgroundColor: isActive ? appConfig.backgroundColor : "transparent",
 												flex: "0 0 20px",
+												opacity: isActive ? 1 : 0.65,
+												transition: "all 180ms ease",
 											}}
 										>
 											<AppIcon sx={{ fontSize: "var(--font-size-sm)" }} />
@@ -536,12 +586,14 @@ export function WindowTabs({
 										className="window-tab-name"
 										variant="body2"
 										sx={{
-											fontWeight: 500,
+											fontSize: "var(--font-size-xs)",
+											fontWeight: isActive ? 600 : 400,
 											overflow: "hidden",
 											textOverflow: "ellipsis",
 											whiteSpace: "nowrap",
 											minWidth: 0,
 											flex: "1 1 auto",
+											letterSpacing: "-0.01em",
 										}}
 									>
 										{displayName}
@@ -554,17 +606,20 @@ export function WindowTabs({
 												display: "inline-flex",
 												alignItems: "center",
 												justifyContent: "center",
-												minWidth: 18,
-												height: 18,
+												minWidth: 16,
+												height: 16,
 												padding: "0 4px",
-												borderRadius: "50%",
-												fontSize: "var(--font-size-xs)",
-												fontWeight: 600,
+												borderRadius: "var(--radius-full)",
+												fontSize: "var(--font-size-2xs)",
+												fontWeight: 700,
 												lineHeight: 1,
 												color: "#fff",
 												backgroundColor: isAttentionExplicit ? "var(--color-attention-explicit)" : "var(--color-attention)",
-													animation: isAttentionExplicit ? `${pulseAnimation} 2s infinite` : "none",
+												animation: isAttentionExplicit ? `${pulseAnimation} 2s infinite` : "none",
 												flexShrink: 0,
+												boxShadow: isAttentionExplicit
+													? "0 0 6px rgba(220,38,38,0.5)"
+													: "0 0 6px rgba(217,119,6,0.4)",
 											}}
 										>
 											{window.attentionCount}
