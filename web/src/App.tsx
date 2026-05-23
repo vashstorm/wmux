@@ -19,6 +19,7 @@ import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
+import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js";
 import { normalizeThemeId } from "./ui/themes.js";
 
 function UISettingsInit() {
@@ -98,10 +99,16 @@ function ThemeToggle() {
 	);
 }
 
+function WorkspaceNavigationSync() {
+	useWorkspaceNavigation();
+	return null;
+}
+
 export function App() {
 	return (
 		<AppProvider>
 			<UISettingsInit />
+			<WorkspaceNavigationSync />
 			<MuiThemeShell>
 				<div className="app-shell" data-testid="app-shell">
 					<ConfigConflictBanner />
