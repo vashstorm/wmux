@@ -371,7 +371,7 @@ export function WindowTabs({
 			display: "flex",
 			alignItems: "center",
 			minHeight: 52,
-			paddingX: "var(--spacing-lg)",
+			paddingX: "calc(var(--spacing-lg) - 6px)",
 			paddingY: 0,
 			background: (theme) =>
 				theme.palette.mode === "dark"
@@ -408,8 +408,10 @@ export function WindowTabs({
 						display: "none",
 					},
 					"& .MuiTabs-flexContainer": {
-						gap: "6px",
+						gap: "0px",
 						alignItems: "center",
+						paddingLeft: "6px",
+						paddingRight: "6px",
 					},
 				}}
 			>
@@ -452,7 +454,7 @@ export function WindowTabs({
 								...tabSxBase,
 								position: "relative",
 								maxWidth: isActive ? 260 : 160,
-								marginRight: 0,
+								marginRight: "8px",
 								/* Active tab: filled background with subtle gradient */
 								background: isActive
 									? (theme) => hasNonDefaultStatus

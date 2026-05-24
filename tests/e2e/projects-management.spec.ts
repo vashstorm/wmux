@@ -34,7 +34,7 @@ test.describe("wmux project management workflow", () => {
 
 		await page.getByTestId("project-launch-button").click();
 		
-		await expect(page.getByTestId("project-launch-button")).toBeEnabled({ timeout: 10000 });
+		await expect(page.getByTestId("main-title")).toBeVisible({ timeout: 10000 });
 		
 		try {
 			execFileSync("tmux", ["has-session", "-t", sessionName], { stdio: "ignore" });
