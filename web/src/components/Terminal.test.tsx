@@ -175,7 +175,7 @@ describe("Terminal", () => {
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(mockProposeDimensions).toHaveBeenCalled();
 		expect(mockFit).not.toHaveBeenCalled();
-		expect(callArgs.cols).toBe(114);
+		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
 	});
 
@@ -183,8 +183,8 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
 
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockXTermResize).toHaveBeenCalledWith(114, 40);
-		expect(callArgs.cols).toBe(114);
+		expect(mockXTermResize).toHaveBeenCalledWith(120, 40);
+		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
 	});
 
@@ -208,7 +208,7 @@ describe("Terminal", () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
 		expect(capturedOnResize).not.toBeNull();
-		capturedOnResize!({ cols: 114, rows: 40 });
+		capturedOnResize!({ cols: 120, rows: 40 });
 
 		expect(mockWsSend).not.toHaveBeenCalled();
 	});

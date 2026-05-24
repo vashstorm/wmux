@@ -24,25 +24,15 @@ interface TerminalSize {
 	rows: number;
 }
 
-const TERMINAL_FIT_COLUMN_GUTTER = 6;
-const MIN_TERMINAL_COLS = 2;
-
 function normalizeTerminalSize(cols: number | undefined, rows: number | undefined): TerminalSize | null {
 	if (!Number.isInteger(cols) || !Number.isInteger(rows)) return null;
 	if (!cols || !rows || cols <= 0 || rows <= 0) return null;
 	return { cols, rows };
 }
 
-function applyFitGutter(size: TerminalSize): TerminalSize {
-	return {
-		cols: Math.max(MIN_TERMINAL_COLS, size.cols - TERMINAL_FIT_COLUMN_GUTTER),
-		rows: size.rows,
-	};
-}
-
 function resolveDisplaySize(fittedSize: TerminalSize | null, sourceSize: TerminalSize | null | undefined): TerminalSize | null {
 	if (!fittedSize) return sourceSize ?? null;
-	return applyFitGutter(fittedSize);
+	return fittedSize;
 }
 
 function redrawTerminal(terminal: XTerm) {

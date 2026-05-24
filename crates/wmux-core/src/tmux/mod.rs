@@ -10,6 +10,7 @@ use tokio::process::Command;
 
 const DEFAULT_BINARY_PATH: &str = "tmux";
 const FIELD_SEPARATOR: &str = "\x1f";
+const INTERNAL_TERMINAL_SESSION_PREFIX: &str = "wmux-terminal-";
 
 const SESSION_FORMAT: &str =
     "#{session_id}\x1f#{session_name}\x1f#{session_attached}\x1f#{session_windows}";
@@ -117,7 +118,12 @@ impl<R: CommandRunner> Adapter<R> {
 
     pub async fn list_sessions(&self) -> Result<Vec<Session>> {
         match self.run_raw(&["list-sessions", "-F", SESSION_FORMAT]).await {
-            Ok(output) => parse_sessions_output(output.as_str()),
+            Ok(output) => parse_sessions_output(output.as_str()).map(|sessions| {
+                sessions
+                    .into_iter()
+                    .filter(|session| !session.name.starts_with(INTERNAL_TERMINAL_SESSION_PREFIX))
+                    .collect()
+            }),
             Err(TmuxError::NoSessions) => Ok(Vec::new()),
             Err(err) => Err(err),
         }
@@ -861,6 +867,25 @@ mod tests {
         let sessions = adapter.list_sessions().await.expect("list sessions");
 
         assert!(sessions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn tmux_list_sessions_hides_internal_terminal_groups() {
+        let runner = MockRunner::with_response(MockResponse::Output {
+            stdout: [
+                joined(&["$1", "dev", "0", "1"]),
+                joined(&["$2", "wmux-terminal-123-0", "1", "1"]),
+            ]
+            .join("\n"),
+            stderr: String::new(),
+            code: 0,
+        });
+        let adapter = Adapter::with_runner("tmux", runner);
+
+        let sessions = adapter.list_sessions().await.expect("list sessions");
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].name, "dev");
     }
 
     #[tokio::test]

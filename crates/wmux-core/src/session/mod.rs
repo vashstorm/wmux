@@ -1,20 +1,24 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io;
+use std::io::{self, Read, Write};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::process::Command;
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio::task::JoinError;
+
+use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
 const DEFAULT_WINDOW_ROWS: u16 = 24;
 const DEFAULT_WINDOW_COLS: u16 = 80;
 const CHANNEL_CAPACITY: usize = 256;
 const TERMINAL_CLOSE_GRACE_MS: u64 = 200;
-const CONTROL_CLIENT_FLAGS: &str = "active-pane";
+const TMUX_CLIENT_FLAGS: &str = "active-pane";
+const TERMINAL_GROUP_PREFIX: &str = "wmux-terminal-";
+static NEXT_TERMINAL_GROUP_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -60,12 +64,6 @@ impl From<JoinError> for SessionError {
 pub struct WindowSize {
     pub cols: u16,
     pub rows: u16,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CursorPosition {
-    x: u16,
-    y: u16,
 }
 
 impl Default for WindowSize {
@@ -163,25 +161,24 @@ impl SessionManager {
 
         let tmux_path = tmux_path.into();
         let parsed_target = AttachTarget::parse(&target.into())?;
-        let resolved_pane = resolve_control_pane(&tmux_path, &parsed_target).await?;
         let initial_size = initial_size.normalize();
-        let process = spawn_control_process(
-            &tmux_path,
-            &parsed_target.session,
-            &resolved_pane,
-            initial_size,
-        )
-        .await?;
-        let initial_output =
-            capture_pane_snapshot(&tmux_path, &resolved_pane.pane_id, initial_size).await?;
+        let prepared_target = prepare_terminal_target(&tmux_path, &parsed_target).await?;
+        let process = match spawn_terminal_process(&tmux_path, &prepared_target, initial_size).await
+        {
+            Ok(process) => process,
+            Err(error) => {
+                cleanup_terminal_group(&tmux_path, &prepared_target.temp_session).await;
+                return Err(error);
+            }
+        };
 
         let session = self.register(
             target_name.clone(),
-            resolved_pane.display_target.clone(),
+            prepared_target.display_target.clone(),
             process,
-            initial_output,
+            None,
         )?;
-        tracing::debug!(target_name = %target_name, target = %resolved_pane.display_target, pane_id = %resolved_pane.pane_id, "terminal control client attached");
+        tracing::debug!(target_name = %target_name, target = %prepared_target.display_target, temp_session = %prepared_target.temp_session, "terminal pty client attached");
         Ok(session)
     }
 
@@ -238,11 +235,11 @@ impl SessionManager {
         &self,
         target_name: String,
         target: String,
-        process: ControlProcessParts,
+        process: TerminalProcessParts,
         initial_output: Option<String>,
     ) -> Result<Session, SessionError> {
         let (input_tx, input_rx) = mpsc::channel(CHANNEL_CAPACITY);
-        let (control_tx, control_rx) = mpsc::channel(CHANNEL_CAPACITY);
+        let (terminal_tx, terminal_rx) = mpsc::channel(CHANNEL_CAPACITY);
         let (events_tx, _) = broadcast::channel(CHANNEL_CAPACITY);
         let (closed_tx, closed_rx) = watch::channel(false);
         let close_sent = Arc::new(AtomicBool::new(false));
@@ -255,7 +252,7 @@ impl SessionManager {
                 target_name,
                 target,
                 input_tx,
-                control_tx,
+                terminal_tx,
                 events_tx: events_tx.clone(),
                 closed_rx,
                 child_pid: process.child_pid,
@@ -269,13 +266,13 @@ impl SessionManager {
             .sessions
             .insert(session.id.clone(), session.clone());
 
-        spawn_control_tasks(
+        spawn_terminal_tasks(
             Arc::clone(&self.inner),
             session.id.clone(),
             process,
             SessionTaskChannels {
                 input_rx,
-                control_rx,
+                terminal_rx,
                 events_tx,
                 closed_tx,
                 close_sent,
@@ -299,7 +296,7 @@ pub struct Session {
     target_name: String,
     target: String,
     input_tx: mpsc::Sender<String>,
-    control_tx: mpsc::Sender<SessionControl>,
+    terminal_tx: mpsc::Sender<TerminalControl>,
     events_tx: broadcast::Sender<ServerMessage>,
     closed_rx: watch::Receiver<bool>,
     child_pid: Option<u32>,
@@ -340,15 +337,15 @@ impl Session {
 
     pub async fn resize(&self, size: WindowSize) -> Result<(), SessionError> {
         validate_window_size(size)?;
-        self.control_tx
-            .send(SessionControl::Resize(size))
+        self.terminal_tx
+            .send(TerminalControl::Resize(size))
             .await
             .map_err(|_| SessionError::SessionClosed)
     }
 
     pub async fn close(&self) -> Result<(), SessionError> {
-        self.control_tx
-            .send(SessionControl::Close)
+        self.terminal_tx
+            .send(TerminalControl::Close)
             .await
             .map_err(|_| SessionError::SessionClosed)
     }
@@ -376,7 +373,7 @@ impl Session {
 }
 
 #[derive(Debug)]
-enum SessionControl {
+enum TerminalControl {
     Resize(WindowSize),
     Close,
 }
@@ -401,104 +398,80 @@ impl ManagerState {
 
 struct SessionTaskChannels {
     input_rx: mpsc::Receiver<String>,
-    control_rx: mpsc::Receiver<SessionControl>,
+    terminal_rx: mpsc::Receiver<TerminalControl>,
     events_tx: broadcast::Sender<ServerMessage>,
     closed_tx: watch::Sender<bool>,
     close_sent: Arc<AtomicBool>,
 }
 
-struct ControlProcessParts {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: ChildStdout,
+struct TerminalProcessParts {
+    child: Box<dyn Child + Send + Sync>,
+    killer: Box<dyn ChildKiller + Send + Sync>,
+    master: Box<dyn MasterPty + Send>,
+    reader: Box<dyn Read + Send>,
+    writer: Box<dyn Write + Send>,
     child_pid: Option<u32>,
     tmux_path: String,
-    pane_id: String,
-    current_size: Arc<Mutex<WindowSize>>,
+    temp_session: String,
 }
 
 #[derive(Debug, Clone)]
-struct ResolvedControlPane {
+struct PreparedTerminalTarget {
+    source_session: String,
+    window_id: String,
     pane_id: String,
     display_target: String,
+    temp_session: String,
 }
 
-fn spawn_control_tasks(
+fn spawn_terminal_tasks(
     manager: Arc<Mutex<ManagerState>>,
     session_id: String,
-    process: ControlProcessParts,
+    process: TerminalProcessParts,
     channels: SessionTaskChannels,
 ) {
-    spawn_control_reader_task(
-        process.stdout,
-        process.tmux_path,
-        process.pane_id.clone(),
-        Arc::clone(&process.current_size),
+    spawn_terminal_reader_task(
+        process.reader,
         channels.events_tx.clone(),
         Arc::clone(&channels.close_sent),
     );
-    spawn_control_process_task(
+    spawn_terminal_process_task(
         manager,
         session_id,
         process.child,
-        process.stdin,
-        process.pane_id,
-        process.current_size,
+        process.killer,
+        process.master,
+        process.writer,
+        process.tmux_path,
+        process.temp_session,
         channels.input_rx,
-        channels.control_rx,
+        channels.terminal_rx,
         channels.events_tx,
         channels.closed_tx,
         channels.close_sent,
     );
 }
 
-fn spawn_control_reader_task(
-    stdout: ChildStdout,
-    tmux_path: String,
-    pane_id: String,
-    current_size: Arc<Mutex<WindowSize>>,
+fn spawn_terminal_reader_task(
+    mut reader: Box<dyn Read + Send>,
     events_tx: broadcast::Sender<ServerMessage>,
     close_sent: Arc<AtomicBool>,
 ) {
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout);
-        let mut line = Vec::new();
+    tokio::task::spawn_blocking(move || {
+        let mut buffer = [0_u8; 8192];
         loop {
-            line.clear();
-            match reader.read_until(b'\n', &mut line).await {
+            match reader.read(&mut buffer) {
                 Ok(0) => {
                     send_close_once(&events_tx, &close_sent);
                     return;
                 }
-                Ok(_) => {
-                    let control_line_bytes = trim_control_line_bytes(&line);
-                    let control_line = String::from_utf8_lossy(control_line_bytes);
-                    match parse_control_output_line(&control_line, &pane_id) {
-                        Ok(Some(data)) => {
-                            let size = *current_size.lock().expect("terminal size mutex poisoned");
-                            match capture_pane_snapshot(&tmux_path, &pane_id, size).await {
-                                Ok(Some(snapshot)) => {
-                                    let _ =
-                                        events_tx.send(ServerMessage::Output { data: snapshot });
-                                }
-                                Ok(None) => {
-                                    let _ = events_tx.send(ServerMessage::Output { data });
-                                }
-                                Err(error) => {
-                                    tracing::debug!(%error, "falling back to raw terminal output after snapshot refresh failed");
-                                    let _ = events_tx.send(ServerMessage::Output { data });
-                                }
-                            }
-                        }
-                        Ok(None) => {}
-                        Err(error) => {
-                            tracing::debug!(%error, line = %control_line, "ignored malformed tmux control output");
-                        }
-                    }
+                Ok(bytes_read) => {
+                    let data = String::from_utf8_lossy(&buffer[..bytes_read]).into_owned();
+                    let _ = events_tx.send(ServerMessage::Output { data });
                 }
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
                 Err(error) => {
-                    tracing::error!(%error, "terminal control read error");
+                    tracing::error!(%error, "terminal pty read error");
                     let _ = events_tx.send(ServerMessage::Error {
                         error: ErrorDetail::new(
                             "terminal_output_failed",
@@ -513,83 +486,97 @@ fn spawn_control_reader_task(
     });
 }
 
-fn trim_control_line_bytes(line: &[u8]) -> &[u8] {
-    let mut end = line.len();
-    while end > 0 && matches!(line[end - 1], b'\r' | b'\n') {
-        end -= 1;
-    }
-    &line[..end]
-}
-
-fn spawn_control_process_task(
+#[allow(clippy::too_many_arguments)]
+fn spawn_terminal_process_task(
     manager: Arc<Mutex<ManagerState>>,
     session_id: String,
-    mut child: Child,
-    mut stdin: ChildStdin,
-    pane_id: String,
-    current_size: Arc<Mutex<WindowSize>>,
+    mut child: Box<dyn Child + Send + Sync>,
+    mut killer: Box<dyn ChildKiller + Send + Sync>,
+    master: Box<dyn MasterPty + Send>,
+    mut writer: Box<dyn Write + Send>,
+    tmux_path: String,
+    temp_session: String,
     mut input_rx: mpsc::Receiver<String>,
-    mut control_rx: mpsc::Receiver<SessionControl>,
+    mut terminal_rx: mpsc::Receiver<TerminalControl>,
     events_tx: broadcast::Sender<ServerMessage>,
     closed_tx: watch::Sender<bool>,
     close_sent: Arc<AtomicBool>,
 ) {
     tokio::spawn(async move {
+        let (wait_tx, mut wait_rx) = oneshot::channel();
+        tokio::task::spawn_blocking(move || {
+            let result = child.wait();
+            let _ = wait_tx.send(result);
+        });
+
         loop {
             tokio::select! {
-                wait_result = child.wait() => {
-                    if let Err(error) = wait_result {
-                        tracing::error!(session_id = %session_id, %error, "terminal control process exited unexpectedly");
-                        let _ = events_tx.send(ServerMessage::Error {
-                            error: ErrorDetail::new(
-                                "terminal_closed",
-                                format!("terminal session ended unexpectedly: {error}"),
-                            ),
-                        });
+                wait_result = &mut wait_rx => {
+                    match wait_result {
+                        Ok(Ok(status)) if status.success() => {}
+                        Ok(Ok(status)) => {
+                            tracing::debug!(session_id = %session_id, ?status, "terminal pty process exited");
+                        }
+                        Ok(Err(error)) => {
+                            tracing::error!(session_id = %session_id, %error, "terminal pty process exited unexpectedly");
+                            let _ = events_tx.send(ServerMessage::Error {
+                                error: ErrorDetail::new(
+                                    "terminal_closed",
+                                    format!("terminal session ended unexpectedly: {error}"),
+                                ),
+                            });
+                        }
+                        Err(error) => {
+                            tracing::error!(session_id = %session_id, %error, "terminal pty wait task failed");
+                            let _ = events_tx.send(ServerMessage::Error {
+                                error: ErrorDetail::new(
+                                    "terminal_closed",
+                                    format!("terminal wait task failed: {error}"),
+                                ),
+                            });
+                        }
                     }
-                    finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
+                    cleanup_terminal_group(&tmux_path, &temp_session).await;
+                    finish_terminal_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                     return;
                 }
                 input = input_rx.recv() => {
                     match input {
                         Some(data) if !data.is_empty() => {
-                            if let Err(error) = write_control_input(&mut stdin, &pane_id, &data).await {
-                                tracing::error!(%error, "terminal control write error");
+                            if let Err(error) = write_terminal_input(&mut writer, &data) {
+                                tracing::error!(%error, "terminal pty write error");
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_write_failed", format!("failed to forward terminal input: {error}")),
                                 });
-                                terminate_control_process(&mut child, &mut stdin).await;
-                                finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
+                                terminate_terminal_process(&mut *killer, &tmux_path, &temp_session).await;
+                                finish_terminal_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                                 return;
                             }
                         }
                         Some(_) => {}
                         None => {
-                            terminate_control_process(&mut child, &mut stdin).await;
-                            finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
+                            terminate_terminal_process(&mut *killer, &tmux_path, &temp_session).await;
+                            finish_terminal_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                             return;
                         }
                     }
                 }
-                control = control_rx.recv() => {
+                control = terminal_rx.recv() => {
                     match control {
-                        Some(SessionControl::Resize(size)) => {
-                            if let Err(error) = write_control_resize(&mut stdin, size).await {
-                                tracing::error!(%error, "terminal control resize error");
+                        Some(TerminalControl::Resize(size)) => {
+                            if let Err(error) = master.resize(to_pty_size(size)) {
+                                tracing::error!(%error, "terminal pty resize error");
                                 let _ = events_tx.send(ServerMessage::Error {
                                     error: ErrorDetail::new("terminal_resize_failed", format!("failed to resize terminal client: {error}")),
                                 });
-                                terminate_control_process(&mut child, &mut stdin).await;
-                                finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
+                                terminate_terminal_process(&mut *killer, &tmux_path, &temp_session).await;
+                                finish_terminal_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                                 return;
                             }
-                            *current_size
-                                .lock()
-                                .expect("terminal size mutex poisoned") = size;
                         }
-                        Some(SessionControl::Close) | None => {
-                            terminate_control_process(&mut child, &mut stdin).await;
-                            finish_control_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
+                        Some(TerminalControl::Close) | None => {
+                            terminate_terminal_process(&mut *killer, &tmux_path, &temp_session).await;
+                            finish_terminal_session(&manager, &session_id, &events_tx, &closed_tx, &close_sent);
                             return;
                         }
                     }
@@ -599,7 +586,7 @@ fn spawn_control_process_task(
     });
 }
 
-fn finish_control_session(
+fn finish_terminal_session(
     manager: &Arc<Mutex<ManagerState>>,
     session_id: &str,
     events_tx: &broadcast::Sender<ServerMessage>,
@@ -619,89 +606,83 @@ fn send_close_once(events_tx: &broadcast::Sender<ServerMessage>, close_sent: &At
     }
 }
 
-async fn terminate_control_process(child: &mut Child, stdin: &mut ChildStdin) {
-    let _ = write_control_command(stdin, "detach-client\n").await;
+async fn terminate_terminal_process(
+    killer: &mut dyn ChildKiller,
+    tmux_path: &str,
+    temp_session: &str,
+) {
+    cleanup_terminal_group(tmux_path, temp_session).await;
     tokio::time::sleep(std::time::Duration::from_millis(TERMINAL_CLOSE_GRACE_MS)).await;
-    if matches!(child.try_wait(), Ok(None)) {
-        let _ = child.start_kill();
-    }
+    let _ = killer.kill();
 }
 
-async fn write_control_input(
-    stdin: &mut ChildStdin,
-    pane_id: &str,
+fn write_terminal_input(
+    writer: &mut Box<dyn Write + Send>,
     data: &str,
 ) -> Result<(), SessionError> {
-    for command in build_input_commands(pane_id, data) {
-        write_control_command(stdin, command.as_str()).await?;
-    }
+    writer.write_all(data.as_bytes())?;
+    writer.flush()?;
     Ok(())
 }
 
-async fn write_control_resize(
-    stdin: &mut ChildStdin,
-    size: WindowSize,
-) -> Result<(), SessionError> {
-    write_control_command(
-        stdin,
-        &format!("refresh-client -C {}x{}\n", size.cols, size.rows),
-    )
-    .await
-}
-
-async fn write_control_command(stdin: &mut ChildStdin, command: &str) -> Result<(), SessionError> {
-    stdin.write_all(command.as_bytes()).await?;
-    stdin.flush().await?;
-    Ok(())
-}
-
-async fn spawn_control_process(
+async fn spawn_terminal_process(
     tmux_path: &str,
-    session_target: &str,
-    resolved_pane: &ResolvedControlPane,
+    prepared_target: &PreparedTerminalTarget,
     initial_size: WindowSize,
-) -> Result<ControlProcessParts, SessionError> {
-    let mut child = Command::new(tmux_path)
-        .env("LANG", "en_US.UTF-8")
-        .env("LC_ALL", "en_US.UTF-8")
-        .args([
-            "-C",
-            "attach-session",
-            "-f",
-            CONTROL_CLIENT_FLAGS,
-            "-t",
-            session_target,
-        ])
-        .env_remove("TMUX")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-    let child_pid = child.id();
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| SessionError::Pty("tmux control stdin unavailable".to_string()))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| SessionError::Pty("tmux control stdout unavailable".to_string()))?;
-    write_control_resize(&mut stdin, initial_size).await?;
-    Ok(ControlProcessParts {
+) -> Result<TerminalProcessParts, SessionError> {
+    let pty_system = native_pty_system();
+    let pair = pty_system.openpty(to_pty_size(initial_size))?;
+    let reader = pair.master.try_clone_reader()?;
+    let writer = pair.master.take_writer()?;
+
+    let mut command = CommandBuilder::new(tmux_path);
+    command.args(build_terminal_attach_args(&prepared_target.temp_session));
+    command.env("LANG", "en_US.UTF-8");
+    command.env("LC_ALL", "en_US.UTF-8");
+    command.env("TERM", "xterm-256color");
+    command.env_remove("TMUX");
+
+    let child = pair.slave.spawn_command(command)?;
+    let child_pid = child.process_id();
+    let killer = child.clone_killer();
+
+    Ok(TerminalProcessParts {
         child,
-        stdin,
-        stdout,
+        killer,
+        master: pair.master,
+        reader,
+        writer,
         child_pid,
         tmux_path: tmux_path.to_string(),
-        pane_id: resolved_pane.pane_id.clone(),
-        current_size: Arc::new(Mutex::new(initial_size)),
+        temp_session: prepared_target.temp_session.clone(),
     })
 }
 
-async fn resolve_control_pane(
+fn build_terminal_attach_args(session_target: &str) -> [&str; 5] {
+    [
+        "attach-session",
+        "-f",
+        TMUX_CLIENT_FLAGS,
+        "-t",
+        session_target,
+    ]
+}
+
+async fn prepare_terminal_target(
     tmux_path: &str,
     target: &AttachTarget,
-) -> Result<ResolvedControlPane, SessionError> {
+) -> Result<PreparedTerminalTarget, SessionError> {
+    let prepared = resolve_terminal_target(tmux_path, target).await?;
+    create_terminal_group(tmux_path, &prepared).await?;
+    configure_terminal_group(tmux_path, &prepared).await?;
+    select_terminal_group_target(tmux_path, &prepared).await?;
+    Ok(prepared)
+}
+
+async fn resolve_terminal_target(
+    tmux_path: &str,
+    target: &AttachTarget,
+) -> Result<PreparedTerminalTarget, SessionError> {
     let display_target = target.display();
     let output = run_tmux_output(
         tmux_path,
@@ -711,52 +692,111 @@ async fn resolve_control_pane(
             "-t".to_string(),
             display_target.clone(),
             "-F".to_string(),
-            "#{window_id}\x1f#{pane_id}".to_string(),
+            "#{session_name}\x1f#{window_id}\x1f#{pane_id}".to_string(),
         ],
     )
     .await?;
     let fields = output.split('\x1f').collect::<Vec<_>>();
-    if fields.len() != 2 {
+    if fields.len() != 3 {
         return Err(SessionError::TmuxCommandFailed(format!(
-            "tmux did not resolve target {display_target:?} to a window and pane id"
+            "tmux did not resolve target {display_target:?} to a session, window, and pane id"
         )));
     }
-    let window_id = fields[0].trim().to_string();
-    let pane_id = fields[1].trim().to_string();
-    let pane_id = pane_id.trim().to_string();
-    if window_id.is_empty()
+    let source_session = fields[0].trim().to_string();
+    let window_id = fields[1].trim().to_string();
+    let pane_id = fields[2].trim().to_string();
+    if source_session.is_empty()
+        || window_id.is_empty()
         || !window_id.starts_with('@')
         || pane_id.is_empty()
         || !pane_id.starts_with('%')
     {
         return Err(SessionError::TmuxCommandFailed(format!(
-            "tmux did not resolve target {display_target:?} to valid window and pane ids"
+            "tmux did not resolve target {display_target:?} to valid terminal ids"
         )));
     }
-    Ok(ResolvedControlPane {
+
+    Ok(PreparedTerminalTarget {
+        source_session,
+        window_id,
         pane_id,
         display_target,
+        temp_session: next_terminal_group_name(),
     })
 }
 
-async fn capture_pane_snapshot(
+async fn create_terminal_group(
     tmux_path: &str,
-    pane_id: &str,
-    size: WindowSize,
-) -> Result<Option<String>, SessionError> {
-    let output = run_tmux_output(
+    prepared: &PreparedTerminalTarget,
+) -> Result<(), SessionError> {
+    run_tmux_output(
         tmux_path,
         vec![
-            "capture-pane".to_string(),
-            "-p".to_string(),
-            "-e".to_string(),
+            "new-session".to_string(),
+            "-d".to_string(),
             "-t".to_string(),
-            pane_id.to_string(),
+            prepared.source_session.clone(),
+            "-s".to_string(),
+            prepared.temp_session.clone(),
+        ],
+    )
+    .await
+    .map(|_| ())
+}
+
+async fn configure_terminal_group(
+    tmux_path: &str,
+    prepared: &PreparedTerminalTarget,
+) -> Result<(), SessionError> {
+    run_tmux_output(
+        tmux_path,
+        vec![
+            "set-option".to_string(),
+            "-t".to_string(),
+            prepared.temp_session.clone(),
+            "status".to_string(),
+            "off".to_string(),
+        ],
+    )
+    .await
+    .map(|_| ())
+}
+
+async fn select_terminal_group_target(
+    tmux_path: &str,
+    prepared: &PreparedTerminalTarget,
+) -> Result<(), SessionError> {
+    run_tmux_output(
+        tmux_path,
+        vec![
+            "select-window".to_string(),
+            "-t".to_string(),
+            format!("{}:{}", prepared.temp_session, prepared.window_id),
         ],
     )
     .await?;
-    let cursor = capture_pane_cursor(tmux_path, pane_id).await.ok();
-    Ok(terminal_snapshot_output(&output, cursor, size))
+    run_tmux_output(
+        tmux_path,
+        vec![
+            "select-pane".to_string(),
+            "-t".to_string(),
+            prepared.pane_id.clone(),
+        ],
+    )
+    .await
+    .map(|_| ())
+}
+
+async fn cleanup_terminal_group(tmux_path: &str, temp_session: &str) {
+    let _ = Command::new(tmux_path)
+        .env("LANG", "en_US.UTF-8")
+        .env("LC_ALL", "en_US.UTF-8")
+        .args(["kill-session", "-t", temp_session])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await;
 }
 
 async fn run_tmux_output(tmux_path: &str, args: Vec<String>) -> Result<String, SessionError> {
@@ -782,287 +822,18 @@ async fn run_tmux_output(tmux_path: &str, args: Vec<String>) -> Result<String, S
     }))
 }
 
-async fn capture_pane_cursor(
-    tmux_path: &str,
-    pane_id: &str,
-) -> Result<CursorPosition, SessionError> {
-    let output = run_tmux_output(
-        tmux_path,
-        vec![
-            "display-message".to_string(),
-            "-p".to_string(),
-            "-t".to_string(),
-            pane_id.to_string(),
-            "#{cursor_x},#{cursor_y}".to_string(),
-        ],
-    )
-    .await?;
-
-    parse_cursor_position(&output)
-}
-
-fn parse_cursor_position(output: &str) -> Result<CursorPosition, SessionError> {
-    let (x, y) = output
-        .trim()
-        .split_once(',')
-        .ok_or_else(|| SessionError::InvalidTarget("invalid cursor position".to_string()))?;
-    let x = x
-        .parse::<u16>()
-        .map_err(|error| SessionError::InvalidTarget(format!("invalid cursor x: {error}")))?;
-    let y = y
-        .parse::<u16>()
-        .map_err(|error| SessionError::InvalidTarget(format!("invalid cursor y: {error}")))?;
-    Ok(CursorPosition { x, y })
-}
-
-fn terminal_snapshot_output(
-    output: &str,
-    cursor: Option<CursorPosition>,
-    size: WindowSize,
-) -> Option<String> {
-    if output.is_empty() {
-        return None;
-    }
-    let mut snapshot = String::from("\x1b[0m\x1b[H\x1b[2J\x1b[?7l");
-    for (index, line) in output.lines().take(size.rows as usize).enumerate() {
-        snapshot.push_str(&format!(
-            "\x1b[{};1H{}",
-            index + 1,
-            fit_snapshot_line(line, size.cols as usize)
-        ));
-    }
-    snapshot.push_str("\x1b[?7h");
-    if let Some(cursor) = cursor {
-        let row = (cursor.y + 1).min(size.rows);
-        let col = (cursor.x + 1).min(size.cols);
-        snapshot.push_str(&format!("\x1b[{row};{col}H"));
-    }
-    Some(snapshot)
-}
-
-fn fit_snapshot_line(line: &str, cols: usize) -> String {
-    if cols == 0 || visible_width(line) <= cols {
-        return line.to_string();
-    }
-
-    if let Some(separator_index) = line.find('')
-        && let Some(space_run) = last_space_run_before(line, separator_index)
-    {
-        let excess = visible_width(line).saturating_sub(cols);
-        let removable = space_run.end.saturating_sub(space_run.start);
-        let remove_count = excess.min(removable.saturating_sub(1));
-        if remove_count > 0 {
-            let mut fitted = String::with_capacity(line.len().saturating_sub(remove_count));
-            fitted.push_str(&line[..space_run.start]);
-            fitted.push_str(&line[space_run.start + remove_count..]);
-            return fitted;
-        }
-    }
-
-    line.to_string()
-}
-
-fn last_space_run_before(line: &str, end: usize) -> Option<std::ops::Range<usize>> {
-    let bytes = line.as_bytes();
-    let mut index = end.min(bytes.len());
-    while index > 0 && bytes[index - 1] != b' ' {
-        index -= 1;
-    }
-    let run_end = index;
-    while index > 0 && bytes[index - 1] == b' ' {
-        index -= 1;
-    }
-    if run_end > index {
-        Some(index..run_end)
-    } else {
-        None
+fn to_pty_size(size: WindowSize) -> PtySize {
+    PtySize {
+        rows: size.rows,
+        cols: size.cols,
+        pixel_width: 0,
+        pixel_height: 0,
     }
 }
 
-fn visible_width(line: &str) -> usize {
-    let mut width = 0;
-    let mut chars = line.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '\x1b' {
-            if chars.peek() == Some(&'[') {
-                let _ = chars.next();
-                for next in chars.by_ref() {
-                    if ('@'..='~').contains(&next) {
-                        break;
-                    }
-                }
-            }
-            continue;
-        }
-        width += 1;
-    }
-    width
-}
-
-fn parse_control_output_line(line: &str, pane_id: &str) -> Result<Option<String>, SessionError> {
-    if let Some(rest) = line.strip_prefix("%output ") {
-        let mut parts = rest.splitn(2, ' ');
-        let output_pane = parts.next().unwrap_or_default();
-        let value = parts.next().unwrap_or_default();
-        if output_pane == pane_id {
-            return decode_control_value(value).map(Some);
-        }
-        return Ok(None);
-    }
-
-    if let Some(rest) = line.strip_prefix("%extended-output ") {
-        let mut parts = rest.splitn(2, ' ');
-        let output_pane = parts.next().unwrap_or_default();
-        let remainder = parts.next().unwrap_or_default();
-        if output_pane != pane_id {
-            return Ok(None);
-        }
-        if let Some((_, value)) = remainder.split_once(" : ") {
-            return decode_control_value(value).map(Some);
-        }
-    }
-
-    Ok(None)
-}
-
-fn decode_control_value(value: &str) -> Result<String, SessionError> {
-    let bytes = value.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'\\' && index + 3 < bytes.len() {
-            let octal = &value[index + 1..index + 4];
-            if octal
-                .as_bytes()
-                .iter()
-                .all(|byte| matches!(byte, b'0'..=b'7'))
-            {
-                let byte = u8::from_str_radix(octal, 8).map_err(|error| {
-                    SessionError::InvalidTarget(format!("invalid tmux control escape: {error}"))
-                })?;
-                decoded.push(byte);
-                index += 4;
-                continue;
-            }
-        }
-        decoded.push(bytes[index]);
-        index += 1;
-    }
-    Ok(String::from_utf8_lossy(&decoded).into_owned())
-}
-
-fn build_input_commands(pane_id: &str, data: &str) -> Vec<String> {
-    let mut commands = Vec::new();
-    let mut literal = String::new();
-    let mut index = 0;
-
-    while index < data.len() {
-        let remaining = &data[index..];
-        if let Some((sequence, key)) = known_escape_key(remaining) {
-            flush_literal_command(&mut commands, pane_id, &mut literal);
-            commands.push(build_key_command(pane_id, key));
-            index += sequence.len();
-            continue;
-        }
-
-        let ch = remaining
-            .chars()
-            .next()
-            .expect("remaining input is non-empty");
-        match ch {
-            '\r' | '\n' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                commands.push(build_key_command(pane_id, "Enter"));
-            }
-            '\t' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                commands.push(build_key_command(pane_id, "Tab"));
-            }
-            '\u{7f}' | '\u{8}' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                commands.push(build_key_command(pane_id, "BSpace"));
-            }
-            '\u{1b}' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                let fallback = collect_escape_sequence(remaining);
-                tracing::debug!(sequence = ?fallback, "forwarding unrecognized terminal escape sequence literally");
-                commands.push(build_literal_command(pane_id, fallback));
-                index += fallback.len();
-                continue;
-            }
-            '\u{1}'..='\u{1a}' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                let key = format!("C-{}", ((ch as u8 - 1) + b'a') as char);
-                commands.push(build_key_command(pane_id, &key));
-            }
-            '\u{0}' => {
-                flush_literal_command(&mut commands, pane_id, &mut literal);
-                commands.push(build_key_command(pane_id, "C-Space"));
-            }
-            _ => literal.push(ch),
-        }
-        index += ch.len_utf8();
-    }
-
-    flush_literal_command(&mut commands, pane_id, &mut literal);
-    commands
-}
-
-fn known_escape_key(input: &str) -> Option<(&'static str, &'static str)> {
-    [
-        ("\x1b[A", "Up"),
-        ("\x1b[B", "Down"),
-        ("\x1b[C", "Right"),
-        ("\x1b[D", "Left"),
-        ("\x1b[H", "Home"),
-        ("\x1b[F", "End"),
-        ("\x1b[1~", "Home"),
-        ("\x1b[4~", "End"),
-        ("\x1b[2~", "Insert"),
-        ("\x1b[3~", "Delete"),
-        ("\x1b[5~", "PageUp"),
-        ("\x1b[6~", "PageDown"),
-        ("\x1bOH", "Home"),
-        ("\x1bOF", "End"),
-    ]
-    .into_iter()
-    .find(|(sequence, _)| input.starts_with(sequence))
-}
-
-fn collect_escape_sequence(input: &str) -> &str {
-    for (index, ch) in input.char_indices().skip(1) {
-        if ch.is_ascii_alphabetic() || ch == '~' {
-            return &input[..index + ch.len_utf8()];
-        }
-    }
-    "\x1b"
-}
-
-fn flush_literal_command(commands: &mut Vec<String>, pane_id: &str, literal: &mut String) {
-    if literal.is_empty() {
-        return;
-    }
-    commands.push(build_literal_command(pane_id, literal.as_str()));
-    literal.clear();
-}
-
-fn build_literal_command(pane_id: &str, literal: &str) -> String {
-    format!(
-        "send-keys -l -t {} -- {}\n",
-        pane_id,
-        shell_quote_arg(literal)
-    )
-}
-
-fn build_key_command(pane_id: &str, key: &str) -> String {
-    format!("send-keys -t {} {}\n", pane_id, key)
-}
-
-fn shell_quote_arg(value: &str) -> String {
-    if value.is_empty() {
-        return "''".to_string();
-    }
-    format!("'{}'", value.replace('\'', r#"'\''"#))
+fn next_terminal_group_name() -> String {
+    let id = NEXT_TERMINAL_GROUP_ID.fetch_add(1, AtomicOrdering::Relaxed);
+    format!("{TERMINAL_GROUP_PREFIX}{}-{id}", std::process::id())
 }
 
 fn validate_window_size(size: WindowSize) -> Result<WindowSize, SessionError> {
@@ -1328,126 +1099,28 @@ mod tests {
     }
 
     #[test]
-    fn control_output_decodes_octal_escapes_for_target_pane() {
-        let output = parse_control_output_line("%output %1 hello\\015\\012", "%1")
-            .unwrap()
-            .unwrap();
-        assert_eq!(output, "hello\r\n");
+    fn terminal_attach_args_use_regular_tmux_client() {
+        let args = build_terminal_attach_args("dev");
 
-        let output = parse_control_output_line("%output %2 ignored\\012", "%1").unwrap();
-        assert_eq!(output, None);
+        assert_eq!(args, ["attach-session", "-f", "active-pane", "-t", "dev"]);
+        assert!(!args.contains(&"-C"));
+        assert!(!args.contains(&"ignore-size"));
     }
 
     #[test]
-    fn control_extended_output_decodes_target_pane_payload() {
-        let output = parse_control_output_line("%extended-output %1 25 : hi\\040there", "%1")
-            .unwrap()
-            .unwrap();
-        assert_eq!(output, "hi there");
-    }
-
-    #[test]
-    fn control_output_accepts_invalid_utf8_bytes() {
-        let mut line = b"%output %1 bad".to_vec();
-        line.push(0xff);
-        line.extend_from_slice(b"byte\\012\r\n");
-
-        let control_line = String::from_utf8_lossy(trim_control_line_bytes(&line));
-        let output = parse_control_output_line(&control_line, "%1")
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(output, "bad\u{fffd}byte\n");
-    }
-
-    #[test]
-    fn terminal_snapshot_restores_cursor_position() {
-        let snapshot = terminal_snapshot_output(
-            "prompt right-status",
-            Some(CursorPosition { x: 6, y: 2 }),
-            WindowSize { cols: 80, rows: 24 },
-        )
-        .unwrap();
-
-        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
-        assert!(snapshot.ends_with("\x1b[3;7H"));
-    }
-
-    #[test]
-    fn terminal_snapshot_clears_with_default_background() {
-        let snapshot = terminal_snapshot_output(
-            "\x1b[48;5;238mprompt",
-            None,
-            WindowSize { cols: 80, rows: 24 },
-        )
-        .unwrap();
-
-        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
-        assert!(snapshot.contains("\x1b[1;1H\x1b[48;5;238mprompt"));
-    }
-
-    #[test]
-    fn terminal_snapshot_preserves_truecolor_line_background_after_foreground() {
-        let snapshot = terminal_snapshot_output(
-            "\x1b[38;2;255;255;255m\x1b[48;2;36;39;58mOpenCode",
-            None,
-            WindowSize { cols: 80, rows: 24 },
-        )
-        .unwrap();
-
-        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
-        assert!(snapshot.contains("\x1b[1;1H\x1b[38;2;255;255;255m\x1b[48;2;36;39;58mOpenCode"));
-    }
-
-    #[test]
-    fn terminal_snapshot_ignores_background_reset_for_clear_fill() {
-        let snapshot = terminal_snapshot_output(
-            "\x1b[49mplain prompt",
-            None,
-            WindowSize { cols: 80, rows: 24 },
-        )
-        .unwrap();
-
-        assert!(snapshot.starts_with("\x1b[0m\x1b[H\x1b[2J"));
-    }
-
-    #[test]
-    fn terminal_snapshot_fits_right_prompt_spacing_without_wrapping() {
-        let line = "left prompt                     right";
-        let snapshot =
-            terminal_snapshot_output(line, None, WindowSize { cols: 24, rows: 1 }).unwrap();
-
-        assert!(snapshot.contains("left prompt       right"));
-        assert!(snapshot.contains("\x1b[?7l"));
-        assert!(snapshot.contains("\x1b[?7h"));
-    }
-
-    #[test]
-    fn cursor_position_parses_tmux_display_output() {
+    fn terminal_window_size_maps_to_pty_size() {
         assert_eq!(
-            parse_cursor_position("13,6\n").unwrap(),
-            CursorPosition { x: 13, y: 6 }
+            to_pty_size(WindowSize {
+                cols: 120,
+                rows: 40
+            }),
+            PtySize {
+                cols: 120,
+                rows: 40,
+                pixel_width: 0,
+                pixel_height: 0,
+            }
         );
-    }
-
-    #[test]
-    fn control_input_commands_encode_common_xterm_keys() {
-        let commands = build_input_commands("%1", "echo hi\r\x1b[A\x03");
-        assert_eq!(
-            commands,
-            vec![
-                "send-keys -l -t %1 -- 'echo hi'\n",
-                "send-keys -t %1 Enter\n",
-                "send-keys -t %1 Up\n",
-                "send-keys -t %1 C-c\n",
-            ]
-        );
-    }
-
-    #[test]
-    fn control_input_commands_quote_literal_text() {
-        let commands = build_input_commands("%1", "can't stop");
-        assert_eq!(commands, vec!["send-keys -l -t %1 -- 'can'\\''t stop'\n"]);
     }
 
     #[tokio::test]
