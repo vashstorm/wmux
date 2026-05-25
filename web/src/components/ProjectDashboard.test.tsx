@@ -7,15 +7,12 @@ import type { Project } from "../api/client.js";
 import * as client from "../api/client.js";
 
 vi.mock("../api/client.js", () => ({
-	launchProject: vi.fn(),
 	syncProjectFromTmux: vi.fn(),
 	generateProjectAiHtml: vi.fn(),
 	getProject: vi.fn(),
 }));
 
-const mockLaunchProject = vi.mocked(client.launchProject);
 const mockSyncProjectFromTmux = vi.mocked(client.syncProjectFromTmux);
-const mockGenerateProjectAiHtml = vi.mocked(client.generateProjectAiHtml);
 const mockGetProject = vi.mocked(client.getProject);
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
@@ -88,7 +85,7 @@ describe("ProjectDashboard", () => {
 				<ProjectDashboard />
 			</TestWrapper>,
 		);
-		expect(screen.getByTestId("project-launch-button")).toBeInTheDocument();
+		expect(screen.queryByTestId("project-launch-button")).not.toBeInTheDocument();
 		expect(screen.getByTestId("project-sync-button")).toBeInTheDocument();
 		expect(screen.getByTestId("project-ai-generate-button")).toBeInTheDocument();
 	});
@@ -113,37 +110,6 @@ describe("ProjectDashboard", () => {
 		expect(screen.getByText("Test description")).toBeInTheDocument();
 	});
 
-	test("launch button calls launchProject API and navigates to session", async () => {
-		const updatedProject = makeProject({ status: "running" });
-		mockLaunchProject.mockResolvedValue({ project: updatedProject, operation: "launch" });
-		mockGetProject.mockResolvedValue(updatedProject);
-
-		function SelectedProjectChecker() {
-			const { selectedProject } = useAppState();
-			return <span data-testid="selected-project-state">{selectedProject ? selectedProject.name : "no-project"}</span>;
-		}
-
-		render(
-			<TestWrapper>
-				{enableProject(makeProject())}
-				<ProjectDashboard />
-				<SelectedProjectChecker />
-			</TestWrapper>,
-		);
-
-		expect(screen.getByTestId("selected-project-state")).toHaveTextContent("Test Project");
-
-		fireEvent.click(screen.getByTestId("project-launch-button"));
-
-		await waitFor(() => {
-			expect(mockLaunchProject).toHaveBeenCalledWith("proj-1");
-		});
-
-		await waitFor(() => {
-			expect(screen.getByTestId("selected-project-state")).toHaveTextContent("no-project");
-		});
-	});
-
 	test("sync button calls syncProjectFromTmux API", async () => {
 		const updatedProject = makeProject({ lastSyncedAt: "2025-01-01T00:00:00Z" });
 		mockSyncProjectFromTmux.mockResolvedValue({ project: updatedProject, operation: "sync" });
@@ -163,79 +129,9 @@ describe("ProjectDashboard", () => {
 		});
 	});
 
-	test("ai generate button calls generateProjectAiHtml API", async () => {
-		const updatedProject = makeProject({ aiHtml: "<p>Generated</p>", aiStatus: "done" });
-		mockGenerateProjectAiHtml.mockResolvedValue(updatedProject);
-		mockGetProject.mockResolvedValue(updatedProject);
-
-		render(
-			<TestWrapper>
-				{enableProject(makeProject())}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-
-		fireEvent.click(screen.getByTestId("project-ai-generate-button"));
-
-		await waitFor(() => {
-			expect(mockGenerateProjectAiHtml).toHaveBeenCalledWith("proj-1");
-		});
-	});
-
-	test("shows AI HTML via SafeHtml when aiStatus is done", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({
-					aiHtml: "<p>Generated <strong>content</strong></p>",
-					aiStatus: "done",
-				}))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		const aiHtmlEl = screen.getByTestId("project-ai-html");
-		expect(aiHtmlEl).toBeInTheDocument();
-		expect(screen.getByText("Generated")).toBeInTheDocument();
-	});
-
-	test("shows loading state when aiStatus is generating", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({ aiStatus: "generating" }))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		expect(screen.queryByTestId("project-ai-html")).toBeNull();
-		expect(screen.getByText("Generating AI content...")).toBeInTheDocument();
-	});
-
-	test("shows error state when aiStatus is error with aiError", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({
-					aiStatus: "error",
-					aiError: "API key missing",
-				}))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		expect(screen.queryByTestId("project-ai-html")).toBeNull();
-		expect(screen.getByText("API key missing")).toBeInTheDocument();
-	});
-
-	test("shows empty state when no aiHtml and aiStatus is idle", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({ aiStatus: "idle", aiHtml: "" }))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		expect(screen.queryByTestId("project-ai-html")).toBeNull();
-		expect(screen.getByText(/No AI-generated content yet/)).toBeInTheDocument();
-	});
-
-	test("API error on launch shows error message", async () => {
+	test("API error on sync shows error message", async () => {
 		const { ApiError } = await import("../api/errors.js");
-		mockLaunchProject.mockRejectedValue(new ApiError("bad_request", "Session conflict", 409));
+		mockSyncProjectFromTmux.mockRejectedValue(new ApiError("bad_request", "Session conflict", 409));
 
 		render(
 			<TestWrapper>
@@ -244,7 +140,7 @@ describe("ProjectDashboard", () => {
 			</TestWrapper>,
 		);
 
-		fireEvent.click(screen.getByTestId("project-launch-button"));
+		fireEvent.click(screen.getByTestId("project-sync-button"));
 
 		await waitFor(() => {
 			expect(screen.getByText("Session conflict")).toBeInTheDocument();
@@ -253,7 +149,7 @@ describe("ProjectDashboard", () => {
 
 	test("action buttons disabled while another action is loading", async () => {
 		const neverResolve = new Promise(() => {});
-		mockLaunchProject.mockReturnValue(neverResolve as never);
+		mockSyncProjectFromTmux.mockReturnValue(neverResolve as never);
 
 		render(
 			<TestWrapper>
@@ -262,55 +158,11 @@ describe("ProjectDashboard", () => {
 			</TestWrapper>,
 		);
 
-		fireEvent.click(screen.getByTestId("project-launch-button"));
+		fireEvent.click(screen.getByTestId("project-sync-button"));
 
 		await waitFor(() => {
-			expect((screen.getByTestId("project-sync-button") as HTMLButtonElement).disabled).toBe(true);
 			expect((screen.getByTestId("project-ai-generate-button") as HTMLButtonElement).disabled).toBe(true);
 		});
-	});
-
-	test("script tags are not rendered from aiHtml", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({
-					aiHtml: "<script>alert('xss')</script><p>safe</p>",
-					aiStatus: "done",
-				}))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		expect(document.querySelector("script")).toBeNull();
-		expect(screen.getByText("safe")).toBeInTheDocument();
-	});
-
-	test("onclick attributes are not rendered from aiHtml", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({
-					aiHtml: '<button onclick="alert(1)">click</button>',
-					aiStatus: "done",
-				}))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		const btn = screen.getByText("click");
-		expect(btn).not.toHaveAttribute("onclick");
-	});
-
-	test("javascript: URLs are not rendered from aiHtml", () => {
-		render(
-			<TestWrapper>
-				{enableProject(makeProject({
-					aiHtml: '<a href="javascript:alert(1)">evil</a>',
-					aiStatus: "done",
-				}))}
-				<ProjectDashboard />
-			</TestWrapper>,
-		);
-		const link = screen.getByText("evil");
-		const href = link.getAttribute("href");
-		expect(href).toBeFalsy();
 	});
 
 	test("displays layout summary when layoutJson contains windows", () => {

@@ -1,10 +1,9 @@
 import { useState, useCallback } from "react";
 import { Box, Typography, Button, Chip, CircularProgress, Paper, Divider, Stack } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SyncIcon from "@mui/icons-material/Sync";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { useAppState } from "../state/store.js";
-import { launchProject, syncProjectFromTmux, generateProjectAiHtml, getProject, listWindows, listPanes } from "../api/client.js";
+import { syncProjectFromTmux, generateProjectAiHtml, getProject } from "../api/client.js";
 import { SafeHtml } from "./SafeHtml.js";
 import { ApiError } from "../api/errors.js";
 
@@ -86,10 +85,6 @@ export function ProjectDashboard() {
 	const {
 		selectedProject,
 		setSelectedProject,
-		selectedTargetName,
-		setSelectedPane,
-		setWindows,
-		setPanes,
 	} = useAppState();
 	const [actionLoading, setActionLoading] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
@@ -103,69 +98,6 @@ export function ProjectDashboard() {
 			// stale reads are acceptable
 		}
 	}, [selectedProject, setSelectedProject]);
-
-	const handleLaunch = useCallback(async () => {
-		if (!selectedProject) return;
-		setActionLoading("launch");
-		setActionError(null);
-		try {
-			await launchProject(selectedProject.id);
-			await refreshProject();
-
-			const targetName = selectedTargetName ?? "local";
-			const sessionName = selectedProject.sessionName;
-
-			if (sessionName) {
-				try {
-					const windowsResponse = await listWindows(targetName, sessionName);
-					const windows = windowsResponse?.data ?? [];
-
-					if (windows.length === 0) {
-						setSelectedPane({ targetName, session: sessionName });
-						setActionLoading(null);
-						setTimeout(() => {
-							setSelectedProject(null);
-						}, 50);
-						return;
-					}
-
-					const initialWindow = windows[0];
-					if (initialWindow) {
-						const initialWindowID = initialWindow.ID;
-						const panesResponse = await listPanes(targetName, sessionName, initialWindowID);
-						const panes = panesResponse?.data ?? [];
-
-						setWindows(targetName, sessionName, windows);
-						setPanes(targetName, sessionName, initialWindowID, panes);
-
-						const initialPane = panes[0];
-						setSelectedPane({
-							targetName,
-							session: sessionName,
-							window: initialWindowID,
-							pane: initialPane?.ID,
-						});
-					} else {
-						setSelectedPane({ targetName, session: sessionName });
-					}
-					setActionLoading(null);
-					setTimeout(() => {
-						setSelectedProject(null);
-					}, 50);
-				} catch {
-					setSelectedPane({ targetName, session: sessionName });
-					setActionLoading(null);
-					setTimeout(() => {
-						setSelectedProject(null);
-					}, 50);
-				}
-			}
-		} catch (err) {
-			setActionError(err instanceof ApiError ? err.message : "Failed to launch project");
-		} finally {
-			setActionLoading(null);
-		}
-	}, [selectedProject, refreshProject, selectedTargetName, setSelectedPane, setSelectedProject, setWindows, setPanes]);
 
 	const handleSync = useCallback(async () => {
 		if (!selectedProject) return;
@@ -432,18 +364,6 @@ export function ProjectDashboard() {
 								size="small"
 								variant="contained"
 								className="project-dashboard-btn project-dashboard-btn-primary"
-								startIcon={actionLoading === "launch" ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
-								disabled={actionLoading !== null}
-								onClick={handleLaunch}
-								data-testid="project-launch-button"
-								sx={{ flex: { xs: 1, md: "initial" } }}
-							>
-								Launch
-							</Button>
-							<Button
-								size="small"
-								variant="outlined"
-								className="project-dashboard-btn project-dashboard-btn-secondary"
 								startIcon={actionLoading === "sync" ? <CircularProgress size={16} color="inherit" /> : <SyncIcon fontSize="small" />}
 								disabled={actionLoading !== null}
 								onClick={handleSync}

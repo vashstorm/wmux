@@ -448,104 +448,7 @@ describe("attention field mapping", () => {
 	});
 });
 
-describe("updateSession", () => {
-	function TestUpdateSessionComponent() {
-		const state = useAppState();
-		return (
-			<div>
-				<button
-					data-testid="set-initial-sessions"
-					onClick={() => state.setSessions("conn1", [
-						{ name: "session1" },
-						{ name: "session2" },
-					])}
-				>
-					Set Initial Sessions
-				</button>
-				<button
-					data-testid="update-session1"
-					onClick={() => state.updateSession("conn1", "session1", {
-						intelligenceApp: "claude",
-						intelligenceStatus: "waiting",
-						intelligenceSummary: "Waiting for input",
-					})}
-				>
-					Update Session1
-				</button>
-				<span data-testid="session1-status">
-					{state.sessions["conn1"]?.find(s => s.name === "session1")?.intelligenceStatus ?? "null"}
-				</span>
-				<span data-testid="sessions-count">
-					{(state.sessions["conn1"] ?? []).length}
-				</span>
-			</div>
-		);
-	}
-
-	function renderWithProvider() {
-		return render(
-			<AppProvider>
-				<TestUpdateSessionComponent />
-			</AppProvider>,
-		);
-	}
-
-	test("updateSession updates only the target session", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-initial-sessions"));
-		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
-		expect(screen.getByTestId("session1-status").textContent).toBe("null");
-
-		fireEvent.click(screen.getByTestId("update-session1"));
-		expect(screen.getByTestId("session1-status").textContent).toBe("waiting");
-		expect(screen.getByTestId("sessions-count").textContent).toBe("2");
-	});
-
-	test("updateSession does not affect other connections", () => {
-		function TestMultiConnectionComponent() {
-			const state = useAppState();
-			return (
-				<div>
-					<button
-						data-testid="set-conn1-sessions"
-						onClick={() => state.setSessions("conn1", [{ name: "s1" }])}
-					>
-						Set Conn1
-					</button>
-					<button
-						data-testid="set-conn2-sessions"
-						onClick={() => state.setSessions("conn2", [{ name: "s2" }])}
-					>
-						Set Conn2
-					</button>
-					<button
-						data-testid="update-conn1"
-						onClick={() => state.updateSession("conn1", "s1", { intelligenceStatus: "running" })}
-					>
-						Update Conn1
-					</button>
-					<span data-testid="conn1-status">
-						{state.sessions["conn1"]?.[0]?.intelligenceStatus ?? "null"}
-					</span>
-				</div>
-			);
-		}
-
-		render(
-			<AppProvider>
-				<TestMultiConnectionComponent />
-			</AppProvider>,
-		);
-
-		fireEvent.click(screen.getByTestId("set-conn1-sessions"));
-		fireEvent.click(screen.getByTestId("set-conn2-sessions"));
-		fireEvent.click(screen.getByTestId("update-conn1"));
-
-		expect(screen.getByTestId("conn1-status").textContent).toBe("running");
-	});
-});
-
-describe("UISettings uiScaleStep", () => {
+	describe("UISettings uiScaleStep", () => {
 	test("uiScaleStep defaults to 0 when no localStorage", () => {
 		function ScaleStepProbe() {
 			const { uiSettings } = useAppState();
@@ -731,25 +634,6 @@ describe("selection state exclusivity", () => {
 		schemaVersion: 1,
 	};
 
-	const mockAiEvent = {
-		id: "ai1",
-		projectId: null,
-		provider: "openai",
-		model: "gpt-4",
-		targetName: "conn1",
-		sessionName: "session1",
-		status: "success",
-		durationMs: 1000,
-		promptTokens: 100,
-		completionTokens: 50,
-		totalTokens: 150,
-		estimatedCost: 0.01,
-		errorMessage: null,
-		windowNumber: null,
-		responseJson: null,
-		createdAt: "2024-01-01T00:00:00Z",
-	};
-
 	function TestSelectionComponent() {
 		const state = useAppState();
 		return (
@@ -767,12 +651,6 @@ describe("selection state exclusivity", () => {
 					Set Pane
 				</button>
 				<button
-					data-testid="set-ai-event"
-					onClick={() => state.setSelectedAiEvent(mockAiEvent)}
-				>
-					Set AI Event
-				</button>
-				<button
 					data-testid="clear-project"
 					onClick={() => state.setSelectedProject(null)}
 				>
@@ -780,7 +658,6 @@ describe("selection state exclusivity", () => {
 				</button>
 				<span data-testid="selected-project">{state.selectedProject?.id ?? "null"}</span>
 				<span data-testid="selected-pane">{state.selectedPane?.pane ?? "null"}</span>
-				<span data-testid="selected-ai-event">{state.selectedAiEvent?.id ?? "null"}</span>
 			</div>
 		);
 	}
@@ -793,58 +670,26 @@ describe("selection state exclusivity", () => {
 		);
 	}
 
-	test("setSelectedProject clears selectedPane and selectedAiEvent", () => {
+	test("setSelectedProject clears selectedPane", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-pane"));
 		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
-		expect(screen.getByTestId("selected-project").textContent).toBe("null");
-
-		fireEvent.click(screen.getByTestId("set-ai-event"));
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
-		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
 		expect(screen.getByTestId("selected-project").textContent).toBe("null");
 
 		fireEvent.click(screen.getByTestId("set-project"));
 		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
 		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
 	});
 
-	test("setSelectedPane clears selectedProject and selectedAiEvent", () => {
+	test("setSelectedPane clears selectedProject", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-project"));
 		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
-		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
-
-		fireEvent.click(screen.getByTestId("set-ai-event"));
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
-		expect(screen.getByTestId("selected-project").textContent).toBe("null");
 		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
 
 		fireEvent.click(screen.getByTestId("set-pane"));
 		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
 		expect(screen.getByTestId("selected-project").textContent).toBe("null");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
-	});
-
-	test("setSelectedAiEvent clears selectedProject and selectedPane", () => {
-		renderWithProvider();
-		fireEvent.click(screen.getByTestId("set-project"));
-		expect(screen.getByTestId("selected-project").textContent).toBe("p1");
-		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
-
-		fireEvent.click(screen.getByTestId("set-pane"));
-		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
-		expect(screen.getByTestId("selected-project").textContent).toBe("null");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
-
-		fireEvent.click(screen.getByTestId("set-ai-event"));
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("ai1");
-		expect(screen.getByTestId("selected-project").textContent).toBe("null");
-		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
 	});
 
 	test("clearing selection with null does not affect other selections", () => {
@@ -855,13 +700,11 @@ describe("selection state exclusivity", () => {
 		fireEvent.click(screen.getByTestId("clear-project"));
 		expect(screen.getByTestId("selected-project").textContent).toBe("null");
 		expect(screen.getByTestId("selected-pane").textContent).toBe("p1");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
 	});
 
 	test("default state has null for all selections", () => {
 		renderWithProvider();
 		expect(screen.getByTestId("selected-project").textContent).toBe("null");
 		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
-		expect(screen.getByTestId("selected-ai-event").textContent).toBe("null");
 	});
 });

@@ -12,8 +12,8 @@ test.describe("wmux project management workflow", () => {
 		});
 	});
 
-	test("create project, see dashboard, launch missing tmux session", async ({ page }) => {
-		const sessionName = `wmux-e2e-launch-${Date.now()}`;
+	test("create project, then create and open its tmux session from the project list", async ({ page }) => {
+		const sessionName = `wmux-e2e-session-${Date.now()}`;
 		
 		await page.goto("/");
 		await page.getByTestId("open-projects-button").click();
@@ -28,13 +28,13 @@ test.describe("wmux project management workflow", () => {
 		await expect(page.getByTestId("project-form")).not.toBeVisible({ timeout: 5000 });
 		await expect(page.getByTestId("project-dashboard")).toBeVisible({ timeout: 5000 });
 		await expect(page.getByTestId("project-dashboard-title")).toContainText(sessionName);
-		await expect(page.getByTestId("project-launch-button")).toBeVisible();
 		await expect(page.getByTestId("project-sync-button")).toBeVisible();
 		await expect(page.getByTestId("project-ai-generate-button")).toBeVisible();
 
-		await page.getByTestId("project-launch-button").click();
+		await page.getByTestId("projects-view").getByText(sessionName, { exact: true }).hover();
+		await page.getByLabel(`Open or create session for ${sessionName}`).click();
 		
-		await expect(page.getByTestId("main-title")).toBeVisible({ timeout: 10000 });
+		await expect(page.getByTestId("terminal")).toBeVisible({ timeout: 10000 });
 		
 		try {
 			execFileSync("tmux", ["has-session", "-t", sessionName], { stdio: "ignore" });
@@ -127,7 +127,7 @@ test.describe("wmux project management workflow", () => {
 		await expect(page.getByTestId("project-dashboard")).toBeVisible({ timeout: 5000 });
 		await expect(page.getByTestId("project-dashboard-title")).toBeVisible();
 		await expect(page.getByTestId("project-dashboard-title")).toContainText("wmux-e2e-dashboard-test");
-		await expect(page.getByTestId("project-launch-button")).toBeVisible();
+		await expect(page.getByTestId("project-launch-button")).toHaveCount(0);
 		await expect(page.getByTestId("project-sync-button")).toBeVisible();
 		await expect(page.getByTestId("project-ai-generate-button")).toBeVisible();
 		
@@ -142,7 +142,6 @@ test.describe("wmux project management workflow", () => {
 
 		await expect(page.getByText("AI Generated Content")).toBeVisible();
 
-		await expect(page.getByTestId("project-launch-button")).toBeEnabled();
 		await expect(page.getByTestId("project-sync-button")).toBeEnabled();
 		await expect(page.getByTestId("project-ai-generate-button")).toBeEnabled();
 	});

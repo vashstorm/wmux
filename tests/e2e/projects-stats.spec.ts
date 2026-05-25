@@ -55,20 +55,4 @@ test("projects view loads empty state", async ({ page }) => {
         await expect(projectAfterReload).toBeVisible({ timeout: 5000 });
     });
 
-    test("stats view renders empty state", async ({ page }) => {
-        await page.goto("/");
-        await page.getByTestId("open-stats-button").click();
-        await expect(page.getByTestId("stats-empty")).toBeVisible({ timeout: 5000 });
-    });
-
-    test("stats view shows summary after projects have been loaded", async ({ page }) => {
-        await page.goto("/");
-        await page.getByTestId("open-stats-button").click();
-        // Stats view should render either empty state or summary (no AI calls in E2E)
-        const statsView = page.getByTestId("stats-view");
-        await expect(statsView).toBeVisible({ timeout: 5000 });
-        // Either empty or summary must be present (not an error state)
-        const emptyOrSummary = page.getByTestId("stats-empty").or(page.getByTestId("stats-summary"));
-        await expect(emptyOrSummary.first()).toBeVisible({ timeout: 5000 });
-    });
 });

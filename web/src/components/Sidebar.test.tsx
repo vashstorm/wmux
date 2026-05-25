@@ -20,8 +20,7 @@ vi.mock("../api/client.js", () => ({
 	createProject: vi.fn(),
 	updateProject: vi.fn(),
 	deleteProject: vi.fn(),
-	listAiStats: vi.fn(),
-	cleanupAiStats: vi.fn(),
+
 }));
 
 const mockListConnections = vi.mocked(client.listConnections);
@@ -34,8 +33,7 @@ const mockListProjects = vi.mocked(client.listProjects);
 const mockCreateProject = vi.mocked(client.createProject);
 const mockUpdateProject = vi.mocked(client.updateProject);
 const mockDeleteProject = vi.mocked(client.deleteProject);
-const mockListAiStats = vi.mocked(client.listAiStats);
-const mockCleanupAiStats = vi.mocked(client.cleanupAiStats);
+
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
 	return <AppProvider>{children}</AppProvider>;
@@ -468,6 +466,28 @@ describe("Projects view", () => {
 		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
 		mockListConnectionHealth.mockResolvedValue([]);
 		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [],
+		});
+		mockListWindows.mockResolvedValue({
+			targetName: "conn1",
+			session: "new",
+			mode: "local",
+			data: [
+				{ ID: "@1", Name: "main", Index: 0, Active: true, PaneCount: 1, ActivePaneID: "%1", ActivePaneTitle: "bash" },
+			],
+		});
+		mockListPanes.mockResolvedValue({
+			targetName: "conn1",
+			session: "new",
+			window: "@1",
+			mode: "local",
+			data: [
+				{ ID: "%1", Title: "bash", Index: 0, Active: true, Width: 80, Height: 24, Left: 0, Top: 0 },
+			],
+		});
 		vi.mocked(client.listProjects).mockReset().mockResolvedValue([]);
 		vi.mocked(client.createProject).mockReset().mockResolvedValue({
 			id: "p1",
@@ -508,6 +528,7 @@ describe("Projects view", () => {
 			schemaVersion: 1,
 		});
 		vi.mocked(client.deleteProject).mockReset().mockResolvedValue(undefined);
+		vi.mocked(client.createSession).mockReset().mockResolvedValue({ targetName: "conn1", operation: "create_session", mode: "local", status: "ok" });
 	});
 
 	test("clicking Projects button loads projects and shows empty state", async () => {
@@ -577,196 +598,90 @@ describe("Projects view", () => {
 			expect(screen.getByTestId("projects-error")).toBeInTheDocument();
 		});
 	});
-});
 
-	describe("Stats view", () => {
-	beforeEach(() => {
-		vi.useRealTimers();
-		vi.clearAllMocks();
-		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
-		mockListConnectionHealth.mockResolvedValue([]);
-		mockFetchErrorLogs.mockResolvedValue({ enabled: false, path: null, lines: [], truncated: false, maxLines: 1000 });
-	});
+	test("project session action creates missing session and jumps to it", async () => {
+		vi.mocked(client.listProjects).mockResolvedValue([{
+			id: "p1",
+			name: "new",
+			path: "/tmp",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "new",
+			status: "stopped",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		}]);
 
-	test("clicking Stats button calls listAiStats and renders populated data", async () => {
-		mockListAiStats.mockResolvedValue({
-			data: [
-				{ id: "e1", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 150, promptTokens: 50, completionTokens: 30, totalTokens: 80, estimatedCost: 0.01, errorMessage: null, createdAt: "2024-01-01T00:00:00Z" },
-			],
-			summary: { totalEvents: 1, totalSuccess: 1, totalError: 0, totalDurationMs: 150, totalPromptTokens: 50, totalCompletionTokens: 30, totalTokens: 80, totalEstimatedCost: 0.01 },
-		});
+		function SelectedPaneChecker() {
+			const { selectedPane } = useAppState();
+			return <span data-testid="selected-pane-state">{selectedPane ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}` : "none"}</span>;
+		}
 
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-		await waitFor(() => {
-			const statsView = screen.getByTestId("stats-view");
-			expect(within(statsView).getByTestId("stats-event-e1")).toBeInTheDocument();
-			expect(within(statsView).getByText("sess1")).toBeInTheDocument();
-			expect(within(statsView).getByTestId("stats-summary")).toBeInTheDocument();
-		});
-	});
+		render(<TestWrapper><Sidebar /><SelectedPaneChecker /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		await waitFor(() => expect(screen.getByTestId("project-item-p1")).toBeInTheDocument());
 
-	test("stats cleanup keeps latest event per window and refreshes data", async () => {
-		mockListAiStats
-			.mockResolvedValueOnce({
-				data: [
-					{ id: "e1", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 150, promptTokens: 50, completionTokens: 30, totalTokens: 80, estimatedCost: 0.01, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-01T00:00:00Z" },
-					{ id: "e2", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 120, promptTokens: 45, completionTokens: 20, totalTokens: 65, estimatedCost: 0.008, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-02T00:00:00Z" },
-				],
-				summary: { totalEvents: 2, totalSuccess: 2, totalError: 0, totalDurationMs: 270, totalPromptTokens: 95, totalCompletionTokens: 50, totalTokens: 145, totalEstimatedCost: 0.018 },
-			})
-			.mockResolvedValueOnce({
-				data: [
-					{ id: "e2", projectId: null, provider: "openai", model: "gpt-4", targetName: "target1", sessionName: "sess1", status: "success", durationMs: 120, promptTokens: 45, completionTokens: 20, totalTokens: 65, estimatedCost: 0.008, errorMessage: null, windowNumber: 1, responseJson: null, createdAt: "2024-01-02T00:00:00Z" },
-				],
-				summary: { totalEvents: 1, totalSuccess: 1, totalError: 0, totalDurationMs: 120, totalPromptTokens: 45, totalCompletionTokens: 20, totalTokens: 65, totalEstimatedCost: 0.008 },
-			});
-		mockCleanupAiStats.mockResolvedValue({ deleted: 1 });
-
-		render(<TestWrapper><Sidebar /><ConfirmDialog /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-		await waitFor(() => expect(screen.getByTestId("stats-event-e1")).toBeInTheDocument());
-
-		fireEvent.click(screen.getByTestId("stats-cleanup-button"));
-		fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+		fireEvent.click(screen.getByTestId("project-open-session-p1"));
 
 		await waitFor(() => {
-			expect(mockCleanupAiStats).toHaveBeenCalledTimes(1);
-			expect(screen.getByTestId("stats-cleanup-message")).toHaveTextContent("Cleaned 1 old records");
-			expect(screen.queryByTestId("stats-event-e1")).not.toBeInTheDocument();
-			expect(screen.getByTestId("stats-event-e2")).toBeInTheDocument();
+			expect(vi.mocked(client.createSession)).toHaveBeenCalledWith("conn1", "new");
+			expect(screen.getByTestId("selected-pane-state")).toHaveTextContent("conn1:new:@1:%1");
 		});
 	});
 
-	test("empty stats shows empty state", async () => {
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
+	test("project session action jumps when session already exists", async () => {
+		vi.mocked(client.listProjects).mockResolvedValue([{
+			id: "p1",
+			name: "new",
+			path: "/tmp",
+			description: "",
+			createdAt: "",
+			updatedAt: "",
+			sessionName: "new",
+			status: "running",
+			workdir: "",
+			layoutJson: "{}",
+			detailsJson: "{}",
+			progressJson: "{}",
+			aiHtml: "",
+			aiStatus: "idle",
+			aiError: "",
+			lastSyncedAt: null,
+			schemaVersion: 1,
+		}]);
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "new" }],
 		});
 
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-		await waitFor(() => {
-			expect(screen.getByTestId("stats-empty")).toBeInTheDocument();
-		});
-	});
+		function SelectedPaneChecker() {
+			const { selectedPane } = useAppState();
+			return <span data-testid="selected-pane-state">{selectedPane ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}` : "none"}</span>;
+		}
 
-	test("stats API error shows error state with retry", async () => {
-		mockListAiStats.mockRejectedValue(new ApiError("internal_error", "db error", 500));
+		render(<TestWrapper><Sidebar /><SelectedPaneChecker /></TestWrapper>);
+		fireEvent.click(screen.getByTestId("open-projects-button"));
+		await waitFor(() => expect(screen.getByTestId("project-item-p1")).toBeInTheDocument());
 
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-		await waitFor(() => {
-			expect(screen.getByTestId("stats-error")).toBeInTheDocument();
-		});
-
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
-		});
-		fireEvent.click(screen.getByTestId("stats-retry-button"));
-		await waitFor(() => {
-			expect(screen.getByTestId("stats-empty")).toBeInTheDocument();
-		});
-	});
-
-	test("auto-refreshes stats every 30 seconds by default", async () => {
-		vi.useFakeTimers({ shouldAdvanceTime: true });
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
-		});
-
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
+		fireEvent.click(screen.getByTestId("project-open-session-p1"));
 
 		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		mockListAiStats.mockClear();
-		vi.advanceTimersByTime(30000);
-
-		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		vi.useRealTimers();
-	});
-
-	test("manual refresh resets the auto-refresh interval", async () => {
-		vi.useFakeTimers({ shouldAdvanceTime: true });
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
-		});
-
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-
-		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		vi.advanceTimersByTime(15000);
-		mockListAiStats.mockClear();
-
-		fireEvent.click(screen.getByTestId("stats-refresh-button"));
-		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		mockListAiStats.mockClear();
-		vi.advanceTimersByTime(15000);
-		expect(mockListAiStats).not.toHaveBeenCalled();
-
-		vi.advanceTimersByTime(15000);
-		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		vi.useRealTimers();
-	});
-
-	test("disabling auto-refresh stops the interval", async () => {
-		vi.useFakeTimers({ shouldAdvanceTime: true });
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
-		});
-
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-
-		await waitFor(() => {
-			expect(mockListAiStats).toHaveBeenCalledTimes(1);
-		});
-
-		const autoRefreshSwitch = screen.getByTestId("stats-auto-refresh-switch").querySelector("input");
-		expect(autoRefreshSwitch).not.toBeNull();
-		fireEvent.click(autoRefreshSwitch!);
-
-		mockListAiStats.mockClear();
-		vi.advanceTimersByTime(30000);
-		expect(mockListAiStats).not.toHaveBeenCalled();
-
-		vi.useRealTimers();
-	});
-
-	test("shows last refreshed time after loading", async () => {
-		mockListAiStats.mockResolvedValue({
-			data: [],
-			summary: { totalEvents: 0, totalSuccess: 0, totalError: 0, totalDurationMs: 0, totalPromptTokens: 0, totalCompletionTokens: 0, totalTokens: 0, totalEstimatedCost: 0 },
-		});
-
-		render(<TestWrapper><Sidebar /></TestWrapper>);
-		fireEvent.click(screen.getByTestId("open-stats-button"));
-
-		await waitFor(() => {
-			expect(screen.getByTestId("stats-last-refreshed")).toBeInTheDocument();
+			expect(vi.mocked(client.createSession)).not.toHaveBeenCalled();
+			expect(screen.getByTestId("selected-pane-state")).toHaveTextContent("conn1:new:@1:%1");
 		});
 	});
 });
+
+
 
 describe("Session Card Icons and Association Confirmation", () => {
 	beforeEach(() => {

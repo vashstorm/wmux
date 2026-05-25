@@ -5,16 +5,38 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import TerminalIcon from "@mui/icons-material/Terminal";
 import { useAppState } from "../../state/store.js";
-import { listProjects, createProject, updateProject, deleteProject, getProject } from "../../api/client.js";
-import type { Project, NewProject } from "../../api/client.js";
+import { listProjects, createProject, updateProject, deleteProject, getProject, createSession, listSessions, listWindows, listPanes } from "../../api/client.js";
+import type { Project, NewProject, WindowInfo } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 
+function projectSessionName(project: Project): string {
+	return (project.sessionName || project.name).trim();
+}
+
+const SESSION_WORKSPACE_LOAD_ATTEMPTS = 5;
+const SESSION_WORKSPACE_RETRY_DELAY_MS = 80;
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 export function ProjectsView() {
-	const { selectedProject, setSelectedProject } = useAppState();
+	const {
+		selectedProject,
+		setSelectedProject,
+		selectedPane,
+		selectedTargetName,
+		setSessions,
+		setSelectedPane,
+		setWindows,
+		setPanes,
+	} = useAppState();
 	const [projects, setProjects] = useState<Project[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [sessionActionProjectId, setSessionActionProjectId] = useState<string | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const [formName, setFormName] = useState("");
@@ -48,7 +70,7 @@ export function ProjectsView() {
 		setEditingId(null);
 	};
 
-	const handleSelect = (project: Project) => {
+	const handleOpenProjectDetails = (project: Project) => {
 		if (selectedProject?.id === project.id) {
 			setSelectedProject(null);
 			return;
@@ -108,6 +130,85 @@ export function ProjectsView() {
 		}
 	};
 
+	const openSession = useCallback(async (targetName: string, sessionName: string) => {
+		let windows: WindowInfo[] = [];
+		for (let attempt = 0; attempt < SESSION_WORKSPACE_LOAD_ATTEMPTS; attempt++) {
+			const windowsResponse = await listWindows(targetName, sessionName);
+			windows = windowsResponse.data ?? [];
+			const initialWindow = windows[0];
+
+			if (initialWindow) {
+				const panesResponse = await listPanes(targetName, sessionName, initialWindow.ID);
+				const panes = panesResponse.data ?? [];
+				if (panes.length > 0) {
+					setWindows(targetName, sessionName, windows);
+					setPanes(targetName, sessionName, initialWindow.ID, panes);
+
+					const initialPane = panes[0];
+					setSelectedPane({
+						targetName,
+						session: sessionName,
+						window: initialWindow.ID,
+						pane: initialPane?.ID,
+					});
+					return;
+				}
+			}
+
+			if (attempt < SESSION_WORKSPACE_LOAD_ATTEMPTS - 1) {
+				await delay(SESSION_WORKSPACE_RETRY_DELAY_MS);
+			}
+		}
+
+		if (windows.length > 0) {
+			setWindows(targetName, sessionName, windows);
+		}
+		setSelectedPane({ targetName, session: sessionName });
+	}, [setPanes, setSelectedPane, setWindows]);
+
+	const handleOpenOrCreateSession = useCallback(async (project: Project) => {
+		if (sessionActionProjectId !== null) return;
+
+		if (!selectedTargetName) {
+			setError("No active connection selected");
+			return;
+		}
+
+		const sessionName = projectSessionName(project);
+		if (!sessionName) {
+			setError("Project session name cannot be empty");
+			return;
+		}
+
+		setSessionActionProjectId(project.id);
+		setError(null);
+		try {
+			const sessionsResponse = await listSessions(selectedTargetName);
+			const sessions = sessionsResponse.data ?? [];
+			setSessions(selectedTargetName, sessions);
+
+			const exists = sessions.some((session) => session.name === sessionName || session.id === sessionName);
+			if (!exists) {
+				try {
+					await createSession(selectedTargetName, sessionName);
+				} catch (err) {
+					if (!(err instanceof ApiError && err.code === "conflict")) {
+						throw err;
+					}
+				}
+
+				const refreshedSessions = await listSessions(selectedTargetName);
+				setSessions(selectedTargetName, refreshedSessions.data ?? []);
+			}
+
+			await openSession(selectedTargetName, sessionName);
+		} catch (err) {
+			setError(err instanceof ApiError ? err.message : "Failed to open project session");
+		} finally {
+			setSessionActionProjectId(null);
+		}
+	}, [openSession, selectedTargetName, sessionActionProjectId, setSessions]);
+
 	const refreshSelectedProject = useCallback(async (id: string) => {
 		if (!selectedProject || selectedProject.id !== id) return;
 		try {
@@ -162,12 +263,24 @@ export function ProjectsView() {
 			) : (
 				<Stack spacing={0.5} sx={{ mt: 0.5 }}>
 					{projects.map((project) => {
-						const isSelected = selectedProject?.id === project.id;
+						const sessionName = projectSessionName(project);
+						const isSelected = selectedProject?.id === project.id
+							|| (selectedPane?.targetName === selectedTargetName && selectedPane.session === sessionName);
 						return (
 							<Box
 								key={project.id}
 								data-testid={`project-item-${project.id}`}
-								onClick={() => handleSelect(project)}
+								role="button"
+								tabIndex={0}
+								aria-label={`Open project details for ${project.name}`}
+								aria-busy={sessionActionProjectId === project.id}
+								onClick={() => handleOpenProjectDetails(project)}
+								onKeyDown={(event) => {
+									if (event.key === "Enter" || event.key === " ") {
+										event.preventDefault();
+										handleOpenProjectDetails(project);
+									}
+								}}
 								sx={{
 									position: "relative",
 									display: "flex",
@@ -176,7 +289,7 @@ export function ProjectsView() {
 									px: 1.25,
 									py: 1,
 									borderRadius: "var(--radius-sm)",
-									cursor: "pointer",
+									cursor: sessionActionProjectId === project.id ? "progress" : "pointer",
 									border: "1px solid",
 									borderColor: isSelected ? "var(--color-glass-highlight-border)" : "transparent",
 									bgcolor: isSelected ? "var(--color-accent-subtle)" : "transparent",
@@ -219,7 +332,7 @@ export function ProjectsView() {
 								</Box>
 
 								{/* Text */}
-								<Box sx={{ flex: 1, minWidth: 0, pr: 6 }}>
+								<Box sx={{ flex: 1, minWidth: 0, pr: 9 }}>
 									<Typography
 										sx={{
 											fontSize: "var(--font-size-sm)",
@@ -264,6 +377,23 @@ export function ProjectsView() {
 										transition: "opacity var(--transition-fast)",
 									}}
 								>
+									<IconButton
+										size="small"
+										onClick={(e) => { e.stopPropagation(); void handleOpenOrCreateSession(project); }}
+										data-testid={`project-open-session-${project.id}`}
+										aria-label={`Open or create session for ${project.name}`}
+										title="Open or create session"
+										disabled={sessionActionProjectId !== null}
+										sx={{
+											width: 24,
+											height: 24,
+											borderRadius: "var(--radius-sm)",
+											color: "var(--color-text-muted)",
+											"&:hover": { bgcolor: "var(--color-surface-hover)", color: "var(--color-accent)" },
+										}}
+									>
+										<TerminalIcon sx={{ fontSize: 13 }} />
+									</IconButton>
 									<IconButton
 										size="small"
 										onClick={(e) => { e.stopPropagation(); startEdit(project); }}

@@ -10,287 +10,86 @@ import {
 } from "./workspaceUrl.js";
 
 describe("parseWorkspaceUrl", () => {
-	describe("valid inputs", () => {
-		test("parses connection and session", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux");
-			expect(result).toEqual({
-				connection: "local",
-				session: "wmux",
-			});
+	test("parses valid inputs and decodes URL-encoded values", () => {
+		expect(parseWorkspaceUrl("?connection=local&session=wmux")).toEqual({
+			connection: "local",
+			session: "wmux",
 		});
-
-		test("parses connection, session, and window", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux&window=%401");
-			expect(result).toEqual({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-			});
+		expect(parseWorkspaceUrl("?connection=local&session=wmux&window=%401")).toEqual({
+			connection: "local",
+			session: "wmux",
+			window: "@1",
 		});
-
-		test("parses full location with all fields", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux&window=%401&pane=%251");
-			expect(result).toEqual({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			});
+		expect(parseWorkspaceUrl("?connection=local&session=wmux&window=%401&pane=%251")).toEqual({
+			connection: "local",
+			session: "wmux",
+			window: "@1",
+			pane: "%1",
 		});
-
-		test("decodes URL-encoded values", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=my%20session%23name");
-			expect(result).toEqual({
-				connection: "local",
-				session: "my session#name",
-			});
-		});
-
-		test("handles special characters: @ and %", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux&window=%401&pane=%251");
-			expect(result?.window).toBe("@1");
-			expect(result?.pane).toBe("%1");
-		});
-
-		test("handles session names with spaces", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=my%20session");
-			expect(result).toEqual({
-				connection: "local",
-				session: "my session",
-			});
-		});
-
-		test("handles session names with #", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=session%23name");
-			expect(result).toEqual({
-				connection: "local",
-				session: "session#name",
-			});
+		expect(parseWorkspaceUrl("?connection=local&session=my%20session%23name")).toEqual({
+			connection: "local",
+			session: "my session#name",
 		});
 	});
 
-	describe("invalid inputs returning null", () => {
-		test("returns null for empty search string", () => {
-			expect(parseWorkspaceUrl("")).toBeNull();
-		});
-
-		test("returns null for search with only ?", () => {
-			expect(parseWorkspaceUrl("?")).toBeNull();
-		});
-
-		test("returns null when connection is missing", () => {
-			expect(parseWorkspaceUrl("?session=wmux")).toBeNull();
-		});
-
-		test("returns null when session is missing", () => {
-			expect(parseWorkspaceUrl("?connection=local")).toBeNull();
-		});
-
-		test("returns null when pane is present without window", () => {
-			expect(parseWorkspaceUrl("?connection=local&session=wmux&pane=%251")).toBeNull();
-		});
-
-		test("window without pane is valid", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux&window=%401");
-			expect(result).toEqual({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-			});
-		});
-
-		test("returns null for empty connection", () => {
-			expect(parseWorkspaceUrl("?connection=&session=wmux")).toBeNull();
-		});
-
-		test("returns null for empty session", () => {
-			expect(parseWorkspaceUrl("?connection=local&session=")).toBeNull();
-		});
+	test("returns null for invalid or empty inputs", () => {
+		expect(parseWorkspaceUrl("")).toBeNull();
+		expect(parseWorkspaceUrl("?")).toBeNull();
+		expect(parseWorkspaceUrl("?session=wmux")).toBeNull();
+		expect(parseWorkspaceUrl("?connection=local")).toBeNull();
+		expect(parseWorkspaceUrl("?connection=local&session=wmux&pane=%251")).toBeNull();
+		expect(parseWorkspaceUrl("?connection=&session=wmux")).toBeNull();
+		expect(parseWorkspaceUrl("?connection=local&session=")).toBeNull();
 	});
 
-	describe("edge cases", () => {
-		test("handles extra query parameters (ignores them)", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux&extra=ignored");
-			expect(result).toEqual({
-				connection: "local",
-				session: "wmux",
-			});
+	test("handles extra params and optional leading ?", () => {
+		expect(parseWorkspaceUrl("?connection=local&session=wmux&extra=ignored")).toEqual({
+			connection: "local",
+			session: "wmux",
 		});
-
-		test("handles leading ? correctly", () => {
-			const result = parseWorkspaceUrl("?connection=local&session=wmux");
-			expect(result).not.toBeNull();
-		});
-
-		test("handles no leading ? (just key=value string)", () => {
-			const result = parseWorkspaceUrl("connection=local&session=wmux");
-			expect(result).not.toBeNull();
+		expect(parseWorkspaceUrl("connection=local&session=wmux")).toEqual({
+			connection: "local",
+			session: "wmux",
 		});
 	});
 });
 
 describe("formatWorkspaceUrl", () => {
-	describe("valid locations", () => {
-		test("formats connection and session", () => {
-			const result = formatWorkspaceUrl({ connection: "local", session: "wmux" });
-			expect(result).toBe("?connection=local&session=wmux");
-		});
-
-		test("formats connection, session, and window", () => {
-			const result = formatWorkspaceUrl({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-			});
-			expect(result).toBe("?connection=local&session=wmux&window=%401");
-		});
-
-		test("formats full location with pane", () => {
-			const result = formatWorkspaceUrl({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			});
-			expect(result).toBe("?connection=local&session=wmux&window=%401&pane=%251");
-		});
-
-		test("URL-encodes special characters", () => {
-			const result = formatWorkspaceUrl({
-				connection: "local",
-				session: "my session#name",
-			});
-			// URLSearchParams encodes space as + (valid, equivalent to %20)
-			expect(result).toBe("?connection=local&session=my+session%23name");
-		});
-
-		test("encodes @ in window ID", () => {
-			const result = formatWorkspaceUrl({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-			});
-			expect(result).toContain("window=%401");
-		});
-
-		test("encodes % in pane ID", () => {
-			const result = formatWorkspaceUrl({
-				connection: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			});
-			expect(result).toContain("pane=%251");
-		});
+	test("formats valid locations and encodes special characters", () => {
+		expect(formatWorkspaceUrl({ connection: "local", session: "wmux" })).toBe("?connection=local&session=wmux");
+		expect(formatWorkspaceUrl({ connection: "local", session: "wmux", window: "@1" })).toBe("?connection=local&session=wmux&window=%401");
+		expect(formatWorkspaceUrl({ connection: "local", session: "wmux", window: "@1", pane: "%1" })).toBe("?connection=local&session=wmux&window=%401&pane=%251");
+		expect(formatWorkspaceUrl({ connection: "local", session: "my session#name" })).toBe("?connection=local&session=my+session%23name");
 	});
 
-	describe("invalid locations returning empty string", () => {
-		test("returns empty string for null", () => {
-			expect(formatWorkspaceUrl(null)).toBe("");
-		});
-
-		test("returns empty string for connection without session", () => {
-			// Type assertion needed since TypeScript would prevent this
-			expect(formatWorkspaceUrl({ connection: "local" } as WorkspaceLocation)).toBe("");
-		});
-
-		test("returns empty string for missing connection", () => {
-			expect(formatWorkspaceUrl({ session: "wmux" } as WorkspaceLocation)).toBe("");
-		});
+	test("returns empty string for null or incomplete locations", () => {
+		expect(formatWorkspaceUrl(null)).toBe("");
+		expect(formatWorkspaceUrl({ connection: "local" } as WorkspaceLocation)).toBe("");
+		expect(formatWorkspaceUrl({ session: "wmux" } as WorkspaceLocation)).toBe("");
 	});
 });
 
 describe("round-trip: formatWorkspaceUrl -> parseWorkspaceUrl", () => {
-	test("round-trips simple location", () => {
-		const original: WorkspaceLocation = { connection: "local", session: "wmux" };
-		const formatted = formatWorkspaceUrl(original);
-		const parsed = parseWorkspaceUrl(formatted);
-		expect(parsed).toEqual(original);
-	});
-
-	test("round-trips location with window and pane", () => {
-		const original: WorkspaceLocation = {
-			connection: "local",
-			session: "wmux",
-			window: "@1",
-			pane: "%1",
-		};
-		const formatted = formatWorkspaceUrl(original);
-		const parsed = parseWorkspaceUrl(formatted);
-		expect(parsed).toEqual(original);
-	});
-
-	test("round-trips session with spaces", () => {
-		const original: WorkspaceLocation = {
-			connection: "local",
-			session: "my session name",
-		};
-		const formatted = formatWorkspaceUrl(original);
-		const parsed = parseWorkspaceUrl(formatted);
-		expect(parsed).toEqual(original);
-	});
-
-	test("round-trips session with #", () => {
-		const original: WorkspaceLocation = {
-			connection: "local",
-			session: "session#name",
-		};
-		const formatted = formatWorkspaceUrl(original);
-		const parsed = parseWorkspaceUrl(formatted);
-		expect(parsed).toEqual(original);
+	test("preserves locations through format and parse", () => {
+		const cases: WorkspaceLocation[] = [
+			{ connection: "local", session: "wmux" },
+			{ connection: "local", session: "wmux", window: "@1", pane: "%1" },
+			{ connection: "local", session: "my session name" },
+			{ connection: "local", session: "session#name" },
+		];
+		for (const original of cases) {
+			expect(parseWorkspaceUrl(formatWorkspaceUrl(original))).toEqual(original);
+		}
 	});
 });
 
 describe("toSelectedPane", () => {
-	test("maps connection to targetName", () => {
-		const location: WorkspaceLocation = {
-			connection: "my-connection",
+	test("maps WorkspaceLocation fields correctly", () => {
+		expect(toSelectedPane({ connection: "my-connection", session: "wmux" })).toEqual({
+			targetName: "my-connection",
 			session: "wmux",
-		};
-		const result = toSelectedPane(location);
-		expect(result.targetName).toBe("my-connection");
-		expect(result.session).toBe("wmux");
-	});
-
-	test("preserves session", () => {
-		const location: WorkspaceLocation = {
-			connection: "local",
-			session: "my-session",
-		};
-		const result = toSelectedPane(location);
-		expect(result.session).toBe("my-session");
-	});
-
-	test("preserves optional window", () => {
-		const location: WorkspaceLocation = {
-			connection: "local",
-			session: "wmux",
-			window: "@1",
-		};
-		const result = toSelectedPane(location);
-		expect(result.window).toBe("@1");
-	});
-
-	test("preserves optional pane", () => {
-		const location: WorkspaceLocation = {
-			connection: "local",
-			session: "wmux",
-			window: "@1",
-			pane: "%1",
-		};
-		const result = toSelectedPane(location);
-		expect(result.pane).toBe("%1");
-	});
-
-	test("handles full location", () => {
-		const location: WorkspaceLocation = {
-			connection: "conn1",
-			session: "sess1",
-			window: "@5",
-			pane: "%10",
-		};
-		const result = toSelectedPane(location);
-		expect(result).toEqual({
+		});
+		expect(toSelectedPane({ connection: "conn1", session: "sess1", window: "@5", pane: "%10" })).toEqual({
 			targetName: "conn1",
 			session: "sess1",
 			window: "@5",
@@ -300,285 +99,97 @@ describe("toSelectedPane", () => {
 });
 
 describe("fromSelectedPane", () => {
-	test("converts SelectedPane to WorkspaceLocation", () => {
-		const pane: SelectedPane = {
-			targetName: "my-connection",
-			session: "wmux",
-		};
-		const result = fromSelectedPane(pane);
-		expect(result).toEqual({
+	test("maps SelectedPane fields correctly", () => {
+		expect(fromSelectedPane({ targetName: "my-connection", session: "wmux" })).toEqual({
 			connection: "my-connection",
 			session: "wmux",
 		});
-	});
-
-	test("maps targetName to connection", () => {
-		const pane: SelectedPane = {
-			targetName: "conn1",
-			session: "sess1",
-		};
-		const result = fromSelectedPane(pane);
-		expect(result?.connection).toBe("conn1");
-	});
-
-	test("preserves optional window", () => {
-		const pane: SelectedPane = {
-			targetName: "local",
-			session: "wmux",
-			window: "@1",
-		};
-		const result = fromSelectedPane(pane);
-		expect(result?.window).toBe("@1");
-	});
-
-	test("preserves optional pane", () => {
-		const pane: SelectedPane = {
-			targetName: "local",
-			session: "wmux",
-			window: "@1",
-			pane: "%1",
-		};
-		const result = fromSelectedPane(pane);
-		expect(result?.pane).toBe("%1");
-	});
-
-	test("returns null for null input", () => {
-		expect(fromSelectedPane(null)).toBeNull();
-	});
-
-	test("handles full SelectedPane", () => {
-		const pane: SelectedPane = {
-			targetName: "conn1",
-			session: "sess1",
-			window: "@5",
-			pane: "%10",
-		};
-		const result = fromSelectedPane(pane);
-		expect(result).toEqual({
+		expect(fromSelectedPane({ targetName: "conn1", session: "sess1", window: "@5", pane: "%10" })).toEqual({
 			connection: "conn1",
 			session: "sess1",
 			window: "@5",
 			pane: "%10",
 		});
 	});
+
+	test("returns null for null input", () => {
+		expect(fromSelectedPane(null)).toBeNull();
+	});
 });
 
 describe("getWorkspaceHistoryAction", () => {
-	describe("push actions", () => {
-		test("null to non-null is push", () => {
-			const next: SelectedPane = { targetName: "local", session: "wmux" };
-			expect(getWorkspaceHistoryAction(null, next)).toBe("push");
-		});
+	test("returns push for navigation changes", () => {
+		const next: SelectedPane = { targetName: "local", session: "wmux" };
+		expect(getWorkspaceHistoryAction(null, next)).toBe("push");
 
-		test("session A to session B is push", () => {
-			const prev: SelectedPane = { targetName: "local", session: "session1" };
-			const next: SelectedPane = { targetName: "local", session: "session2" };
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("push");
-		});
+		const a: SelectedPane = { targetName: "local", session: "session1" };
+		const b: SelectedPane = { targetName: "local", session: "session2" };
+		expect(getWorkspaceHistoryAction(a, b)).toBe("push");
 
-		test("different connections is push", () => {
-			const prev: SelectedPane = { targetName: "conn1", session: "session1" };
-			const next: SelectedPane = { targetName: "conn2", session: "session1" };
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("push");
-		});
+		const c: SelectedPane = { targetName: "conn1", session: "session1" };
+		const d: SelectedPane = { targetName: "conn2", session: "session1" };
+		expect(getWorkspaceHistoryAction(c, d)).toBe("push");
 
-		test("same session, window A to window B is push", () => {
-			const prev: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
-			const next: SelectedPane = { targetName: "local", session: "wmux", window: "@2" };
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("push");
-		});
+		const e: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
+		const f: SelectedPane = { targetName: "local", session: "wmux", window: "@2" };
+		expect(getWorkspaceHistoryAction(e, f)).toBe("push");
 
-		test("same session, no window to window is push", () => {
-			const prev: SelectedPane = { targetName: "local", session: "wmux" };
-			const next: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("push");
-		});
+		const g: SelectedPane = { targetName: "local", session: "wmux" };
+		const h: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
+		expect(getWorkspaceHistoryAction(g, h)).toBe("push");
 
-		test("same session, window to no window is push", () => {
-			const prev: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
-			const next: SelectedPane = { targetName: "local", session: "wmux" };
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("push");
-		});
+		const i: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
+		const j: SelectedPane = { targetName: "local", session: "wmux" };
+		expect(getWorkspaceHistoryAction(i, j)).toBe("push");
 	});
 
-	describe("replace actions", () => {
-		test("non-null to null is replace", () => {
-			const prev: SelectedPane = { targetName: "local", session: "wmux" };
-			expect(getWorkspaceHistoryAction(prev, null)).toBe("replace");
-		});
+	test("returns replace for null or same-session pane changes", () => {
+		const prev: SelectedPane = { targetName: "local", session: "wmux" };
+		expect(getWorkspaceHistoryAction(prev, null)).toBe("replace");
+		expect(getWorkspaceHistoryAction(null, null)).toBe("replace");
 
-		test("null to null is replace", () => {
-			expect(getWorkspaceHistoryAction(null, null)).toBe("replace");
-		});
+		const a: SelectedPane = { targetName: "local", session: "wmux", window: "@1", pane: "%1" };
+		const b: SelectedPane = { targetName: "local", session: "wmux", window: "@1", pane: "%2" };
+		expect(getWorkspaceHistoryAction(a, b)).toBe("replace");
 
-		test("same session and window, pane A to pane B is replace", () => {
-			const prev: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			};
-			const next: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%2",
-			};
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("replace");
-		});
+		const c: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
+		const d: SelectedPane = { targetName: "local", session: "wmux", window: "@1", pane: "%1" };
+		expect(getWorkspaceHistoryAction(c, d)).toBe("replace");
 
-		test("same session and window, no pane to pane is replace", () => {
-			const prev: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-			};
-			const next: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			};
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("replace");
-		});
+		const e: SelectedPane = { targetName: "local", session: "wmux", window: "@1", pane: "%1" };
+		const f: SelectedPane = { targetName: "local", session: "wmux", window: "@1" };
+		expect(getWorkspaceHistoryAction(e, f)).toBe("replace");
 
-		test("same session and window, pane to no pane is replace", () => {
-			const prev: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			};
-			const next: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-			};
-			expect(getWorkspaceHistoryAction(prev, next)).toBe("replace");
-		});
-
-		test("identical location is replace (no-op case)", () => {
-			const pane: SelectedPane = {
-				targetName: "local",
-				session: "wmux",
-				window: "@1",
-				pane: "%1",
-			};
-			expect(getWorkspaceHistoryAction(pane, pane)).toBe("replace");
-		});
+		expect(getWorkspaceHistoryAction(a, a)).toBe("replace");
 	});
 });
 
 describe("isStructurallyValidWorkspaceLocation", () => {
-	describe("valid locations", () => {
-		test("connection + session is valid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "wmux",
-				}),
-			).toBe(true);
-		});
-
-		test("connection + session + window is valid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "wmux",
-					window: "@1",
-				}),
-			).toBe(true);
-		});
-
-		test("connection + session + window + pane is valid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "wmux",
-					window: "@1",
-					pane: "%1",
-				}),
-			).toBe(true);
-		});
+	test("accepts valid locations", () => {
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local", session: "wmux" })).toBe(true);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local", session: "wmux", window: "@1" })).toBe(true);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local", session: "wmux", window: "@1", pane: "%1" })).toBe(true);
 	});
 
-	describe("invalid locations", () => {
-		test("missing connection is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					session: "wmux",
-				} as WorkspaceLocation),
-			).toBe(false);
-		});
-
-		test("missing session is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-				} as WorkspaceLocation),
-			).toBe(false);
-		});
-
-		test("empty connection is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "",
-					session: "wmux",
-				}),
-			).toBe(false);
-		});
-
-		test("empty session is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "",
-				}),
-			).toBe(false);
-		});
-
-		test("pane without window is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "wmux",
-					pane: "%1",
-				} as WorkspaceLocation),
-			).toBe(false);
-		});
-
-		test("connection + session + pane (no window) is invalid", () => {
-			expect(
-				isStructurallyValidWorkspaceLocation({
-					connection: "local",
-					session: "wmux",
-					pane: "%1",
-				} as WorkspaceLocation),
-			).toBe(false);
-		});
+	test("rejects incomplete or malformed locations", () => {
+		expect(isStructurallyValidWorkspaceLocation({ session: "wmux" } as WorkspaceLocation)).toBe(false);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local" } as WorkspaceLocation)).toBe(false);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "", session: "wmux" })).toBe(false);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local", session: "" })).toBe(false);
+		expect(isStructurallyValidWorkspaceLocation({ connection: "local", session: "wmux", pane: "%1" } as WorkspaceLocation)).toBe(false);
 	});
 });
 
 describe("acceptance criteria", () => {
-	test("parseWorkspaceUrl with encoded @ and %", () => {
-		const result = parseWorkspaceUrl("?connection=local&session=wmux&window=%401&pane=%251");
-		expect(result).toEqual({
+	test("covers key URL behaviors", () => {
+		expect(parseWorkspaceUrl("?connection=local&session=wmux&window=%401&pane=%251")).toEqual({
 			connection: "local",
 			session: "wmux",
 			window: "@1",
 			pane: "%1",
 		});
-	});
-
-	test("pane without window returns null", () => {
 		expect(parseWorkspaceUrl("?connection=local&session=wmux&pane=%251")).toBeNull();
-	});
-
-	test("formatWorkspaceUrl(null) returns empty string", () => {
 		expect(formatWorkspaceUrl(null)).toBe("");
-	});
-
-	test("formatWorkspaceUrl with missing session returns empty string", () => {
 		expect(formatWorkspaceUrl({ connection: "local" } as WorkspaceLocation)).toBe("");
 	});
 });
