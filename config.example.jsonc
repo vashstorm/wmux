@@ -48,4 +48,30 @@
     // Delete rotated log files older than this many days. Set 0 to disable cleanup.
     "retentionDays": 14
   }
+,
+  "voice": {
+    // Voice control via Qwen3.5-Omni realtime API.
+    // When enabled, dashscopeApiKey is required.
+    "enabled": false,
+    // Obtain your API key from https://www.alibabacloud.com/help/en/dashscope/
+    // This key is stored server-side only and is never sent to the frontend.
+    "dashscopeApiKey": "YOUR_DASHSCOPE_API_KEY_HERE",
+    // Valid models: qwen3.5-omni-flash-realtime, qwen3.5-omni-plus-realtime
+    "model": "qwen3.5-omni-flash-realtime",
+    // DashScope realtime WebSocket endpoint. Do not change unless using a custom deployment.
+    "endpoint": "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
+    // When true, the microphone stays active after each command (continuous listening mode).
+    // Privacy note: audio is streamed to DashScope servers while listening.
+    // If the browser blocks microphone access, check site permissions for the Wmux origin.
+    "continuousListening": true,
+    // Save raw audio recordings to disk. Disabled by default for privacy.
+    "storeRawAudio": false,
+    // Optional: path to a JSON-lines audit log file for voice interactions.
+    // Secrets are automatically redacted from audit log entries.
+    "auditLogPath": null,
+    // Enable voice activity detection (VAD) to detect when the user starts/stops speaking.
+    "vadEnabled": true,
+    // VAD sensitivity threshold (0.0 - 1.0). Lower values detect quieter speech.
+    "vadThreshold": 0.5
+  }
 }

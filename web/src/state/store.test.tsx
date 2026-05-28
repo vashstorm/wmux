@@ -708,3 +708,101 @@ describe("selection state exclusivity", () => {
 		expect(screen.getByTestId("selected-pane").textContent).toBe("null");
 	});
 });
+
+describe("voice state", () => {
+	function VoiceTestComponent() {
+		const state = useAppState();
+		return (
+			<div>
+				<span data-testid="voice-status">{state.voiceStatus}</span>
+				<span data-testid="voice-transcript">{state.voiceTranscript || "empty"}</span>
+				<span data-testid="voice-confirmation">{state.voicePendingConfirmation ? `${state.voicePendingConfirmation.confirmationId}:${state.voicePendingConfirmation.skill}` : "null"}</span>
+				<span data-testid="voice-error">{state.voiceError || "null"}</span>
+				<button data-testid="set-voice-listening" onClick={() => state.setVoiceStatus("listening")}>Set Listening</button>
+				<button data-testid="set-voice-error" onClick={() => state.setVoiceError("access denied")}>Set Error</button>
+				<button data-testid="append-transcript" onClick={() => state.appendVoiceTranscript("hello ")}>Append</button>
+				<button data-testid="set-transcript" onClick={() => state.setVoiceTranscript("done")}>Set Transcript</button>
+				<button data-testid="set-confirmation" onClick={() => state.setVoiceConfirmation({ confirmationId: "c1", skill: "send_to_pane" })}>Set Confirmation</button>
+				<button data-testid="clear-confirmation" onClick={() => state.setVoiceConfirmation(null)}>Clear Confirmation</button>
+				<button data-testid="clear-voice-error" onClick={() => state.setVoiceError(null)}>Clear Error</button>
+			</div>
+		);
+	}
+
+	function renderWithProvider() {
+		return render(
+			<AppProvider>
+				<VoiceTestComponent />
+			</AppProvider>,
+		);
+	}
+
+	test("default voice status is disabled", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("voice-status").textContent).toBe("disabled");
+	});
+
+	test("default transcript is empty", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("voice-transcript").textContent).toBe("empty");
+	});
+
+	test("default confirmation is null", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("voice-confirmation").textContent).toBe("null");
+	});
+
+	test("default voice error is null", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("voice-error").textContent).toBe("null");
+	});
+
+	test("setVoiceStatus updates status", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-voice-listening"));
+		expect(screen.getByTestId("voice-status").textContent).toBe("listening");
+	});
+
+	test("setVoiceError updates error", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-voice-error"));
+		expect(screen.getByTestId("voice-error").textContent).toBe("access denied");
+	});
+
+	test("appendVoiceTranscript appends text", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("append-transcript"));
+		expect(screen.getByTestId("voice-transcript").textContent).toBe("hello ");
+		fireEvent.click(screen.getByTestId("append-transcript"));
+		expect(screen.getByTestId("voice-transcript").textContent).toBe("hello hello ");
+	});
+
+	test("setVoiceTranscript replaces transcript", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("append-transcript"));
+		fireEvent.click(screen.getByTestId("set-transcript"));
+		expect(screen.getByTestId("voice-transcript").textContent).toBe("done");
+	});
+
+	test("setVoiceConfirmation sets confirmation", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-confirmation"));
+		expect(screen.getByTestId("voice-confirmation").textContent).toBe("c1:send_to_pane");
+	});
+
+	test("clearing confirmation sets null", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-confirmation"));
+		expect(screen.getByTestId("voice-confirmation").textContent).toBe("c1:send_to_pane");
+		fireEvent.click(screen.getByTestId("clear-confirmation"));
+		expect(screen.getByTestId("voice-confirmation").textContent).toBe("null");
+	});
+
+	test("clearing voice error sets null", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-voice-error"));
+		expect(screen.getByTestId("voice-error").textContent).toBe("access denied");
+		fireEvent.click(screen.getByTestId("clear-voice-error"));
+		expect(screen.getByTestId("voice-error").textContent).toBe("null");
+	});
+});

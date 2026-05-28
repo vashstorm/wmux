@@ -15,6 +15,7 @@ pub mod session;
 pub mod state;
 pub mod storage;
 pub mod tmux;
+pub mod voice;
 
 pub fn version() -> &'static str {
     match option_env!("WMUX_VERSION") {

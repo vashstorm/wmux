@@ -19,6 +19,7 @@ const MAX_TERMINAL_FONT_SIZE: u16 = 32;
 const VALID_TERMINAL_FONT_WEIGHTS: &[&str] = &[
     "normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900",
 ];
+const VALID_VOICE_MODELS: &[&str] = &["qwen3.5-omni-flash-realtime", "qwen3.5-omni-plus-realtime"];
 
 pub type Result<T> = std::result::Result<T, ConfigError>;
 
@@ -42,9 +43,13 @@ pub enum ConfigError {
     LockPoisoned,
     #[error("path is empty or missing")]
     PathMissing,
+    #[error("dashscope API key is required when voice is enabled")]
+    VoiceApiKeyRequired,
+    #[error("invalid voice model: {0}")]
+    InvalidVoiceModel(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(default = "default_schema_version")]
@@ -65,9 +70,11 @@ pub struct Config {
     pub intelligence: IntelligenceConfig,
     #[serde(default)]
     pub logs: LogsConfig,
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerConfig {
     #[serde(default = "default_bind")]
@@ -81,7 +88,7 @@ pub struct AuthConfig {
     pub token: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TmuxConfig {
     #[serde(default = "default_tmux_path")]
@@ -107,7 +114,7 @@ pub struct ConnectionConfig {
     pub known_hosts_path: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UIConfig {
     #[serde(default = "default_theme")]
@@ -137,7 +144,7 @@ pub struct IntelligenceProviderConfig {
     pub base_url: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogsConfig {
     #[serde(default = "default_log_level")]
@@ -148,7 +155,7 @@ pub struct LogsConfig {
     pub retention_days: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IntelligenceConfig {
     #[serde(default)]
@@ -187,6 +194,29 @@ pub struct IntelligenceConfig {
     pub cache_ttl_sec: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dashscope_api_key: Option<String>,
+    #[serde(default = "default_voice_model")]
+    pub model: String,
+    #[serde(default = "default_voice_endpoint")]
+    pub endpoint: String,
+    #[serde(default = "default_voice_continuous_listening")]
+    pub continuous_listening: bool,
+    #[serde(default)]
+    pub store_raw_audio: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit_log_path: Option<String>,
+    #[serde(default = "default_voice_vad_enabled")]
+    pub vad_enabled: bool,
+    #[serde(default = "default_voice_vad_threshold")]
+    pub vad_threshold: f32,
+}
+
 #[derive(Debug, Clone)]
 pub struct Store {
     inner: Arc<Mutex<StoreInner>>,
@@ -209,6 +239,23 @@ impl Config {
             return Ok(());
         }
         Err(ConfigError::AuthTokenRequired)
+    }
+
+    pub fn validate_voice(&self) -> Result<()> {
+        if !self.voice.enabled {
+            return Ok(());
+        }
+
+        match &self.voice.dashscope_api_key {
+            Some(key) if !key.trim().is_empty() => {}
+            _ => return Err(ConfigError::VoiceApiKeyRequired),
+        }
+
+        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
+            return Err(ConfigError::InvalidVoiceModel(self.voice.model.clone()));
+        }
+
+        Ok(())
     }
 
     pub fn is_localhost_bind(&self) -> bool {
@@ -310,6 +357,17 @@ impl Config {
             provider.model = provider.model.trim().to_string();
             provider.base_url = provider.base_url.trim().to_string();
         }
+
+        if self.voice.model.trim().is_empty() {
+            self.voice.model = default_voice_model();
+        }
+        if self.voice.endpoint.trim().is_empty() {
+            self.voice.endpoint = default_voice_endpoint();
+        }
+        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
+            self.voice.model = default_voice_model();
+        }
+        self.voice.vad_threshold = self.voice.vad_threshold.clamp(0.0, 1.0);
     }
 }
 
@@ -325,6 +383,7 @@ impl Default for Config {
             ui: UIConfig::default(),
             intelligence: IntelligenceConfig::default(),
             logs: LogsConfig::default(),
+            voice: VoiceConfig::default(),
         };
         config.normalize();
         config
@@ -365,6 +424,22 @@ impl Default for LogsConfig {
             level: default_log_level(),
             rotation_size_bytes: default_log_rotation_size_bytes(),
             retention_days: default_log_retention_days(),
+        }
+    }
+}
+
+impl Default for VoiceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            dashscope_api_key: None,
+            model: default_voice_model(),
+            endpoint: default_voice_endpoint(),
+            continuous_listening: default_voice_continuous_listening(),
+            store_raw_audio: false,
+            audit_log_path: None,
+            vad_enabled: default_voice_vad_enabled(),
+            vad_threshold: default_voice_vad_threshold(),
         }
     }
 }
@@ -883,6 +958,26 @@ fn default_log_retention_days() -> u64 {
     14
 }
 
+fn default_voice_model() -> String {
+    "qwen3.5-omni-flash-realtime".to_string()
+}
+
+fn default_voice_endpoint() -> String {
+    "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime".to_string()
+}
+
+fn default_voice_continuous_listening() -> bool {
+    true
+}
+
+fn default_voice_vad_enabled() -> bool {
+    true
+}
+
+fn default_voice_vad_threshold() -> f32 {
+    0.5
+}
+
 fn is_zero_u16(value: &u16) -> bool {
     *value == 0
 }
@@ -1172,5 +1267,107 @@ mod tests {
             resolve_log_file_path("runtime", &config_path, "wmux-error.log").expect("resolve log");
         assert_eq!(resolved, dir.path().join("runtime/logs/wmux-error.log"));
         assert!(dir.path().join("runtime/logs").exists());
+    }
+
+    #[test]
+    fn voice_config_defaults_to_disabled() {
+        let config = Config::default();
+        assert!(!config.voice.enabled);
+        assert_eq!(config.voice.dashscope_api_key, None);
+        assert_eq!(config.voice.model, "qwen3.5-omni-flash-realtime");
+        assert_eq!(
+            config.voice.endpoint,
+            "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+        );
+        assert!(config.voice.continuous_listening);
+        assert!(!config.voice.store_raw_audio);
+        assert_eq!(config.voice.audit_log_path, None);
+        assert!(config.voice.vad_enabled);
+        assert_eq!(config.voice.vad_threshold, 0.5);
+    }
+
+    #[test]
+    fn voice_config_enabled_requires_api_key() {
+        let mut config = Config::default();
+        config.voice.enabled = true;
+        config.voice.dashscope_api_key = None;
+        let err = config
+            .validate_voice()
+            .expect_err("enabled voice without key should fail");
+        assert!(matches!(err, ConfigError::VoiceApiKeyRequired));
+
+        config.voice.dashscope_api_key = Some(String::new());
+        let err = config
+            .validate_voice()
+            .expect_err("enabled voice with empty key should fail");
+        assert!(matches!(err, ConfigError::VoiceApiKeyRequired));
+
+        config.voice.dashscope_api_key = Some("valid-key".to_string());
+        config
+            .validate_voice()
+            .expect("enabled voice with valid key should pass");
+    }
+
+    #[test]
+    fn voice_config_validates_model() {
+        let mut config = Config::default();
+        config.voice.enabled = true;
+        config.voice.dashscope_api_key = Some("test-key".to_string());
+        config.voice.model = "invalid-model".to_string();
+        let err = config
+            .validate_voice()
+            .expect_err("invalid voice model should fail");
+        assert!(matches!(err, ConfigError::InvalidVoiceModel(_)));
+
+        config.voice.model = "qwen3.5-omni-flash-realtime".to_string();
+        config
+            .validate_voice()
+            .expect("valid flash model should pass");
+
+        config.voice.model = "qwen3.5-omni-plus-realtime".to_string();
+        config
+            .validate_voice()
+            .expect("valid plus model should pass");
+    }
+
+    #[test]
+    fn voice_config_omitted_enabled_defaults_to_disabled() {
+        let data = r#"{
+          "voice": {
+            "dashscopeApiKey": "test-key"
+          }
+        }"#;
+        let config = parse_config(data).expect("parse config");
+        assert!(!config.voice.enabled);
+    }
+
+    #[test]
+    fn voice_config_deserializes_from_jsonc() {
+        let data = r#"{
+          "voice": {
+            "enabled": true,
+            "dashscopeApiKey": "sk-test",
+            "model": "qwen3.5-omni-plus-realtime",
+            "endpoint": "wss://custom.endpoint.com",
+            "continuousListening": false,
+            "storeRawAudio": true,
+            "auditLogPath": "/var/log/voice.log",
+            "vadEnabled": false,
+            "vadThreshold": 0.7
+          }
+        }"#;
+        let config = parse_config(data).expect("parse config");
+        assert!(config.voice.enabled);
+        assert_eq!(config.voice.dashscope_api_key, Some("sk-test".to_string()));
+        assert_eq!(config.voice.model, "qwen3.5-omni-plus-realtime");
+        assert_eq!(config.voice.endpoint, "wss://custom.endpoint.com");
+        assert!(!config.voice.continuous_listening);
+        assert!(config.voice.store_raw_audio);
+        assert_eq!(
+            config.voice.audit_log_path,
+            Some("/var/log/voice.log".to_string())
+        );
+        assert!(!config.voice.vad_enabled);
+        assert_eq!(config.voice.vad_threshold, 0.7);
     }
 }

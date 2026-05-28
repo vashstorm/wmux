@@ -19,6 +19,7 @@ import { NewConnectionForm } from "./components/NewConnectionForm.js";
 import { SettingsPanel } from "./components/SettingsPanel.js";
 import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
+import { VoiceControl } from "./components/VoiceControl.js";
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js";
 import { normalizeThemeId } from "./ui/themes.js";
 
@@ -119,6 +120,7 @@ export function App() {
 					<NewConnectionForm />
 					<SettingsPanel />
 					<ErrorLogsPanel />
+					<VoiceControl />
 				</div>
 			</MuiThemeShell>
 		</AppProvider>

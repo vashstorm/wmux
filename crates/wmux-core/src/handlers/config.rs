@@ -79,6 +79,9 @@ pub async fn update(
     payload
         .validate_auth()
         .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    payload
+        .validate_voice()
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
 
     if let Err(error) = state.store.replace(payload) {
         if matches!(error, ConfigError::ConfigModified) {

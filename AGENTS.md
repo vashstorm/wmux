@@ -37,7 +37,7 @@ Workspace members:
 Core runtime scope:
 - Local tmux terminal management only for V1.
 - SSH connections are intentionally excluded from V1.
-- Intelligence/AI analysis is intentionally excluded from V1.
+- Intelligence/AI analysis is intentionally excluded from V1 (but Qwen3.5-Omni voice control IS a V1-supported capability).
 
 REST API routes (all under `/api/`, auth required except `/api/health` and static files):
 - Connections CRUD + health: `GET/POST /api/connections`, `GET/PUT/DELETE /api/connections/{id}`, health endpoints
@@ -66,7 +66,7 @@ Frontend static files are built to `web/dist` and served directly by the Rust se
 - Run: `cargo test --workspace` or `make test`.
 - `wmux-core` covers config/protocol/tmux/session logic.
 - `wmux-server` covers Axum routes, auth, config, connections, and local terminal API behavior.
-- V1 SSH and intelligence endpoints must remain unsupported and covered as exclusions where applicable.
+- V1 SSH and intelligence endpoints must remain unsupported and covered as exclusions where applicable (Qwen3.5-Omni voice control is an exception).
 
 ### Frontend Unit Tests
 - vitest 3 + jsdom + `@testing-library/react`.
@@ -106,7 +106,7 @@ Runtime config is JSONC (`config.jsonc` by default, ignored by git). Use `-c <pa
 Key rules:
 - `server.bind` defaults to `127.0.0.1:7331`.
 - `auth.token` may be empty **only** when binding to localhost. Non-localhost requires a token.
-- V1 supports local tmux connections only. Do not document SSH or intelligence as supported runtime features.
+- V1 supports local tmux connections only. Do not document SSH or intelligence as supported runtime features (Qwen3.5-Omni voice control is an exception).
 
 Example: `config.example.jsonc`.
 

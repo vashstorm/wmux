@@ -43,6 +43,9 @@ pub fn load_startup_config(config_path: PathBuf) -> Result<StartupConfig> {
     config
         .validate_path()
         .with_context(|| format!("invalid path config in {}", loaded_config_path.display()))?;
+    config
+        .validate_voice()
+        .with_context(|| format!("invalid voice config in {}", loaded_config_path.display()))?;
 
     Ok(StartupConfig {
         store,

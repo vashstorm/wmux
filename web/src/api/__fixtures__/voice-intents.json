@@ -1,0 +1,63 @@
+{
+  "send_to_pane_intent": {
+    "type": "intent_received",
+    "skill": "send_to_pane",
+    "params": {
+      "target_name": "local",
+      "session_name": "main",
+      "window_name": "0",
+      "pane_index": 0,
+      "text": "ls -la",
+      "execute": false,
+      "append_enter": true
+    },
+    "confirmationRequired": true,
+    "confirmationId": "550e8400-e29b-41d4-a716-446655440000"
+  },
+  "delete_session_intent": {
+    "type": "intent_received",
+    "skill": "delete_session",
+    "params": {
+      "target_name": "local",
+      "session_name": "test-session"
+    },
+    "confirmationRequired": true,
+    "confirmationId": "550e8400-e29b-41d4-a716-446655440001"
+  },
+  "list_sessions_intent": {
+    "type": "intent_received",
+    "skill": "list_sessions",
+    "params": {
+      "target_name": "local"
+    },
+    "confirmationRequired": false
+  },
+  "navigate_frontend_intent": {
+    "type": "intent_received",
+    "skill": "navigate_frontend",
+    "params": {
+      "route": "settings"
+    },
+    "confirmationRequired": false
+  },
+  "unknown_skill_intent": {
+    "type": "intent_received",
+    "skill": "run_arbitrary_shell",
+    "params": {
+      "command": "rm -rf /"
+    },
+    "confirmationRequired": true,
+    "confirmationId": "550e8400-e29b-41d4-a716-446655440002"
+  },
+  "invalid_route_intent": {
+    "type": "intent_received",
+    "skill": "invoke_backend_route",
+    "params": {
+      "route_id": "sessions.kill",
+      "params": {
+        "session_name": "main"
+      }
+    },
+    "confirmationRequired": false
+  }
+}

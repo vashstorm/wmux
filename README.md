@@ -130,6 +130,56 @@ API responses may return these stable error codes:
 - `bad_request`: invalid request payload or forbidden secret fields
 - `conflict`: config file changed on disk and must be reloaded before retrying
 
+## Voice Control Setup
+
+Wmux supports voice control via the Qwen3.5-Omni realtime API. Voice is disabled by default.
+
+### Enabling Voice
+
+1. Obtain a DashScope API key from [Alibaba Cloud DashScope](https://www.alibabacloud.com/help/en/dashscope/)
+2. Add the `voice` section to your `config.jsonc`:
+
+```json
+{
+  "voice": {
+    "enabled": true,
+    "dashscopeApiKey": "YOUR_DASHSCOPE_API_KEY_HERE",
+    "model": "qwen3.5-omni-flash-realtime",
+    "endpoint": "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
+    "continuousListening": true,
+    "storeRawAudio": false,
+    "auditLogPath": null,
+    "vadEnabled": true,
+    "vadThreshold": 0.5
+  }
+}
+```
+
+### Voice Configuration Options
+
+| Option | Description |
+|--------|-------------|
+| `enabled` | Turn voice control on or off |
+| `dashscopeApiKey` | Your DashScope API key (required when enabled) |
+| `model` | Model to use: `qwen3.5-omni-flash-realtime` or `qwen3.5-omni-plus-realtime` |
+| `endpoint` | DashScope realtime WebSocket endpoint |
+| `continuousListening` | Keep microphone active after each command |
+| `storeRawAudio` | Save raw audio recordings to disk |
+| `auditLogPath` | Optional path to a JSON-lines audit log file |
+| `vadEnabled` | Enable voice activity detection |
+| `vadThreshold` | VAD sensitivity (0.0 - 1.0) |
+
+### Privacy Notes
+
+- When `continuousListening` is enabled, the microphone stays active and audio is streamed to DashScope servers.
+- Voice interactions are logged (with secrets redacted) if `auditLogPath` is set.
+- The DashScope API key is stored only in the backend config file and is never exposed to the frontend.
+
+### Troubleshooting
+
+- **Browser permission denied**: If the microphone does not activate, check your browser's site permissions and ensure microphone access is allowed for the Wmux origin.
+- **No voice response**: Verify `dashscopeApiKey` is valid and `voice.enabled` is `true`. Check server logs for connection errors to the DashScope endpoint.
+
 ## Known Limitations
 
 - No Windows support

@@ -3,6 +3,11 @@ interface WmuxRuntime {
 	token: string;
 }
 
+interface RuntimeFlags {
+	isTauri: boolean;
+	voiceAvailable: boolean;
+}
+
 declare global {
 	interface Window {
 		__WMUX_RUNTIME__?: WmuxRuntime;
@@ -17,6 +22,15 @@ export function getBaseUrl(): string {
 
 export function getAuthToken(): string | null {
 	return window.__WMUX_RUNTIME__?.token || sessionStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function getRuntimeFlags(): RuntimeFlags {
+	const mediaDevices = typeof navigator === "undefined" ? undefined : navigator.mediaDevices;
+
+	return {
+		isTauri: Boolean(window.__WMUX_RUNTIME__?.baseUrl),
+		voiceAvailable: typeof mediaDevices?.getUserMedia === "function",
+	};
 }
 
 export function getWebSocketUrl(path: string, query: URLSearchParams): string {

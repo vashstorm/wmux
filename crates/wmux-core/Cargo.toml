@@ -21,8 +21,11 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-time = { version = "0.3", features = ["formatting", "parsing"] }
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+uuid = { version = "1", features = ["v4"] }
 ammonia = "4"
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 serde_json = "1"

@@ -5,7 +5,7 @@ use axum::routing::{delete, get, post};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
-use crate::handlers::{ai_stats, config, connections, health, logs, projects, sessions, terminal};
+use crate::handlers::{ai_stats, config, connections, health, logs, projects, sessions, terminal, voice};
 use crate::http::api_not_found;
 use crate::state::AppState;
 
@@ -119,10 +119,18 @@ pub fn router(state: AppState) -> Router {
             crate::middleware::terminal_auth_middleware,
         ));
 
+    let voice_api = Router::new()
+        .route("/voice", get(voice::websocket))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::middleware::terminal_auth_middleware,
+        ));
+
     let api = Router::new()
         .route("/health", get(health::get))
         .merge(protected_api)
         .merge(terminal_api)
+        .merge(voice_api)
         .fallback(api_not_found);
 
     let static_service = ServeDir::new(state.assets_dir.clone())
