@@ -2,6 +2,8 @@ use serde::de::{Error as DeError, Unexpected};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::config::VoiceSkillConfig;
+
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not_found";
 pub const ERROR_BAD_REQUEST: &str = "bad_request";
@@ -203,6 +205,11 @@ pub enum VoiceClientMessage {
         #[serde(rename = "sampleRate")]
         sample_rate: u32,
     },
+    /// Send typed text to Qwen for processing.
+    TextMessage {
+        /// User text input.
+        text: String,
+    },
     /// Confirm a pending dangerous action.
     ConfirmAction {
         /// Confirmation ID from intent_received event.
@@ -271,6 +278,11 @@ pub enum VoiceServerEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
+    /// Assistant text response.
+    AssistantMessage {
+        /// Assistant message text.
+        text: String,
+    },
     /// Voice session error.
     Error {
         /// Stable error code.
@@ -288,7 +300,13 @@ pub enum VoiceServerEvent {
 
 /// Allowed frontend routes for navigate_frontend skill.
 pub const VOICE_FRONTEND_ROUTES: [&str; 7] = [
-    "home", "settings", "projects", "connections", "session", "window", "pane",
+    "home",
+    "settings",
+    "projects",
+    "connections",
+    "session",
+    "window",
+    "pane",
 ];
 
 /// Allowed backend routes for invoke_backend_route skill.
@@ -306,17 +324,133 @@ pub const VOICE_BACKEND_ROUTES: [&str; 11] = [
     "panes.delete",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoiceSkillRiskLevel {
+    Safe,
+    Write,
+    Dangerous,
+    Dynamic,
+    FlowControl,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BuiltInVoiceSkill {
+    pub id: &'static str,
+    pub default_name: &'static str,
+    pub default_description: &'static str,
+    pub risk_level: VoiceSkillRiskLevel,
+}
+
+pub const VALID_VOICE_SKILL_IDS: [&str; 9] = [
+    "navigate_frontend",
+    "invoke_backend_route",
+    "list_sessions",
+    "create_session",
+    "rename_session",
+    "delete_session",
+    "send_to_pane",
+    "confirm_action",
+    "cancel_action",
+];
+
+pub const BUILT_IN_VOICE_SKILLS: [BuiltInVoiceSkill; 9] = [
+    BuiltInVoiceSkill {
+        id: "navigate_frontend",
+        default_name: "Navigate Frontend",
+        default_description: "Navigate the frontend UI to a specific page. Allowed routes: home, settings, projects, connections, session, window, pane.",
+        risk_level: VoiceSkillRiskLevel::Safe,
+    },
+    BuiltInVoiceSkill {
+        id: "invoke_backend_route",
+        default_name: "Invoke Backend Route",
+        default_description: "Invoke a backend REST API route. Only read-only routes are allowed for safety.",
+        risk_level: VoiceSkillRiskLevel::Dynamic,
+    },
+    BuiltInVoiceSkill {
+        id: "list_sessions",
+        default_name: "List Sessions",
+        default_description: "List all tmux sessions for a target connection.",
+        risk_level: VoiceSkillRiskLevel::Safe,
+    },
+    BuiltInVoiceSkill {
+        id: "create_session",
+        default_name: "Create Session",
+        default_description: "Create a new tmux session on a target connection.",
+        risk_level: VoiceSkillRiskLevel::Write,
+    },
+    BuiltInVoiceSkill {
+        id: "rename_session",
+        default_name: "Rename Session",
+        default_description: "Rename an existing tmux session.",
+        risk_level: VoiceSkillRiskLevel::Write,
+    },
+    BuiltInVoiceSkill {
+        id: "delete_session",
+        default_name: "Delete Session",
+        default_description: "Delete a tmux session. WARNING: This is a destructive operation that requires confirmation.",
+        risk_level: VoiceSkillRiskLevel::Dangerous,
+    },
+    BuiltInVoiceSkill {
+        id: "send_to_pane",
+        default_name: "Send To Pane",
+        default_description: "Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=true, control=true, or multiline=true, this is dangerous and requires confirmation.",
+        risk_level: VoiceSkillRiskLevel::Dynamic,
+    },
+    BuiltInVoiceSkill {
+        id: "confirm_action",
+        default_name: "Confirm Action",
+        default_description: "Confirm a pending dangerous action using the confirmation ID provided by the intent_received event.",
+        risk_level: VoiceSkillRiskLevel::FlowControl,
+    },
+    BuiltInVoiceSkill {
+        id: "cancel_action",
+        default_name: "Cancel Action",
+        default_description: "Cancel a pending dangerous action using the confirmation ID.",
+        risk_level: VoiceSkillRiskLevel::FlowControl,
+    },
+];
+
+pub fn built_in_voice_skill(id: &str) -> Option<&'static BuiltInVoiceSkill> {
+    BUILT_IN_VOICE_SKILLS.iter().find(|skill| skill.id == id)
+}
+
+pub fn voice_skill_enabled(skill_overlay: &[VoiceSkillConfig], skill_id: &str) -> bool {
+    skill_overlay
+        .iter()
+        .find(|skill| skill.id == skill_id)
+        .map(|skill| skill.enabled)
+        .unwrap_or(true)
+}
+
+fn voice_skill_description<'a>(skill_overlay: &'a [VoiceSkillConfig], skill_id: &str) -> &'a str {
+    skill_overlay
+        .iter()
+        .find(|skill| skill.id == skill_id)
+        .and_then(|skill| {
+            if skill.description.trim().is_empty() {
+                None
+            } else {
+                Some(skill.description.as_str())
+            }
+        })
+        .unwrap_or_else(|| {
+            built_in_voice_skill(skill_id)
+                .expect("built-in voice skill must exist")
+                .default_description
+        })
+}
+
 /// Generate Qwen function-call tool definitions for all V1 voice skills.
 ///
 /// Returns JSON array of tool definitions compatible with Qwen Realtime API.
 /// Each tool has: type="function", name (snake_case), description, parameters (JSON Schema).
-pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
-    vec![
+pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json::Value> {
+    let mut tools = vec![
         // navigate_frontend
         serde_json::json!({
             "type": "function",
             "name": "navigate_frontend",
-            "description": "Navigate the frontend UI to a specific page. Allowed routes: home, settings, projects, connections, session, window, pane.",
+            "description": voice_skill_description(skill_overlay, "navigate_frontend"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -333,7 +467,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "invoke_backend_route",
-            "description": "Invoke a backend REST API route. Only read-only routes are allowed for safety.",
+            "description": voice_skill_description(skill_overlay, "invoke_backend_route"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -355,7 +489,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "list_sessions",
-            "description": "List all tmux sessions for a target connection.",
+            "description": voice_skill_description(skill_overlay, "list_sessions"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -371,7 +505,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "create_session",
-            "description": "Create a new tmux session on a target connection.",
+            "description": voice_skill_description(skill_overlay, "create_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -391,7 +525,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "rename_session",
-            "description": "Rename an existing tmux session.",
+            "description": voice_skill_description(skill_overlay, "rename_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -415,7 +549,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "delete_session",
-            "description": "Delete a tmux session. WARNING: This is a destructive operation that requires confirmation.",
+            "description": voice_skill_description(skill_overlay, "delete_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -435,7 +569,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "send_to_pane",
-            "description": "Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=true, control=true, or multiline=true, this is dangerous and requires confirmation.",
+            "description": voice_skill_description(skill_overlay, "send_to_pane"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -487,7 +621,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "confirm_action",
-            "description": "Confirm a pending dangerous action using the confirmation ID provided by the intent_received event.",
+            "description": voice_skill_description(skill_overlay, "confirm_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -504,7 +638,7 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
         serde_json::json!({
             "type": "function",
             "name": "cancel_action",
-            "description": "Cancel a pending dangerous action using the confirmation ID.",
+            "description": voice_skill_description(skill_overlay, "cancel_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -517,12 +651,20 @@ pub fn generate_qwen_tools() -> Vec<serde_json::Value> {
                 "required": ["confirmation_id"]
             }
         }),
-    ]
+    ];
+    tools.retain(|tool| {
+        tool["name"]
+            .as_str()
+            .map(|skill_id| voice_skill_enabled(skill_overlay, skill_id))
+            .unwrap_or(false)
+    });
+    tools
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::VoiceSkillConfig;
 
     #[test]
     fn protocol_terminal_message_round_trips() {
@@ -623,6 +765,9 @@ mod tests {
                 pcm16_base64: "BASE64_AUDIO_DATA".to_string(),
                 sample_rate: 16000,
             },
+            VoiceClientMessage::TextMessage {
+                text: "hello from keyboard".to_string(),
+            },
             VoiceClientMessage::ConfirmAction {
                 confirmation_id: "uuid-confirmation-id".to_string(),
             },
@@ -653,6 +798,17 @@ mod tests {
                 "type": "audio_frame",
                 "pcm16Base64": "audio",
                 "sampleRate": 16000
+            })
+        );
+
+        assert_eq!(
+            serde_json::to_value(VoiceClientMessage::TextMessage {
+                text: "hello".to_string(),
+            })
+            .expect("serialize"),
+            serde_json::json!({
+                "type": "text_message",
+                "text": "hello"
             })
         );
 
@@ -693,6 +849,9 @@ mod tests {
                 skill: "list_sessions".to_string(),
                 success: true,
                 error: None,
+            },
+            VoiceServerEvent::AssistantMessage {
+                text: "Done".to_string(),
             },
             VoiceServerEvent::Error {
                 code: "voice_disabled".to_string(),
@@ -819,7 +978,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_returns_nine_tools() {
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         assert_eq!(tools.len(), 9, "should have 9 voice skills");
 
         // Verify each tool has required structure
@@ -833,7 +992,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_invoke_backend_route_has_allowlist() {
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         let invoke_route = tools
             .iter()
             .find(|t| t["name"] == "invoke_backend_route")
@@ -869,7 +1028,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_navigate_frontend_has_route_enum() {
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         let navigate = tools
             .iter()
             .find(|t| t["name"] == "navigate_frontend")
@@ -901,7 +1060,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_send_to_pane_has_dangerous_flags() {
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         let send_to_pane = tools
             .iter()
             .find(|t| t["name"] == "send_to_pane")
@@ -917,5 +1076,36 @@ mod tests {
         // Verify they are boolean with default false
         assert_eq!(props["execute"]["type"], "boolean");
         assert_eq!(props["execute"]["default"], false);
+    }
+
+    #[test]
+    fn generate_qwen_tools_omits_disabled_skills() {
+        let tools = generate_qwen_tools(&[VoiceSkillConfig {
+            id: "delete_session".to_string(),
+            enabled: false,
+            description: String::new(),
+        }]);
+
+        assert_eq!(tools.len(), 8);
+        assert!(tools.iter().all(|tool| tool["name"] != "delete_session"));
+        assert!(tools.iter().any(|tool| tool["name"] == "list_sessions"));
+    }
+
+    #[test]
+    fn generate_qwen_tools_uses_description_overrides() {
+        let tools = generate_qwen_tools(&[VoiceSkillConfig {
+            id: "list_sessions".to_string(),
+            enabled: true,
+            description: "List active workspaces for the current machine.".to_string(),
+        }]);
+        let list_sessions = tools
+            .iter()
+            .find(|tool| tool["name"] == "list_sessions")
+            .expect("list_sessions tool");
+
+        assert_eq!(
+            list_sessions["description"],
+            "List active workspaces for the current machine."
+        );
     }
 }

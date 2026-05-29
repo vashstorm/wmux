@@ -56,6 +56,23 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_ai_usage_events_created_at ON ai_usage_events(created_at);
         CREATE INDEX IF NOT EXISTS idx_ai_usage_events_project_created ON ai_usage_events(project_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS voice_conversation_messages (
+            id TEXT PRIMARY KEY NOT NULL,
+            conversation_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            text TEXT NOT NULL,
+            event_json TEXT,
+            target_name TEXT,
+            session_name TEXT,
+            window_name TEXT,
+            pane_index INTEGER,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_voice_history_conv_created ON voice_conversation_messages(conversation_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_voice_history_created ON voice_conversation_messages(created_at);
         "#,
     )
     .execute(&mut *tx)
@@ -280,5 +297,51 @@ mod tests {
         assert_eq!(events_columns[14].1, "TEXT");
         assert_eq!(events_columns[15].0, "created_at");
         assert_eq!(events_columns[15].1, "TEXT");
+    }
+
+    #[tokio::test]
+    async fn voice_history_migration_creates_table_and_indexes() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("create pool");
+        run_migrations(&pool).await.expect("run migrations");
+
+        let columns: Vec<(String, String)> = sqlx::query_as(
+            "SELECT name, type FROM pragma_table_info('voice_conversation_messages') ORDER BY cid",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get voice history columns");
+
+        assert_eq!(columns.len(), 11);
+        assert_eq!(columns[0], ("id".to_string(), "TEXT".to_string()));
+        assert_eq!(
+            columns[1],
+            ("conversation_id".to_string(), "TEXT".to_string())
+        );
+        assert_eq!(columns[2], ("role".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[3], ("kind".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[4], ("text".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[5], ("event_json".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[6], ("target_name".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[7], ("session_name".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[8], ("window_name".to_string(), "TEXT".to_string()));
+        assert_eq!(
+            columns[9],
+            ("pane_index".to_string(), "INTEGER".to_string())
+        );
+        assert_eq!(columns[10], ("created_at".to_string(), "TEXT".to_string()));
+
+        let indexes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='voice_conversation_messages' ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("get voice history indexes");
+
+        assert!(indexes.contains(&"idx_voice_history_conv_created".to_string()));
+        assert!(indexes.contains(&"idx_voice_history_created".to_string()));
     }
 }

@@ -56,6 +56,19 @@
     // Obtain your API key from https://www.alibabacloud.com/help/en/dashscope/
     // This key is stored server-side only and is never sent to the frontend.
     "dashscopeApiKey": "YOUR_DASHSCOPE_API_KEY_HERE",
+    // Safety switch: set true to block all microphone access regardless of other settings.
+    "microphoneDisabled": false,
+    // TTS voice name, e.g., Cherry. See DashScope docs for available voices.
+    "voice": null,
+    // Override built-in voice skills. Each entry can enable/disable a skill
+    // or customize its system-prompt description.
+    "skills": [
+      // {
+      //   "id": "session.switch",
+      //   "enabled": true,
+      //   "description": "Switch to a named tmux session."
+      // }
+    ],
     // Valid models: qwen3.5-omni-flash-realtime, qwen3.5-omni-plus-realtime
     "model": "qwen3.5-omni-flash-realtime",
     // DashScope realtime WebSocket endpoint. Do not change unless using a custom deployment.

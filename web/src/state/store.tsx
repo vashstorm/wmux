@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project, VoiceConversationMessage } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
 import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE, clampUIScaleStep } from "../ui/fontSize.js";
 
@@ -236,6 +236,7 @@ export interface AppState {
 	voiceTranscript: string;
 	voicePendingConfirmation: VoicePendingConfirmation | null;
 	voiceError: string | null;
+	voiceHistory: VoiceConversationMessage[];
 }
 
 export interface ConfigConflictState {
@@ -279,6 +280,7 @@ interface AppContextValue extends AppState {
 	setVoiceTranscript: (text: string) => void;
 	setVoiceConfirmation: (confirmation: VoicePendingConfirmation | null) => void;
 	setVoiceError: (error: string | null) => void;
+	setVoiceHistory: (history: VoiceConversationMessage[]) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -311,6 +313,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [voiceTranscript, setVoiceTranscriptState] = useState("");
 	const [voicePendingConfirmation, setVoiceConfirmationState] = useState<VoicePendingConfirmation | null>(null);
 	const [voiceError, setVoiceErrorState] = useState<string | null>(null);
+	const [voiceHistory, setVoiceHistoryState] = useState<VoiceConversationMessage[]>([]);
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {
 		setConnectionsState(newConnections);
@@ -406,6 +409,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setVoiceErrorState(error);
 	}, []);
 
+	const setVoiceHistory = useCallback((history: VoiceConversationMessage[]) => {
+		setVoiceHistoryState(history);
+	}, []);
+
 	const setSelectedPane = useCallback((pane: SelectedPane | null) => {
 		setSelectedPaneState(pane);
 		if (pane !== null) {
@@ -474,11 +481,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		voiceTranscript,
 		voicePendingConfirmation,
 		voiceError,
+		voiceHistory,
 		setVoiceStatus,
 		appendVoiceTranscript,
 		setVoiceTranscript,
 		setVoiceConfirmation,
 		setVoiceError,
+		setVoiceHistory,
 	};
 
 	return (

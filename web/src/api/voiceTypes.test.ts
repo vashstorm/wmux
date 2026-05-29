@@ -3,6 +3,7 @@ import {
 	isVoiceClientMessage,
 	isVoiceServerEvent,
 	isVoiceAudioFrameMessage,
+	isVoiceTextMessage,
 	isVoiceConfirmActionMessage,
 	isVoiceCancelActionMessage,
 	isVoiceStopListeningMessage,
@@ -13,6 +14,7 @@ import {
 	isVoiceTranscriptDoneEvent,
 	isVoiceIntentReceivedEvent,
 	isVoiceActionResultEvent,
+	isVoiceAssistantMessageEvent,
 	isVoiceErrorEvent,
 	isVoiceSessionTimeoutEvent,
 	isValidVoiceSkill,
@@ -44,6 +46,14 @@ describe("voiceTypes", () => {
 			expect(isVoiceClientMessage(msg)).toBe(true);
 			if (isVoiceClientMessage(msg)) {
 				expect(isVoiceConfirmActionMessage(msg)).toBe(true);
+			}
+		});
+
+		it("recognizes text_message message", () => {
+			const msg = { type: "text_message", text: "hello" };
+			expect(isVoiceClientMessage(msg)).toBe(true);
+			if (isVoiceClientMessage(msg)) {
+				expect(isVoiceTextMessage(msg)).toBe(true);
 			}
 		});
 
@@ -143,6 +153,14 @@ describe("voiceTypes", () => {
 			expect(isVoiceServerEvent(event)).toBe(true);
 			if (isVoiceServerEvent(event)) {
 				expect(isVoiceActionResultEvent(event)).toBe(true);
+			}
+		});
+
+		it("recognizes assistant_message event", () => {
+			const event = { type: "assistant_message", text: "Done" };
+			expect(isVoiceServerEvent(event)).toBe(true);
+			if (isVoiceServerEvent(event)) {
+				expect(isVoiceAssistantMessageEvent(event)).toBe(true);
 			}
 		});
 

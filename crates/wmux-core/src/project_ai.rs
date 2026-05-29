@@ -88,7 +88,9 @@ struct ChatMessageResponse {
 ///
 /// Returns the provider config if it exists and has all required fields
 /// (base_url, model, api_key), otherwise returns an error.
-pub fn get_active_provider(config: &IntelligenceConfig) -> Result<IntelligenceProviderConfig, AiError> {
+pub fn get_active_provider(
+    config: &IntelligenceConfig,
+) -> Result<IntelligenceProviderConfig, AiError> {
     // Find the active provider by name
     let active_name = config.active_provider.trim();
     if active_name.is_empty() {
@@ -169,18 +171,19 @@ pub fn build_prompt(project: &Project) -> String {
 pub fn sanitize_html(html: &str) -> String {
     // Define allowed tags
     let allowed_tags: HashSet<&str> = [
-        "p", "br", "strong", "em", "code", "pre",
-        "ul", "ol", "li", "h2", "h3",
-        "section", "article", "div", "span",
-        "table", "thead", "tbody", "tr", "th", "td", "a",
-    ].iter().cloned().collect();
+        "p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "h2", "h3", "section",
+        "article", "div", "span", "table", "thead", "tbody", "tr", "th", "td", "a",
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Define allowed URL schemes for href
     let allowed_schemes: HashSet<&str> = ["http", "https", "mailto"].iter().cloned().collect();
 
     // Build tag-specific attributes
     let mut tag_attributes: HashMap<&str, HashSet<&str>> = HashMap::new();
-    
+
     // Allow href only on 'a' tag
     tag_attributes.insert("a", ["href"].iter().cloned().collect());
 
@@ -221,7 +224,10 @@ fn truncate_to_size(s: &str, max_bytes: usize) -> &str {
 /// 7. Sanitizes HTML using ammonia
 ///
 /// Returns the sanitized HTML string.
-pub async fn generate_sanitized_html(config: &Config, project: &Project) -> Result<String, AiError> {
+pub async fn generate_sanitized_html(
+    config: &Config,
+    project: &Project,
+) -> Result<String, AiError> {
     // Get and validate provider config
     let provider = get_active_provider(&config.intelligence)?;
 
@@ -270,7 +276,10 @@ pub async fn generate_sanitized_html(config: &Config, project: &Project) -> Resu
     // Check HTTP status (do not include response body in error to avoid leaking provider internals)
     if !response.status().is_success() {
         let status = response.status().as_u16();
-        return Err(AiError::HttpError(format!("AI provider returned HTTP {}", status)));
+        return Err(AiError::HttpError(format!(
+            "AI provider returned HTTP {}",
+            status
+        )));
     }
 
     // Parse the response
@@ -294,4 +303,3 @@ pub async fn generate_sanitized_html(config: &Config, project: &Project) -> Resu
 
     Ok(sanitized)
 }
-

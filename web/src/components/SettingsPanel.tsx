@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
-import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Lan as LanIcon, Memory as MemoryIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
-import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName } from "../api/client.js";
+import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Lan as LanIcon, Memory as MemoryIcon, Mic as MicIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon, Functions as FunctionsIcon } from "@mui/icons-material";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type VoiceSkillConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearVoiceHistory } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
@@ -37,9 +37,17 @@ interface SettingsFormState {
 	intelligenceMaxConcurrency: number;
 	intelligenceCacheTTLSec: number;
 	editingProvider: ProviderFormState | null;
+	voiceEnabled: boolean;
+	voiceEndpoint: string;
+	voiceSkInput: string;
+	voiceSkConfigured: boolean;
+	voiceModel: string;
+	voiceVoice: string;
+	voiceMicrophoneDisabled: boolean;
+	voiceSkills: VoiceSkillConfig[];
 }
 
-type SettingsTabKey = "general" | "connections" | "typography" | "intelligence";
+type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "voice" | "voice-skills";
 
 const SETTINGS_SECTIONS: Array<{
 	key: SettingsTabKey;
@@ -66,6 +74,28 @@ const SETTINGS_SECTIONS: Array<{
 		label: "AI",
 		icon: PsychologyIcon,
 	},
+	{
+		key: "voice",
+		label: "Voice",
+		icon: MicIcon,
+	},
+	{
+		key: "voice-skills",
+		label: "Voice Skills",
+		icon: FunctionsIcon,
+	},
+];
+
+const BUILTIN_VOICE_SKILLS: VoiceSkillConfig[] = [
+	{ id: "navigate_frontend", enabled: true, description: "" },
+	{ id: "invoke_backend_route", enabled: true, description: "" },
+	{ id: "list_sessions", enabled: true, description: "" },
+	{ id: "create_session", enabled: true, description: "" },
+	{ id: "rename_session", enabled: true, description: "" },
+	{ id: "delete_session", enabled: true, description: "" },
+	{ id: "send_to_pane", enabled: true, description: "" },
+	{ id: "confirm_action", enabled: true, description: "" },
+	{ id: "cancel_action", enabled: true, description: "" },
 ];
 
 function buildFormState(config: AppConfig): SettingsFormState {
@@ -99,6 +129,14 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,
 		intelligenceCacheTTLSec: intel?.cacheTTLSec ?? 300,
 		editingProvider: null,
+		voiceEnabled: config.voice?.enabled ?? false,
+		voiceEndpoint: config.voice?.endpoint ?? "",
+		voiceSkInput: "",
+		voiceSkConfigured: config.voice?.dashscopeApiKeyConfigured ?? false,
+		voiceModel: config.voice?.model ?? "qwen3.5-omni-flash-realtime",
+		voiceVoice: config.voice?.voice ?? "",
+		voiceMicrophoneDisabled: config.voice?.microphoneDisabled ?? false,
+		voiceSkills: config.voice?.skills && config.voice.skills.length > 0 ? config.voice.skills : BUILTIN_VOICE_SKILLS,
 	};
 }
 
@@ -260,6 +298,19 @@ export function SettingsPanel() {
 				maxConcurrency: formState.intelligenceMaxConcurrency,
 				cacheTTLSec: formState.intelligenceCacheTTLSec,
 			},
+			voice: {
+				enabled: formState.voiceEnabled,
+				dashscopeApiKeyConfigured: formState.voiceSkConfigured || (formState.voiceSkInput.trim().length > 0),
+				microphoneDisabled: formState.voiceMicrophoneDisabled,
+				voice: formState.voiceVoice || undefined,
+				skills: formState.voiceSkills,
+				model: formState.voiceModel,
+				endpoint: formState.voiceEndpoint,
+				continuousListening: config.voice?.continuousListening ?? false,
+				storeRawAudio: config.voice?.storeRawAudio ?? false,
+				vadEnabled: config.voice?.vadEnabled ?? true,
+				vadThreshold: config.voice?.vadThreshold ?? 0.5,
+			},
 		};
 	};
 
@@ -316,6 +367,7 @@ export function SettingsPanel() {
 								maxConcurrency: payload.intelligence.maxConcurrency,
 								cacheTTLSec: payload.intelligence.cacheTTLSec,
 							},
+							voice: payload.voice,
 							connections: latest.connections.map((connection) => {
 								if (connection.type !== "ssh") {
 									return connection;
@@ -412,6 +464,13 @@ export function SettingsPanel() {
 			});
 		}
 		closePanel();
+	};
+
+	const handleClearVoiceHistory = async () => {
+		try {
+			await clearVoiceHistory();
+		} catch {
+		}
 	};
 
 	const handleDeleteConnection = (connection: ConnectionConfig) => {
@@ -708,6 +767,7 @@ export function SettingsPanel() {
 										selected={selected}
 										onClick={() => flushSync(() => setActiveTab(item.key))}
 										className={`settings-nav-item ${selected ? "is-active" : ""}`}
+										data-testid={`settings-tab-${item.key}`}
 										sx={{
 											flex: "0 0 auto",
 											minHeight: 36,
@@ -722,7 +782,7 @@ export function SettingsPanel() {
 												{item.label}
 											</Typography>
 											<Typography variant="caption" color="text.secondary" className="settings-panel-subtitle" sx={{ display: "block", mt: 0.125, lineHeight: 1.2 }}>
-												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : formState.intelligenceEnabled ? "Enabled" : "Disabled"}
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : item.key === "voice" ? (formState.voiceEnabled ? "Enabled" : "Disabled") : `${formState.voiceSkills.filter((s) => s.enabled).length}/${formState.voiceSkills.length}`}
 											</Typography>
 										</Box>
 									</ListItemButton>
@@ -1197,6 +1257,206 @@ export function SettingsPanel() {
 														},
 													}}
 												/>
+											</Box>
+										</Box>
+									</Box>
+								)}
+
+								{activeTab === "voice" && (
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Control</Typography>
+											<FormControlLabel
+												control={
+													<Switch
+														id="voice-enabled"
+														checked={formState.voiceEnabled}
+														onChange={(event) => updateField("voiceEnabled", event.target.checked)}
+														slotProps={{
+															input: {
+																"data-testid": "voice-enabled-toggle",
+															} as React.InputHTMLAttributes<HTMLInputElement>,
+														}}
+													/>
+												}
+												label="Enable Voice Control"
+											/>
+											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, mb: 2 }}>
+												Voice control allows hands-free operation via Qwen3.5-Omni.
+											</Typography>
+										</Box>
+
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>API Configuration</Typography>
+											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+												<TextField
+													id="voice-base-url"
+													label="Base URL"
+													type="text"
+													value={formState.voiceEndpoint}
+													onChange={(event) => updateField("voiceEndpoint", event.target.value)}
+													placeholder="wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "voice-base-url-input",
+														},
+													}}
+												/>
+												<TextField
+													id="voice-model"
+													label="Model"
+													type="text"
+													value={formState.voiceModel}
+													onChange={(event) => updateField("voiceModel", event.target.value)}
+													placeholder="qwen3.5-omni-flash-realtime"
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "voice-model-input",
+														},
+													}}
+												/>
+											</Box>
+											<TextField
+												id="voice-sk"
+												label="SK / API Key"
+												type="password"
+												value={formState.voiceSkInput}
+												onChange={(event) => updateField("voiceSkInput", event.target.value)}
+												placeholder={formState.voiceSkConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "sk-..."}
+												fullWidth
+												autoComplete="new-password"
+												className="password-input-wrapper"
+												sx={{ mt: 2 }}
+												slotProps={{
+													htmlInput: {
+														"data-testid": "voice-sk-input",
+													},
+												}}
+											/>
+											{formState.voiceSkConfigured && (
+												<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+													SK configured. Enter a new value to replace it, or leave blank to keep existing.
+												</Typography>
+											)}
+										</Box>
+
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Settings</Typography>
+											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+												<TextField
+													id="voice-voice"
+													label="Voice / Timbre"
+													type="text"
+													value={formState.voiceVoice}
+													onChange={(event) => updateField("voiceVoice", event.target.value)}
+													placeholder="Chelsie"
+													fullWidth
+													slotProps={{
+														htmlInput: {
+															"data-testid": "voice-voice-input",
+														},
+													}}
+												/>
+												<FormControlLabel
+													control={
+														<Switch
+															id="voice-microphone-disabled"
+															checked={formState.voiceMicrophoneDisabled}
+															onChange={(event) => updateField("voiceMicrophoneDisabled", event.target.checked)}
+															slotProps={{
+																input: {
+																	"data-testid": "voice-microphone-disabled-toggle",
+																} as React.InputHTMLAttributes<HTMLInputElement>,
+															}}
+														/>
+													}
+													label="Disable Microphone"
+												/>
+											</Box>
+										</Box>
+
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice History</Typography>
+											<Button
+												type="button"
+												variant="outlined"
+												color="error"
+												onClick={() => {
+													void handleClearVoiceHistory();
+												}}
+												startIcon={<DeleteIcon />}
+												data-testid="voice-history-clear"
+											>
+												CLEAR HISTORY
+											</Button>
+										</Box>
+									</Box>
+								)}
+
+								{activeTab === "voice-skills" && (
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+										<Box>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Skills</Typography>
+											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+												Configure which skills are available to the voice assistant. Each skill has a description used by the AI to determine when to invoke it.
+											</Typography>
+											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+												{formState.voiceSkills.map((skill) => (
+													<Box
+														key={skill.id}
+														component="li"
+														sx={{
+															display: "flex",
+															alignItems: "flex-start",
+															gap: 2,
+															p: 1.5,
+															border: 1,
+															borderColor: "divider",
+															borderRadius: 1,
+															bgcolor: skill.enabled ? "action.selected" : "background.paper",
+														}}
+													>
+														<Switch
+															id={`voice-skill-${skill.id}`}
+															checked={skill.enabled}
+															onChange={(event) => {
+																const updated = formState.voiceSkills.map((s) =>
+																	s.id === skill.id ? { ...s, enabled: event.target.checked } : s
+																);
+																updateField("voiceSkills", updated);
+															}}
+															size="small"
+															slotProps={{
+																input: {
+																	"data-testid": `voice-skill-${skill.id}-enabled`,
+																} as React.InputHTMLAttributes<HTMLInputElement>,
+															}}
+															sx={{ mt: 0.25, flexShrink: 0 }}
+														/>
+														<TextField
+															id={`voice-skill-desc-${skill.id}`}
+															label={skill.id}
+															type="text"
+															value={skill.description}
+															onChange={(event) => {
+																const updated = formState.voiceSkills.map((s) =>
+																	s.id === skill.id ? { ...s, description: event.target.value } : s
+																);
+																updateField("voiceSkills", updated);
+															}}
+															placeholder="Skill description..."
+															size="small"
+															fullWidth
+															slotProps={{
+																htmlInput: {
+																	"data-testid": `voice-skill-${skill.id}-description`,
+																},
+															}}
+														/>
+													</Box>
+												))}
 											</Box>
 										</Box>
 									</Box>

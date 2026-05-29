@@ -104,10 +104,7 @@ impl AuditEntry {
     /// Set the transcript text (truncated to 200 chars).
     pub fn with_transcript(mut self, text: Option<String>) -> Self {
         self.transcript_text = text.map(|t| {
-            let end = t
-                .char_indices()
-                .nth(200)
-                .map_or(t.len(), |(i, _)| i);
+            let end = t.char_indices().nth(200).map_or(t.len(), |(i, _)| i);
             if end < t.len() {
                 format!("{}...", &t[..end])
             } else {

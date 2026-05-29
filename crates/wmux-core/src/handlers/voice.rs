@@ -23,9 +23,11 @@ use uuid::Uuid;
 
 use wmux_core::config::VoiceConfig;
 use wmux_core::protocol::{VoiceClientMessage, VoiceServerEvent, generate_qwen_tools};
+use wmux_core::storage::{models::VoiceConversationMessage, voice_history::VoiceHistoryRepository};
 
 use crate::state::AppState;
-use crate::voice::{ConfirmationState, is_dangerous, VoiceSkillExecutor};
+use crate::voice::audit::redact_secrets;
+use crate::voice::{ConfirmationState, VoiceSkillExecutor, is_dangerous};
 
 /// Session timeout constants
 const SESSION_TIMEOUT_MINUTES: u64 = 120;
@@ -44,6 +46,7 @@ struct FunctionCallAccumulator {
 
 /// Active voice session state
 struct VoiceSessionState {
+    conversation_id: String,
     /// Confirmation state manager for dangerous actions
     confirmation_state: ConfirmationState,
     /// Pending function call accumulators by call_id
@@ -55,6 +58,7 @@ struct VoiceSessionState {
 impl VoiceSessionState {
     fn new() -> Self {
         Self {
+            conversation_id: Uuid::new_v4().to_string(),
             confirmation_state: ConfirmationState::new(),
             function_calls: Arc::new(RwLock::new(HashMap::new())),
             started_at: Instant::now(),
@@ -131,6 +135,17 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
         }
     };
 
+    if voice_config.microphone_disabled {
+        tracing::warn!("microphone disabled, rejecting voice connection");
+        send_error_and_close(
+            &mut socket,
+            "microphone_disabled",
+            "Microphone disabled in Settings".to_string(),
+        )
+        .await;
+        return;
+    }
+
     // Send Connected event to client
     if send_voice_event(&mut socket, &VoiceServerEvent::Connected)
         .await
@@ -185,6 +200,137 @@ fn get_voice_config(state: &AppState) -> Result<VoiceConfig, String> {
         .map_err(|e| format!("failed to read config: {}", e))
 }
 
+async fn persist_history_message(state: &AppState, message: VoiceConversationMessage) {
+    let Some(pool) = &state.storage else {
+        return;
+    };
+    let repository = VoiceHistoryRepository::new(pool.clone());
+    if let Err(error) = repository.insert(&message).await {
+        tracing::error!(
+            conversation_id = %message.conversation_id,
+            role = %message.role,
+            kind = %message.kind,
+            "voice history insert failed: {}",
+            error
+        );
+    }
+}
+
+fn history_message(
+    conversation_id: &str,
+    role: &str,
+    kind: &str,
+    text: String,
+    event_json: Option<String>,
+) -> VoiceConversationMessage {
+    VoiceConversationMessage {
+        id: String::new(),
+        conversation_id: conversation_id.to_string(),
+        role: role.to_string(),
+        kind: kind.to_string(),
+        text,
+        event_json,
+        target_name: None,
+        session_name: None,
+        window_name: None,
+        pane_index: None,
+        created_at: String::new(),
+    }
+}
+
+fn redacted_json(value: serde_json::Value) -> Option<String> {
+    serde_json::to_string(&redact_secrets(&value)).ok()
+}
+
+async fn persist_voice_event(
+    state: &AppState,
+    session_state: &VoiceSessionState,
+    event: &VoiceServerEvent,
+) {
+    match event {
+        VoiceServerEvent::TranscriptDone { text } => {
+            persist_history_message(
+                state,
+                history_message(
+                    &session_state.conversation_id,
+                    "user",
+                    "transcript",
+                    text.clone(),
+                    None,
+                ),
+            )
+            .await;
+        }
+        VoiceServerEvent::ActionResult { skill, .. } => {
+            let event_json = serde_json::to_value(event).ok().and_then(redacted_json);
+            persist_history_message(
+                state,
+                history_message(
+                    &session_state.conversation_id,
+                    "tool",
+                    "tool_result",
+                    skill.clone(),
+                    event_json,
+                ),
+            )
+            .await;
+        }
+        _ => {}
+    }
+}
+
+async fn persist_assistant_text(state: &AppState, session_state: &VoiceSessionState, text: String) {
+    persist_history_message(
+        state,
+        history_message(
+            &session_state.conversation_id,
+            "assistant",
+            "assistant_text",
+            text,
+            None,
+        ),
+    )
+    .await;
+}
+
+async fn persist_tool_call(
+    state: &AppState,
+    session_state: &VoiceSessionState,
+    skill: &str,
+    params: &serde_json::Value,
+) {
+    let event_json = redacted_json(serde_json::json!({
+        "skill": skill,
+        "params": params,
+    }));
+    persist_history_message(
+        state,
+        history_message(
+            &session_state.conversation_id,
+            "tool",
+            "tool_call",
+            skill.to_string(),
+            event_json,
+        ),
+    )
+    .await;
+}
+
+async fn persist_tool_result(
+    state: &AppState,
+    session_state: &VoiceSessionState,
+    skill: &str,
+    success: bool,
+    error: Option<String>,
+) {
+    let event = VoiceServerEvent::ActionResult {
+        skill: skill.to_string(),
+        success,
+        error,
+    };
+    persist_voice_event(state, session_state, &event).await;
+}
+
 /// Connect to Qwen DashScope WebSocket endpoint with auth header.
 async fn connect_to_qwen(
     url: &str,
@@ -214,7 +360,7 @@ async fn send_session_update(
     upstream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     config: &VoiceConfig,
 ) -> Result<(), String> {
-    let tools = generate_qwen_tools();
+    let tools = generate_qwen_tools(&config.skills);
 
     let session_update = serde_json::json!({
         "type": "session.update",
@@ -276,12 +422,13 @@ async fn bridge_voice(
                 match message {
                     Some(Ok(Message::Text(text))) => {
                         match handle_client_message(&text, &session_state, &state, &tool_result_tx).await {
-                            Ok(Some(qwen_msg)) => {
-                                if let Err(error) = send_qwen_json(&mut upstream_tx, &qwen_msg).await {
-                                    tracing::error!("failed to forward to Qwen: {}", error);
+                            Ok(qwen_messages) => {
+                                for qwen_msg in qwen_messages {
+                                    if let Err(error) = send_qwen_json(&mut upstream_tx, &qwen_msg).await {
+                                        tracing::error!("failed to forward to Qwen: {}", error);
+                                    }
                                 }
                             }
-                            Ok(None) => {} // No message to forward
                             Err(error) => {
                                 tracing::error!("client message handling failed: {}", error);
                                 let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::Error {
@@ -410,7 +557,7 @@ async fn handle_client_message(
     session_state: &VoiceSessionState,
     state: &AppState,
     tool_result_tx: &mpsc::Sender<serde_json::Value>,
-) -> Result<Option<serde_json::Value>, String> {
+) -> Result<Vec<serde_json::Value>, String> {
     let msg: VoiceClientMessage =
         serde_json::from_str(text).map_err(|e| format!("invalid client message: {}", e))?;
 
@@ -418,7 +565,7 @@ async fn handle_client_message(
         VoiceClientMessage::AudioFrame {
             pcm16_base64,
             sample_rate,
-        } => Ok(Some(serde_json::json!({
+        } => Ok(vec![serde_json::json!({
             "type": "input_audio_buffer.append",
             "audio": pcm16_base64,
             "format": {
@@ -426,7 +573,42 @@ async fn handle_client_message(
                 "sample_rate": sample_rate,
                 "channels": 1
             }
-        }))),
+        })]),
+
+        VoiceClientMessage::TextMessage { text } => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Err("text is required".to_string());
+            }
+
+            persist_voice_event(
+                state,
+                session_state,
+                &VoiceServerEvent::TranscriptDone {
+                    text: trimmed.to_string(),
+                },
+            )
+            .await;
+
+            Ok(vec![
+                serde_json::json!({
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": trimmed
+                            }
+                        ]
+                    }
+                }),
+                serde_json::json!({
+                    "type": "response.create"
+                }),
+            ])
+        }
 
         VoiceClientMessage::ConfirmAction { confirmation_id } => {
             let id = Uuid::parse_str(&confirmation_id)
@@ -453,36 +635,47 @@ async fn handle_client_message(
 
             // Execute the skill
             let result = execute_voice_action(skill, &clean_params, state).await;
+            let success = result.is_ok();
+            let error = result.as_ref().err().cloned();
+            persist_tool_result(state, session_state, skill, success, error.clone()).await;
 
             // Send tool result to Qwen
             let tool_result = serde_json::json!({
                 "call_id": confirmation_id,
                 "output": {
-                    "success": result.is_ok(),
-                    "error": result.err()
+                    "success": success,
+                    "error": error
                 }
             });
             let _ = tool_result_tx.try_send(tool_result);
-            Ok(None)
+            Ok(Vec::new())
         }
 
         VoiceClientMessage::CancelAction { confirmation_id } => {
+            persist_tool_result(
+                state,
+                session_state,
+                "cancel_action",
+                false,
+                Some("action_cancelled".to_string()),
+            )
+            .await;
             // Just send cancellation result to Qwen
             let result = serde_json::json!({
                 "call_id": confirmation_id,
                 "output": { "success": false, "error": "action_cancelled" }
             });
             let _ = tool_result_tx.try_send(result);
-            Ok(None)
+            Ok(Vec::new())
         }
 
-        VoiceClientMessage::StopListening => Ok(Some(serde_json::json!({
+        VoiceClientMessage::StopListening => Ok(vec![serde_json::json!({
             "type": "input_audio_buffer.clear"
-        }))),
+        })]),
 
-        VoiceClientMessage::StartListening => Ok(Some(serde_json::json!({
+        VoiceClientMessage::StartListening => Ok(vec![serde_json::json!({
             "type": "input_audio_buffer.commit"
-        }))),
+        })]),
     }
 }
 
@@ -532,7 +725,22 @@ async fn handle_qwen_message(
                 .or_else(|| value.get("text"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            Ok(Some(VoiceServerEvent::TranscriptDone {
+            let event = VoiceServerEvent::TranscriptDone {
+                text: text_content.to_string(),
+            };
+            persist_voice_event(state, session_state, &event).await;
+            Ok(Some(event))
+        }
+
+        "response.text.done" | "response.output_text.done" | "output_text.done" => {
+            let text_content = value
+                .get("text")
+                .or_else(|| value.get("transcript"))
+                .or_else(|| value.get("content"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            persist_assistant_text(state, session_state, text_content.to_string()).await;
+            Ok(Some(VoiceServerEvent::AssistantMessage {
                 text: text_content.to_string(),
             }))
         }
@@ -596,12 +804,16 @@ async fn handle_qwen_message(
                 };
 
                 let dangerous = is_dangerous(&skill, &params);
+                persist_tool_call(state, session_state, &skill, &params).await;
 
                 if dangerous {
                     // Store skill name in params for later retrieval during confirmation
                     let mut params_with_skill = params.clone();
                     if let Some(obj) = params_with_skill.as_object_mut() {
-                        obj.insert("_skill".to_string(), serde_json::Value::String(skill.clone()));
+                        obj.insert(
+                            "_skill".to_string(),
+                            serde_json::Value::String(skill.clone()),
+                        );
                     }
                     let confirmation = session_state
                         .confirmation_state
@@ -617,13 +829,16 @@ async fn handle_qwen_message(
                 } else {
                     // Execute immediately
                     let result = execute_voice_action(&skill, &params, state).await;
+                    let success = result.is_ok();
+                    let error = result.as_ref().err().cloned();
+                    persist_tool_result(state, session_state, &skill, success, error.clone()).await;
 
                     // Send tool result
                     let tool_result = serde_json::json!({
                         "call_id": call_id,
                         "output": {
-                            "success": result.is_ok(),
-                            "error": result.err()
+                            "success": success,
+                            "error": error
                         }
                     });
                     let _ = tool_result_tx.try_send(tool_result);
@@ -675,9 +890,10 @@ async fn execute_voice_action(
     params: &serde_json::Value,
     state: &AppState,
 ) -> Result<(), String> {
+    let voice_config = get_voice_config(state)?;
     let executor = VoiceSkillExecutor::new(state.clone());
     executor
-        .execute(skill, params.clone())
+        .execute_with_overlay(skill, params.clone(), &voice_config.skills)
         .await
         .map(|_| ())
         .map_err(|e| e.to_string())
@@ -755,6 +971,7 @@ mod tests {
     };
     use wmux_core::config::Config;
     use wmux_core::logging::LoggingHandle;
+    use wmux_core::storage::{db, models::VoiceConversationMessage};
 
     const TOKEN: &str = "test-token";
 
@@ -767,6 +984,31 @@ mod tests {
         config.voice.endpoint = endpoint;
         config.voice.model = "qwen3.5-omni-flash-realtime".to_string();
         config
+    }
+
+    async fn test_state_with_storage(
+        config: Config,
+    ) -> (AppState, tempfile::TempDir, sqlx::SqlitePool) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+        let store = Config::load(&config_path).expect("load config");
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("create pool");
+        db::run_migrations(&pool).await.expect("run migrations");
+        let mut state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        state.storage = Some(pool.clone());
+        (state, dir, pool)
     }
 
     fn test_app(config: Config) -> (Router, tempfile::TempDir) {
@@ -1017,6 +1259,73 @@ mod tests {
         app_handle.abort();
     }
 
+    #[tokio::test]
+    async fn microphone_disabled_returns_error_without_qwen_connection() {
+        let (qwen_endpoint, mut qwen_rx, qwen_handle) = spawn_mock_qwen().await;
+        let mut config = test_voice_config(qwen_endpoint, true, Some("dashscope-test-key"));
+        config.voice.microphone_disabled = true;
+        let (app_url, app_handle, _dir) = spawn_test_app(config).await;
+        let request = authorized_request(&app_url);
+        let (mut client, _) = connect_async(request)
+            .await
+            .expect("connect voice websocket");
+
+        assert_eq!(
+            next_client_event(&mut client).await,
+            VoiceServerEvent::Error {
+                code: "microphone_disabled".to_string(),
+                message: "Microphone disabled in Settings".to_string(),
+            }
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), qwen_rx.recv())
+                .await
+                .is_err(),
+            "Qwen should not receive a connection when microphone is disabled"
+        );
+
+        let _ = client.close(None).await;
+        app_handle.abort();
+        qwen_handle.abort();
+    }
+
+    #[tokio::test]
+    async fn transcript_done_event_inserts_history_with_session_conversation_id() {
+        let config = test_voice_config("ws://127.0.0.1:9/realtime".to_string(), true, Some("key"));
+        let (state, _dir, pool) = test_state_with_storage(config).await;
+        let session_state = VoiceSessionState::new();
+
+        let event = handle_qwen_message(
+            &json!({ "type": "input_audio_transcription.done", "text": "hello history" })
+                .to_string(),
+            &session_state,
+            &state,
+            &mpsc::channel(1).0,
+        )
+        .await
+        .expect("handle qwen message");
+
+        assert_eq!(
+            event,
+            Some(VoiceServerEvent::TranscriptDone {
+                text: "hello history".to_string(),
+            })
+        );
+        let rows = sqlx::query_as::<_, VoiceConversationMessage>(
+            "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("fetch history rows");
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].conversation_id, session_state.conversation_id);
+        assert!(Uuid::parse_str(&rows[0].conversation_id).is_ok());
+        assert_eq!(rows[0].role, "user");
+        assert_eq!(rows[0].kind, "transcript");
+        assert_eq!(rows[0].text, "hello history");
+    }
+
     /// Test voice config validation returns error when voice disabled.
     #[tokio::test]
     async fn test_voice_disabled_validation() {
@@ -1024,6 +1333,9 @@ mod tests {
         let config = VoiceConfig {
             enabled: false,
             dashscope_api_key: None,
+            microphone_disabled: false,
+            voice: None,
+            skills: Vec::new(),
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1046,6 +1358,9 @@ mod tests {
         let config = VoiceConfig {
             enabled: true,
             dashscope_api_key: None,
+            microphone_disabled: false,
+            voice: None,
+            skills: Vec::new(),
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1065,6 +1380,9 @@ mod tests {
         let config = VoiceConfig {
             enabled: true,
             dashscope_api_key: Some("test-key".to_string()),
+            microphone_disabled: false,
+            voice: None,
+            skills: Vec::new(),
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1074,7 +1392,7 @@ mod tests {
             vad_threshold: 0.5,
         };
 
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         let session_update = serde_json::json!({
             "type": "session.update",
             "session": {
@@ -1149,10 +1467,18 @@ mod tests {
         };
 
         let text = serde_json::to_string(&client_msg).unwrap();
-        let result = handle_client_message(&text, &VoiceSessionState::new(), &state, &mpsc::channel(1).0).await;
+        let result = handle_client_message(
+            &text,
+            &VoiceSessionState::new(),
+            &state,
+            &mpsc::channel(1).0,
+        )
+        .await;
 
         assert!(result.is_ok());
-        let qwen_msg = result.unwrap().unwrap();
+        let qwen_messages = result.unwrap();
+        assert_eq!(qwen_messages.len(), 1);
+        let qwen_msg = &qwen_messages[0];
         assert_eq!(
             qwen_msg.get("type").and_then(|v| v.as_str()),
             Some("input_audio_buffer.append")
@@ -1160,6 +1486,51 @@ mod tests {
         assert_eq!(
             qwen_msg.get("audio").and_then(|v| v.as_str()),
             Some("test-audio")
+        );
+    }
+
+    /// Test text message conversion.
+    #[tokio::test]
+    async fn test_text_message_conversion() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&Config::default()).expect("serialize config"),
+        )
+        .expect("write config");
+        let store = Config::load(&config_path).expect("load config");
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
+
+        let client_msg = VoiceClientMessage::TextMessage {
+            text: "hello ai".to_string(),
+        };
+
+        let text = serde_json::to_string(&client_msg).unwrap();
+        let result = handle_client_message(
+            &text,
+            &VoiceSessionState::new(),
+            &state,
+            &mpsc::channel(1).0,
+        )
+        .await
+        .expect("handle text message");
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result[0].get("type").and_then(|v| v.as_str()),
+            Some("conversation.item.create")
+        );
+        assert_eq!(
+            result[0]["item"]["content"][0]["text"].as_str(),
+            Some("hello ai")
+        );
+        assert_eq!(
+            result[1].get("type").and_then(|v| v.as_str()),
+            Some("response.create")
         );
     }
 
@@ -1240,7 +1611,7 @@ mod tests {
     /// Test generate_qwen_tools.
     #[test]
     fn test_generate_qwen_tools() {
-        let tools = generate_qwen_tools();
+        let tools = generate_qwen_tools(&[]);
         assert_eq!(tools.len(), 9);
 
         for tool in &tools {
@@ -1287,7 +1658,11 @@ mod tests {
         )
         .await;
         // connections.list doesn't require target_name, so it should work
-        assert!(result.is_ok(), "connections.list should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "connections.list should succeed: {:?}",
+            result.err()
+        );
 
         // Navigate frontend is always OK
         let result = execute_voice_action(
@@ -1299,12 +1674,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Unknown skill is rejected
-        let result = execute_voice_action(
-            "unknown_skill",
-            &serde_json::json!({}),
-            &state,
-        )
-        .await;
+        let result = execute_voice_action("unknown_skill", &serde_json::json!({}), &state).await;
         assert!(result.is_err(), "unknown skill should be rejected");
     }
 

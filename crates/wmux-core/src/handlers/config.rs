@@ -3,7 +3,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use wmux_core::config::{
     AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig,
-    UIConfig,
+    UIConfig, VoiceSkillConfig,
 };
 
 use crate::http::{ApiError, ApiResult};
@@ -21,6 +21,7 @@ pub struct ConfigResponse {
     ui: UIConfig,
     intelligence: ConfigIntelligenceResponse,
     logs: LogsConfig,
+    voice: ConfigVoiceResponse,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +56,26 @@ struct ConfigIntelligenceResponse {
     max_concurrency: u32,
     #[serde(rename = "cacheTTLSec")]
     cache_ttl_sec: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfigVoiceResponse {
+    enabled: bool,
+    dashscope_api_key_configured: bool,
+    microphone_disabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    voice: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    skills: Vec<VoiceSkillConfig>,
+    model: String,
+    endpoint: String,
+    continuous_listening: bool,
+    store_raw_audio: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    audit_log_path: Option<String>,
+    vad_enabled: bool,
+    vad_threshold: f32,
 }
 
 pub async fn get(State(state): State<AppState>) -> ApiResult<ConfigResponse> {
@@ -112,6 +133,7 @@ pub fn sanitized_config(config: &Config) -> Config {
     for provider in &mut sanitized.intelligence.providers {
         provider.api_key.clear();
     }
+    sanitized.voice.dashscope_api_key = None;
     sanitized
 }
 
@@ -155,6 +177,24 @@ fn new_config_response(config: &Config) -> ConfigResponse {
             cache_ttl_sec: sanitized.intelligence.cache_ttl_sec,
         },
         logs: sanitized.logs,
+        voice: ConfigVoiceResponse {
+            enabled: sanitized.voice.enabled,
+            dashscope_api_key_configured: config
+                .voice
+                .dashscope_api_key
+                .as_deref()
+                .is_some_and(|key| !key.trim().is_empty()),
+            microphone_disabled: sanitized.voice.microphone_disabled,
+            voice: sanitized.voice.voice,
+            skills: sanitized.voice.skills,
+            model: sanitized.voice.model,
+            endpoint: sanitized.voice.endpoint,
+            continuous_listening: sanitized.voice.continuous_listening,
+            store_raw_audio: sanitized.voice.store_raw_audio,
+            audit_log_path: sanitized.voice.audit_log_path,
+            vad_enabled: sanitized.voice.vad_enabled,
+            vad_threshold: sanitized.voice.vad_threshold,
+        },
     }
 }
 
@@ -164,6 +204,14 @@ fn preserve_secret_fields(current: &Config, payload: &mut Config) {
     }
     if payload.intelligence.api_key.trim().is_empty() {
         payload.intelligence.api_key = current.intelligence.api_key.clone();
+    }
+    if payload
+        .voice
+        .dashscope_api_key
+        .as_deref()
+        .is_none_or(|key| key.trim().is_empty())
+    {
+        payload.voice.dashscope_api_key = current.voice.dashscope_api_key.clone();
     }
 
     let payload_names: Vec<String> = payload
@@ -210,5 +258,63 @@ fn store_error(error: ConfigError) -> ApiError {
     match error {
         ConfigError::ConfigModified => ApiError::conflict(error.to_string()),
         _ => ApiError::internal("failed to persist configuration"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_api_sanitizes_voice_secret_in_response() {
+        let mut config = Config::default();
+        config.voice.enabled = true;
+        config.voice.dashscope_api_key = Some("sk-secret".to_string());
+        config.voice.microphone_disabled = true;
+        config.voice.voice = Some("Cherry".to_string());
+
+        let response = new_config_response(&config);
+        let value = serde_json::to_value(response).expect("serialize response");
+
+        assert_eq!(value["voice"]["enabled"], true);
+        assert_eq!(value["voice"]["dashscopeApiKeyConfigured"], true);
+        assert_eq!(value["voice"]["microphoneDisabled"], true);
+        assert_eq!(value["voice"]["voice"], "Cherry");
+        assert!(value["voice"].get("dashscopeApiKey").is_none());
+        assert!(!value.to_string().contains("sk-secret"));
+    }
+
+    #[test]
+    fn config_api_preserves_voice_secret_when_payload_key_empty() {
+        let mut current = Config::default();
+        current.voice.dashscope_api_key = Some("sk-existing".to_string());
+
+        let mut payload = Config::default();
+        payload.voice.enabled = true;
+        payload.voice.dashscope_api_key = Some(String::new());
+
+        preserve_secret_fields(&current, &mut payload);
+
+        assert_eq!(
+            payload.voice.dashscope_api_key,
+            Some("sk-existing".to_string())
+        );
+    }
+
+    #[test]
+    fn config_api_preserves_voice_secret_when_payload_key_absent() {
+        let mut current = Config::default();
+        current.voice.dashscope_api_key = Some("sk-existing".to_string());
+
+        let mut payload = Config::default();
+        payload.voice.enabled = true;
+        payload.voice.dashscope_api_key = None;
+
+        preserve_secret_fields(&current, &mut payload);
+
+        assert_eq!(
+            payload.voice.dashscope_api_key,
+            Some("sk-existing".to_string())
+        );
     }
 }

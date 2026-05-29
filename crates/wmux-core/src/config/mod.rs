@@ -6,8 +6,11 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use rand::RngCore;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+use crate::protocol::VALID_VOICE_SKILL_IDS;
 
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
@@ -16,10 +19,14 @@ const MIN_UI_FONT_SIZE: u16 = 12;
 const MAX_UI_FONT_SIZE: u16 = 24;
 const MIN_TERMINAL_FONT_SIZE: u16 = 8;
 const MAX_TERMINAL_FONT_SIZE: u16 = 32;
+const MAX_VOICE_NAME_LEN: usize = 64;
 const VALID_TERMINAL_FONT_WEIGHTS: &[&str] = &[
     "normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900",
 ];
 const VALID_VOICE_MODELS: &[&str] = &["qwen3.5-omni-flash-realtime", "qwen3.5-omni-plus-realtime"];
+const VALID_VOICE_ENDPOINT_HOSTS: &[&str] =
+    &["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"];
+const VALID_VOICE_ENDPOINT_PATH: &str = "/api-ws/v1/realtime";
 
 pub type Result<T> = std::result::Result<T, ConfigError>;
 
@@ -47,6 +54,12 @@ pub enum ConfigError {
     VoiceApiKeyRequired,
     #[error("invalid voice model: {0}")]
     InvalidVoiceModel(String),
+    #[error("invalid voice endpoint: {0}")]
+    InvalidVoiceEndpoint(String),
+    #[error("invalid voice name: {0}")]
+    InvalidVoiceName(String),
+    #[error("invalid voice skill id: {0}")]
+    InvalidVoiceSkillId(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -201,6 +214,12 @@ pub struct VoiceConfig {
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dashscope_api_key: Option<String>,
+    #[serde(default)]
+    pub microphone_disabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voice: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<VoiceSkillConfig>,
     #[serde(default = "default_voice_model")]
     pub model: String,
     #[serde(default = "default_voice_endpoint")]
@@ -215,6 +234,17 @@ pub struct VoiceConfig {
     pub vad_enabled: bool,
     #[serde(default = "default_voice_vad_threshold")]
     pub vad_threshold: f32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceSkillConfig {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub description: String,
 }
 
 #[derive(Debug, Clone)]
@@ -242,6 +272,19 @@ impl Config {
     }
 
     pub fn validate_voice(&self) -> Result<()> {
+        for skill in &self.voice.skills {
+            if !VALID_VOICE_SKILL_IDS.contains(&skill.id.as_str()) {
+                return Err(ConfigError::InvalidVoiceSkillId(skill.id.clone()));
+            }
+        }
+
+        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
+            return Err(ConfigError::InvalidVoiceModel(self.voice.model.clone()));
+        }
+
+        validate_voice_endpoint(&self.voice.endpoint)?;
+        validate_voice_name(self.voice.voice.as_deref())?;
+
         if !self.voice.enabled {
             return Ok(());
         }
@@ -249,10 +292,6 @@ impl Config {
         match &self.voice.dashscope_api_key {
             Some(key) if !key.trim().is_empty() => {}
             _ => return Err(ConfigError::VoiceApiKeyRequired),
-        }
-
-        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
-            return Err(ConfigError::InvalidVoiceModel(self.voice.model.clone()));
         }
 
         Ok(())
@@ -433,6 +472,9 @@ impl Default for VoiceConfig {
         Self {
             enabled: false,
             dashscope_api_key: None,
+            microphone_disabled: false,
+            voice: None,
+            skills: Vec::new(),
             model: default_voice_model(),
             endpoint: default_voice_endpoint(),
             continuous_listening: default_voice_continuous_listening(),
@@ -723,6 +765,61 @@ pub fn is_localhost_bind(bind: &str) -> bool {
         Ok(IpAddr::V6(ip)) => ip.octets() == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
         Err(_) => false,
     }
+}
+
+fn validate_voice_endpoint(endpoint: &str) -> Result<()> {
+    let parsed = Url::parse(endpoint)
+        .map_err(|_| ConfigError::InvalidVoiceEndpoint(endpoint.to_string()))?;
+    if parsed.scheme() != "wss" {
+        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    }
+    if parsed.path() != VALID_VOICE_ENDPOINT_PATH {
+        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    }
+
+    let Some(host) = parsed.host_str() else {
+        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    };
+    if host.eq_ignore_ascii_case("localhost") {
+        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    }
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if is_loopback_or_private(ip) {
+            return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+        }
+    }
+    if !VALID_VOICE_ENDPOINT_HOSTS
+        .iter()
+        .any(|allowed| host.eq_ignore_ascii_case(allowed))
+    {
+        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    }
+
+    Ok(())
+}
+
+fn is_loopback_or_private(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => ip.is_loopback() || ip.is_private(),
+        IpAddr::V6(ip) => ip.is_loopback(),
+    }
+}
+
+fn validate_voice_name(voice: Option<&str>) -> Result<()> {
+    let Some(voice) = voice else {
+        return Ok(());
+    };
+    if voice.is_empty() || voice.len() > MAX_VOICE_NAME_LEN {
+        return Err(ConfigError::InvalidVoiceName(voice.to_string()));
+    }
+    if !voice
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+    {
+        return Err(ConfigError::InvalidVoiceName(voice.to_string()));
+    }
+
+    Ok(())
 }
 
 fn load_config_file(path: &Path) -> Result<(Config, SystemTime)> {
@@ -1274,6 +1371,9 @@ mod tests {
         let config = Config::default();
         assert!(!config.voice.enabled);
         assert_eq!(config.voice.dashscope_api_key, None);
+        assert!(!config.voice.microphone_disabled);
+        assert_eq!(config.voice.voice, None);
+        assert!(config.voice.skills.is_empty());
         assert_eq!(config.voice.model, "qwen3.5-omni-flash-realtime");
         assert_eq!(
             config.voice.endpoint,
@@ -1284,6 +1384,124 @@ mod tests {
         assert_eq!(config.voice.audit_log_path, None);
         assert!(config.voice.vad_enabled);
         assert_eq!(config.voice.vad_threshold, 0.5);
+    }
+
+    #[test]
+    fn voice_config_old_shape_loads_new_defaults() {
+        let data = r#"{
+          "voice": {
+            "enabled": false,
+            "model": "qwen3.5-omni-flash-realtime"
+          }
+        }"#;
+        let config = parse_config(data).expect("parse config");
+
+        assert!(!config.voice.microphone_disabled);
+        assert_eq!(config.voice.voice, None);
+        assert!(config.voice.skills.is_empty());
+    }
+
+    #[test]
+    fn voice_config_serializes_new_camel_case_fields() {
+        let mut config = Config::default();
+        config.voice.microphone_disabled = true;
+        config.voice.voice = Some("Cherry".to_string());
+        config.voice.skills = vec![VoiceSkillConfig {
+            id: "session.switch".to_string(),
+            enabled: true,
+            description: "Switch sessions".to_string(),
+        }];
+
+        let value = serde_json::to_value(config).expect("serialize");
+
+        assert_eq!(value["voice"]["microphoneDisabled"], true);
+        assert_eq!(value["voice"]["voice"], "Cherry");
+        assert_eq!(value["voice"]["skills"][0]["id"], "session.switch");
+        assert_eq!(value["voice"]["skills"][0]["enabled"], true);
+        assert_eq!(
+            value["voice"]["skills"][0]["description"],
+            "Switch sessions"
+        );
+    }
+
+    #[test]
+    fn voice_config_rejects_invalid_endpoints() {
+        for endpoint in [
+            "http://dashscope.aliyuncs.com/api-ws/v1/realtime",
+            "ws://dashscope.aliyuncs.com/api-ws/v1/realtime",
+            "wss://localhost/api-ws/v1/realtime",
+            "wss://127.0.0.1/api-ws/v1/realtime",
+            "wss://[::1]/api-ws/v1/realtime",
+            "wss://10.0.0.5/api-ws/v1/realtime",
+            "wss://172.16.0.5/api-ws/v1/realtime",
+            "wss://172.31.255.255/api-ws/v1/realtime",
+            "wss://192.168.1.2/api-ws/v1/realtime",
+            "wss://evil.example.test/api-ws/v1/realtime",
+        ] {
+            let mut config = Config::default();
+            config.voice.enabled = true;
+            config.voice.dashscope_api_key = Some("test-key".to_string());
+            config.voice.endpoint = endpoint.to_string();
+
+            assert!(
+                matches!(
+                    config.validate_voice(),
+                    Err(ConfigError::InvalidVoiceEndpoint(_))
+                ),
+                "endpoint should be rejected: {endpoint}"
+            );
+        }
+    }
+
+    #[test]
+    fn voice_config_accepts_dashscope_endpoints() {
+        for endpoint in [
+            "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+            "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
+        ] {
+            let mut config = Config::default();
+            config.voice.enabled = true;
+            config.voice.dashscope_api_key = Some("test-key".to_string());
+            config.voice.endpoint = endpoint.to_string();
+
+            config.validate_voice().expect("valid endpoint should pass");
+        }
+    }
+
+    #[test]
+    fn voice_config_rejects_unknown_skill_ids() {
+        let mut config = Config::default();
+        config.voice.skills = vec![VoiceSkillConfig {
+            id: "run_arbitrary_shell".to_string(),
+            enabled: true,
+            description: String::new(),
+        }];
+
+        assert!(matches!(
+            config.validate_voice(),
+            Err(ConfigError::InvalidVoiceSkillId(id)) if id == "run_arbitrary_shell"
+        ));
+    }
+
+    #[test]
+    fn voice_config_validates_voice_name() {
+        let mut config = Config::default();
+        config.voice.enabled = true;
+        config.voice.dashscope_api_key = Some("test-key".to_string());
+        config.voice.voice = Some("Cherry_01".to_string());
+        config.validate_voice().expect("valid voice should pass");
+
+        config.voice.voice = Some("bad voice!".to_string());
+        assert!(matches!(
+            config.validate_voice(),
+            Err(ConfigError::InvalidVoiceName(_))
+        ));
+
+        config.voice.voice = Some("a".repeat(65));
+        assert!(matches!(
+            config.validate_voice(),
+            Err(ConfigError::InvalidVoiceName(_))
+        ));
     }
 
     #[test]

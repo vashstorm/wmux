@@ -4,10 +4,12 @@ pub mod db;
 pub mod models;
 pub mod projects;
 pub mod sync;
+pub mod voice_history;
 
 pub use ai_usage::AiUsageRepository;
 pub use models::*;
 pub use projects::{ProjectRepoError, ProjectRepository};
+pub use voice_history::{VoiceHistoryRepoError, VoiceHistoryRepository};
 
 #[cfg(test)]
 mod tests {

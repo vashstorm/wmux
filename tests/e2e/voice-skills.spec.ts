@@ -86,10 +86,10 @@ async function listFirstPane(request: APIRequestContext, sessionName: string) {
 }
 
 async function startVoice(page: Page) {
-	const voiceControl = page.locator("[data-voice-state]");
-	await expect(voiceControl).toHaveAttribute("data-voice-state", "idle");
+	const voiceControl = page.locator("[data-ai-assistant-state]");
+	await expect(voiceControl).toHaveAttribute("data-ai-assistant-state", "idle");
 	await page.getByRole("button", { name: "Start listening" }).click();
-	await expect(voiceControl).toHaveAttribute("data-voice-state", "listening");
+	await expect(voiceControl).toHaveAttribute("data-ai-assistant-state", "listening");
 }
 
 async function emitIntent(page: Page, skill: string, params: Record<string, unknown>, confirmationId?: string) {
@@ -138,12 +138,12 @@ test.describe("voice skills", () => {
 		await stopEvidence(page, context, testInfo);
 	});
 
-	test("renders VoiceControl with voice state when voice is enabled", async ({ page }) => {
+	test("renders AiAssistant with voice state when voice is enabled", async ({ page }) => {
 		await page.goto("/");
 
-		const voiceControl = page.locator("[data-voice-state]");
+		const voiceControl = page.locator("[data-ai-assistant-state]");
 		await expect(voiceControl).toBeVisible();
-		await expect(voiceControl).toHaveAttribute("data-voice-state", "idle");
+		await expect(voiceControl).toHaveAttribute("data-ai-assistant-state", "idle");
 
 		await startVoice(page);
 	});
@@ -192,7 +192,7 @@ test.describe("voice skills", () => {
 
 		const confirmationId = "11111111-1111-4111-8111-111111111111";
 		await emitIntent(page, "delete_session", { target_name: "local", session: voiceSessionName }, confirmationId);
-		await expect(page.locator("[data-voice-state]")).toHaveAttribute("data-voice-state", "confirming");
+		await expect(page.locator("[data-ai-assistant-state]")).toHaveAttribute("data-ai-assistant-state", "confirming");
 		await page.getByRole("button", { name: "Confirm" }).click();
 		await waitForVoiceClientMessage(page, "confirm_action");
 		const messages = await getVoiceClientMessages(page);
@@ -235,5 +235,56 @@ test.describe("voice skills", () => {
 		await emitActionResult(page, "send_to_pane");
 
 		await expect(page.getByTestId("terminal")).toContainText("VOICE_E2E_OK");
+	});
+
+	test("voice skills toggle and description persist after refresh", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-tab-voice-skills").click();
+
+		const navigateToggle = page.getByTestId("voice-skill-navigate_frontend-enabled");
+		await expect(navigateToggle).toBeVisible();
+		await expect(navigateToggle).toBeChecked();
+
+		await navigateToggle.click();
+		await expect(navigateToggle).not.toBeChecked();
+
+		const descriptionInput = page.getByTestId("voice-skill-navigate_frontend-description");
+		await descriptionInput.fill("Navigate to frontend pages with custom routes");
+
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+
+		await page.reload();
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.getByTestId("settings-tab-voice-skills").click();
+
+		await expect(page.getByTestId("voice-skill-navigate_frontend-enabled")).not.toBeChecked();
+		await expect(page.getByTestId("voice-skill-navigate_frontend-description")).toHaveValue("Navigate to frontend pages with custom routes");
+
+		await page.getByTestId("voice-skill-navigate_frontend-enabled").click();
+		await expect(page.getByTestId("voice-skill-navigate_frontend-enabled")).toBeChecked();
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+	});
+
+	test("voice history displays after transcript event", async ({ page, request }) => {
+		await createLocalConnection(request);
+		await resetVoiceSessions(request);
+		await page.goto("/");
+		await startVoice(page);
+
+		await emitVoiceEvent(page, { type: "transcript_done", text: "test history transcript" });
+		await emitIntent(page, "navigate_frontend", { route: "settings" });
+		await emitActionResult(page, "navigate_frontend");
+
+		await expect(page.locator(".voice-history")).toBeVisible({ timeout: 5000 });
+		await expect(page.locator(".voice-history")).toContainText("test history transcript");
+		await expect(page.locator(".voice-history")).toContainText("Executed: navigate_frontend");
 	});
 });

@@ -27,18 +27,26 @@ fn now_utc() -> String {
 fn validate_project_name(name: &str) -> Result<(), ProjectRepoError> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err(ProjectRepoError::ValidationError("name cannot be empty or whitespace".to_string()));
+        return Err(ProjectRepoError::ValidationError(
+            "name cannot be empty or whitespace".to_string(),
+        ));
     }
     if trimmed.len() > 80 {
-        return Err(ProjectRepoError::ValidationError("name cannot exceed 80 characters".to_string()));
+        return Err(ProjectRepoError::ValidationError(
+            "name cannot exceed 80 characters".to_string(),
+        ));
     }
     if trimmed.contains(':') {
-        return Err(ProjectRepoError::ValidationError("name cannot contain colon (:)".to_string()));
+        return Err(ProjectRepoError::ValidationError(
+            "name cannot contain colon (:)".to_string(),
+        ));
     }
     for ch in trimmed.chars() {
         let code = ch as u32;
         if code <= 0x1F || code == 0x7F {
-            return Err(ProjectRepoError::ValidationError("name cannot contain ASCII control characters".to_string()));
+            return Err(ProjectRepoError::ValidationError(
+                "name cannot contain ASCII control characters".to_string(),
+            ));
         }
     }
     Ok(())
@@ -78,13 +86,19 @@ impl ProjectRepository {
 
     pub async fn create(&self, new_project: &NewProject) -> Result<Project, ProjectRepoError> {
         validate_project_name(&new_project.name)?;
-        
+
         let id = random_hex(16);
         let now = now_utc();
-        let session_name = new_project.session_name.clone().unwrap_or_else(|| new_project.name.clone());
+        let session_name = new_project
+            .session_name
+            .clone()
+            .unwrap_or_else(|| new_project.name.clone());
         validate_project_name(&session_name)?;
         let workdir = new_project.workdir.clone().unwrap_or_default();
-        let layout_json = new_project.layout_json.clone().unwrap_or_else(|| "{\"schemaVersion\":1,\"windows\":[]}".to_string());
+        let layout_json = new_project
+            .layout_json
+            .clone()
+            .unwrap_or_else(|| "{\"schemaVersion\":1,\"windows\":[]}".to_string());
         let details_json = new_project.details_json.clone().unwrap_or_default();
         let progress_json = new_project.progress_json.clone().unwrap_or_default();
 
@@ -151,8 +165,14 @@ impl ProjectRepository {
         };
         let new_workdir = update.workdir.as_ref().unwrap_or(&current.workdir);
         let new_layout_json = update.layout_json.as_ref().unwrap_or(&current.layout_json);
-        let new_details_json = update.details_json.as_ref().unwrap_or(&current.details_json);
-        let new_progress_json = update.progress_json.as_ref().unwrap_or(&current.progress_json);
+        let new_details_json = update
+            .details_json
+            .as_ref()
+            .unwrap_or(&current.details_json);
+        let new_progress_json = update
+            .progress_json
+            .as_ref()
+            .unwrap_or(&current.progress_json);
 
         let result = sqlx::query(
             "UPDATE projects SET name = ?, path = ?, description = ?, session_name = ?, workdir = ?, layout_json = ?, details_json = ?, progress_json = ?, updated_at = ? WHERE id = ?",
@@ -628,13 +648,21 @@ mod tests {
         let created = repo.create(&new_project).await.expect("create");
 
         let updated = repo
-            .update_snapshot(&created.id, "{\"schemaVersion\":2,\"windows\":[]}", "running", "2026-05-22T12:00:00Z")
+            .update_snapshot(
+                &created.id,
+                "{\"schemaVersion\":2,\"windows\":[]}",
+                "running",
+                "2026-05-22T12:00:00Z",
+            )
             .await
             .expect("update_snapshot");
 
         assert_eq!(updated.layout_json, "{\"schemaVersion\":2,\"windows\":[]}");
         assert_eq!(updated.status, "running");
-        assert_eq!(updated.last_synced_at, Some("2026-05-22T12:00:00Z".to_string()));
+        assert_eq!(
+            updated.last_synced_at,
+            Some("2026-05-22T12:00:00Z".to_string())
+        );
         assert_eq!(updated.description, "original description");
         assert_eq!(updated.details_json, "{\"detail\":\"original\"}");
         assert_eq!(updated.progress_json, "{\"progress\":50}");
@@ -661,7 +689,12 @@ mod tests {
         let created = repo.create(&new_project).await.expect("create");
 
         let snapshot = repo
-            .update_snapshot(&created.id, "{\"schemaVersion\":2,\"windows\":[]}", "running", "2026-05-22T12:00:00Z")
+            .update_snapshot(
+                &created.id,
+                "{\"schemaVersion\":2,\"windows\":[]}",
+                "running",
+                "2026-05-22T12:00:00Z",
+            )
             .await
             .expect("update_snapshot");
 
@@ -678,7 +711,10 @@ mod tests {
         assert_eq!(updated.ai_error, "");
         assert_eq!(updated.layout_json, "{\"schemaVersion\":2,\"windows\":[]}");
         assert_eq!(updated.status, "running");
-        assert_eq!(updated.last_synced_at, Some("2026-05-22T12:00:00Z".to_string()));
+        assert_eq!(
+            updated.last_synced_at,
+            Some("2026-05-22T12:00:00Z".to_string())
+        );
     }
 
     #[tokio::test]
@@ -686,7 +722,9 @@ mod tests {
         let (pool, _dir) = setup_test_db().await;
         let repo = ProjectRepository::new(pool);
 
-        let result = repo.update_snapshot("nonexistent-id", "{}", "running", "2026-05-22T12:00:00Z").await;
+        let result = repo
+            .update_snapshot("nonexistent-id", "{}", "running", "2026-05-22T12:00:00Z")
+            .await;
         assert!(result.is_err());
         match result.unwrap_err() {
             ProjectRepoError::NotFound(id) => assert_eq!(id, "nonexistent-id"),
@@ -699,7 +737,9 @@ mod tests {
         let (pool, _dir) = setup_test_db().await;
         let repo = ProjectRepository::new(pool);
 
-        let result = repo.update_ai_result("nonexistent-id", "<html></html>", "idle", "").await;
+        let result = repo
+            .update_ai_result("nonexistent-id", "<html></html>", "idle", "")
+            .await;
         assert!(result.is_err());
         match result.unwrap_err() {
             ProjectRepoError::NotFound(id) => assert_eq!(id, "nonexistent-id"),

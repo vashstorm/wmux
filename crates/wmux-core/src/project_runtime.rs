@@ -70,7 +70,10 @@ impl ProjectRuntimeSnapshot {
         let window_count = windows.len();
         let layout = ProjectLayout {
             schema_version: 1,
-            windows: windows.iter().map(RuntimeWindow::to_layout_window).collect(),
+            windows: windows
+                .iter()
+                .map(RuntimeWindow::to_layout_window)
+                .collect(),
         };
         let layout_json = serde_json::to_string(&layout).unwrap_or_default();
         Self {
@@ -90,7 +93,10 @@ impl ProjectRuntimeSnapshot {
         let window_count = windows.len();
         let layout = ProjectLayout {
             schema_version: 1,
-            windows: windows.iter().map(RuntimeWindow::to_layout_window).collect(),
+            windows: windows
+                .iter()
+                .map(RuntimeWindow::to_layout_window)
+                .collect(),
         };
         let layout_json = serde_json::to_string(&layout).unwrap_or_default();
         Self {
@@ -142,7 +148,10 @@ pub async fn snapshot_from_tmux<R: CommandRunner>(
 
         let window_with_layout = window.clone().with_layout(layout.unwrap_or_default());
         let runtime_panes = panes.iter().map(RuntimePane::from_tmux_pane).collect();
-        runtime_windows.push(RuntimeWindow::from_tmux_window(&window_with_layout, runtime_panes));
+        runtime_windows.push(RuntimeWindow::from_tmux_window(
+            &window_with_layout,
+            runtime_panes,
+        ));
     }
 
     Ok(ProjectRuntimeSnapshot::sync(session_name, runtime_windows))
@@ -175,7 +184,10 @@ async fn launch_project<R: CommandRunner>(
         let window = if i == 0 {
             adapter.list_windows(session_name).await?.first().cloned()
         } else {
-            adapter.new_window(session_name, &layout_window.name).await.ok()
+            adapter
+                .new_window(session_name, &layout_window.name)
+                .await
+                .ok()
         };
 
         let window = match window {
@@ -207,10 +219,16 @@ async fn launch_project<R: CommandRunner>(
 
         let layout_str = adapter.get_window_layout(&window.id).await.ok();
         let window_with_layout = window.clone().with_layout(layout_str.unwrap_or_default());
-        runtime_windows.push(RuntimeWindow::from_tmux_window(&window_with_layout, runtime_panes));
+        runtime_windows.push(RuntimeWindow::from_tmux_window(
+            &window_with_layout,
+            runtime_panes,
+        ));
     }
 
-    Ok(ProjectRuntimeSnapshot::launch(session_name, runtime_windows))
+    Ok(ProjectRuntimeSnapshot::launch(
+        session_name,
+        runtime_windows,
+    ))
 }
 
 #[cfg(test)]
@@ -317,47 +335,33 @@ mod tests {
     fn pane_format(id: &str, index: usize) -> String {
         let index_str = index.to_string();
         joined(&[
-            id,
-            "zsh",
-            &index_str,
-            "1",
-            "80",
-            "24",
-            "0",
-            "0",
-            "0",
-            "0",
-            "0",
-            "0",
-            "zsh",
+            id, "zsh", &index_str, "1", "80", "24", "0", "0", "0", "0", "0", "0", "zsh",
         ])
     }
 
     fn make_layout() -> ProjectLayout {
         ProjectLayout {
             schema_version: 1,
-            windows: vec![
-                ProjectLayoutWindow {
-                    name: "main".to_string(),
-                    index: 0,
-                    active: true,
-                    panes: vec![
-                        ProjectLayoutPane {
-                            index: 0,
-                            active: true,
-                            width: 80,
-                            height: 24,
-                        },
-                        ProjectLayoutPane {
-                            index: 1,
-                            active: false,
-                            width: 40,
-                            height: 24,
-                        },
-                    ],
-                    window_layout: None,
-                },
-            ],
+            windows: vec![ProjectLayoutWindow {
+                name: "main".to_string(),
+                index: 0,
+                active: true,
+                panes: vec![
+                    ProjectLayoutPane {
+                        index: 0,
+                        active: true,
+                        width: 80,
+                        height: 24,
+                    },
+                    ProjectLayoutPane {
+                        index: 1,
+                        active: false,
+                        width: 40,
+                        height: 24,
+                    },
+                ],
+                window_layout: None,
+            }],
         }
     }
 
@@ -414,12 +418,32 @@ mod tests {
         assert_eq!(snapshot.pane_count, 2);
 
         let calls = runner.calls();
-        assert!(calls.iter().any(|c| c.args.contains(&"has-session".to_string())));
-        assert!(calls.iter().any(|c| c.args.contains(&"new-session".to_string())));
-        assert!(calls.iter().any(|c| c.args.contains(&"split-window".to_string())));
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"has-session".to_string()))
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"new-session".to_string()))
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"split-window".to_string()))
+        );
 
-        assert!(!calls.iter().any(|c| c.args.contains(&"send-keys".to_string())));
-        assert!(!calls.iter().any(|c| c.args.contains(&"kill-session".to_string())));
+        assert!(
+            !calls
+                .iter()
+                .any(|c| c.args.contains(&"send-keys".to_string()))
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|c| c.args.contains(&"kill-session".to_string()))
+        );
     }
 
     #[tokio::test]
@@ -460,13 +484,37 @@ mod tests {
         assert_eq!(snapshot.pane_count, 2);
 
         let calls = runner.calls();
-        assert!(calls.iter().any(|c| c.args.contains(&"has-session".to_string())));
-        assert!(calls.iter().any(|c| c.args.contains(&"list-windows".to_string())));
-        assert!(calls.iter().any(|c| c.args.contains(&"list-panes".to_string())));
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"has-session".to_string()))
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"list-windows".to_string()))
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|c| c.args.contains(&"list-panes".to_string()))
+        );
 
-        assert!(!calls.iter().any(|c| c.args.contains(&"new-session".to_string())));
-        assert!(!calls.iter().any(|c| c.args.contains(&"send-keys".to_string())));
-        assert!(!calls.iter().any(|c| c.args.contains(&"kill-session".to_string())));
+        assert!(
+            !calls
+                .iter()
+                .any(|c| c.args.contains(&"new-session".to_string()))
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|c| c.args.contains(&"send-keys".to_string()))
+        );
+        assert!(
+            !calls
+                .iter()
+                .any(|c| c.args.contains(&"kill-session".to_string()))
+        );
     }
 
     #[tokio::test]
@@ -491,9 +539,7 @@ mod tests {
 
         let adapter = Adapter::with_runner("tmux", runner.clone());
 
-        let snapshot = snapshot_from_tmux(&adapter, "dev")
-            .await
-            .expect("snapshot");
+        let snapshot = snapshot_from_tmux(&adapter, "dev").await.expect("snapshot");
 
         assert_eq!(snapshot.operation, "sync");
         assert_eq!(snapshot.session_name, "dev");
@@ -542,18 +588,17 @@ mod tests {
             2,
             "%1".to_string(),
             "vim".to_string(),
-        ).with_layout("d78c,80x24,0,0,5".to_string());
+        )
+        .with_layout("d78c,80x24,0,0,5".to_string());
 
-        let panes = vec![
-            RuntimePane {
-                id: "%1".to_string(),
-                index: 0,
-                active: true,
-                width: 80,
-                height: 24,
-                title: "vim".to_string(),
-            },
-        ];
+        let panes = vec![RuntimePane {
+            id: "%1".to_string(),
+            index: 0,
+            active: true,
+            width: 80,
+            height: 24,
+            title: "vim".to_string(),
+        }];
 
         let runtime_window = RuntimeWindow::from_tmux_window(&window, panes);
 
@@ -561,6 +606,9 @@ mod tests {
         assert_eq!(runtime_window.index, 0);
         assert!(runtime_window.active);
         assert_eq!(runtime_window.panes.len(), 1);
-        assert_eq!(runtime_window.window_layout, Some("d78c,80x24,0,0,5".to_string()));
+        assert_eq!(
+            runtime_window.window_layout,
+            Some("d78c,80x24,0,0,5".to_string())
+        );
     }
 }

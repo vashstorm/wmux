@@ -203,6 +203,46 @@ export interface AppConfig {
 		rotationSizeBytes?: number;
 		retentionDays?: number;
 	};
+	voice?: VoiceConfig;
+}
+
+export interface VoiceSkillConfig {
+	id: string;
+	enabled: boolean;
+	description: string;
+}
+
+export interface VoiceConfig {
+	enabled: boolean;
+	dashscopeApiKeyConfigured: boolean;
+	microphoneDisabled: boolean;
+	voice?: string;
+	skills: VoiceSkillConfig[];
+	model: string;
+	endpoint: string;
+	continuousListening: boolean;
+	storeRawAudio: boolean;
+	auditLogPath?: string;
+	vadEnabled: boolean;
+	vadThreshold: number;
+}
+
+export interface VoiceConversationMessage {
+	id: string;
+	conversationId: string;
+	role: string;
+	kind: string;
+	text: string;
+	eventJson?: string;
+	targetName?: string;
+	sessionName?: string;
+	windowName?: string;
+	paneIndex?: number;
+ createdAt: string;
+}
+
+export interface VoiceHistoryListResponse {
+	data: VoiceConversationMessage[];
 }
 
 export interface ErrorLogsResponse {
@@ -792,4 +832,31 @@ export async function cleanupAiStats(query: Pick<AiStatsQuery, "projectId"> = {}
 	const qs = params.toString();
 	const path = qs ? `/api/ai/stats/cleanup?${qs}` : "/api/ai/stats/cleanup";
 	return (await apiFetch(path, { method: "POST" })) as AiStatsCleanupResponse;
+}
+
+// --- Voice History client functions ---
+
+export interface VoiceHistoryQuery {
+	conversationId: string;
+	limit?: number;
+	before?: string;
+}
+
+export async function getVoiceHistory(query: VoiceHistoryQuery): Promise<VoiceConversationMessage[]> {
+	const params = new URLSearchParams();
+	params.set("conversationId", query.conversationId);
+	if (query.limit !== undefined) {
+		params.set("limit", String(query.limit));
+	}
+	if (query.before) {
+		params.set("before", query.before);
+	}
+	const response = (await apiFetch(`/api/voice/history?${params.toString()}`)) as VoiceHistoryListResponse;
+	return response.data ?? [];
+}
+
+export async function clearVoiceHistory(): Promise<void> {
+	await apiFetch("/api/voice/history", {
+		method: "DELETE",
+	});
 }

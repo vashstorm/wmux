@@ -718,6 +718,7 @@ describe("voice state", () => {
 				<span data-testid="voice-transcript">{state.voiceTranscript || "empty"}</span>
 				<span data-testid="voice-confirmation">{state.voicePendingConfirmation ? `${state.voicePendingConfirmation.confirmationId}:${state.voicePendingConfirmation.skill}` : "null"}</span>
 				<span data-testid="voice-error">{state.voiceError || "null"}</span>
+				<span data-testid="voice-history-count">{state.voiceHistory.length}</span>
 				<button data-testid="set-voice-listening" onClick={() => state.setVoiceStatus("listening")}>Set Listening</button>
 				<button data-testid="set-voice-error" onClick={() => state.setVoiceError("access denied")}>Set Error</button>
 				<button data-testid="append-transcript" onClick={() => state.appendVoiceTranscript("hello ")}>Append</button>
@@ -725,6 +726,8 @@ describe("voice state", () => {
 				<button data-testid="set-confirmation" onClick={() => state.setVoiceConfirmation({ confirmationId: "c1", skill: "send_to_pane" })}>Set Confirmation</button>
 				<button data-testid="clear-confirmation" onClick={() => state.setVoiceConfirmation(null)}>Clear Confirmation</button>
 				<button data-testid="clear-voice-error" onClick={() => state.setVoiceError(null)}>Clear Error</button>
+				<button data-testid="set-voice-history" onClick={() => state.setVoiceHistory([{ id: "m1", conversationId: "c1", role: "user", kind: "transcript", text: "test", createdAt: "2024-01-01T00:00:00Z" }])}>Set History</button>
+				<button data-testid="clear-voice-history" onClick={() => state.setVoiceHistory([])}>Clear History</button>
 			</div>
 		);
 	}
@@ -804,5 +807,24 @@ describe("voice state", () => {
 		expect(screen.getByTestId("voice-error").textContent).toBe("access denied");
 		fireEvent.click(screen.getByTestId("clear-voice-error"));
 		expect(screen.getByTestId("voice-error").textContent).toBe("null");
+	});
+
+	test("default voice history is empty", () => {
+		renderWithProvider();
+		expect(screen.getByTestId("voice-history-count").textContent).toBe("0");
+	});
+
+	test("setVoiceHistory updates history", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-voice-history"));
+		expect(screen.getByTestId("voice-history-count").textContent).toBe("1");
+	});
+
+	test("clearing voice history sets empty array", () => {
+		renderWithProvider();
+		fireEvent.click(screen.getByTestId("set-voice-history"));
+		expect(screen.getByTestId("voice-history-count").textContent).toBe("1");
+		fireEvent.click(screen.getByTestId("clear-voice-history"));
+		expect(screen.getByTestId("voice-history-count").textContent).toBe("0");
 	});
 });

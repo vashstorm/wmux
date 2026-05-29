@@ -1,0 +1,446 @@
+/* ==========================================================================
+   AI Voice Chat Dialog
+   ========================================================================== */
+
+.ai-assistant {
+  position: fixed;
+  right: var(--spacing-md);
+  bottom: var(--spacing-md);
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - (var(--spacing-md) * 2)));
+  height: min(520px, calc(100vh - (var(--spacing-lg) * 2)));
+  min-height: 360px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-input);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+}
+
+.ai-assistant[data-ai-assistant-state="listening"] {
+  border-color: var(--color-success);
+  box-shadow: var(--shadow-lg), var(--glow-success);
+}
+
+.ai-assistant[data-ai-assistant-state="speaking"],
+.ai-assistant[data-ai-assistant-state="processing"] {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-lg), var(--glow-accent);
+}
+
+.ai-assistant[data-ai-assistant-state="confirming"] {
+  border-color: var(--color-warning);
+  box-shadow: var(--shadow-lg), var(--glow-warning);
+}
+
+.ai-assistant[data-ai-assistant-state="error"] {
+  border-color: var(--color-danger);
+  box-shadow: var(--shadow-lg), var(--glow-danger);
+}
+
+.ai-assistant[data-ai-assistant-state="disabled"] {
+  opacity: 0.72;
+}
+
+.voice-launcher {
+  position: fixed;
+  right: var(--spacing-md);
+  bottom: var(--spacing-md);
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-input);
+  background: var(--color-panel);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.voice-launcher:hover {
+  border-color: var(--color-surface-border-hover);
+  background: var(--color-surface-hover);
+}
+
+/* --- Header --- */
+.voice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-height: 48px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-panel-border);
+  background: var(--color-surface);
+}
+
+.voice-title {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.voice-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--color-text-disabled);
+  transition: background var(--transition-base);
+}
+
+.ai-assistant[data-ai-assistant-state="idle"] .voice-status-dot,
+.ai-assistant[data-ai-assistant-state="connecting"] .voice-status-dot {
+  background: var(--color-text-muted);
+}
+
+.ai-assistant[data-ai-assistant-state="listening"] .voice-status-dot {
+  background: var(--color-success);
+  animation: voice-pulse 1.5s ease-in-out infinite;
+}
+
+.ai-assistant[data-ai-assistant-state="processing"] .voice-status-dot,
+.ai-assistant[data-ai-assistant-state="speaking"] .voice-status-dot {
+  background: var(--color-accent);
+}
+
+.ai-assistant[data-ai-assistant-state="confirming"] .voice-status-dot {
+  background: var(--color-warning);
+}
+
+.ai-assistant[data-ai-assistant-state="error"] .voice-status-dot {
+  background: var(--color-danger);
+}
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.voice-status-label {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-2xs);
+  text-transform: capitalize;
+}
+
+/* --- Chat Body --- */
+.voice-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-height: 0;
+  padding: var(--spacing-md);
+  overflow-y: auto;
+  background: var(--color-panel);
+}
+
+.voice-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-width: 88%;
+}
+
+.voice-message--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.voice-message--assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.voice-message-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--color-text-disabled);
+  font-size: var(--font-size-2xs);
+  line-height: 1.2;
+}
+
+.voice-message-bubble {
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.voice-message--user .voice-message-bubble {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.voice-message--live .voice-message-bubble {
+  border-style: dashed;
+}
+
+.voice-history-loading,
+.voice-empty-state,
+.voice-disabled-indicator {
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.voice-history-loading {
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.voice-empty-state {
+  margin: auto 0;
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.voice-empty-title {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.voice-empty-copy {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+}
+
+/* --- Confirmation --- */
+.voice-confirmation {
+  padding: var(--spacing-sm);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: var(--radius-input);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.voice-confirmation-text {
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+}
+
+.voice-confirmation-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.voice-confirm-btn,
+.voice-cancel-btn {
+  flex: 1;
+  min-height: 30px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), filter var(--transition-fast);
+}
+
+.voice-confirm-btn {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.voice-confirm-btn:hover {
+  filter: brightness(1.08);
+}
+
+.voice-cancel-btn {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+}
+
+.voice-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* --- State Messages --- */
+.voice-error {
+  padding: var(--spacing-sm);
+  border: 1px solid rgba(239, 68, 68, 0.26);
+  border-radius: var(--radius-input);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
+}
+
+.voice-disabled-indicator {
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+/* --- Composer --- */
+.voice-composer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-top: 1px solid var(--color-panel-border);
+  background: var(--color-surface);
+}
+
+.voice-composer-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 38px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-panel-border);
+  border-radius: var(--radius-input);
+  background: var(--color-panel);
+}
+
+.voice-input {
+  width: 100%;
+  min-height: 24px;
+  max-height: 96px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+.voice-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.ai-assistant-controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--spacing-xs);
+}
+
+.voice-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.voice-btn:hover {
+  border-color: var(--color-panel-border);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.voice-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.voice-btn--start {
+  color: var(--color-success);
+}
+
+.voice-btn--start:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.voice-btn--stop {
+  color: var(--color-danger);
+}
+
+.voice-btn--stop:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.voice-btn--send {
+  color: var(--color-accent);
+}
+
+.voice-btn--send:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+}
+
+.voice-btn--ghost {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+}
+
+/* --- Audio Level --- */
+.voice-level-bar {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 2px;
+  width: 100%;
+  height: 4px;
+  margin-top: var(--spacing-xs);
+}
+
+.voice-level-segment {
+  min-width: 0;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-border);
+  transition: background var(--transition-fast);
+}
+
+.voice-level-segment--active {
+  background: var(--color-success);
+}
+
+.ai-assistant[data-ai-assistant-state="speaking"] .voice-level-segment--active,
+.ai-assistant[data-ai-assistant-state="processing"] .voice-level-segment--active {
+  background: var(--color-accent);
+}
+
+@media (max-width: 560px) {
+  .ai-assistant {
+    right: var(--spacing-sm);
+    bottom: var(--spacing-sm);
+    width: calc(100vw - (var(--spacing-sm) * 2));
+    height: min(520px, calc(100vh - (var(--spacing-md) * 2)));
+  }
+}

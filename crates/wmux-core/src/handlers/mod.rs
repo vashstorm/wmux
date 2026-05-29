@@ -7,3 +7,4 @@ pub mod projects;
 pub mod sessions;
 pub mod terminal;
 pub mod voice;
+pub mod voice_history;

@@ -137,48 +137,53 @@ Wmux supports voice control via the Qwen3.5-Omni realtime API. Voice is disabled
 ### Enabling Voice
 
 1. Obtain a DashScope API key from [Alibaba Cloud DashScope](https://www.alibabacloud.com/help/en/dashscope/)
-2. Add the `voice` section to your `config.jsonc`:
+2. Open **Settings > Voice Control** in the Wmux UI
+3. Toggle voice on, paste your API key, and configure options
 
-```json
-{
-  "voice": {
-    "enabled": true,
-    "dashscopeApiKey": "YOUR_DASHSCOPE_API_KEY_HERE",
-    "model": "qwen3.5-omni-flash-realtime",
-    "endpoint": "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
-    "continuousListening": true,
-    "storeRawAudio": false,
-    "auditLogPath": null,
-    "vadEnabled": true,
-    "vadThreshold": 0.5
-  }
-}
-```
+Voice configuration is managed through the Settings UI and persisted server-side in `config.jsonc`.
 
-### Voice Configuration Options
+### Key Fields
 
-| Option | Description |
-|--------|-------------|
-| `enabled` | Turn voice control on or off |
-| `dashscopeApiKey` | Your DashScope API key (required when enabled) |
+| Field | Description |
+|-------|-------------|
+| `endpoint` | DashScope base URL for the realtime WebSocket endpoint |
+| `dashscopeApiKey` | Your DashScope SK/API Key (required when voice is enabled) |
+| `microphoneDisabled` | Safety switch. Set `true` to block all microphone access, overriding other settings |
 | `model` | Model to use: `qwen3.5-omni-flash-realtime` or `qwen3.5-omni-plus-realtime` |
-| `endpoint` | DashScope realtime WebSocket endpoint |
+| `voice` | TTS voice name, e.g., `Cherry` |
 | `continuousListening` | Keep microphone active after each command |
-| `storeRawAudio` | Save raw audio recordings to disk |
-| `auditLogPath` | Optional path to a JSON-lines audit log file |
+| `storeRawAudio` | Save raw audio to disk. Disabled by default for privacy |
 | `vadEnabled` | Enable voice activity detection |
 | `vadThreshold` | VAD sensitivity (0.0 - 1.0) |
 
-### Privacy Notes
+### Built-in Voice Skills
 
-- When `continuousListening` is enabled, the microphone stays active and audio is streamed to DashScope servers.
-- Voice interactions are logged (with secrets redacted) if `auditLogPath` is set.
-- The DashScope API key is stored only in the backend config file and is never exposed to the frontend.
+Wmux ships with predefined voice skills. You can enable/disable them and customize their descriptions through **Settings > Voice Control > Skills**:
+
+| Skill ID | What it does |
+|----------|-------------|
+| `navigate_frontend` | Navigate to different UI views |
+| `invoke_backend_route` | Call backend API endpoints |
+| `list_sessions` | List active tmux sessions |
+| `create_session` | Create a new tmux session |
+| `rename_session` | Rename an existing session |
+| `delete_session` | Delete a session (requires confirmation) |
+| `send_to_pane` | Send text to a specific pane (requires confirmation) |
+
+Skills that perform destructive actions (delete, send to pane) require explicit confirmation through the UI.
+
+### Privacy and Security
+
+- The DashScope API key is stored only in the backend config file. The raw key is **never** sent to the frontend.
+- Voice interactions are logged (with secrets redacted) if an audit log path is configured.
+- Raw audio is **not** stored in conversation history. Only text transcripts and tool-call results are persisted.
+- When `continuousListening` is on, the microphone stays active and audio streams to DashScope. Set `microphoneDisabled: true` to block all microphone access regardless of other settings.
 
 ### Troubleshooting
 
-- **Browser permission denied**: If the microphone does not activate, check your browser's site permissions and ensure microphone access is allowed for the Wmux origin.
-- **No voice response**: Verify `dashscopeApiKey` is valid and `voice.enabled` is `true`. Check server logs for connection errors to the DashScope endpoint.
+- **Browser permission denied**: Check your browser's site permissions. Ensure microphone access is allowed for the Wmux origin.
+- **No voice response**: Verify your API key is valid and voice is enabled in Settings. Check server logs for DashScope connection errors.
+- **Microphone blocked locally**: If `microphoneDisabled` is set in your config, the microphone will not activate. Remove or set it to `false` to re-enable.
 
 ## Known Limitations
 

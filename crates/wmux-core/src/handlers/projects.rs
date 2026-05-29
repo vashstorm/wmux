@@ -40,11 +40,15 @@ pub async fn create(
     }
 
     let pool = storage(&state)?;
-    let session_to_check = payload.session_name.as_deref().unwrap_or(payload.name.as_str());
+    let session_to_check = payload
+        .session_name
+        .as_deref()
+        .unwrap_or(payload.name.as_str());
 
-    let config = state.store.snapshot().map_err(|e| {
-        ApiError::internal(format!("failed to read config: {}", e))
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
     let tmux_path = if config.tmux.path.is_empty() {
         "tmux"
     } else {
@@ -65,7 +69,10 @@ pub async fn create(
         let now_str = time::OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .expect("RFC3339 format is infallible");
-        if let Ok(updated) = repo.update_snapshot(&project.id, &project.layout_json, "running", &now_str).await {
+        if let Ok(updated) = repo
+            .update_snapshot(&project.id, &project.layout_json, "running", &now_str)
+            .await
+        {
             project = updated;
         }
     }
@@ -123,9 +130,10 @@ pub async fn delete(
             &project.session_name
         };
 
-        let config = state.store.snapshot().map_err(|e| {
-            ApiError::internal(format!("failed to read config: {}", e))
-        })?;
+        let config = state
+            .store
+            .snapshot()
+            .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
         let tmux_path = if config.tmux.path.is_empty() {
             "tmux"
         } else {
@@ -178,9 +186,10 @@ pub async fn launch(
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state.store.snapshot().map_err(|e| {
-        ApiError::internal(format!("failed to read config: {}", e))
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
     let tmux_path = if config.tmux.path.is_empty() {
         "tmux"
     } else {
@@ -235,9 +244,10 @@ pub async fn sync_from_tmux(
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state.store.snapshot().map_err(|e| {
-        ApiError::internal(format!("failed to read config: {}", e))
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
     let tmux_path = if config.tmux.path.is_empty() {
         "tmux"
     } else {
@@ -251,7 +261,10 @@ pub async fn sync_from_tmux(
         &project.session_name
     };
 
-    let exists = adapter.has_session(session_name).await.map_err(map_tmux_error)?;
+    let exists = adapter
+        .has_session(session_name)
+        .await
+        .map_err(map_tmux_error)?;
     if !exists {
         return Err(ApiError::not_found(format!(
             "tmux session '{}' not found",
@@ -297,9 +310,10 @@ pub async fn generate_ai_html(
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state.store.snapshot().map_err(|e| {
-        ApiError::internal(format!("failed to read config: {}", e))
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
 
     match generate_sanitized_html(&config, &project).await {
         Ok(ai_html) => {
@@ -319,9 +333,7 @@ pub async fn generate_ai_html(
         Err(err) => {
             let api_err: ApiError = err.into();
             let error_msg = api_err.message().to_string();
-            let _ = repo
-                .update_ai_result(&id, "", "error", &error_msg)
-                .await;
+            let _ = repo.update_ai_result(&id, "", "error", &error_msg).await;
 
             tracing::error!(
                 project_id = %id,

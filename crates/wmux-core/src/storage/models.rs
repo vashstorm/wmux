@@ -168,3 +168,25 @@ pub struct NewAiUsageEvent {
     pub window_number: Option<i64>,
     pub response_json: Option<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceConversationMessage {
+    pub id: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub kind: String,
+    pub text: String,
+    pub event_json: Option<String>,
+    pub target_name: Option<String>,
+    pub session_name: Option<String>,
+    pub window_name: Option<String>,
+    pub pane_index: Option<i64>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceHistoryListResponse {
+    pub data: Vec<VoiceConversationMessage>,
+}

@@ -157,4 +157,3 @@ impl AiUsageRepository {
         Ok(result.rows_affected())
     }
 }
-

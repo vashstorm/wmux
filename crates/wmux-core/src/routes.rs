@@ -5,7 +5,9 @@ use axum::routing::{delete, get, post};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
-use crate::handlers::{ai_stats, config, connections, health, logs, projects, sessions, terminal, voice};
+use crate::handlers::{
+    ai_stats, config, connections, health, logs, projects, sessions, terminal, voice, voice_history,
+};
 use crate::http::api_not_found;
 use crate::state::AppState;
 
@@ -96,8 +98,14 @@ pub fn router(state: AppState) -> Router {
                 .delete(projects::delete),
         )
         .route("/projects/{id}/launch", post(projects::launch))
-        .route("/projects/{id}/sync-from-tmux", post(projects::sync_from_tmux))
-        .route("/projects/{id}/generate-ai-html", post(projects::generate_ai_html))
+        .route(
+            "/projects/{id}/sync-from-tmux",
+            post(projects::sync_from_tmux),
+        )
+        .route(
+            "/projects/{id}/generate-ai-html",
+            post(projects::generate_ai_html),
+        )
         .route(
             "/logs/errors",
             get(logs::get_error_logs).delete(logs::clear_error_logs),
@@ -121,6 +129,10 @@ pub fn router(state: AppState) -> Router {
 
     let voice_api = Router::new()
         .route("/voice", get(voice::websocket))
+        .route(
+            "/voice/history",
+            get(voice_history::list).delete(voice_history::clear),
+        )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::terminal_auth_middleware,
@@ -259,6 +271,42 @@ mod tests {
             .expect("create state with storage");
 
         (router(state), dir)
+    }
+
+    async fn test_app_with_memory_storage() -> (Router, tempfile::TempDir, sqlx::SqlitePool) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+
+        let config = json!({
+            "schemaVersion": 1,
+            "server": { "bind": "127.0.0.1:0" },
+            "auth": { "token": TOKEN },
+            "tmux": { "path": "tmux" },
+            "connections": [],
+            "ui": { "theme": "dark" }
+        });
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+
+        let store = Config::load(&config_path).expect("load config");
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("create pool");
+        wmux_core::storage::db::run_migrations(&pool)
+            .await
+            .expect("run migrations");
+        let mut state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        state.storage = Some(pool.clone());
+
+        (router(state), dir, pool)
     }
 
     fn base_config() -> Value {
@@ -460,8 +508,7 @@ mod tests {
         let body = json_body(get_response).await;
 
         assert_eq!(
-            body["intelligence"]["providers"][0]["apiKeyConfigured"],
-            true,
+            body["intelligence"]["providers"][0]["apiKeyConfigured"], true,
             "apiKey should be preserved when blank was sent"
         );
 
@@ -1005,6 +1052,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn voice_history_route_rejects_unauthenticated_requests() {
+        let (app, _dir, _pool) = test_app_with_memory_storage().await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/voice/history?conversationId=conv-a")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(json_body(response).await["error"]["code"], "unauthorized");
+    }
+
+    #[tokio::test]
+    async fn voice_history_route_lists_and_clears_authenticated_history() {
+        let (app, _dir, pool) = test_app_with_memory_storage().await;
+
+        for (id, conversation_id, text, created_at) in [
+            ("msg-1", "conv-a", "first", "2026-05-28T10:00:00Z"),
+            ("msg-2", "conv-a", "second", "2026-05-28T10:01:00Z"),
+            ("msg-3", "conv-b", "other", "2026-05-28T10:02:00Z"),
+        ] {
+            sqlx::query(
+                "INSERT INTO voice_conversation_messages (id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(id)
+            .bind(conversation_id)
+            .bind("user")
+            .bind("transcript")
+            .bind(text)
+            .bind(None::<String>)
+            .bind(Some("local"))
+            .bind(Some("session-a"))
+            .bind(Some("window-a"))
+            .bind(Some(1_i64))
+            .bind(created_at)
+            .execute(&pool)
+            .await
+            .expect("insert voice history");
+        }
+
+        let list = app
+            .clone()
+            .oneshot(request(
+                "GET",
+                "/api/voice/history?conversationId=conv-a&limit=10",
+                None,
+            ))
+            .await
+            .expect("response");
+        assert_eq!(list.status(), StatusCode::OK);
+        let body = json_body(list).await;
+        assert_eq!(body["data"].as_array().expect("data array").len(), 2);
+        assert_eq!(body["data"][0]["text"], "second");
+        assert_eq!(body["data"][0]["conversationId"], "conv-a");
+
+        let clear = app
+            .clone()
+            .oneshot(request("DELETE", "/api/voice/history", None))
+            .await
+            .expect("response");
+        assert_eq!(clear.status(), StatusCode::OK);
+        assert_eq!(json_body(clear).await, json!({ "data": [] }));
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM voice_conversation_messages")
+            .fetch_one(&pool)
+            .await
+            .expect("count voice history");
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
     async fn project_launch_not_found_returns_404() {
         let (app, _dir) = test_app_with_storage().await;
 
@@ -1022,7 +1146,11 @@ mod tests {
         let (app, _dir) = test_app_with_storage().await;
 
         let resp = app
-            .oneshot(request("POST", "/api/projects/nonexistent-id/sync-from-tmux", None))
+            .oneshot(request(
+                "POST",
+                "/api/projects/nonexistent-id/sync-from-tmux",
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -1035,7 +1163,11 @@ mod tests {
         let (app, _dir) = test_app_with_storage().await;
 
         let resp = app
-            .oneshot(request("POST", "/api/projects/nonexistent-id/generate-ai-html", None))
+            .oneshot(request(
+                "POST",
+                "/api/projects/nonexistent-id/generate-ai-html",
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -1115,7 +1247,11 @@ mod tests {
         let id2 = created2["id"].as_str().unwrap().to_string();
 
         let resp = app_no_provider
-            .oneshot(request("POST", &format!("/api/projects/{}/generate-ai-html", id2), None))
+            .oneshot(request(
+                "POST",
+                &format!("/api/projects/{}/generate-ai-html", id2),
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);

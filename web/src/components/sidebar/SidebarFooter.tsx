@@ -1,4 +1,4 @@
-import { Badge, Box, Divider } from "@mui/material";
+import { Badge, Box, Stack } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import DescriptionIcon from "@mui/icons-material/Description";
 import { SidebarIconButton } from "./SidebarIconButton.js";
@@ -27,7 +27,6 @@ export function SidebarFooter({
         borderColor: "divider",
         flexShrink: 0,
         justifyContent: "flex-end",
-        gap: 0.5,
         boxShadow: "var(--shadow-footer-top)",
         background: (theme) =>
           theme.palette.mode === "dark"
@@ -35,6 +34,7 @@ export function SidebarFooter({
             : "linear-gradient(to top, rgba(255,255,255,0.9) 0%, transparent 100%)",
       }}
     >
+      <Stack direction="row" spacing={0.25} sx={{ alignItems: "center" }}>
       <SidebarIconButton
         icon={SettingsIcon}
         onClick={onOpenSettings}
@@ -89,10 +89,10 @@ export function SidebarFooter({
       </Badge>
       {themeToggle && (
         <>
-          <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 0.5 }} />
           {themeToggle}
         </>
       )}
+      </Stack>
     </Box>
   );
 }

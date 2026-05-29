@@ -6,9 +6,9 @@ use tokio::task::JoinHandle;
 use tokio::time::{Duration, MissedTickBehavior, interval};
 
 use crate::config::Store;
+use crate::project_runtime::snapshot_from_tmux;
 use crate::storage::ProjectRepository;
 use crate::tmux::Adapter;
-use crate::project_runtime::snapshot_from_tmux;
 
 const SYNC_INTERVAL_SECS: u64 = 5;
 const STARTUP_DELAY_SECS: u64 = 2;
@@ -77,7 +77,15 @@ async fn run_sync_once(pool: &SqlitePool, store: &Store) {
                         let now_str = OffsetDateTime::now_utc()
                             .format(&Rfc3339)
                             .expect("RFC3339 format is infallible");
-                        if let Err(e) = repo.update_snapshot(&project.id, &snapshot.layout_json, &snapshot.status, &now_str).await {
+                        if let Err(e) = repo
+                            .update_snapshot(
+                                &project.id,
+                                &snapshot.layout_json,
+                                &snapshot.status,
+                                &now_str,
+                            )
+                            .await
+                        {
                             tracing::error!(project_id = %project.id, error = %e, "failed to update project snapshot in sync task");
                         }
                     }
@@ -92,7 +100,10 @@ async fn run_sync_once(pool: &SqlitePool, store: &Store) {
                     let now_str = OffsetDateTime::now_utc()
                         .format(&Rfc3339)
                         .expect("RFC3339 format is infallible");
-                    if let Err(e) = repo.update_snapshot(&project.id, &project.layout_json, "stopped", &now_str).await {
+                    if let Err(e) = repo
+                        .update_snapshot(&project.id, &project.layout_json, "stopped", &now_str)
+                        .await
+                    {
                         tracing::error!(project_id = %project.id, error = %e, "failed to update project status to stopped in sync task");
                     } else {
                         tracing::info!(project_id = %project.id, session_name = %session_name, "project status updated to stopped in sync task");

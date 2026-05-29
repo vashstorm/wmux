@@ -179,4 +179,115 @@ test.describe("settings panel", () => {
 		);
 		expect(scaledTerminalFontSize).toBe("19px");
 	});
+
+	test("voice settings persist after save", async ({ page, request }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-tab-voice").click();
+		await expect(page.getByTestId("voice-enabled-toggle")).toBeVisible();
+
+		await page.getByTestId("voice-base-url-input").fill("wss://dashscope.aliyuncs.com/api-ws/v1/realtime");
+		await page.getByTestId("voice-model-input").fill("qwen3.5-omni-plus-realtime");
+		await page.getByTestId("voice-voice-input").fill("TestVoice");
+
+		const saveButton = page.getByRole("button", { name: /^Save$/i });
+		await expect(saveButton).not.toBeDisabled();
+
+		const [saveResponse] = await Promise.all([
+			page.waitForResponse((resp) => resp.url().includes("/api/config") && resp.request().method() === "PUT"),
+			saveButton.click(),
+		]);
+
+		expect(saveResponse.ok()).toBeTruthy();
+
+		const configResponse = await request.get("/api/config", {
+			headers: { Authorization: "Bearer playwright-token" },
+		});
+		expect(configResponse.ok()).toBeTruthy();
+		const config = await configResponse.json();
+
+		expect(config.voice?.endpoint).toBe("wss://dashscope.aliyuncs.com/api-ws/v1/realtime");
+		expect(config.voice?.model).toBe("qwen3.5-omni-plus-realtime");
+		expect(config.voice?.voice).toBe("TestVoice");
+	});
+
+	test("microphone disabled toggle persists after refresh", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-tab-voice").click();
+		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeVisible();
+
+		const toggle = page.getByTestId("voice-microphone-disabled-toggle");
+		await expect(toggle).not.toBeChecked();
+
+		await toggle.click();
+		await expect(toggle).toBeChecked();
+
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+
+		await page.reload();
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.getByTestId("settings-tab-voice").click();
+
+		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeChecked();
+
+		// Toggle back to enabled for cleanup
+		await page.getByTestId("voice-microphone-disabled-toggle").click();
+		await expect(page.getByTestId("voice-microphone-disabled-toggle")).not.toBeChecked();
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+	});
+
+	test("microphone disabled blocks voice start button", async ({ page }) => {
+		await page.goto("/");
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+
+		await page.getByTestId("settings-tab-voice").click();
+		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeVisible();
+
+		const toggle = page.getByTestId("voice-microphone-disabled-toggle");
+		await toggle.click();
+		await expect(toggle).toBeChecked();
+
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+
+		await page.goto("/");
+
+		const voiceControl = page.locator("[data-ai-assistant-state]");
+		await expect(voiceControl).toBeVisible();
+
+		const disabledIndicator = page.locator(".voice-disabled-indicator");
+		await expect(disabledIndicator).toBeVisible();
+		await expect(disabledIndicator).toContainText("Microphone disabled");
+
+		const startButton = page.getByRole("button", { name: "Start listening" });
+		await expect(startButton).toBeDisabled();
+
+		await page.evaluate(() => {
+			const getUserMediaCalls = (window as unknown as { __getUserMediaCalls?: number }).__getUserMediaCalls ?? 0;
+			(window as unknown as { __getUserMediaCalls: number }).__getUserMediaCalls = getUserMediaCalls;
+		});
+
+		const initialCalls = await page.evaluate(() => (window as unknown as { __getUserMediaCalls?: number }).__getUserMediaCalls ?? 0);
+		expect(initialCalls).toBe(0);
+
+		await page.getByTestId("open-settings-button").click();
+		await expect(page.getByTestId("settings-panel")).toBeVisible();
+		await page.getByTestId("settings-tab-voice").click();
+		await page.getByTestId("voice-microphone-disabled-toggle").click();
+		await page.getByRole("button", { name: /Save/i }).click();
+		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
+	});
 });

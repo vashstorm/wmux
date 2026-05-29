@@ -23,6 +23,8 @@ import {
 	deleteProject,
 	launchProject,
 	syncProjectFromTmux,
+	getVoiceHistory,
+	clearVoiceHistory,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -484,5 +486,143 @@ describe("api client", () => {
 			expect(call[0]).toContain(encodeURIComponent("proj#1"));
 		});
 
+	});
+
+	describe("voice history", () => {
+		test("getVoiceHistory returns data array", async () => {
+			mockJsonResponse(200, {
+				data: [
+					{
+						id: "msg1",
+						conversationId: "conv1",
+						role: "user",
+						kind: "transcript",
+						text: "Hello",
+					 createdAt: "2024-01-01T00:00:00Z",
+					},
+				],
+			});
+			const result = await getVoiceHistory({ conversationId: "conv1" });
+			expect(result).toHaveLength(1);
+			expect(result[0]!.id).toBe("msg1");
+			expect(result[0]!.conversationId).toBe("conv1");
+			expect(result[0]!.role).toBe("user");
+			expect(result[0]!.kind).toBe("transcript");
+			expect(result[0]!.text).toBe("Hello");
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/voice/history");
+			expect(call[0]).toContain("conversationId=conv1");
+		});
+
+		test("getVoiceHistory sends limit and before params", async () => {
+			mockJsonResponse(200, { data: [] });
+			await getVoiceHistory({
+				conversationId: "conv1",
+				limit: 50,
+				before: "msg10",
+			});
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("conversationId=conv1");
+			expect(call[0]).toContain("limit=50");
+			expect(call[0]).toContain("before=msg10");
+		});
+
+		test("getVoiceHistory returns empty array when data is null", async () => {
+			mockJsonResponse(200, { data: null });
+			const result = await getVoiceHistory({ conversationId: "conv1" });
+			expect(result).toEqual([]);
+		});
+
+		test("clearVoiceHistory sends DELETE request", async () => {
+			mockFetch(new Response(null, { status: 204 }));
+			await clearVoiceHistory();
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[1]?.method).toBe("DELETE");
+			expect(call[0]).toContain("/api/voice/history");
+		});
+
+		test("clearVoiceHistory does not throw on 204", async () => {
+			mockFetch(new Response(null, { status: 204 }));
+			await expect(clearVoiceHistory()).resolves.toBeUndefined();
+		});
+
+		test("getConfig returns voice with dashscopeApiKeyConfigured", async () => {
+			mockJsonResponse(200, {
+				schemaVersion: 1,
+				path: ".",
+				server: { bind: "127.0.0.1:7331" },
+				auth: { token: "" },
+				tmux: { path: "tmux" },
+				connections: [],
+				ui: {
+					theme: "dark",
+					windowTheme: "dark",
+					fontSize: 14,
+					terminalFontSize: 14,
+					terminalFontWeight: "normal",
+				},
+				intelligence: {
+					enabled: false,
+					providers: [],
+					maxBytes: 12000,
+					timeoutSec: 8,
+					minSessionIntervalSec: 60,
+					maxConcurrency: 3,
+					cacheTTLSec: 300,
+				},
+				voice: {
+					enabled: true,
+					dashscopeApiKeyConfigured: true,
+					microphoneDisabled: false,
+					skills: [],
+					model: "qwen3.5-omni-flash-realtime",
+					endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+					continuousListening: false,
+					storeRawAudio: false,
+					vadEnabled: true,
+					vadThreshold: 0.5,
+				},
+			});
+			const result = await getConfig();
+			expect(result.voice?.enabled).toBe(true);
+			expect(result.voice?.dashscopeApiKeyConfigured).toBe(true);
+			expect(result.voice?.microphoneDisabled).toBe(false);
+			expect(result.voice?.model).toBe("qwen3.5-omni-flash-realtime");
+			expect(result.voice?.endpoint).toBe(
+				"wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+			);
+		});
+
+		test("getConfig voice defaults to undefined if not present", async () => {
+			mockJsonResponse(200, {
+				schemaVersion: 1,
+				path: ".",
+				server: { bind: "127.0.0.1:7331" },
+				auth: { token: "" },
+				tmux: { path: "tmux" },
+				connections: [],
+				ui: {
+					theme: "dark",
+					windowTheme: "dark",
+					fontSize: 14,
+					terminalFontSize: 14,
+					terminalFontWeight: "normal",
+				},
+				intelligence: {
+					enabled: false,
+					providers: [],
+					maxBytes: 12000,
+					timeoutSec: 8,
+					minSessionIntervalSec: 60,
+					maxConcurrency: 3,
+					cacheTTLSec: 300,
+				},
+			});
+			const result = await getConfig();
+			expect(result.voice).toBeUndefined();
+		});
 	});
 });

@@ -130,13 +130,13 @@ test.describe("wmux project management workflow", () => {
 		await expect(page.getByTestId("project-launch-button")).toHaveCount(0);
 		await expect(page.getByTestId("project-sync-button")).toBeVisible();
 		await expect(page.getByTestId("project-ai-generate-button")).toBeVisible();
-		
+
 		await expect(page.getByText("Project Info")).toBeVisible();
 		await expect(page.getByText("Name")).toBeVisible();
-		await expect(page.getByText("Session")).toBeVisible();
-		await expect(page.getByText("Status")).toBeVisible();
-		await expect(page.getByText("Working dir")).toBeVisible();
-		await expect(page.getByText("Path")).toBeVisible();
+		await expect(page.getByTestId("project-dashboard").getByText("Session")).toBeVisible();
+		await expect(page.getByTestId("project-dashboard").getByText("Status")).toBeVisible();
+		await expect(page.getByTestId("project-dashboard").getByText("Working dir")).toBeVisible();
+		await expect(page.getByTestId("project-dashboard").getByText("Path")).toBeVisible();
 		await expect(page.getByText("Created")).toBeVisible();
 		await expect(page.getByText("Updated")).toBeVisible();
 

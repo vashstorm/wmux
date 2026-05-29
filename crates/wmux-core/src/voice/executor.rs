@@ -6,9 +6,10 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
 
+use crate::config::VoiceSkillConfig;
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
-use crate::protocol::{VOICE_FRONTEND_ROUTES, VoiceServerEvent, VoiceSkill};
+use crate::protocol::{VOICE_FRONTEND_ROUTES, VoiceServerEvent, VoiceSkill, voice_skill_enabled};
 use crate::state::AppState;
 use crate::tmux::{Adapter, TmuxError};
 use crate::voice::audit::{
@@ -118,8 +119,19 @@ impl VoiceSkillExecutor {
         skill: &str,
         params: Value,
     ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+        self.execute_with_overlay(skill, params, &[]).await
+    }
+
+    pub async fn execute_with_overlay(
+        &self,
+        skill: &str,
+        params: Value,
+        skill_overlay: &[VoiceSkillConfig],
+    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
         let start = Instant::now();
-        let result = self.execute_unconfirmed(skill, params.clone()).await;
+        let result = self
+            .execute_unconfirmed(skill, params.clone(), skill_overlay)
+            .await;
         self.audit(skill, &params, audit_target(&params), &result, false, start)
             .await;
         result
@@ -146,7 +158,12 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
+        skill_overlay: &[VoiceSkillConfig],
     ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+        if !voice_skill_enabled(skill_overlay, skill) {
+            return Err(VoiceExecutorError::bad_request("skill is disabled"));
+        }
+
         match skill {
             "navigate_frontend" => self.navigate_frontend(params).await,
             "invoke_backend_route" => self.invoke_backend_route(params, false).await,
@@ -993,7 +1010,7 @@ fn audit_target(params: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config::{Config, VoiceSkillConfig};
     use crate::logging::LoggingHandle;
     use crate::state::AppState;
     use std::fs;
@@ -1158,6 +1175,27 @@ esac
             .expect_err("invalid route");
 
         assert_eq!(error.code, "bad_request");
+    }
+
+    #[tokio::test]
+    async fn executor_rejects_disabled_skill_before_dispatch() {
+        let test = test_executor();
+        let error = test
+            .executor
+            .execute_with_overlay(
+                "navigate_frontend",
+                json!({ "route": "settings" }),
+                &[VoiceSkillConfig {
+                    id: "navigate_frontend".to_string(),
+                    enabled: false,
+                    description: String::new(),
+                }],
+            )
+            .await
+            .expect_err("disabled skill");
+
+        assert_eq!(error.code, "bad_request");
+        assert_eq!(error.message, "skill is disabled");
     }
 
     #[tokio::test]

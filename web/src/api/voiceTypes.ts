@@ -93,6 +93,12 @@ export interface VoiceAudioFrameMessage extends VoiceClientMessageBase {
 	sampleRate: number;
 }
 
+/** Send typed text to Qwen for processing */
+export interface VoiceTextMessage extends VoiceClientMessageBase {
+	type: "text_message";
+	text: string;
+}
+
 /** Confirm a pending dangerous action */
 export interface VoiceConfirmActionMessage extends VoiceClientMessageBase {
 	type: "confirm_action";
@@ -118,6 +124,7 @@ export interface VoiceStartListeningMessage extends VoiceClientMessageBase {
 /** Union type for all client-to-server voice messages */
 export type VoiceClientMessage =
 	| VoiceAudioFrameMessage
+	| VoiceTextMessage
 	| VoiceConfirmActionMessage
 	| VoiceCancelActionMessage
 	| VoiceStopListeningMessage
@@ -173,6 +180,12 @@ export interface VoiceActionResultEvent extends VoiceServerEventBase {
 	error?: string;
 }
 
+/** Assistant text response */
+export interface VoiceAssistantMessageEvent extends VoiceServerEventBase {
+	type: "assistant_message";
+	text: string;
+}
+
 /** Voice session error */
 export interface VoiceErrorEvent extends VoiceServerEventBase {
 	type: "error";
@@ -194,6 +207,7 @@ export type VoiceServerEvent =
 	| VoiceTranscriptDoneEvent
 	| VoiceIntentReceivedEvent
 	| VoiceActionResultEvent
+	| VoiceAssistantMessageEvent
 	| VoiceErrorEvent
 	| VoiceSessionTimeoutEvent;
 
@@ -204,6 +218,7 @@ export type VoiceServerEvent =
 /** Client message type strings */
 const CLIENT_MESSAGE_TYPES = [
 	"audio_frame",
+	"text_message",
 	"confirm_action",
 	"cancel_action",
 	"stop_listening",
@@ -218,6 +233,7 @@ const SERVER_EVENT_TYPES = [
 	"transcript_done",
 	"intent_received",
 	"action_result",
+	"assistant_message",
 	"error",
 	"session_timeout",
 ] as const;
@@ -251,6 +267,13 @@ export function isVoiceServerEvent(msg: unknown): msg is VoiceServerEvent {
  */
 export function isVoiceAudioFrameMessage(msg: VoiceClientMessage): msg is VoiceAudioFrameMessage {
 	return msg.type === "audio_frame";
+}
+
+/**
+ * Type guard for VoiceTextMessage.
+ */
+export function isVoiceTextMessage(msg: VoiceClientMessage): msg is VoiceTextMessage {
+	return msg.type === "text_message";
 }
 
 /**
@@ -321,6 +344,13 @@ export function isVoiceIntentReceivedEvent(event: VoiceServerEvent): event is Vo
  */
 export function isVoiceActionResultEvent(event: VoiceServerEvent): event is VoiceActionResultEvent {
 	return event.type === "action_result";
+}
+
+/**
+ * Type guard for VoiceAssistantMessageEvent.
+ */
+export function isVoiceAssistantMessageEvent(event: VoiceServerEvent): event is VoiceAssistantMessageEvent {
+	return event.type === "assistant_message";
 }
 
 /**
