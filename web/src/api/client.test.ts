@@ -23,8 +23,8 @@ import {
 	deleteProject,
 	launchProject,
 	syncProjectFromTmux,
-	getVoiceHistory,
-	clearVoiceHistory,
+	getOmniHistory,
+	clearOmniHistory,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -489,7 +489,7 @@ describe("api client", () => {
 	});
 
 	describe("voice history", () => {
-		test("getVoiceHistory returns data array", async () => {
+		test("getOmniHistory returns data array", async () => {
 			mockJsonResponse(200, {
 				data: [
 					{
@@ -502,7 +502,7 @@ describe("api client", () => {
 					},
 				],
 			});
-			const result = await getVoiceHistory({ conversationId: "conv1" });
+			const result = await getOmniHistory({ conversationId: "conv1" });
 			expect(result).toHaveLength(1);
 			expect(result[0]!.id).toBe("msg1");
 			expect(result[0]!.conversationId).toBe("conv1");
@@ -515,9 +515,9 @@ describe("api client", () => {
 			expect(call[0]).toContain("conversationId=conv1");
 		});
 
-		test("getVoiceHistory sends limit and before params", async () => {
+		test("getOmniHistory sends limit and before params", async () => {
 			mockJsonResponse(200, { data: [] });
-			await getVoiceHistory({
+			await getOmniHistory({
 				conversationId: "conv1",
 				limit: 50,
 				before: "msg10",
@@ -529,24 +529,24 @@ describe("api client", () => {
 			expect(call[0]).toContain("before=msg10");
 		});
 
-		test("getVoiceHistory returns empty array when data is null", async () => {
+		test("getOmniHistory returns empty array when data is null", async () => {
 			mockJsonResponse(200, { data: null });
-			const result = await getVoiceHistory({ conversationId: "conv1" });
+			const result = await getOmniHistory({ conversationId: "conv1" });
 			expect(result).toEqual([]);
 		});
 
-		test("clearVoiceHistory sends DELETE request", async () => {
+		test("clearOmniHistory sends DELETE request", async () => {
 			mockFetch(new Response(null, { status: 204 }));
-			await clearVoiceHistory();
+			await clearOmniHistory();
 
 			const call = vi.mocked(fetch).mock.calls[0]!;
 			expect(call[1]?.method).toBe("DELETE");
 			expect(call[0]).toContain("/api/voice/history");
 		});
 
-		test("clearVoiceHistory does not throw on 204", async () => {
+		test("clearOmniHistory does not throw on 204", async () => {
 			mockFetch(new Response(null, { status: 204 }));
-			await expect(clearVoiceHistory()).resolves.toBeUndefined();
+			await expect(clearOmniHistory()).resolves.toBeUndefined();
 		});
 
 		test("getConfig returns voice with dashscopeApiKeyConfigured", async () => {

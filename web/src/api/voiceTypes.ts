@@ -82,47 +82,47 @@ export interface VoiceActionResult {
 // ============================================================================
 
 /** Base type for all voice client messages */
-export interface VoiceClientMessageBase {
+export interface OmniClientMessageBase {
 	type: string;
 }
 
 /** Send audio data to Qwen for processing */
-export interface VoiceAudioFrameMessage extends VoiceClientMessageBase {
+export interface VoiceAudioFrameMessage extends OmniClientMessageBase {
 	type: "audio_frame";
 	pcm16Base64: string;
 	sampleRate: number;
 }
 
 /** Send typed text to Qwen for processing */
-export interface VoiceTextMessage extends VoiceClientMessageBase {
+export interface VoiceTextMessage extends OmniClientMessageBase {
 	type: "text_message";
 	text: string;
 }
 
 /** Confirm a pending dangerous action */
-export interface VoiceConfirmActionMessage extends VoiceClientMessageBase {
+export interface VoiceConfirmActionMessage extends OmniClientMessageBase {
 	type: "confirm_action";
 	confirmationId: string;
 }
 
 /** Cancel a pending dangerous action */
-export interface VoiceCancelActionMessage extends VoiceClientMessageBase {
+export interface VoiceCancelActionMessage extends OmniClientMessageBase {
 	type: "cancel_action";
 	confirmationId: string;
 }
 
 /** Stop voice recognition/listening */
-export interface VoiceStopListeningMessage extends VoiceClientMessageBase {
+export interface VoiceStopListeningMessage extends OmniClientMessageBase {
 	type: "stop_listening";
 }
 
 /** Start voice recognition/listening */
-export interface VoiceStartListeningMessage extends VoiceClientMessageBase {
+export interface VoiceStartListeningMessage extends OmniClientMessageBase {
 	type: "start_listening";
 }
 
 /** Union type for all client-to-server voice messages */
-export type VoiceClientMessage =
+export type OmniClientMessage =
 	| VoiceAudioFrameMessage
 	| VoiceTextMessage
 	| VoiceConfirmActionMessage
@@ -135,36 +135,36 @@ export type VoiceClientMessage =
 // ============================================================================
 
 /** Base type for all voice server events */
-export interface VoiceServerEventBase {
+export interface OmniServerEventBase {
 	type: string;
 }
 
 /** Voice session established successfully */
-export interface VoiceConnectedEvent extends VoiceServerEventBase {
+export interface VoiceConnectedEvent extends OmniServerEventBase {
 	type: "connected";
 }
 
 /** Audio output from Qwen (TTS response) */
-export interface VoiceAudioDeltaEvent extends VoiceServerEventBase {
+export interface VoiceAudioDeltaEvent extends OmniServerEventBase {
 	type: "audio_delta";
 	pcm16Base64: string;
 	sampleRate: number;
 }
 
 /** Incremental transcript update (partial recognition) */
-export interface VoiceTranscriptDeltaEvent extends VoiceServerEventBase {
+export interface VoiceTranscriptDeltaEvent extends OmniServerEventBase {
 	type: "transcript_delta";
 	text: string;
 }
 
 /** Final transcript (complete recognition) */
-export interface VoiceTranscriptDoneEvent extends VoiceServerEventBase {
+export interface VoiceTranscriptDoneEvent extends OmniServerEventBase {
 	type: "transcript_done";
 	text: string;
 }
 
 /** Intent parsed from transcript with action parameters */
-export interface VoiceIntentReceivedEvent extends VoiceServerEventBase {
+export interface VoiceIntentReceivedEvent extends OmniServerEventBase {
 	type: "intent_received";
 	skill: string;
 	params: Record<string, unknown>;
@@ -173,7 +173,7 @@ export interface VoiceIntentReceivedEvent extends VoiceServerEventBase {
 }
 
 /** Result of executed action */
-export interface VoiceActionResultEvent extends VoiceServerEventBase {
+export interface VoiceActionResultEvent extends OmniServerEventBase {
 	type: "action_result";
 	skill: string;
 	success: boolean;
@@ -181,26 +181,26 @@ export interface VoiceActionResultEvent extends VoiceServerEventBase {
 }
 
 /** Assistant text response */
-export interface VoiceAssistantMessageEvent extends VoiceServerEventBase {
+export interface VoiceAssistantMessageEvent extends OmniServerEventBase {
 	type: "assistant_message";
 	text: string;
 }
 
 /** Voice session error */
-export interface VoiceErrorEvent extends VoiceServerEventBase {
+export interface VoiceErrorEvent extends OmniServerEventBase {
 	type: "error";
 	code: string;
 	message: string;
 }
 
 /** Session timeout warning */
-export interface VoiceSessionTimeoutEvent extends VoiceServerEventBase {
+export interface VoiceSessionTimeoutEvent extends OmniServerEventBase {
 	type: "session_timeout";
 	remainingSeconds: number;
 }
 
 /** Union type for all server-to-client voice events */
-export type VoiceServerEvent =
+export type OmniServerEvent =
 	| VoiceConnectedEvent
 	| VoiceAudioDeltaEvent
 	| VoiceTranscriptDeltaEvent
@@ -239,10 +239,10 @@ const SERVER_EVENT_TYPES = [
 ] as const;
 
 /**
- * Type guard for VoiceClientMessage.
+ * Type guard for OmniClientMessage.
  * Returns true if the object is a valid voice client message.
  */
-export function isVoiceClientMessage(msg: unknown): msg is VoiceClientMessage {
+export function isOmniClientMessage(msg: unknown): msg is OmniClientMessage {
 	if (typeof msg !== "object" || msg === null) {
 		return false;
 	}
@@ -251,10 +251,10 @@ export function isVoiceClientMessage(msg: unknown): msg is VoiceClientMessage {
 }
 
 /**
- * Type guard for VoiceServerEvent.
+ * Type guard for OmniServerEvent.
  * Returns true if the object is a valid voice server event.
  */
-export function isVoiceServerEvent(msg: unknown): msg is VoiceServerEvent {
+export function isOmniServerEvent(msg: unknown): msg is OmniServerEvent {
 	if (typeof msg !== "object" || msg === null) {
 		return false;
 	}
@@ -265,105 +265,105 @@ export function isVoiceServerEvent(msg: unknown): msg is VoiceServerEvent {
 /**
  * Type guard for VoiceAudioFrameMessage.
  */
-export function isVoiceAudioFrameMessage(msg: VoiceClientMessage): msg is VoiceAudioFrameMessage {
+export function isVoiceAudioFrameMessage(msg: OmniClientMessage): msg is VoiceAudioFrameMessage {
 	return msg.type === "audio_frame";
 }
 
 /**
  * Type guard for VoiceTextMessage.
  */
-export function isVoiceTextMessage(msg: VoiceClientMessage): msg is VoiceTextMessage {
+export function isVoiceTextMessage(msg: OmniClientMessage): msg is VoiceTextMessage {
 	return msg.type === "text_message";
 }
 
 /**
  * Type guard for VoiceConfirmActionMessage.
  */
-export function isVoiceConfirmActionMessage(msg: VoiceClientMessage): msg is VoiceConfirmActionMessage {
+export function isVoiceConfirmActionMessage(msg: OmniClientMessage): msg is VoiceConfirmActionMessage {
 	return msg.type === "confirm_action";
 }
 
 /**
  * Type guard for VoiceCancelActionMessage.
  */
-export function isVoiceCancelActionMessage(msg: VoiceClientMessage): msg is VoiceCancelActionMessage {
+export function isVoiceCancelActionMessage(msg: OmniClientMessage): msg is VoiceCancelActionMessage {
 	return msg.type === "cancel_action";
 }
 
 /**
  * Type guard for VoiceStopListeningMessage.
  */
-export function isVoiceStopListeningMessage(msg: VoiceClientMessage): msg is VoiceStopListeningMessage {
+export function isVoiceStopListeningMessage(msg: OmniClientMessage): msg is VoiceStopListeningMessage {
 	return msg.type === "stop_listening";
 }
 
 /**
  * Type guard for VoiceStartListeningMessage.
  */
-export function isVoiceStartListeningMessage(msg: VoiceClientMessage): msg is VoiceStartListeningMessage {
+export function isVoiceStartListeningMessage(msg: OmniClientMessage): msg is VoiceStartListeningMessage {
 	return msg.type === "start_listening";
 }
 
 /**
  * Type guard for VoiceConnectedEvent.
  */
-export function isVoiceConnectedEvent(event: VoiceServerEvent): event is VoiceConnectedEvent {
+export function isVoiceConnectedEvent(event: OmniServerEvent): event is VoiceConnectedEvent {
 	return event.type === "connected";
 }
 
 /**
  * Type guard for VoiceAudioDeltaEvent.
  */
-export function isVoiceAudioDeltaEvent(event: VoiceServerEvent): event is VoiceAudioDeltaEvent {
+export function isVoiceAudioDeltaEvent(event: OmniServerEvent): event is VoiceAudioDeltaEvent {
 	return event.type === "audio_delta";
 }
 
 /**
  * Type guard for VoiceTranscriptDeltaEvent.
  */
-export function isVoiceTranscriptDeltaEvent(event: VoiceServerEvent): event is VoiceTranscriptDeltaEvent {
+export function isVoiceTranscriptDeltaEvent(event: OmniServerEvent): event is VoiceTranscriptDeltaEvent {
 	return event.type === "transcript_delta";
 }
 
 /**
  * Type guard for VoiceTranscriptDoneEvent.
  */
-export function isVoiceTranscriptDoneEvent(event: VoiceServerEvent): event is VoiceTranscriptDoneEvent {
+export function isVoiceTranscriptDoneEvent(event: OmniServerEvent): event is VoiceTranscriptDoneEvent {
 	return event.type === "transcript_done";
 }
 
 /**
  * Type guard for VoiceIntentReceivedEvent.
  */
-export function isVoiceIntentReceivedEvent(event: VoiceServerEvent): event is VoiceIntentReceivedEvent {
+export function isVoiceIntentReceivedEvent(event: OmniServerEvent): event is VoiceIntentReceivedEvent {
 	return event.type === "intent_received";
 }
 
 /**
  * Type guard for VoiceActionResultEvent.
  */
-export function isVoiceActionResultEvent(event: VoiceServerEvent): event is VoiceActionResultEvent {
+export function isVoiceActionResultEvent(event: OmniServerEvent): event is VoiceActionResultEvent {
 	return event.type === "action_result";
 }
 
 /**
  * Type guard for VoiceAssistantMessageEvent.
  */
-export function isVoiceAssistantMessageEvent(event: VoiceServerEvent): event is VoiceAssistantMessageEvent {
+export function isVoiceAssistantMessageEvent(event: OmniServerEvent): event is VoiceAssistantMessageEvent {
 	return event.type === "assistant_message";
 }
 
 /**
  * Type guard for VoiceErrorEvent.
  */
-export function isVoiceErrorEvent(event: VoiceServerEvent): event is VoiceErrorEvent {
+export function isVoiceErrorEvent(event: OmniServerEvent): event is VoiceErrorEvent {
 	return event.type === "error";
 }
 
 /**
  * Type guard for VoiceSessionTimeoutEvent.
  */
-export function isVoiceSessionTimeoutEvent(event: VoiceServerEvent): event is VoiceSessionTimeoutEvent {
+export function isVoiceSessionTimeoutEvent(event: OmniServerEvent): event is VoiceSessionTimeoutEvent {
 	return event.type === "session_timeout";
 }
 

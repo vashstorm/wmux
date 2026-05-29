@@ -2,7 +2,7 @@ use serde::de::{Error as DeError, Unexpected};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::config::VoiceSkillConfig;
+use crate::config::OmniSkillConfig;
 
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not_found";
@@ -125,7 +125,7 @@ where
 /// Wire format uses snake_case to match Qwen API expectations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VoiceSkill {
+pub enum OmniSkill {
     /// Navigate frontend to a specific page/route.
     NavigateFrontend,
     /// Invoke a backend REST API route (with allowlist).
@@ -151,7 +151,7 @@ pub enum VoiceSkill {
 /// Used to identify which connection/session/window/pane an action targets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceTarget {
+pub struct OmniTarget {
     /// Target connection name (e.g., "local" or SSH host).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_name: Option<String>,
@@ -166,7 +166,7 @@ pub struct VoiceTarget {
     pub pane: Option<String>,
 }
 
-impl Default for VoiceTarget {
+impl Default for OmniTarget {
     fn default() -> Self {
         Self {
             target_name: None,
@@ -180,7 +180,7 @@ impl Default for VoiceTarget {
 /// Result of a voice-initiated action execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceActionResult {
+pub struct OmniActionResult {
     /// The skill that was executed.
     pub skill: String,
     /// Whether execution succeeded.
@@ -195,7 +195,7 @@ pub struct VoiceActionResult {
 /// Sent from frontend to backend during voice sessions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum VoiceClientMessage {
+pub enum OmniClientMessage {
     /// Send audio data to Qwen for processing.
     AudioFrame {
         /// PCM16 audio data encoded as base64.
@@ -233,7 +233,7 @@ pub enum VoiceClientMessage {
 /// Sent from backend to frontend during voice sessions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum VoiceServerEvent {
+pub enum OmniServerEvent {
     /// Voice session established successfully.
     Connected,
     /// Audio output from Qwen (TTS response).
@@ -325,7 +325,7 @@ pub const VOICE_BACKEND_ROUTES: [&str; 11] = [
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VoiceSkillRiskLevel {
+pub enum OmniSkillRiskLevel {
     Safe,
     Write,
     Dangerous,
@@ -334,14 +334,14 @@ pub enum VoiceSkillRiskLevel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BuiltInVoiceSkill {
+pub struct BuiltInOmniSkill {
     pub id: &'static str,
     pub default_name: &'static str,
     pub default_description: &'static str,
-    pub risk_level: VoiceSkillRiskLevel,
+    pub risk_level: OmniSkillRiskLevel,
 }
 
-pub const VALID_VOICE_SKILL_IDS: [&str; 9] = [
+pub const VALID_OMNI_SKILL_IDS: [&str; 9] = [
     "navigate_frontend",
     "invoke_backend_route",
     "list_sessions",
@@ -353,68 +353,68 @@ pub const VALID_VOICE_SKILL_IDS: [&str; 9] = [
     "cancel_action",
 ];
 
-pub const BUILT_IN_VOICE_SKILLS: [BuiltInVoiceSkill; 9] = [
-    BuiltInVoiceSkill {
+pub const BUILT_IN_OMNI_SKILLS: [BuiltInOmniSkill; 9] = [
+    BuiltInOmniSkill {
         id: "navigate_frontend",
         default_name: "Navigate Frontend",
         default_description: "Navigate the frontend UI to a specific page. Allowed routes: home, settings, projects, connections, session, window, pane.",
-        risk_level: VoiceSkillRiskLevel::Safe,
+        risk_level: OmniSkillRiskLevel::Safe,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "invoke_backend_route",
         default_name: "Invoke Backend Route",
         default_description: "Invoke a backend REST API route. Only read-only routes are allowed for safety.",
-        risk_level: VoiceSkillRiskLevel::Dynamic,
+        risk_level: OmniSkillRiskLevel::Dynamic,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "list_sessions",
         default_name: "List Sessions",
         default_description: "List all tmux sessions for a target connection.",
-        risk_level: VoiceSkillRiskLevel::Safe,
+        risk_level: OmniSkillRiskLevel::Safe,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "create_session",
         default_name: "Create Session",
         default_description: "Create a new tmux session on a target connection.",
-        risk_level: VoiceSkillRiskLevel::Write,
+        risk_level: OmniSkillRiskLevel::Write,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "rename_session",
         default_name: "Rename Session",
         default_description: "Rename an existing tmux session.",
-        risk_level: VoiceSkillRiskLevel::Write,
+        risk_level: OmniSkillRiskLevel::Write,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "delete_session",
         default_name: "Delete Session",
         default_description: "Delete a tmux session. WARNING: This is a destructive operation that requires confirmation.",
-        risk_level: VoiceSkillRiskLevel::Dangerous,
+        risk_level: OmniSkillRiskLevel::Dangerous,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "send_to_pane",
         default_name: "Send To Pane",
         default_description: "Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=true, control=true, or multiline=true, this is dangerous and requires confirmation.",
-        risk_level: VoiceSkillRiskLevel::Dynamic,
+        risk_level: OmniSkillRiskLevel::Dynamic,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "confirm_action",
         default_name: "Confirm Action",
         default_description: "Confirm a pending dangerous action using the confirmation ID provided by the intent_received event.",
-        risk_level: VoiceSkillRiskLevel::FlowControl,
+        risk_level: OmniSkillRiskLevel::FlowControl,
     },
-    BuiltInVoiceSkill {
+    BuiltInOmniSkill {
         id: "cancel_action",
         default_name: "Cancel Action",
         default_description: "Cancel a pending dangerous action using the confirmation ID.",
-        risk_level: VoiceSkillRiskLevel::FlowControl,
+        risk_level: OmniSkillRiskLevel::FlowControl,
     },
 ];
 
-pub fn built_in_voice_skill(id: &str) -> Option<&'static BuiltInVoiceSkill> {
-    BUILT_IN_VOICE_SKILLS.iter().find(|skill| skill.id == id)
+pub fn built_in_omni_skill(id: &str) -> Option<&'static BuiltInOmniSkill> {
+    BUILT_IN_OMNI_SKILLS.iter().find(|skill| skill.id == id)
 }
 
-pub fn voice_skill_enabled(skill_overlay: &[VoiceSkillConfig], skill_id: &str) -> bool {
+pub fn omni_skill_enabled(skill_overlay: &[OmniSkillConfig], skill_id: &str) -> bool {
     skill_overlay
         .iter()
         .find(|skill| skill.id == skill_id)
@@ -422,7 +422,7 @@ pub fn voice_skill_enabled(skill_overlay: &[VoiceSkillConfig], skill_id: &str) -
         .unwrap_or(true)
 }
 
-fn voice_skill_description<'a>(skill_overlay: &'a [VoiceSkillConfig], skill_id: &str) -> &'a str {
+fn omni_skill_description<'a>(skill_overlay: &'a [OmniSkillConfig], skill_id: &str) -> &'a str {
     skill_overlay
         .iter()
         .find(|skill| skill.id == skill_id)
@@ -434,7 +434,7 @@ fn voice_skill_description<'a>(skill_overlay: &'a [VoiceSkillConfig], skill_id: 
             }
         })
         .unwrap_or_else(|| {
-            built_in_voice_skill(skill_id)
+            built_in_omni_skill(skill_id)
                 .expect("built-in voice skill must exist")
                 .default_description
         })
@@ -444,13 +444,13 @@ fn voice_skill_description<'a>(skill_overlay: &'a [VoiceSkillConfig], skill_id: 
 ///
 /// Returns JSON array of tool definitions compatible with Qwen Realtime API.
 /// Each tool has: type="function", name (snake_case), description, parameters (JSON Schema).
-pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json::Value> {
+pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json::Value> {
     let mut tools = vec![
         // navigate_frontend
         serde_json::json!({
             "type": "function",
             "name": "navigate_frontend",
-            "description": voice_skill_description(skill_overlay, "navigate_frontend"),
+            "description": omni_skill_description(skill_overlay, "navigate_frontend"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -467,7 +467,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "invoke_backend_route",
-            "description": voice_skill_description(skill_overlay, "invoke_backend_route"),
+            "description": omni_skill_description(skill_overlay, "invoke_backend_route"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -489,7 +489,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "list_sessions",
-            "description": voice_skill_description(skill_overlay, "list_sessions"),
+            "description": omni_skill_description(skill_overlay, "list_sessions"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -505,7 +505,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "create_session",
-            "description": voice_skill_description(skill_overlay, "create_session"),
+            "description": omni_skill_description(skill_overlay, "create_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -525,7 +525,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "rename_session",
-            "description": voice_skill_description(skill_overlay, "rename_session"),
+            "description": omni_skill_description(skill_overlay, "rename_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -549,7 +549,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "delete_session",
-            "description": voice_skill_description(skill_overlay, "delete_session"),
+            "description": omni_skill_description(skill_overlay, "delete_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -569,7 +569,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "send_to_pane",
-            "description": voice_skill_description(skill_overlay, "send_to_pane"),
+            "description": omni_skill_description(skill_overlay, "send_to_pane"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -621,7 +621,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "confirm_action",
-            "description": voice_skill_description(skill_overlay, "confirm_action"),
+            "description": omni_skill_description(skill_overlay, "confirm_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -638,7 +638,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
         serde_json::json!({
             "type": "function",
             "name": "cancel_action",
-            "description": voice_skill_description(skill_overlay, "cancel_action"),
+            "description": omni_skill_description(skill_overlay, "cancel_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -655,7 +655,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
     tools.retain(|tool| {
         tool["name"]
             .as_str()
-            .map(|skill_id| voice_skill_enabled(skill_overlay, skill_id))
+            .map(|skill_id| omni_skill_enabled(skill_overlay, skill_id))
             .unwrap_or(false)
     });
     tools
@@ -664,7 +664,7 @@ pub fn generate_qwen_tools(skill_overlay: &[VoiceSkillConfig]) -> Vec<serde_json
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::VoiceSkillConfig;
+    use crate::config::OmniSkillConfig;
 
     #[test]
     fn protocol_terminal_message_round_trips() {
@@ -727,33 +727,33 @@ mod tests {
     #[test]
     fn voice_skill_serializes_to_snake_case() {
         assert_eq!(
-            serde_json::to_value(VoiceSkill::NavigateFrontend).expect("serialize"),
+            serde_json::to_value(OmniSkill::NavigateFrontend).expect("serialize"),
             serde_json::json!("navigate_frontend")
         );
         assert_eq!(
-            serde_json::to_value(VoiceSkill::InvokeBackendRoute).expect("serialize"),
+            serde_json::to_value(OmniSkill::InvokeBackendRoute).expect("serialize"),
             serde_json::json!("invoke_backend_route")
         );
         assert_eq!(
-            serde_json::to_value(VoiceSkill::DeleteSession).expect("serialize"),
+            serde_json::to_value(OmniSkill::DeleteSession).expect("serialize"),
             serde_json::json!("delete_session")
         );
     }
 
     #[test]
     fn voice_skill_deserializes_from_snake_case() {
-        let skill: VoiceSkill =
+        let skill: OmniSkill =
             serde_json::from_value(serde_json::json!("navigate_frontend")).expect("deserialize");
-        assert_eq!(skill, VoiceSkill::NavigateFrontend);
+        assert_eq!(skill, OmniSkill::NavigateFrontend);
 
-        let skill: VoiceSkill =
+        let skill: OmniSkill =
             serde_json::from_value(serde_json::json!("send_to_pane")).expect("deserialize");
-        assert_eq!(skill, VoiceSkill::SendToPane);
+        assert_eq!(skill, OmniSkill::SendToPane);
     }
 
     #[test]
     fn voice_skill_unknown_rejected() {
-        let result: Result<VoiceSkill, _> =
+        let result: Result<OmniSkill, _> =
             serde_json::from_value(serde_json::json!("run_arbitrary_shell"));
         assert!(result.is_err(), "unknown skill should be rejected");
     }
@@ -761,26 +761,26 @@ mod tests {
     #[test]
     fn voice_client_message_round_trips() {
         let messages = [
-            VoiceClientMessage::AudioFrame {
+            OmniClientMessage::AudioFrame {
                 pcm16_base64: "BASE64_AUDIO_DATA".to_string(),
                 sample_rate: 16000,
             },
-            VoiceClientMessage::TextMessage {
+            OmniClientMessage::TextMessage {
                 text: "hello from keyboard".to_string(),
             },
-            VoiceClientMessage::ConfirmAction {
+            OmniClientMessage::ConfirmAction {
                 confirmation_id: "uuid-confirmation-id".to_string(),
             },
-            VoiceClientMessage::CancelAction {
+            OmniClientMessage::CancelAction {
                 confirmation_id: "uuid-confirmation-id".to_string(),
             },
-            VoiceClientMessage::StopListening,
-            VoiceClientMessage::StartListening,
+            OmniClientMessage::StopListening,
+            OmniClientMessage::StartListening,
         ];
 
         for message in messages {
             let json = serde_json::to_string(&message).expect("serialize");
-            let decoded: VoiceClientMessage = serde_json::from_str(&json).expect("deserialize");
+            let decoded: OmniClientMessage = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(decoded, message);
         }
     }
@@ -789,7 +789,7 @@ mod tests {
     fn voice_client_message_json_shape() {
         // AudioFrame with camelCase field names
         assert_eq!(
-            serde_json::to_value(VoiceClientMessage::AudioFrame {
+            serde_json::to_value(OmniClientMessage::AudioFrame {
                 pcm16_base64: "audio".to_string(),
                 sample_rate: 16000,
             })
@@ -802,7 +802,7 @@ mod tests {
         );
 
         assert_eq!(
-            serde_json::to_value(VoiceClientMessage::TextMessage {
+            serde_json::to_value(OmniClientMessage::TextMessage {
                 text: "hello".to_string(),
             })
             .expect("serialize"),
@@ -814,7 +814,7 @@ mod tests {
 
         // ConfirmAction with camelCase confirmationId
         assert_eq!(
-            serde_json::to_value(VoiceClientMessage::ConfirmAction {
+            serde_json::to_value(OmniClientMessage::ConfirmAction {
                 confirmation_id: "abc123".to_string(),
             })
             .expect("serialize"),
@@ -828,50 +828,50 @@ mod tests {
     #[test]
     fn voice_server_event_round_trips() {
         let events = [
-            VoiceServerEvent::Connected,
-            VoiceServerEvent::AudioDelta {
+            OmniServerEvent::Connected,
+            OmniServerEvent::AudioDelta {
                 pcm16_base64: "AUDIO_OUTPUT".to_string(),
                 sample_rate: 24000,
             },
-            VoiceServerEvent::TranscriptDelta {
+            OmniServerEvent::TranscriptDelta {
                 text: "Hello".to_string(),
             },
-            VoiceServerEvent::TranscriptDone {
+            OmniServerEvent::TranscriptDone {
                 text: "Hello world".to_string(),
             },
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 skill: "list_sessions".to_string(),
                 params: serde_json::json!({ "target_name": "local" }),
                 confirmation_required: false,
                 confirmation_id: None,
             },
-            VoiceServerEvent::ActionResult {
+            OmniServerEvent::ActionResult {
                 skill: "list_sessions".to_string(),
                 success: true,
                 error: None,
             },
-            VoiceServerEvent::AssistantMessage {
+            OmniServerEvent::AssistantMessage {
                 text: "Done".to_string(),
             },
-            VoiceServerEvent::Error {
+            OmniServerEvent::Error {
                 code: "voice_disabled".to_string(),
                 message: "Voice feature is not enabled".to_string(),
             },
-            VoiceServerEvent::SessionTimeout {
+            OmniServerEvent::SessionTimeout {
                 remaining_seconds: 30,
             },
         ];
 
         for event in events {
             let json = serde_json::to_string(&event).expect("serialize");
-            let decoded: VoiceServerEvent = serde_json::from_str(&json).expect("deserialize");
+            let decoded: OmniServerEvent = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(decoded, event);
         }
     }
 
     #[test]
     fn voice_server_event_intent_received_with_confirmation() {
-        let event = VoiceServerEvent::IntentReceived {
+        let event = OmniServerEvent::IntentReceived {
             skill: "delete_session".to_string(),
             params: serde_json::json!({ "target_name": "local", "session_name": "test" }),
             confirmation_required: true,
@@ -879,7 +879,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&event).expect("serialize");
-        let decoded: VoiceServerEvent = serde_json::from_str(&json).expect("deserialize");
+        let decoded: OmniServerEvent = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(decoded, event);
 
         // Verify JSON shape with camelCase fields
@@ -892,14 +892,14 @@ mod tests {
 
     #[test]
     fn voice_server_event_action_result_with_error() {
-        let event = VoiceServerEvent::ActionResult {
+        let event = OmniServerEvent::ActionResult {
             skill: "delete_session".to_string(),
             success: false,
             error: Some("Session not found".to_string()),
         };
 
         let json = serde_json::to_string(&event).expect("serialize");
-        let decoded: VoiceServerEvent = serde_json::from_str(&json).expect("deserialize");
+        let decoded: OmniServerEvent = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(decoded, event);
 
         // Verify error field is present when there's an error
@@ -910,7 +910,7 @@ mod tests {
     #[test]
     fn voice_server_event_skips_none_fields() {
         // ActionResult with no error should not have error field in JSON
-        let event = VoiceServerEvent::ActionResult {
+        let event = OmniServerEvent::ActionResult {
             skill: "list_sessions".to_string(),
             success: true,
             error: None,
@@ -923,7 +923,7 @@ mod tests {
         );
 
         // IntentReceived without confirmation should not have confirmationId
-        let event = VoiceServerEvent::IntentReceived {
+        let event = OmniServerEvent::IntentReceived {
             skill: "list_sessions".to_string(),
             params: serde_json::json!({}),
             confirmation_required: false,
@@ -939,7 +939,7 @@ mod tests {
 
     #[test]
     fn voice_target_default() {
-        let target = VoiceTarget::default();
+        let target = OmniTarget::default();
         assert_eq!(target.target_name, None);
         assert_eq!(target.session, None);
         assert_eq!(target.window, None);
@@ -948,7 +948,7 @@ mod tests {
 
     #[test]
     fn voice_target_serializes_with_camel_case() {
-        let target = VoiceTarget {
+        let target = OmniTarget {
             target_name: Some("local".to_string()),
             session: Some("main".to_string()),
             window: Some("0".to_string()),
@@ -964,7 +964,7 @@ mod tests {
 
     #[test]
     fn voice_action_result_serializes_with_camel_case() {
-        let result = VoiceActionResult {
+        let result = OmniActionResult {
             skill: "delete_session".to_string(),
             success: true,
             error: None,
@@ -1080,7 +1080,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_omits_disabled_skills() {
-        let tools = generate_qwen_tools(&[VoiceSkillConfig {
+        let tools = generate_qwen_tools(&[OmniSkillConfig {
             id: "delete_session".to_string(),
             enabled: false,
             description: String::new(),
@@ -1093,7 +1093,7 @@ mod tests {
 
     #[test]
     fn generate_qwen_tools_uses_description_overrides() {
-        let tools = generate_qwen_tools(&[VoiceSkillConfig {
+        let tools = generate_qwen_tools(&[OmniSkillConfig {
             id: "list_sessions".to_string(),
             enabled: true,
             description: "List active workspaces for the current machine.".to_string(),

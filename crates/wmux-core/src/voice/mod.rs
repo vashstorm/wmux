@@ -12,7 +12,7 @@ pub mod policy;
 pub use audit::{
     ActionResult, AuditEntry, AuditLogger, ConfirmationState as AuditConfirmationState,
 };
-pub use executor::{VoiceExecutorError, VoiceSkillExecution, VoiceSkillExecutor};
+pub use executor::{OmniExecutorError, OmniSkillExecution, OmniSkillExecutor};
 pub use policy::{
     ActionRiskLevel, ConfirmationState, DangerousAction, PendingConfirmation, classify_risk_level,
     is_dangerous,

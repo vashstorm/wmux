@@ -203,21 +203,22 @@ export interface AppConfig {
 		rotationSizeBytes?: number;
 		retentionDays?: number;
 	};
-	voice?: VoiceConfig;
+	voice?: OmniConfig;
 }
 
-export interface VoiceSkillConfig {
+export interface OmniSkillConfig {
 	id: string;
 	enabled: boolean;
 	description: string;
 }
 
-export interface VoiceConfig {
+export interface OmniConfig {
 	enabled: boolean;
-	dashscopeApiKeyConfigured: boolean;
+	dashscopeApiKeyConfigured?: boolean;
+	dashscopeApiKey?: string;
 	microphoneDisabled: boolean;
 	voice?: string;
-	skills: VoiceSkillConfig[];
+	skills: OmniSkillConfig[];
 	model: string;
 	endpoint: string;
 	continuousListening: boolean;
@@ -227,7 +228,7 @@ export interface VoiceConfig {
 	vadThreshold: number;
 }
 
-export interface VoiceConversationMessage {
+export interface OmniConversationMessage {
 	id: string;
 	conversationId: string;
 	role: string;
@@ -241,8 +242,8 @@ export interface VoiceConversationMessage {
  createdAt: string;
 }
 
-export interface VoiceHistoryListResponse {
-	data: VoiceConversationMessage[];
+export interface OmniHistoryListResponse {
+	data: OmniConversationMessage[];
 }
 
 export interface ErrorLogsResponse {
@@ -836,13 +837,13 @@ export async function cleanupAiStats(query: Pick<AiStatsQuery, "projectId"> = {}
 
 // --- Voice History client functions ---
 
-export interface VoiceHistoryQuery {
+export interface OmniHistoryQuery {
 	conversationId: string;
 	limit?: number;
 	before?: string;
 }
 
-export async function getVoiceHistory(query: VoiceHistoryQuery): Promise<VoiceConversationMessage[]> {
+export async function getOmniHistory(query: OmniHistoryQuery): Promise<OmniConversationMessage[]> {
 	const params = new URLSearchParams();
 	params.set("conversationId", query.conversationId);
 	if (query.limit !== undefined) {
@@ -851,11 +852,11 @@ export async function getVoiceHistory(query: VoiceHistoryQuery): Promise<VoiceCo
 	if (query.before) {
 		params.set("before", query.before);
 	}
-	const response = (await apiFetch(`/api/voice/history?${params.toString()}`)) as VoiceHistoryListResponse;
+	const response = (await apiFetch(`/api/voice/history?${params.toString()}`)) as OmniHistoryListResponse;
 	return response.data ?? [];
 }
 
-export async function clearVoiceHistory(): Promise<void> {
+export async function clearOmniHistory(): Promise<void> {
 	await apiFetch("/api/voice/history", {
 		method: "DELETE",
 	});

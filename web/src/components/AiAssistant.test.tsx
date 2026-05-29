@@ -13,11 +13,11 @@ const voiceClientMocks = vi.hoisted(() => ({
 
 vi.mock("../api/client.js", () => ({
 	getConfig: vi.fn(),
-	getVoiceHistory: vi.fn(),
+	getOmniHistory: vi.fn(),
 }));
 
 vi.mock("../api/voiceClient.js", () => ({
-	VoiceWebSocket: vi.fn().mockImplementation(() => ({
+	OmniWebSocket: vi.fn().mockImplementation(() => ({
 		connect: voiceClientMocks.connect,
 		send: voiceClientMocks.send,
 		close: voiceClientMocks.close,
@@ -64,7 +64,7 @@ beforeEach(() => {
 			vadThreshold: 50,
 		},
 	});
-	vi.mocked(client.getVoiceHistory).mockResolvedValue([]);
+	vi.mocked(client.getOmniHistory).mockResolvedValue([]);
 });
 
 function renderWithProvider() {
@@ -107,7 +107,7 @@ describe("AiAssistant", () => {
 
 	test("shows start button when idle", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("idle");
+			ctx.setOmniStatus("idle");
 		});
 		showAssistant();
 
@@ -117,27 +117,27 @@ describe("AiAssistant", () => {
 
 	test("shows transcript when present", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceTranscript("hello world");
+			ctx.setOmniTranscript("hello world");
 		});
 		showAssistant();
 
 		expect(screen.getByText("hello world")).toBeInTheDocument();
 	});
 
-	test("shows error message when voiceError is set", () => {
+	test("shows error message when omniError is set", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("error");
-			ctx.setVoiceError("Microphone access denied");
+			ctx.setOmniStatus("error");
+			ctx.setOmniError("Microphone access denied");
 		});
 		showAssistant();
 
 		expect(screen.getByText("Microphone access denied")).toBeInTheDocument();
 	});
 
-	test("shows confirmation prompt when voicePendingConfirmation is set", () => {
+	test("shows confirmation prompt when omniPendingConfirmation is set", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("confirming");
-			ctx.setVoiceConfirmation({ confirmationId: "c1", skill: "send_to_pane" });
+			ctx.setOmniStatus("confirming");
+			ctx.setOmniConfirmation({ confirmationId: "c1", skill: "send_to_pane" });
 		});
 		showAssistant();
 
@@ -153,9 +153,9 @@ describe("AiAssistant", () => {
 		expect(screen.getByText("Voice is disabled")).toBeInTheDocument();
 	});
 
-	test("shows status label matching voiceStatus", () => {
+	test("shows status label matching omniStatus", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("listening");
+			ctx.setOmniStatus("listening");
 		});
 		showAssistant();
 
@@ -241,7 +241,7 @@ describe("AiAssistant", () => {
 			},
 		});
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("idle");
+			ctx.setOmniStatus("idle");
 		});
 		showAssistant();
 		const btn = await screen.findByRole("button", { name: /start listening/i });
@@ -249,7 +249,7 @@ describe("AiAssistant", () => {
 	});
 
 	test("shows history list when messages are loaded", async () => {
-		vi.mocked(client.getVoiceHistory).mockResolvedValueOnce([
+		vi.mocked(client.getOmniHistory).mockResolvedValueOnce([
 			{
 				id: "msg-1",
 				conversationId: "default",
@@ -277,7 +277,7 @@ describe("AiAssistant", () => {
 
 	test("sends typed text messages", () => {
 		renderWithStateSetup((ctx) => {
-			ctx.setVoiceStatus("idle");
+			ctx.setOmniStatus("idle");
 		});
 		showAssistant();
 

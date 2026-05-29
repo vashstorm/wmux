@@ -1,26 +1,26 @@
 import { getWebSocketUrl } from "./runtime.js";
-import type { VoiceClientMessage, VoiceServerEvent } from "./voiceTypes.js";
+import type { OmniClientMessage, OmniServerEvent } from "./voiceTypes.js";
 
-export interface VoiceWebSocketOptions {
+export interface OmniWebSocketOptions {
 	token: string;
-	onMessage: (event: VoiceServerEvent) => void;
+	onMessage: (event: OmniServerEvent) => void;
 	onOpen?: () => void;
 	onClose?: () => void;
 	onError?: (error: Event) => void;
 }
 
-export class VoiceWebSocket {
+export class OmniWebSocket {
 	private ws: WebSocket | null = null;
-	private options: VoiceWebSocketOptions;
+	private options: OmniWebSocketOptions;
 	private writeLock = false;
-	private writeQueue: VoiceClientMessage[] = [];
+	private writeQueue: OmniClientMessage[] = [];
 	private reconnectAttempts = 0;
 	private maxReconnectAttempts = 3;
 	private reconnectDelay = 1000;
 	private closed = false;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-	constructor(options: VoiceWebSocketOptions) {
+	constructor(options: OmniWebSocketOptions) {
 		this.options = options;
 	}
 
@@ -43,7 +43,7 @@ export class VoiceWebSocket {
 
 		this.ws.onmessage = (event) => {
 			try {
-				const message = JSON.parse(event.data as string) as VoiceServerEvent;
+				const message = JSON.parse(event.data as string) as OmniServerEvent;
 				this.options.onMessage(message);
 			} catch {
 				void 0;
@@ -84,7 +84,7 @@ export class VoiceWebSocket {
 		this.writeLock = false;
 	}
 
-	send(message: VoiceClientMessage): void {
+	send(message: OmniClientMessage): void {
 		if (this.closed) {
 			return;
 		}

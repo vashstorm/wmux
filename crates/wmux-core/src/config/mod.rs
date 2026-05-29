@@ -10,7 +10,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::protocol::VALID_VOICE_SKILL_IDS;
+use crate::protocol::VALID_OMNI_SKILL_IDS;
 
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
@@ -19,14 +19,14 @@ const MIN_UI_FONT_SIZE: u16 = 12;
 const MAX_UI_FONT_SIZE: u16 = 24;
 const MIN_TERMINAL_FONT_SIZE: u16 = 8;
 const MAX_TERMINAL_FONT_SIZE: u16 = 32;
-const MAX_VOICE_NAME_LEN: usize = 64;
+const MAX_OMNI_NAME_LEN: usize = 64;
 const VALID_TERMINAL_FONT_WEIGHTS: &[&str] = &[
     "normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900",
 ];
-const VALID_VOICE_MODELS: &[&str] = &["qwen3.5-omni-flash-realtime", "qwen3.5-omni-plus-realtime"];
-const VALID_VOICE_ENDPOINT_HOSTS: &[&str] =
+const VALID_OMNI_MODELS: &[&str] = &["qwen3.5-omni-flash-realtime", "qwen3.5-omni-plus-realtime"];
+const VALID_OMNI_ENDPOINT_HOSTS: &[&str] =
     &["dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com"];
-const VALID_VOICE_ENDPOINT_PATH: &str = "/api-ws/v1/realtime";
+const VALID_OMNI_ENDPOINT_PATH: &str = "/api-ws/v1/realtime";
 
 pub type Result<T> = std::result::Result<T, ConfigError>;
 
@@ -51,15 +51,15 @@ pub enum ConfigError {
     #[error("path is empty or missing")]
     PathMissing,
     #[error("dashscope API key is required when voice is enabled")]
-    VoiceApiKeyRequired,
+    OmniApiKeyRequired,
     #[error("invalid voice model: {0}")]
-    InvalidVoiceModel(String),
+    InvalidOmniModel(String),
     #[error("invalid voice endpoint: {0}")]
-    InvalidVoiceEndpoint(String),
+    InvalidOmniEndpoint(String),
     #[error("invalid voice name: {0}")]
-    InvalidVoiceName(String),
+    InvalidOmniName(String),
     #[error("invalid voice skill id: {0}")]
-    InvalidVoiceSkillId(String),
+    InvalidOmniSkillId(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,8 +83,8 @@ pub struct Config {
     pub intelligence: IntelligenceConfig,
     #[serde(default)]
     pub logs: LogsConfig,
-    #[serde(default)]
-    pub voice: VoiceConfig,
+    #[serde(default, rename = "voice")]
+    pub omni: OmniConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -209,7 +209,7 @@ pub struct IntelligenceConfig {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceConfig {
+pub struct OmniConfig {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -219,26 +219,26 @@ pub struct VoiceConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub skills: Vec<VoiceSkillConfig>,
-    #[serde(default = "default_voice_model")]
+    pub skills: Vec<OmniSkillConfig>,
+    #[serde(default = "default_omni_model")]
     pub model: String,
-    #[serde(default = "default_voice_endpoint")]
+    #[serde(default = "default_omni_endpoint")]
     pub endpoint: String,
-    #[serde(default = "default_voice_continuous_listening")]
+    #[serde(default = "default_omni_continuous_listening")]
     pub continuous_listening: bool,
     #[serde(default)]
     pub store_raw_audio: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audit_log_path: Option<String>,
-    #[serde(default = "default_voice_vad_enabled")]
+    #[serde(default = "default_omni_vad_enabled")]
     pub vad_enabled: bool,
-    #[serde(default = "default_voice_vad_threshold")]
+    #[serde(default = "default_omni_vad_threshold")]
     pub vad_threshold: f32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceSkillConfig {
+pub struct OmniSkillConfig {
     #[serde(default)]
     pub id: String,
     #[serde(default)]
@@ -271,27 +271,27 @@ impl Config {
         Err(ConfigError::AuthTokenRequired)
     }
 
-    pub fn validate_voice(&self) -> Result<()> {
-        for skill in &self.voice.skills {
-            if !VALID_VOICE_SKILL_IDS.contains(&skill.id.as_str()) {
-                return Err(ConfigError::InvalidVoiceSkillId(skill.id.clone()));
+    pub fn validate_omni(&self) -> Result<()> {
+        for skill in &self.omni.skills {
+            if !VALID_OMNI_SKILL_IDS.contains(&skill.id.as_str()) {
+                return Err(ConfigError::InvalidOmniSkillId(skill.id.clone()));
             }
         }
 
-        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
-            return Err(ConfigError::InvalidVoiceModel(self.voice.model.clone()));
+        if !VALID_OMNI_MODELS.contains(&self.omni.model.as_str()) {
+            return Err(ConfigError::InvalidOmniModel(self.omni.model.clone()));
         }
 
-        validate_voice_endpoint(&self.voice.endpoint)?;
-        validate_voice_name(self.voice.voice.as_deref())?;
+        validate_omni_endpoint(&self.omni.endpoint)?;
+        validate_omni_name(self.omni.voice.as_deref())?;
 
-        if !self.voice.enabled {
+        if !self.omni.enabled {
             return Ok(());
         }
 
-        match &self.voice.dashscope_api_key {
+        match &self.omni.dashscope_api_key {
             Some(key) if !key.trim().is_empty() => {}
-            _ => return Err(ConfigError::VoiceApiKeyRequired),
+            _ => return Err(ConfigError::OmniApiKeyRequired),
         }
 
         Ok(())
@@ -397,16 +397,16 @@ impl Config {
             provider.base_url = provider.base_url.trim().to_string();
         }
 
-        if self.voice.model.trim().is_empty() {
-            self.voice.model = default_voice_model();
+        if self.omni.model.trim().is_empty() {
+            self.omni.model = default_omni_model();
         }
-        if self.voice.endpoint.trim().is_empty() {
-            self.voice.endpoint = default_voice_endpoint();
+        if self.omni.endpoint.trim().is_empty() {
+            self.omni.endpoint = default_omni_endpoint();
         }
-        if !VALID_VOICE_MODELS.contains(&self.voice.model.as_str()) {
-            self.voice.model = default_voice_model();
+        if !VALID_OMNI_MODELS.contains(&self.omni.model.as_str()) {
+            self.omni.model = default_omni_model();
         }
-        self.voice.vad_threshold = self.voice.vad_threshold.clamp(0.0, 1.0);
+        self.omni.vad_threshold = self.omni.vad_threshold.clamp(0.0, 1.0);
     }
 }
 
@@ -422,7 +422,7 @@ impl Default for Config {
             ui: UIConfig::default(),
             intelligence: IntelligenceConfig::default(),
             logs: LogsConfig::default(),
-            voice: VoiceConfig::default(),
+            omni: OmniConfig::default(),
         };
         config.normalize();
         config
@@ -467,7 +467,7 @@ impl Default for LogsConfig {
     }
 }
 
-impl Default for VoiceConfig {
+impl Default for OmniConfig {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -475,13 +475,13 @@ impl Default for VoiceConfig {
             microphone_disabled: false,
             voice: None,
             skills: Vec::new(),
-            model: default_voice_model(),
-            endpoint: default_voice_endpoint(),
-            continuous_listening: default_voice_continuous_listening(),
+            model: default_omni_model(),
+            endpoint: default_omni_endpoint(),
+            continuous_listening: default_omni_continuous_listening(),
             store_raw_audio: false,
             audit_log_path: None,
-            vad_enabled: default_voice_vad_enabled(),
-            vad_threshold: default_voice_vad_threshold(),
+            vad_enabled: default_omni_vad_enabled(),
+            vad_threshold: default_omni_vad_threshold(),
         }
     }
 }
@@ -767,32 +767,32 @@ pub fn is_localhost_bind(bind: &str) -> bool {
     }
 }
 
-fn validate_voice_endpoint(endpoint: &str) -> Result<()> {
+fn validate_omni_endpoint(endpoint: &str) -> Result<()> {
     let parsed = Url::parse(endpoint)
-        .map_err(|_| ConfigError::InvalidVoiceEndpoint(endpoint.to_string()))?;
+        .map_err(|_| ConfigError::InvalidOmniEndpoint(endpoint.to_string()))?;
     if parsed.scheme() != "wss" {
-        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+        return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     }
-    if parsed.path() != VALID_VOICE_ENDPOINT_PATH {
-        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+    if parsed.path() != VALID_OMNI_ENDPOINT_PATH {
+        return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     }
 
     let Some(host) = parsed.host_str() else {
-        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+        return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     };
     if host.eq_ignore_ascii_case("localhost") {
-        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+        return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     }
     if let Ok(ip) = host.parse::<IpAddr>() {
         if is_loopback_or_private(ip) {
-            return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+            return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
         }
     }
-    if !VALID_VOICE_ENDPOINT_HOSTS
+    if !VALID_OMNI_ENDPOINT_HOSTS
         .iter()
         .any(|allowed| host.eq_ignore_ascii_case(allowed))
     {
-        return Err(ConfigError::InvalidVoiceEndpoint(endpoint.to_string()));
+        return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     }
 
     Ok(())
@@ -805,18 +805,18 @@ fn is_loopback_or_private(ip: IpAddr) -> bool {
     }
 }
 
-fn validate_voice_name(voice: Option<&str>) -> Result<()> {
+fn validate_omni_name(voice: Option<&str>) -> Result<()> {
     let Some(voice) = voice else {
         return Ok(());
     };
-    if voice.is_empty() || voice.len() > MAX_VOICE_NAME_LEN {
-        return Err(ConfigError::InvalidVoiceName(voice.to_string()));
+    if voice.is_empty() || voice.len() > MAX_OMNI_NAME_LEN {
+        return Err(ConfigError::InvalidOmniName(voice.to_string()));
     }
     if !voice
         .chars()
         .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
     {
-        return Err(ConfigError::InvalidVoiceName(voice.to_string()));
+        return Err(ConfigError::InvalidOmniName(voice.to_string()));
     }
 
     Ok(())
@@ -1055,23 +1055,23 @@ fn default_log_retention_days() -> u64 {
     14
 }
 
-fn default_voice_model() -> String {
+fn default_omni_model() -> String {
     "qwen3.5-omni-flash-realtime".to_string()
 }
 
-fn default_voice_endpoint() -> String {
+fn default_omni_endpoint() -> String {
     "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime".to_string()
 }
 
-fn default_voice_continuous_listening() -> bool {
+fn default_omni_continuous_listening() -> bool {
     true
 }
 
-fn default_voice_vad_enabled() -> bool {
+fn default_omni_vad_enabled() -> bool {
     true
 }
 
-fn default_voice_vad_threshold() -> f32 {
+fn default_omni_vad_threshold() -> f32 {
     0.5
 }
 
@@ -1367,27 +1367,27 @@ mod tests {
     }
 
     #[test]
-    fn voice_config_defaults_to_disabled() {
+    fn omni_config_defaults_to_disabled() {
         let config = Config::default();
-        assert!(!config.voice.enabled);
-        assert_eq!(config.voice.dashscope_api_key, None);
-        assert!(!config.voice.microphone_disabled);
-        assert_eq!(config.voice.voice, None);
-        assert!(config.voice.skills.is_empty());
-        assert_eq!(config.voice.model, "qwen3.5-omni-flash-realtime");
+        assert!(!config.omni.enabled);
+        assert_eq!(config.omni.dashscope_api_key, None);
+        assert!(!config.omni.microphone_disabled);
+        assert_eq!(config.omni.voice, None);
+        assert!(config.omni.skills.is_empty());
+        assert_eq!(config.omni.model, "qwen3.5-omni-flash-realtime");
         assert_eq!(
-            config.voice.endpoint,
+            config.omni.endpoint,
             "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
         );
-        assert!(config.voice.continuous_listening);
-        assert!(!config.voice.store_raw_audio);
-        assert_eq!(config.voice.audit_log_path, None);
-        assert!(config.voice.vad_enabled);
-        assert_eq!(config.voice.vad_threshold, 0.5);
+        assert!(config.omni.continuous_listening);
+        assert!(!config.omni.store_raw_audio);
+        assert_eq!(config.omni.audit_log_path, None);
+        assert!(config.omni.vad_enabled);
+        assert_eq!(config.omni.vad_threshold, 0.5);
     }
 
     #[test]
-    fn voice_config_old_shape_loads_new_defaults() {
+    fn omni_config_old_shape_loads_new_defaults() {
         let data = r#"{
           "voice": {
             "enabled": false,
@@ -1396,17 +1396,17 @@ mod tests {
         }"#;
         let config = parse_config(data).expect("parse config");
 
-        assert!(!config.voice.microphone_disabled);
-        assert_eq!(config.voice.voice, None);
-        assert!(config.voice.skills.is_empty());
+        assert!(!config.omni.microphone_disabled);
+        assert_eq!(config.omni.voice, None);
+        assert!(config.omni.skills.is_empty());
     }
 
     #[test]
-    fn voice_config_serializes_new_camel_case_fields() {
+    fn omni_config_serializes_new_camel_case_fields() {
         let mut config = Config::default();
-        config.voice.microphone_disabled = true;
-        config.voice.voice = Some("Cherry".to_string());
-        config.voice.skills = vec![VoiceSkillConfig {
+        config.omni.microphone_disabled = true;
+        config.omni.voice = Some("Cherry".to_string());
+        config.omni.skills = vec![OmniSkillConfig {
             id: "session.switch".to_string(),
             enabled: true,
             description: "Switch sessions".to_string(),
@@ -1425,7 +1425,7 @@ mod tests {
     }
 
     #[test]
-    fn voice_config_rejects_invalid_endpoints() {
+    fn omni_config_rejects_invalid_endpoints() {
         for endpoint in [
             "http://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "ws://dashscope.aliyuncs.com/api-ws/v1/realtime",
@@ -1439,14 +1439,14 @@ mod tests {
             "wss://evil.example.test/api-ws/v1/realtime",
         ] {
             let mut config = Config::default();
-            config.voice.enabled = true;
-            config.voice.dashscope_api_key = Some("test-key".to_string());
-            config.voice.endpoint = endpoint.to_string();
+            config.omni.enabled = true;
+            config.omni.dashscope_api_key = Some("test-key".to_string());
+            config.omni.endpoint = endpoint.to_string();
 
             assert!(
                 matches!(
-                    config.validate_voice(),
-                    Err(ConfigError::InvalidVoiceEndpoint(_))
+                    config.validate_omni(),
+                    Err(ConfigError::InvalidOmniEndpoint(_))
                 ),
                 "endpoint should be rejected: {endpoint}"
             );
@@ -1454,113 +1454,113 @@ mod tests {
     }
 
     #[test]
-    fn voice_config_accepts_dashscope_endpoints() {
+    fn omni_config_accepts_dashscope_endpoints() {
         for endpoint in [
             "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
             "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime",
         ] {
             let mut config = Config::default();
-            config.voice.enabled = true;
-            config.voice.dashscope_api_key = Some("test-key".to_string());
-            config.voice.endpoint = endpoint.to_string();
+            config.omni.enabled = true;
+            config.omni.dashscope_api_key = Some("test-key".to_string());
+            config.omni.endpoint = endpoint.to_string();
 
-            config.validate_voice().expect("valid endpoint should pass");
+            config.validate_omni().expect("valid endpoint should pass");
         }
     }
 
     #[test]
-    fn voice_config_rejects_unknown_skill_ids() {
+    fn omni_config_rejects_unknown_skill_ids() {
         let mut config = Config::default();
-        config.voice.skills = vec![VoiceSkillConfig {
+        config.omni.skills = vec![OmniSkillConfig {
             id: "run_arbitrary_shell".to_string(),
             enabled: true,
             description: String::new(),
         }];
 
         assert!(matches!(
-            config.validate_voice(),
-            Err(ConfigError::InvalidVoiceSkillId(id)) if id == "run_arbitrary_shell"
+            config.validate_omni(),
+            Err(ConfigError::InvalidOmniSkillId(id)) if id == "run_arbitrary_shell"
         ));
     }
 
     #[test]
-    fn voice_config_validates_voice_name() {
+    fn omni_config_validates_voice_name() {
         let mut config = Config::default();
-        config.voice.enabled = true;
-        config.voice.dashscope_api_key = Some("test-key".to_string());
-        config.voice.voice = Some("Cherry_01".to_string());
-        config.validate_voice().expect("valid voice should pass");
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = Some("test-key".to_string());
+        config.omni.voice = Some("Cherry_01".to_string());
+        config.validate_omni().expect("valid voice should pass");
 
-        config.voice.voice = Some("bad voice!".to_string());
+        config.omni.voice = Some("bad voice!".to_string());
         assert!(matches!(
-            config.validate_voice(),
-            Err(ConfigError::InvalidVoiceName(_))
+            config.validate_omni(),
+            Err(ConfigError::InvalidOmniName(_))
         ));
 
-        config.voice.voice = Some("a".repeat(65));
+        config.omni.voice = Some("a".repeat(65));
         assert!(matches!(
-            config.validate_voice(),
-            Err(ConfigError::InvalidVoiceName(_))
+            config.validate_omni(),
+            Err(ConfigError::InvalidOmniName(_))
         ));
     }
 
     #[test]
-    fn voice_config_enabled_requires_api_key() {
+    fn omni_config_enabled_requires_api_key() {
         let mut config = Config::default();
-        config.voice.enabled = true;
-        config.voice.dashscope_api_key = None;
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = None;
         let err = config
-            .validate_voice()
+            .validate_omni()
             .expect_err("enabled voice without key should fail");
-        assert!(matches!(err, ConfigError::VoiceApiKeyRequired));
+        assert!(matches!(err, ConfigError::OmniApiKeyRequired));
 
-        config.voice.dashscope_api_key = Some(String::new());
+        config.omni.dashscope_api_key = Some(String::new());
         let err = config
-            .validate_voice()
+            .validate_omni()
             .expect_err("enabled voice with empty key should fail");
-        assert!(matches!(err, ConfigError::VoiceApiKeyRequired));
+        assert!(matches!(err, ConfigError::OmniApiKeyRequired));
 
-        config.voice.dashscope_api_key = Some("valid-key".to_string());
+        config.omni.dashscope_api_key = Some("valid-key".to_string());
         config
-            .validate_voice()
+            .validate_omni()
             .expect("enabled voice with valid key should pass");
     }
 
     #[test]
-    fn voice_config_validates_model() {
+    fn omni_config_validates_model() {
         let mut config = Config::default();
-        config.voice.enabled = true;
-        config.voice.dashscope_api_key = Some("test-key".to_string());
-        config.voice.model = "invalid-model".to_string();
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = Some("test-key".to_string());
+        config.omni.model = "invalid-model".to_string();
         let err = config
-            .validate_voice()
+            .validate_omni()
             .expect_err("invalid voice model should fail");
-        assert!(matches!(err, ConfigError::InvalidVoiceModel(_)));
+        assert!(matches!(err, ConfigError::InvalidOmniModel(_)));
 
-        config.voice.model = "qwen3.5-omni-flash-realtime".to_string();
+        config.omni.model = "qwen3.5-omni-flash-realtime".to_string();
         config
-            .validate_voice()
+            .validate_omni()
             .expect("valid flash model should pass");
 
-        config.voice.model = "qwen3.5-omni-plus-realtime".to_string();
+        config.omni.model = "qwen3.5-omni-plus-realtime".to_string();
         config
-            .validate_voice()
+            .validate_omni()
             .expect("valid plus model should pass");
     }
 
     #[test]
-    fn voice_config_omitted_enabled_defaults_to_disabled() {
+    fn omni_config_omitted_enabled_defaults_to_disabled() {
         let data = r#"{
           "voice": {
             "dashscopeApiKey": "test-key"
           }
         }"#;
         let config = parse_config(data).expect("parse config");
-        assert!(!config.voice.enabled);
+        assert!(!config.omni.enabled);
     }
 
     #[test]
-    fn voice_config_deserializes_from_jsonc() {
+    fn omni_config_deserializes_from_jsonc() {
         let data = r#"{
           "voice": {
             "enabled": true,
@@ -1575,17 +1575,17 @@ mod tests {
           }
         }"#;
         let config = parse_config(data).expect("parse config");
-        assert!(config.voice.enabled);
-        assert_eq!(config.voice.dashscope_api_key, Some("sk-test".to_string()));
-        assert_eq!(config.voice.model, "qwen3.5-omni-plus-realtime");
-        assert_eq!(config.voice.endpoint, "wss://custom.endpoint.com");
-        assert!(!config.voice.continuous_listening);
-        assert!(config.voice.store_raw_audio);
+        assert!(config.omni.enabled);
+        assert_eq!(config.omni.dashscope_api_key, Some("sk-test".to_string()));
+        assert_eq!(config.omni.model, "qwen3.5-omni-plus-realtime");
+        assert_eq!(config.omni.endpoint, "wss://custom.endpoint.com");
+        assert!(!config.omni.continuous_listening);
+        assert!(config.omni.store_raw_audio);
         assert_eq!(
-            config.voice.audit_log_path,
+            config.omni.audit_log_path,
             Some("/var/log/voice.log".to_string())
         );
-        assert!(!config.voice.vad_enabled);
-        assert_eq!(config.voice.vad_threshold, 0.7);
+        assert!(!config.omni.vad_enabled);
+        assert_eq!(config.omni.vad_threshold, 0.7);
     }
 }

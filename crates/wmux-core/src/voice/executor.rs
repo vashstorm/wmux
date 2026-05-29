@@ -6,10 +6,10 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use crate::config::VoiceSkillConfig;
+use crate::config::OmniSkillConfig;
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
-use crate::protocol::{VOICE_FRONTEND_ROUTES, VoiceServerEvent, VoiceSkill, voice_skill_enabled};
+use crate::protocol::{VOICE_FRONTEND_ROUTES, OmniServerEvent, OmniSkill, omni_skill_enabled};
 use crate::state::AppState;
 use crate::tmux::{Adapter, TmuxError};
 use crate::voice::audit::{
@@ -21,12 +21,12 @@ use crate::voice::policy::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct VoiceExecutorError {
+pub struct OmniExecutorError {
     pub code: String,
     pub message: String,
 }
 
-impl VoiceExecutorError {
+impl OmniExecutorError {
     fn bad_request(message: impl Into<String>) -> Self {
         Self {
             code: "bad_request".to_string(),
@@ -49,17 +49,17 @@ impl VoiceExecutorError {
     }
 }
 
-impl std::fmt::Display for VoiceExecutorError {
+impl std::fmt::Display for OmniExecutorError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{}: {}", self.code, self.message)
     }
 }
 
-impl std::error::Error for VoiceExecutorError {}
+impl std::error::Error for OmniExecutorError {}
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct VoiceSkillExecution {
-    pub event: VoiceServerEvent,
+pub struct OmniSkillExecution {
+    pub event: OmniServerEvent,
     pub output: Value,
 }
 
@@ -71,14 +71,14 @@ struct BackendRoute {
     is_write: bool,
 }
 
-pub struct VoiceSkillExecutor {
+pub struct OmniSkillExecutor {
     state: AppState,
     confirmation_state: ConfirmationState,
     audit_logger: AuditLogger,
     actor_id: String,
 }
 
-impl VoiceSkillExecutor {
+impl OmniSkillExecutor {
     pub fn new(state: AppState) -> Self {
         Self::with_components(
             state,
@@ -108,9 +108,9 @@ impl VoiceSkillExecutor {
 
     pub async fn execute_skill(
         &self,
-        skill: VoiceSkill,
+        skill: OmniSkill,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         self.execute(skill_name(&skill), params).await
     }
 
@@ -118,7 +118,7 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         self.execute_with_overlay(skill, params, &[]).await
     }
 
@@ -126,8 +126,8 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-        skill_overlay: &[VoiceSkillConfig],
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+        skill_overlay: &[OmniSkillConfig],
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let start = Instant::now();
         let result = self
             .execute_unconfirmed(skill, params.clone(), skill_overlay)
@@ -141,7 +141,7 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         confirmation_id: Uuid,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let start = Instant::now();
         let params = self
             .confirmation_state
@@ -158,10 +158,10 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-        skill_overlay: &[VoiceSkillConfig],
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
-        if !voice_skill_enabled(skill_overlay, skill) {
-            return Err(VoiceExecutorError::bad_request("skill is disabled"));
+        skill_overlay: &[OmniSkillConfig],
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        if !omni_skill_enabled(skill_overlay, skill) {
+            return Err(OmniExecutorError::bad_request("skill is disabled"));
         }
 
         match skill {
@@ -172,7 +172,7 @@ impl VoiceSkillExecutor {
             "rename_session" => self.rename_session(params).await,
             "delete_session" => self.delete_session(params, false).await,
             "send_to_pane" => self.send_to_pane(params, false).await,
-            other => Err(VoiceExecutorError::bad_request(format!(
+            other => Err(OmniExecutorError::bad_request(format!(
                 "unsupported voice skill: {other}"
             ))),
         }
@@ -182,12 +182,12 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         match skill {
             "invoke_backend_route" => self.invoke_backend_route(params, true).await,
             "delete_session" => self.delete_session(params, true).await,
             "send_to_pane" => self.send_to_pane(params, true).await,
-            other => Err(VoiceExecutorError::bad_request(format!(
+            other => Err(OmniExecutorError::bad_request(format!(
                 "skill does not support confirmation: {other}"
             ))),
         }
@@ -196,21 +196,21 @@ impl VoiceSkillExecutor {
     async fn navigate_frontend(
         &self,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let route = required_string(&params, "route")?;
         if !VOICE_FRONTEND_ROUTES.contains(&route.as_str()) {
-            return Err(VoiceExecutorError::bad_request(format!(
+            return Err(OmniExecutorError::bad_request(format!(
                 "frontend route not allowed: {route}"
             )));
         }
 
-        let event = VoiceServerEvent::IntentReceived {
+        let event = OmniServerEvent::IntentReceived {
             skill: "navigate_frontend".to_string(),
             params: json!({ "route": route }),
             confirmation_required: false,
             confirmation_id: None,
         };
-        Ok(VoiceSkillExecution {
+        Ok(OmniSkillExecution {
             event,
             output: json!({ "success": true, "route": route }),
         })
@@ -219,7 +219,7 @@ impl VoiceSkillExecutor {
     async fn list_sessions(
         &self,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string(&params, "target_name")?;
         self.execute_backend_request(
             "list_sessions",
@@ -233,7 +233,7 @@ impl VoiceSkillExecutor {
     async fn create_session(
         &self,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string(&params, "target_name")?;
         let session_name = required_string(&params, "session_name")?;
         self.execute_backend_request(
@@ -248,7 +248,7 @@ impl VoiceSkillExecutor {
     async fn rename_session(
         &self,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string(&params, "target_name")?;
         let session = required_string_alias(&params, &["session", "old_name", "session_name"])?;
         let new_name = required_string(&params, "new_name")?;
@@ -269,7 +269,7 @@ impl VoiceSkillExecutor {
         &self,
         params: Value,
         confirmed: bool,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         if !confirmed && is_dangerous("delete_session", &params) {
             return self.confirmation_required("delete_session", params).await;
         }
@@ -293,7 +293,7 @@ impl VoiceSkillExecutor {
         &self,
         params: Value,
         confirmed: bool,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string_alias(&params, &["target_name", "targetName"])?;
         let session = required_string_alias(&params, &["session", "session_name", "sessionName"])?;
         let window = required_string_alias(&params, &["window", "window_name", "windowName"])?;
@@ -326,7 +326,7 @@ impl VoiceSkillExecutor {
             .await
             .map_err(tmux_error)?;
         if !panes.iter().any(|pane_info| pane_matches(pane_info, &pane)) {
-            return Err(VoiceExecutorError::not_found(format!(
+            return Err(OmniExecutorError::not_found(format!(
                 "pane not found: {target_name}/{session}/{window}/{pane}"
             )));
         }
@@ -338,8 +338,8 @@ impl VoiceSkillExecutor {
             .await
             .map_err(tmux_error)?;
 
-        Ok(VoiceSkillExecution {
-            event: VoiceServerEvent::ActionResult {
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
                 skill: "send_to_pane".to_string(),
                 success: true,
                 error: None,
@@ -361,10 +361,10 @@ impl VoiceSkillExecutor {
         &self,
         params: Value,
         confirmed: bool,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let route_id = required_string(&params, "route_id")?;
         let route = backend_route(&route_id).ok_or_else(|| {
-            VoiceExecutorError::bad_request(format!("backend route not allowed: {route_id}"))
+            OmniExecutorError::bad_request(format!("backend route not allowed: {route_id}"))
         })?;
         let route_params = params.get("params").cloned().unwrap_or_else(|| json!({}));
 
@@ -389,13 +389,13 @@ impl VoiceSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let confirmation = self
             .confirmation_state
             .request_confirmation(skill.to_string(), params.clone())
             .await;
-        Ok(VoiceSkillExecution {
-            event: VoiceServerEvent::IntentReceived {
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::IntentReceived {
                 skill: skill.to_string(),
                 params,
                 confirmation_required: true,
@@ -415,30 +415,30 @@ impl VoiceSkillExecutor {
         method: Method,
         path: String,
         body: Option<Value>,
-    ) -> Result<VoiceSkillExecution, VoiceExecutorError> {
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let request = self.internal_request(method, &path, body)?;
         let response = crate::routes::router(self.state.clone())
             .oneshot(request)
             .await
-            .map_err(|error| VoiceExecutorError::bad_request(error.to_string()))?;
+            .map_err(|error| OmniExecutorError::bad_request(error.to_string()))?;
 
         let status = response.status();
         let bytes = to_bytes(response.into_body(), 1024 * 1024)
             .await
-            .map_err(|error| VoiceExecutorError::bad_request(error.to_string()))?;
+            .map_err(|error| OmniExecutorError::bad_request(error.to_string()))?;
         let body = if bytes.is_empty() {
             Value::Null
         } else {
             serde_json::from_slice(&bytes)
-                .map_err(|error| VoiceExecutorError::bad_request(error.to_string()))?
+                .map_err(|error| OmniExecutorError::bad_request(error.to_string()))?
         };
 
         if !status.is_success() {
             return Err(error_from_response(status, body));
         }
 
-        Ok(VoiceSkillExecution {
-            event: VoiceServerEvent::ActionResult {
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
                 skill: skill.to_string(),
                 success: true,
                 error: None,
@@ -452,13 +452,13 @@ impl VoiceSkillExecutor {
         method: Method,
         path: &str,
         body: Option<Value>,
-    ) -> Result<Request<Body>, VoiceExecutorError> {
+    ) -> Result<Request<Body>, OmniExecutorError> {
         let mut builder = Request::builder().method(method).uri(path);
         let token = self
             .state
             .store
             .snapshot()
-            .map_err(|_| VoiceExecutorError::bad_request("failed to read configuration"))?
+            .map_err(|_| OmniExecutorError::bad_request("failed to read configuration"))?
             .auth
             .token
             .trim()
@@ -474,7 +474,7 @@ impl VoiceSkillExecutor {
                 Some(value) => Body::from(value.to_string()),
                 None => Body::empty(),
             })
-            .map_err(|error| VoiceExecutorError::bad_request(error.to_string()))
+            .map_err(|error| OmniExecutorError::bad_request(error.to_string()))
     }
 
     async fn audit(
@@ -482,7 +482,7 @@ impl VoiceSkillExecutor {
         skill: &str,
         params: &Value,
         target: String,
-        result: &Result<VoiceSkillExecution, VoiceExecutorError>,
+        result: &Result<OmniSkillExecution, OmniExecutorError>,
         confirmed: bool,
         start: Instant,
     ) {
@@ -525,7 +525,7 @@ impl VoiceSkillExecutor {
         self.audit_logger.log_action(&entry).await;
     }
 
-    fn tmux_adapter_for_target(&self, target_name: &str) -> Result<Adapter, VoiceExecutorError> {
+    fn tmux_adapter_for_target(&self, target_name: &str) -> Result<Adapter, OmniExecutorError> {
         if target_name != "local" {
             let connection = find_connection(&self.state, target_name).map_err(api_error)?;
             require_local_connection(&connection).map_err(api_error)?;
@@ -535,17 +535,17 @@ impl VoiceSkillExecutor {
     }
 }
 
-fn skill_name(skill: &VoiceSkill) -> &'static str {
+fn skill_name(skill: &OmniSkill) -> &'static str {
     match skill {
-        VoiceSkill::NavigateFrontend => "navigate_frontend",
-        VoiceSkill::InvokeBackendRoute => "invoke_backend_route",
-        VoiceSkill::ListSessions => "list_sessions",
-        VoiceSkill::CreateSession => "create_session",
-        VoiceSkill::RenameSession => "rename_session",
-        VoiceSkill::DeleteSession => "delete_session",
-        VoiceSkill::SendToPane => "send_to_pane",
-        VoiceSkill::ConfirmAction => "confirm_action",
-        VoiceSkill::CancelAction => "cancel_action",
+        OmniSkill::NavigateFrontend => "navigate_frontend",
+        OmniSkill::InvokeBackendRoute => "invoke_backend_route",
+        OmniSkill::ListSessions => "list_sessions",
+        OmniSkill::CreateSession => "create_session",
+        OmniSkill::RenameSession => "rename_session",
+        OmniSkill::DeleteSession => "delete_session",
+        OmniSkill::SendToPane => "send_to_pane",
+        OmniSkill::ConfirmAction => "confirm_action",
+        OmniSkill::CancelAction => "cancel_action",
     }
 }
 
@@ -624,7 +624,7 @@ fn backend_route(route_id: &str) -> Option<BackendRoute> {
 fn route_request(
     route: &BackendRoute,
     params: &Value,
-) -> Result<(String, Option<Value>), VoiceExecutorError> {
+) -> Result<(String, Option<Value>), OmniExecutorError> {
     match route.id {
         "connections.list" => Ok(("/api/connections".to_string(), None)),
         "sessions.list" => {
@@ -756,25 +756,25 @@ fn route_request(
                 None,
             ))
         }
-        _ => Err(VoiceExecutorError::bad_request(format!(
+        _ => Err(OmniExecutorError::bad_request(format!(
             "backend route not allowed: {}",
             route.id
         ))),
     }
 }
 
-fn required_string(params: &Value, field: &'static str) -> Result<String, VoiceExecutorError> {
+fn required_string(params: &Value, field: &'static str) -> Result<String, OmniExecutorError> {
     value_as_string(params.get(field), field)
 }
 
 fn required_string_alias(
     params: &Value,
     fields: &[&'static str],
-) -> Result<String, VoiceExecutorError> {
+) -> Result<String, OmniExecutorError> {
     fields
         .iter()
         .find_map(|field| value_as_string(params.get(*field), field).ok())
-        .ok_or_else(|| VoiceExecutorError::bad_request(format!("{} is required", fields[0])))
+        .ok_or_else(|| OmniExecutorError::bad_request(format!("{} is required", fields[0])))
 }
 
 fn optional_string_alias(params: &Value, fields: &[&'static str]) -> Option<String> {
@@ -786,21 +786,21 @@ fn optional_string_alias(params: &Value, fields: &[&'static str]) -> Option<Stri
 fn value_as_string(
     value: Option<&Value>,
     field: &'static str,
-) -> Result<String, VoiceExecutorError> {
+) -> Result<String, OmniExecutorError> {
     match value {
         Some(Value::String(value)) if !value.trim().is_empty() => Ok(value.trim().to_string()),
         Some(Value::Number(value)) => Ok(value.to_string()),
-        _ => Err(VoiceExecutorError::bad_request(format!(
+        _ => Err(OmniExecutorError::bad_request(format!(
             "{field} is required"
         ))),
     }
 }
 
-fn required_text(params: &Value, field: &'static str) -> Result<String, VoiceExecutorError> {
+fn required_text(params: &Value, field: &'static str) -> Result<String, OmniExecutorError> {
     match params.get(field) {
         Some(Value::String(value)) if !value.trim().is_empty() => Ok(value.clone()),
         Some(Value::Number(value)) => Ok(value.to_string()),
-        _ => Err(VoiceExecutorError::bad_request(format!(
+        _ => Err(OmniExecutorError::bad_request(format!(
             "{field} is required"
         ))),
     }
@@ -827,7 +827,7 @@ fn send_keys_payload(
     control: bool,
     control_sequence: Option<&str>,
     multiline: bool,
-) -> Result<Vec<String>, VoiceExecutorError> {
+) -> Result<Vec<String>, OmniExecutorError> {
     let mut keys = Vec::new();
     if let Some(sequence) = control_sequence {
         keys.push(sequence.to_string());
@@ -850,7 +850,7 @@ fn send_keys_payload(
         keys.push("Enter".to_string());
     }
     if keys.is_empty() {
-        return Err(VoiceExecutorError::bad_request("text is required"));
+        return Err(OmniExecutorError::bad_request("text is required"));
     }
     Ok(keys)
 }
@@ -880,7 +880,7 @@ fn path_segment(value: &str) -> String {
     encoded
 }
 
-fn error_from_response(status: StatusCode, body: Value) -> VoiceExecutorError {
+fn error_from_response(status: StatusCode, body: Value) -> OmniExecutorError {
     let code = body
         .get("error")
         .and_then(|error| error.get("code"))
@@ -894,9 +894,9 @@ fn error_from_response(status: StatusCode, body: Value) -> VoiceExecutorError {
         .to_string();
 
     match code {
-        "not_found" => VoiceExecutorError::not_found(message),
-        "conflict" => VoiceExecutorError::conflict(message),
-        _ => VoiceExecutorError::bad_request(message),
+        "not_found" => OmniExecutorError::not_found(message),
+        "conflict" => OmniExecutorError::conflict(message),
+        _ => OmniExecutorError::bad_request(message),
     }
 }
 
@@ -908,37 +908,37 @@ fn status_error_code(status: StatusCode) -> &'static str {
     }
 }
 
-fn event_requires_confirmation(event: &VoiceServerEvent) -> bool {
+fn event_requires_confirmation(event: &OmniServerEvent) -> bool {
     matches!(
         event,
-        VoiceServerEvent::IntentReceived {
+        OmniServerEvent::IntentReceived {
             confirmation_required: true,
             ..
         }
     )
 }
 
-fn confirmation_error(error: ConfirmationError) -> VoiceExecutorError {
+fn confirmation_error(error: ConfirmationError) -> OmniExecutorError {
     match error {
-        ConfirmationError::NotFound(_) => VoiceExecutorError::not_found(error.to_string()),
+        ConfirmationError::NotFound(_) => OmniExecutorError::not_found(error.to_string()),
         ConfirmationError::Expired | ConfirmationError::InvalidState => {
-            VoiceExecutorError::bad_request(error.to_string())
+            OmniExecutorError::bad_request(error.to_string())
         }
     }
 }
 
-fn api_error(error: ApiError) -> VoiceExecutorError {
+fn api_error(error: ApiError) -> OmniExecutorError {
     match error.code() {
-        "not_found" => VoiceExecutorError::not_found(error.message().to_string()),
-        "conflict" => VoiceExecutorError::conflict(error.message().to_string()),
-        _ => VoiceExecutorError::bad_request(error.message().to_string()),
+        "not_found" => OmniExecutorError::not_found(error.message().to_string()),
+        "conflict" => OmniExecutorError::conflict(error.message().to_string()),
+        _ => OmniExecutorError::bad_request(error.message().to_string()),
     }
 }
 
-fn tmux_error(error: TmuxError) -> VoiceExecutorError {
+fn tmux_error(error: TmuxError) -> OmniExecutorError {
     match error.code() {
-        "not_found" => VoiceExecutorError::not_found(error.to_string()),
-        _ => VoiceExecutorError::bad_request(error.to_string()),
+        "not_found" => OmniExecutorError::not_found(error.to_string()),
+        _ => OmniExecutorError::bad_request(error.to_string()),
     }
 }
 
@@ -1010,7 +1010,7 @@ fn audit_target(params: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, VoiceSkillConfig};
+    use crate::config::{Config, OmniSkillConfig};
     use crate::logging::LoggingHandle;
     use crate::state::AppState;
     use std::fs;
@@ -1019,7 +1019,7 @@ mod tests {
     const TOKEN: &str = "executor-token";
 
     struct TestExecutor {
-        executor: VoiceSkillExecutor,
+        executor: OmniSkillExecutor,
         audit_path: PathBuf,
         tmux_log_path: PathBuf,
         _dir: tempfile::TempDir,
@@ -1053,7 +1053,7 @@ mod tests {
         .expect("write config");
         let store = Config::load(&config_path).expect("load config");
         let state = AppState::new(store, assets_dir, LoggingHandle::empty());
-        let executor = VoiceSkillExecutor::with_components(
+        let executor = OmniSkillExecutor::with_components(
             state,
             ConfirmationState::new(),
             AuditLogger::new(Some(audit_path.clone())),
@@ -1156,7 +1156,7 @@ esac
 
         assert_eq!(
             result.event,
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 skill: "navigate_frontend".to_string(),
                 params: json!({ "route": "settings" }),
                 confirmation_required: false,
@@ -1185,7 +1185,7 @@ esac
             .execute_with_overlay(
                 "navigate_frontend",
                 json!({ "route": "settings" }),
-                &[VoiceSkillConfig {
+                &[OmniSkillConfig {
                     id: "navigate_frontend".to_string(),
                     enabled: false,
                     description: String::new(),
@@ -1261,7 +1261,7 @@ esac
             .expect("pending delete");
 
         let confirmation_id = match pending.event {
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 confirmation_required: true,
                 confirmation_id: Some(id),
                 ..
@@ -1324,7 +1324,7 @@ esac
         assert!(tmux_log(&test).is_empty());
 
         let confirmation_id = match pending.event {
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 confirmation_required: true,
                 confirmation_id: Some(id),
                 ..
@@ -1387,7 +1387,7 @@ esac
 
         assert!(matches!(
             pending.event,
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 confirmation_required: true,
                 ..
             }
@@ -1454,7 +1454,7 @@ esac
 
         assert!(matches!(
             result.event,
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 confirmation_required: true,
                 ..
             }

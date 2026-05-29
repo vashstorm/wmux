@@ -714,20 +714,20 @@ describe("voice state", () => {
 		const state = useAppState();
 		return (
 			<div>
-				<span data-testid="voice-status">{state.voiceStatus}</span>
-				<span data-testid="voice-transcript">{state.voiceTranscript || "empty"}</span>
-				<span data-testid="voice-confirmation">{state.voicePendingConfirmation ? `${state.voicePendingConfirmation.confirmationId}:${state.voicePendingConfirmation.skill}` : "null"}</span>
-				<span data-testid="voice-error">{state.voiceError || "null"}</span>
-				<span data-testid="voice-history-count">{state.voiceHistory.length}</span>
-				<button data-testid="set-voice-listening" onClick={() => state.setVoiceStatus("listening")}>Set Listening</button>
-				<button data-testid="set-voice-error" onClick={() => state.setVoiceError("access denied")}>Set Error</button>
+				<span data-testid="voice-status">{state.omniStatus}</span>
+				<span data-testid="voice-transcript">{state.omniTranscript || "empty"}</span>
+				<span data-testid="voice-confirmation">{state.omniPendingConfirmation ? `${state.omniPendingConfirmation.confirmationId}:${state.omniPendingConfirmation.skill}` : "null"}</span>
+				<span data-testid="voice-error">{state.omniError || "null"}</span>
+				<span data-testid="voice-history-count">{state.omniHistory.length}</span>
+				<button data-testid="set-voice-listening" onClick={() => state.setOmniStatus("listening")}>Set Listening</button>
+				<button data-testid="set-voice-error" onClick={() => state.setOmniError("access denied")}>Set Error</button>
 				<button data-testid="append-transcript" onClick={() => state.appendVoiceTranscript("hello ")}>Append</button>
-				<button data-testid="set-transcript" onClick={() => state.setVoiceTranscript("done")}>Set Transcript</button>
-				<button data-testid="set-confirmation" onClick={() => state.setVoiceConfirmation({ confirmationId: "c1", skill: "send_to_pane" })}>Set Confirmation</button>
-				<button data-testid="clear-confirmation" onClick={() => state.setVoiceConfirmation(null)}>Clear Confirmation</button>
-				<button data-testid="clear-voice-error" onClick={() => state.setVoiceError(null)}>Clear Error</button>
-				<button data-testid="set-voice-history" onClick={() => state.setVoiceHistory([{ id: "m1", conversationId: "c1", role: "user", kind: "transcript", text: "test", createdAt: "2024-01-01T00:00:00Z" }])}>Set History</button>
-				<button data-testid="clear-voice-history" onClick={() => state.setVoiceHistory([])}>Clear History</button>
+				<button data-testid="set-transcript" onClick={() => state.setOmniTranscript("done")}>Set Transcript</button>
+				<button data-testid="set-confirmation" onClick={() => state.setOmniConfirmation({ confirmationId: "c1", skill: "send_to_pane" })}>Set Confirmation</button>
+				<button data-testid="clear-confirmation" onClick={() => state.setOmniConfirmation(null)}>Clear Confirmation</button>
+				<button data-testid="clear-voice-error" onClick={() => state.setOmniError(null)}>Clear Error</button>
+				<button data-testid="set-voice-history" onClick={() => state.setOmniHistory([{ id: "m1", conversationId: "c1", role: "user", kind: "transcript", text: "test", createdAt: "2024-01-01T00:00:00Z" }])}>Set History</button>
+				<button data-testid="clear-voice-history" onClick={() => state.setOmniHistory([])}>Clear History</button>
 			</div>
 		);
 	}
@@ -760,13 +760,13 @@ describe("voice state", () => {
 		expect(screen.getByTestId("voice-error").textContent).toBe("null");
 	});
 
-	test("setVoiceStatus updates status", () => {
+	test("setOmniStatus updates status", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-voice-listening"));
 		expect(screen.getByTestId("voice-status").textContent).toBe("listening");
 	});
 
-	test("setVoiceError updates error", () => {
+	test("setOmniError updates error", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-voice-error"));
 		expect(screen.getByTestId("voice-error").textContent).toBe("access denied");
@@ -780,14 +780,14 @@ describe("voice state", () => {
 		expect(screen.getByTestId("voice-transcript").textContent).toBe("hello hello ");
 	});
 
-	test("setVoiceTranscript replaces transcript", () => {
+	test("setOmniTranscript replaces transcript", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("append-transcript"));
 		fireEvent.click(screen.getByTestId("set-transcript"));
 		expect(screen.getByTestId("voice-transcript").textContent).toBe("done");
 	});
 
-	test("setVoiceConfirmation sets confirmation", () => {
+	test("setOmniConfirmation sets confirmation", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-confirmation"));
 		expect(screen.getByTestId("voice-confirmation").textContent).toBe("c1:send_to_pane");
@@ -814,7 +814,7 @@ describe("voice state", () => {
 		expect(screen.getByTestId("voice-history-count").textContent).toBe("0");
 	});
 
-	test("setVoiceHistory updates history", () => {
+	test("setOmniHistory updates history", () => {
 		renderWithProvider();
 		fireEvent.click(screen.getByTestId("set-voice-history"));
 		expect(screen.getByTestId("voice-history-count").textContent).toBe("1");

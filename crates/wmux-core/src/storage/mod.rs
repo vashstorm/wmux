@@ -9,7 +9,7 @@ pub mod voice_history;
 pub use ai_usage::AiUsageRepository;
 pub use models::*;
 pub use projects::{ProjectRepoError, ProjectRepository};
-pub use voice_history::{VoiceHistoryRepoError, VoiceHistoryRepository};
+pub use voice_history::{OmniHistoryRepoError, OmniHistoryRepository};
 
 #[cfg(test)]
 mod tests {

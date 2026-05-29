@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
-import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip } from "@mui/material";
-import { Add as AddIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Lan as LanIcon, Memory as MemoryIcon, Mic as MicIcon, Psychology as PsychologyIcon, SettingsOutlined as SettingsOutlinedIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon, Functions as FunctionsIcon } from "@mui/icons-material";
-import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type VoiceSkillConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearVoiceHistory } from "../api/client.js";
+import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip, SvgIcon } from "@mui/material";
+import { Add as AddIcon, Analytics as AnalyticsIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Extension as ExtensionIcon, Lan as LanIcon, Memory as MemoryIcon, SettingsOutlined as SettingsOutlinedIcon, SmartToy as SmartToyIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type OmniSkillConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearOmniHistory } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
@@ -37,17 +37,17 @@ interface SettingsFormState {
 	intelligenceMaxConcurrency: number;
 	intelligenceCacheTTLSec: number;
 	editingProvider: ProviderFormState | null;
-	voiceEnabled: boolean;
-	voiceEndpoint: string;
-	voiceSkInput: string;
-	voiceSkConfigured: boolean;
-	voiceModel: string;
-	voiceVoice: string;
-	voiceMicrophoneDisabled: boolean;
-	voiceSkills: VoiceSkillConfig[];
+	omniEnabled: boolean;
+	omniEndpoint: string;
+	omniSkValue: string;
+	omniSkConfigured: boolean;
+	omniModel: string;
+	omniVoice: string;
+	omniMicrophoneDisabled: boolean;
+	omniSkills: OmniSkillConfig[];
 }
 
-type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "voice" | "voice-skills";
+type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "omni" | "omni-skills";
 
 const SETTINGS_SECTIONS: Array<{
 	key: SettingsTabKey;
@@ -71,22 +71,22 @@ const SETTINGS_SECTIONS: Array<{
 	},
 	{
 		key: "intelligence",
-		label: "AI",
-		icon: PsychologyIcon,
+		label: "Window Analysis",
+		icon: AnalyticsIcon,
 	},
 	{
-		key: "voice",
-		label: "Voice",
-		icon: MicIcon,
+		key: "omni",
+		label: "AI Assistant",
+		icon: SmartToyIcon,
 	},
 	{
-		key: "voice-skills",
-		label: "Voice Skills",
-		icon: FunctionsIcon,
+		key: "omni-skills",
+		label: "Assistant Skills",
+		icon: ExtensionIcon,
 	},
 ];
 
-const BUILTIN_VOICE_SKILLS: VoiceSkillConfig[] = [
+const BUILTIN_OMNI_SKILLS: OmniSkillConfig[] = [
 	{ id: "navigate_frontend", enabled: true, description: "" },
 	{ id: "invoke_backend_route", enabled: true, description: "" },
 	{ id: "list_sessions", enabled: true, description: "" },
@@ -129,15 +129,15 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,
 		intelligenceCacheTTLSec: intel?.cacheTTLSec ?? 300,
 		editingProvider: null,
-		voiceEnabled: config.voice?.enabled ?? false,
-		voiceEndpoint: config.voice?.endpoint ?? "",
-		voiceSkInput: "",
-		voiceSkConfigured: config.voice?.dashscopeApiKeyConfigured ?? false,
-		voiceModel: config.voice?.model ?? "qwen3.5-omni-flash-realtime",
-		voiceVoice: config.voice?.voice ?? "",
-		voiceMicrophoneDisabled: config.voice?.microphoneDisabled ?? false,
-		voiceSkills: config.voice?.skills && config.voice.skills.length > 0 ? config.voice.skills : BUILTIN_VOICE_SKILLS,
-	};
+		omniEnabled: config.voice?.enabled ?? false,
+			omniEndpoint: config.voice?.endpoint ?? "",
+			omniSkConfigured: config.voice?.dashscopeApiKeyConfigured ?? false,
+		omniModel: config.voice?.model ?? "qwen3.5-omni-flash-realtime",
+		omniVoice: config.voice?.voice ?? "",
+		omniMicrophoneDisabled: config.voice?.microphoneDisabled ?? false,
+			omniSkills: config.voice?.skills && config.voice.skills.length > 0 ? config.voice.skills : BUILTIN_OMNI_SKILLS,
+			omniSkValue: "",
+		};
 }
 
 export function SettingsPanel() {
@@ -161,6 +161,7 @@ export function SettingsPanel() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [activeTab, setActiveTab] = useState<SettingsTabKey>("general");
+	const [omniSkShowPlain, setOmniSkShowPlain] = useState(false);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -168,14 +169,17 @@ export function SettingsPanel() {
 		}
 	}, [activeTab]);
 
+	const SK_STORAGE_KEY = "wmux-omni-sk";
 	const knownHostsPlaceholder = useMemo(() => "~/.ssh/known_hosts", []);
 
 	const loadConfig = async () => {
 		setIsLoading(true);
 		try {
 			const response = await getConfig();
+			const restoredSk = sessionStorage.getItem(SK_STORAGE_KEY) ?? "";
+			const baseState = buildFormState(response);
+			setFormState({ ...baseState, omniSkValue: restoredSk });
 			setConfig(response);
-			setFormState(buildFormState(response));
 			setConnections(response.connections);
 			setConfigConflict(null);
 		} catch (err) {
@@ -298,49 +302,57 @@ export function SettingsPanel() {
 				maxConcurrency: formState.intelligenceMaxConcurrency,
 				cacheTTLSec: formState.intelligenceCacheTTLSec,
 			},
-			voice: {
-				enabled: formState.voiceEnabled,
-				dashscopeApiKeyConfigured: formState.voiceSkConfigured || (formState.voiceSkInput.trim().length > 0),
-				microphoneDisabled: formState.voiceMicrophoneDisabled,
-				voice: formState.voiceVoice || undefined,
-				skills: formState.voiceSkills,
-				model: formState.voiceModel,
-				endpoint: formState.voiceEndpoint,
-				continuousListening: config.voice?.continuousListening ?? false,
-				storeRawAudio: config.voice?.storeRawAudio ?? false,
-				vadEnabled: config.voice?.vadEnabled ?? true,
-				vadThreshold: config.voice?.vadThreshold ?? 0.5,
-			},
+				voice: {
+					enabled: formState.omniEnabled,
+					dashscopeApiKeyConfigured: formState.omniSkConfigured || (formState.omniSkValue.trim().length > 0),
+					dashscopeApiKey: formState.omniSkValue.trim() || undefined,
+					microphoneDisabled: formState.omniMicrophoneDisabled,
+					voice: formState.omniVoice || undefined,
+					skills: formState.omniSkills,
+					model: formState.omniModel,
+					endpoint: formState.omniEndpoint,
+					continuousListening: config.voice?.continuousListening ?? false,
+					storeRawAudio: config.voice?.storeRawAudio ?? false,
+					vadEnabled: config.voice?.vadEnabled ?? true,
+					vadThreshold: config.voice?.vadThreshold ?? 0.5,
+				},
 		};
 	};
 
-	const performSave = async (payload: AppConfig) => {
-		setIsSaving(true);
-		try {
-			const saved = await updateConfig(payload);
-			const savedTheme = normalizeThemeId(saved.ui.theme);
-			const savedWindowTheme = normalizeThemeId(saved.ui.windowTheme, savedTheme);
-			setConfig(saved);
-			setFormState(buildFormState(saved));
-			setConnections(saved.connections);
+		const performSave = async (payload: AppConfig) => {
+			setIsSaving(true);
+			try {
+				const saved = await updateConfig(payload);
+				const savedTheme = normalizeThemeId(saved.ui.theme);
+				const savedWindowTheme = normalizeThemeId(saved.ui.windowTheme, savedTheme);
+				setConfig(saved);
+				if (formState?.omniSkValue.trim()) {
+					sessionStorage.setItem(SK_STORAGE_KEY, formState.omniSkValue.trim());
+				}
+				setFormState(buildFormState(saved));
+				setConnections(saved.connections);
 
-			const savedScaleStep = saved.ui.uiScaleStep !== undefined
-				? saved.ui.uiScaleStep
-				: saved.ui.fontSize !== undefined
-					? fontSizeToScaleStep(saved.ui.fontSize)
-					: DEFAULT_UI_SCALE_STEP;
+				const savedScaleStep = saved.ui.uiScaleStep !== undefined
+					? saved.ui.uiScaleStep
+					: saved.ui.fontSize !== undefined
+						? fontSizeToScaleStep(saved.ui.fontSize)
+						: DEFAULT_UI_SCALE_STEP;
 
-			applyUIScaleStep(savedScaleStep);
-			setUISettings({
-				theme: savedTheme,
-				windowTheme: savedWindowTheme,
-				uiScaleStep: savedScaleStep,
-				terminalFontSize: getTerminalFontPx(savedScaleStep),
-				terminalFontWeight: saved.ui.terminalFontWeight,
-			});
-			setConfigConflict(null);
-			setShowSettingsPanel(false);
-		} catch (err: unknown) {
+				applyUIScaleStep(savedScaleStep);
+				setUISettings({
+					theme: savedTheme,
+					windowTheme: savedWindowTheme,
+					uiScaleStep: savedScaleStep,
+					terminalFontSize: getTerminalFontPx(savedScaleStep),
+					terminalFontWeight: saved.ui.terminalFontWeight,
+				});
+				setConfigConflict(null);
+				setShowSettingsPanel(false);
+
+				if (formState?.tokenInput.trim()) {
+					sessionStorage.setItem("wmux-auth-token", formState.tokenInput.trim());
+				}
+			} catch (err: unknown) {
 			if (err instanceof ApiError && err.code === "conflict") {
 				setConfigConflict({
 					pendingConfig: payload,
@@ -466,9 +478,9 @@ export function SettingsPanel() {
 		closePanel();
 	};
 
-	const handleClearVoiceHistory = async () => {
+	const handleClearOmniHistory = async () => {
 		try {
-			await clearVoiceHistory();
+			await clearOmniHistory();
 		} catch {
 		}
 	};
@@ -782,7 +794,7 @@ export function SettingsPanel() {
 												{item.label}
 											</Typography>
 											<Typography variant="caption" color="text.secondary" className="settings-panel-subtitle" sx={{ display: "block", mt: 0.125, lineHeight: 1.2 }}>
-												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : item.key === "voice" ? (formState.voiceEnabled ? "Enabled" : "Disabled") : `${formState.voiceSkills.filter((s) => s.enabled).length}/${formState.voiceSkills.length}`}
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : item.key === "omni" ? (formState.omniEnabled ? "Enabled" : "Disabled") : `${formState.omniSkills.filter((s) => s.enabled).length}/${formState.omniSkills.length}`}
 											</Typography>
 										</Box>
 									</ListItemButton>
@@ -985,7 +997,7 @@ export function SettingsPanel() {
 								{activeTab === "intelligence" && (
 									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>AI Intelligence</Typography>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Window Analysis</Typography>
 											<FormControlLabel
 												control={
 													<Switch
@@ -999,10 +1011,10 @@ export function SettingsPanel() {
 														}}
 													/>
 												}
-												label="Enable AI Intelligence"
+												label="Enable Window Analysis"
 											/>
 											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, mb: 2 }} data-testid="intelligence-projects-context">
-												Projects use the active AI provider to generate AI-powered HTML summaries for your project dashboard.
+												Projects use the active AI provider to generate window analysis HTML summaries for your project dashboard.
 											</Typography>
 										</Box>
 
@@ -1262,27 +1274,27 @@ export function SettingsPanel() {
 									</Box>
 								)}
 
-								{activeTab === "voice" && (
+								{activeTab === "omni" && (
 									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Control</Typography>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>AI Assistant</Typography>
 											<FormControlLabel
 												control={
 													<Switch
-														id="voice-enabled"
-														checked={formState.voiceEnabled}
-														onChange={(event) => updateField("voiceEnabled", event.target.checked)}
+														id="omni-enabled"
+														checked={formState.omniEnabled}
+														onChange={(event) => updateField("omniEnabled", event.target.checked)}
 														slotProps={{
 															input: {
-																"data-testid": "voice-enabled-toggle",
+																"data-testid": "omni-enabled-toggle",
 															} as React.InputHTMLAttributes<HTMLInputElement>,
 														}}
 													/>
 												}
-												label="Enable Voice Control"
+												label="Enable AI Assistant"
 											/>
 											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, mb: 2 }}>
-												Voice control allows hands-free operation via Qwen3.5-Omni.
+												AI Assistant allows hands-free operation via Qwen3.5-Omni.
 											</Typography>
 										</Box>
 
@@ -1290,57 +1302,75 @@ export function SettingsPanel() {
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>API Configuration</Typography>
 											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
 												<TextField
-													id="voice-base-url"
+													id="omni-base-url"
 													label="Base URL"
 													type="text"
-													value={formState.voiceEndpoint}
-													onChange={(event) => updateField("voiceEndpoint", event.target.value)}
+													value={formState.omniEndpoint}
+													onChange={(event) => updateField("omniEndpoint", event.target.value)}
 													placeholder="wss://dashscope.aliyuncs.com/api-ws/v1/inference"
 													fullWidth
 													slotProps={{
 														htmlInput: {
-															"data-testid": "voice-base-url-input",
+															"data-testid": "omni-base-url-input",
 														},
 													}}
 												/>
 												<TextField
-													id="voice-model"
+													id="omni-model"
 													label="Model"
 													type="text"
-													value={formState.voiceModel}
-													onChange={(event) => updateField("voiceModel", event.target.value)}
+													value={formState.omniModel}
+													onChange={(event) => updateField("omniModel", event.target.value)}
 													placeholder="qwen3.5-omni-flash-realtime"
 													fullWidth
 													slotProps={{
 														htmlInput: {
-															"data-testid": "voice-model-input",
+															"data-testid": "omni-model-input",
 														},
 													}}
 												/>
 											</Box>
-											<TextField
-												id="voice-sk"
-												label="SK / API Key"
-												type="password"
-												value={formState.voiceSkInput}
-												onChange={(event) => updateField("voiceSkInput", event.target.value)}
-												placeholder={formState.voiceSkConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "sk-..."}
-												fullWidth
-												autoComplete="new-password"
-												className="password-input-wrapper"
-												sx={{ mt: 2 }}
-												slotProps={{
-													htmlInput: {
-														"data-testid": "voice-sk-input",
-													},
-												}}
-											/>
-											{formState.voiceSkConfigured && (
-												<Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-													SK configured. Enter a new value to replace it, or leave blank to keep existing.
-												</Typography>
-											)}
-										</Box>
+													<TextField
+														id="omni-sk"
+														label="SK / API Key"
+														type={omniSkShowPlain ? "text" : "password"}
+														value={formState.omniSkValue}
+														onChange={(event) => updateField("omniSkValue", event.target.value)}
+														placeholder={formState.omniSkConfigured && !formState.omniSkValue ? "•••••••• (configured)" : "sk-..."}
+														fullWidth
+														autoComplete="new-password"
+														className="password-input-wrapper"
+														sx={{ mt: 2 }}
+														slotProps={{
+															htmlInput: {
+																"data-testid": "omni-sk-input",
+															},
+															input: {
+																endAdornment: (
+																	<IconButton
+																		type="button"
+																		tabIndex={-1}
+																		onMouseDown={(e) => e.preventDefault()}
+																		onClick={() => setOmniSkShowPlain((v) => !v)}
+																		size="small"
+																		sx={{ mr: 0.5 }}
+																		aria-label={omniSkShowPlain ? "Hide API Key" : "Show API Key"}
+																	>
+																		{omniSkShowPlain ? (
+																			<SvgIcon fontSize="small">
+																				<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 001 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+																		</SvgIcon>
+																	) : (
+																		<SvgIcon fontSize="small">
+																			<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+																		</SvgIcon>
+																	)}
+																</IconButton>
+															),
+														},
+													}}
+													/>
+												</Box>
 
 										<Box>
 											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Settings</Typography>
@@ -1349,25 +1379,25 @@ export function SettingsPanel() {
 													id="voice-voice"
 													label="Voice / Timbre"
 													type="text"
-													value={formState.voiceVoice}
-													onChange={(event) => updateField("voiceVoice", event.target.value)}
+													value={formState.omniVoice}
+													onChange={(event) => updateField("omniVoice", event.target.value)}
 													placeholder="Chelsie"
 													fullWidth
 													slotProps={{
 														htmlInput: {
-															"data-testid": "voice-voice-input",
+															"data-testid": "omni-voice-input",
 														},
 													}}
 												/>
 												<FormControlLabel
 													control={
 														<Switch
-															id="voice-microphone-disabled"
-															checked={formState.voiceMicrophoneDisabled}
-															onChange={(event) => updateField("voiceMicrophoneDisabled", event.target.checked)}
+															id="omni-microphone-disabled"
+															checked={formState.omniMicrophoneDisabled}
+															onChange={(event) => updateField("omniMicrophoneDisabled", event.target.checked)}
 															slotProps={{
 																input: {
-																	"data-testid": "voice-microphone-disabled-toggle",
+																	"data-testid": "omni-microphone-disabled-toggle",
 																} as React.InputHTMLAttributes<HTMLInputElement>,
 															}}
 														/>
@@ -1384,10 +1414,10 @@ export function SettingsPanel() {
 												variant="outlined"
 												color="error"
 												onClick={() => {
-													void handleClearVoiceHistory();
+													void handleClearOmniHistory();
 												}}
 												startIcon={<DeleteIcon />}
-												data-testid="voice-history-clear"
+												data-testid="omni-history-clear"
 											>
 												CLEAR HISTORY
 											</Button>
@@ -1395,15 +1425,15 @@ export function SettingsPanel() {
 									</Box>
 								)}
 
-								{activeTab === "voice-skills" && (
+								{activeTab === "omni-skills" && (
 									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
 										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Skills</Typography>
+											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Assistant Skills</Typography>
 											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-												Configure which skills are available to the voice assistant. Each skill has a description used by the AI to determine when to invoke it.
+												Configure which skills are available to the AI assistant. Each skill has a description used by the AI to determine when to invoke it.
 											</Typography>
 											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-												{formState.voiceSkills.map((skill) => (
+												{formState.omniSkills.map((skill) => (
 													<Box
 														key={skill.id}
 														component="li"
@@ -1419,39 +1449,39 @@ export function SettingsPanel() {
 														}}
 													>
 														<Switch
-															id={`voice-skill-${skill.id}`}
+															id={`omni-skill-${skill.id}`}
 															checked={skill.enabled}
 															onChange={(event) => {
-																const updated = formState.voiceSkills.map((s) =>
+																const updated = formState.omniSkills.map((s) =>
 																	s.id === skill.id ? { ...s, enabled: event.target.checked } : s
 																);
-																updateField("voiceSkills", updated);
+																updateField("omniSkills", updated);
 															}}
 															size="small"
 															slotProps={{
 																input: {
-																	"data-testid": `voice-skill-${skill.id}-enabled`,
+																	"data-testid": `omni-skill-${skill.id}-enabled`,
 																} as React.InputHTMLAttributes<HTMLInputElement>,
 															}}
 															sx={{ mt: 0.25, flexShrink: 0 }}
 														/>
 														<TextField
-															id={`voice-skill-desc-${skill.id}`}
+															id={`omni-skill-desc-${skill.id}`}
 															label={skill.id}
 															type="text"
 															value={skill.description}
 															onChange={(event) => {
-																const updated = formState.voiceSkills.map((s) =>
+																const updated = formState.omniSkills.map((s) =>
 																	s.id === skill.id ? { ...s, description: event.target.value } : s
 																);
-																updateField("voiceSkills", updated);
+																updateField("omniSkills", updated);
 															}}
 															placeholder="Skill description..."
 															size="small"
 															fullWidth
 															slotProps={{
 																htmlInput: {
-																	"data-testid": `voice-skill-${skill.id}-description`,
+																	"data-testid": `omni-skill-${skill.id}-description`,
 																},
 															}}
 														/>

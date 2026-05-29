@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project, VoiceConversationMessage } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project, OmniConversationMessage } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
 import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE, clampUIScaleStep } from "../ui/fontSize.js";
 
@@ -135,18 +135,18 @@ function preservePaneGeometry(current: PaneData[] | undefined, next: PaneData[])
 	});
 }
 
-export type VoiceStatus = "disabled" | "idle" | "connecting" | "listening" | "processing" | "confirming" | "speaking" | "error";
+export type OmniStatus = "disabled" | "idle" | "connecting" | "listening" | "processing" | "confirming" | "speaking" | "error";
 
-export interface VoicePendingConfirmation {
+export interface OmniPendingConfirmation {
 	confirmationId: string;
 	skill: string;
 }
 
-export interface VoiceState {
-	voiceStatus: VoiceStatus;
-	voiceTranscript: string;
-	voicePendingConfirmation: VoicePendingConfirmation | null;
-	voiceError: string | null;
+export interface OmniState {
+	omniStatus: OmniStatus;
+	omniTranscript: string;
+	omniPendingConfirmation: OmniPendingConfirmation | null;
+	omniError: string | null;
 }
 
 export interface UISettings {
@@ -232,11 +232,11 @@ export interface AppState {
 	connectionHealth: Record<string, ConnectionHealth>;
 	editingConnection: ConnectionConfig | null;
 	uiSettings: UISettings;
-	voiceStatus: VoiceStatus;
-	voiceTranscript: string;
-	voicePendingConfirmation: VoicePendingConfirmation | null;
-	voiceError: string | null;
-	voiceHistory: VoiceConversationMessage[];
+	omniStatus: OmniStatus;
+	omniTranscript: string;
+	omniPendingConfirmation: OmniPendingConfirmation | null;
+	omniError: string | null;
+	omniHistory: OmniConversationMessage[];
 }
 
 export interface ConfigConflictState {
@@ -275,12 +275,12 @@ interface AppContextValue extends AppState {
 	setConnectionHealth: (health: Record<string, ConnectionHealth>) => void;
 	setEditingConnection: (connection: ConnectionConfig | null) => void;
 	setUISettings: (settings: UISettings) => void;
-	setVoiceStatus: (status: VoiceStatus) => void;
+	setOmniStatus: (status: OmniStatus) => void;
 	appendVoiceTranscript: (text: string) => void;
-	setVoiceTranscript: (text: string) => void;
-	setVoiceConfirmation: (confirmation: VoicePendingConfirmation | null) => void;
-	setVoiceError: (error: string | null) => void;
-	setVoiceHistory: (history: VoiceConversationMessage[]) => void;
+	setOmniTranscript: (text: string) => void;
+	setOmniConfirmation: (confirmation: OmniPendingConfirmation | null) => void;
+	setOmniError: (error: string | null) => void;
+	setOmniHistory: (history: OmniConversationMessage[]) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -309,11 +309,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
 	const [uiSettings, setUISettingsState] = useState<UISettings>(readInitialUISettings);
-	const [voiceStatus, setVoiceStatusState] = useState<VoiceStatus>("disabled");
-	const [voiceTranscript, setVoiceTranscriptState] = useState("");
-	const [voicePendingConfirmation, setVoiceConfirmationState] = useState<VoicePendingConfirmation | null>(null);
-	const [voiceError, setVoiceErrorState] = useState<string | null>(null);
-	const [voiceHistory, setVoiceHistoryState] = useState<VoiceConversationMessage[]>([]);
+	const [omniStatus, setOmniStatusState] = useState<OmniStatus>("disabled");
+	const [omniTranscript, setOmniTranscriptState] = useState("");
+	const [omniPendingConfirmation, setOmniConfirmationState] = useState<OmniPendingConfirmation | null>(null);
+	const [omniError, setOmniErrorState] = useState<string | null>(null);
+	const [omniHistory, setOmniHistoryState] = useState<OmniConversationMessage[]>([]);
 
 	const setConnections = useCallback((newConnections: ConnectionConfig[]) => {
 		setConnectionsState(newConnections);
@@ -389,28 +389,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setUISettingsState(settings);
 	}, []);
 
-	const setVoiceStatus = useCallback((status: VoiceStatus) => {
-		setVoiceStatusState(status);
+	const setOmniStatus = useCallback((status: OmniStatus) => {
+		setOmniStatusState(status);
 	}, []);
 
-	const setVoiceTranscript = useCallback((text: string) => {
-		setVoiceTranscriptState(text);
+	const setOmniTranscript = useCallback((text: string) => {
+		setOmniTranscriptState(text);
 	}, []);
 
 	const appendVoiceTranscript = useCallback((text: string) => {
-		setVoiceTranscriptState((prev) => prev + text);
+		setOmniTranscriptState((prev) => prev + text);
 	}, []);
 
-	const setVoiceConfirmation = useCallback((confirmation: VoicePendingConfirmation | null) => {
-		setVoiceConfirmationState(confirmation);
+	const setOmniConfirmation = useCallback((confirmation: OmniPendingConfirmation | null) => {
+		setOmniConfirmationState(confirmation);
 	}, []);
 
-	const setVoiceError = useCallback((error: string | null) => {
-		setVoiceErrorState(error);
+	const setOmniError = useCallback((error: string | null) => {
+		setOmniErrorState(error);
 	}, []);
 
-	const setVoiceHistory = useCallback((history: VoiceConversationMessage[]) => {
-		setVoiceHistoryState(history);
+	const setOmniHistory = useCallback((history: OmniConversationMessage[]) => {
+		setOmniHistoryState(history);
 	}, []);
 
 	const setSelectedPane = useCallback((pane: SelectedPane | null) => {
@@ -477,17 +477,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setEditingConnection,
 		uiSettings,
 		setUISettings,
-		voiceStatus,
-		voiceTranscript,
-		voicePendingConfirmation,
-		voiceError,
-		voiceHistory,
-		setVoiceStatus,
+		omniStatus,
+		omniTranscript,
+		omniPendingConfirmation,
+		omniError,
+		omniHistory,
+		setOmniStatus,
 		appendVoiceTranscript,
-		setVoiceTranscript,
-		setVoiceConfirmation,
-		setVoiceError,
-		setVoiceHistory,
+		setOmniTranscript,
+		setOmniConfirmation,
+		setOmniError,
+		setOmniHistory,
 	};
 
 	return (

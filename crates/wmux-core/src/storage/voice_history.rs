@@ -1,27 +1,27 @@
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::storage::models::VoiceConversationMessage;
+use crate::storage::models::OmniConversationMessage;
 
 #[derive(Debug, thiserror::Error)]
-pub enum VoiceHistoryRepoError {
+pub enum OmniHistoryRepoError {
     #[error(transparent)]
     Database(#[from] sqlx::Error),
 }
 
-pub struct VoiceHistoryRepository {
+pub struct OmniHistoryRepository {
     pool: SqlitePool,
 }
 
-impl VoiceHistoryRepository {
+impl OmniHistoryRepository {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
     pub async fn insert(
         &self,
-        msg: &VoiceConversationMessage,
-    ) -> Result<VoiceConversationMessage, VoiceHistoryRepoError> {
+        msg: &OmniConversationMessage,
+    ) -> Result<OmniConversationMessage, OmniHistoryRepoError> {
         let id = if msg.id.trim().is_empty() {
             Uuid::new_v4().to_string()
         } else {
@@ -58,11 +58,11 @@ impl VoiceHistoryRepository {
         conversation_id: &str,
         limit: Option<i64>,
         before: Option<&str>,
-    ) -> Result<Vec<VoiceConversationMessage>, VoiceHistoryRepoError> {
+    ) -> Result<Vec<OmniConversationMessage>, OmniHistoryRepoError> {
         let clamped_limit = limit.unwrap_or(50).clamp(1, 200);
 
         let rows = if let Some(before) = before {
-            sqlx::query_as::<_, VoiceConversationMessage>(
+            sqlx::query_as::<_, OmniConversationMessage>(
                 "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages WHERE conversation_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?",
             )
             .bind(conversation_id)
@@ -71,7 +71,7 @@ impl VoiceHistoryRepository {
             .fetch_all(&self.pool)
             .await?
         } else {
-            sqlx::query_as::<_, VoiceConversationMessage>(
+            sqlx::query_as::<_, OmniConversationMessage>(
                 "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?",
             )
             .bind(conversation_id)
@@ -83,15 +83,15 @@ impl VoiceHistoryRepository {
         Ok(rows)
     }
 
-    pub async fn clear(&self) -> Result<(), VoiceHistoryRepoError> {
+    pub async fn clear(&self) -> Result<(), OmniHistoryRepoError> {
         sqlx::query("DELETE FROM voice_conversation_messages")
             .execute(&self.pool)
             .await?;
         Ok(())
     }
 
-    async fn get_by_id(&self, id: &str) -> Result<VoiceConversationMessage, VoiceHistoryRepoError> {
-        let row = sqlx::query_as::<_, VoiceConversationMessage>(
+    async fn get_by_id(&self, id: &str) -> Result<OmniConversationMessage, OmniHistoryRepoError> {
+        let row = sqlx::query_as::<_, OmniConversationMessage>(
             "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages WHERE id = ?",
         )
         .bind(id)
@@ -121,8 +121,8 @@ mod tests {
         (pool, dir)
     }
 
-    fn message(conversation_id: &str, created_at: &str, text: &str) -> VoiceConversationMessage {
-        VoiceConversationMessage {
+    fn message(conversation_id: &str, created_at: &str, text: &str) -> OmniConversationMessage {
+        OmniConversationMessage {
             id: String::new(),
             conversation_id: conversation_id.to_string(),
             role: "user".to_string(),
@@ -140,7 +140,7 @@ mod tests {
     #[tokio::test]
     async fn voice_history_repository_insert_and_list_returns_newest_first() {
         let (pool, _dir) = setup_test_db().await;
-        let repo = VoiceHistoryRepository::new(pool);
+        let repo = OmniHistoryRepository::new(pool);
 
         repo.insert(&message("conv-a", "2026-05-28T10:00:00Z", "first"))
             .await
@@ -166,7 +166,7 @@ mod tests {
     #[tokio::test]
     async fn voice_history_repository_applies_before_cursor_and_limit_clamp() {
         let (pool, _dir) = setup_test_db().await;
-        let repo = VoiceHistoryRepository::new(pool);
+        let repo = OmniHistoryRepository::new(pool);
 
         for index in 0..205 {
             let created_at = format!("2026-05-28T10:{index:02}:00Z");
@@ -198,7 +198,7 @@ mod tests {
     #[tokio::test]
     async fn voice_history_repository_clear_deletes_all_messages() {
         let (pool, _dir) = setup_test_db().await;
-        let repo = VoiceHistoryRepository::new(pool);
+        let repo = OmniHistoryRepository::new(pool);
 
         repo.insert(&message("conv-a", "2026-05-28T10:00:00Z", "first"))
             .await

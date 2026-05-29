@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { VoiceWebSocket } from "./voiceClient.js";
+import { OmniWebSocket } from "./voiceClient.js";
 
 function mockWebSocket(url: string) {
 	const ws: {
@@ -33,7 +33,7 @@ function mockWebSocket(url: string) {
 	return ws;
 }
 
-describe("VoiceWebSocket", () => {
+describe("OmniWebSocket", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 	});
@@ -41,7 +41,7 @@ describe("VoiceWebSocket", () => {
 	test("connects to /api/voice with token", () => {
 		const ws = mockWebSocket("");
 		const onMessage = vi.fn();
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "test-token",
 			onMessage,
 		});
@@ -58,7 +58,7 @@ describe("VoiceWebSocket", () => {
 	test("calls onOpen when connection opens", () => {
 		const ws = mockWebSocket("");
 		const onOpen = vi.fn();
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 			onOpen,
@@ -72,7 +72,7 @@ describe("VoiceWebSocket", () => {
 	test("parses and dispatches server events", () => {
 		const ws = mockWebSocket("");
 		const onMessage = vi.fn();
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage,
 		});
@@ -87,7 +87,7 @@ describe("VoiceWebSocket", () => {
 
 	test("sends audio_frame messages", () => {
 		const ws = mockWebSocket("");
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 		});
@@ -103,7 +103,7 @@ describe("VoiceWebSocket", () => {
 
 	test("sends confirm_action messages", () => {
 		const ws = mockWebSocket("");
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 		});
@@ -120,7 +120,7 @@ describe("VoiceWebSocket", () => {
 	test("queues messages when socket is not open", () => {
 		const ws = mockWebSocket("");
 		ws.readyState = 0;
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 		});
@@ -140,7 +140,7 @@ describe("VoiceWebSocket", () => {
 
 	test("does not send after close", () => {
 		const ws = mockWebSocket("");
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 		});
@@ -153,7 +153,7 @@ describe("VoiceWebSocket", () => {
 
 	test("isConnected returns correct state", () => {
 		const ws = mockWebSocket("");
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 		});
@@ -168,7 +168,7 @@ describe("VoiceWebSocket", () => {
 		const ws1 = mockWebSocket("");
 		const onClose = vi.fn();
 		const onOpen = vi.fn();
-		const client = new VoiceWebSocket({
+		const client = new OmniWebSocket({
 			token: "t",
 			onMessage: vi.fn(),
 			onClose,

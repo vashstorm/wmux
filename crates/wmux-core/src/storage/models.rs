@@ -171,7 +171,7 @@ pub struct NewAiUsageEvent {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceConversationMessage {
+pub struct OmniConversationMessage {
     pub id: String,
     pub conversation_id: String,
     pub role: String,
@@ -187,6 +187,6 @@ pub struct VoiceConversationMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceHistoryListResponse {
-    pub data: Vec<VoiceConversationMessage>,
+pub struct OmniHistoryListResponse {
+    pub data: Vec<OmniConversationMessage>,
 }

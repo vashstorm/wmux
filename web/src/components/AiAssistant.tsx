@@ -8,12 +8,12 @@ import CloseIcon from "@mui/icons-material/Close";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import SendIcon from "@mui/icons-material/Send";
 import { getAuthToken, getRuntimeFlags } from "../api/runtime.js";
-import { VoiceWebSocket } from "../api/voiceClient.js";
+import { OmniWebSocket } from "../api/voiceClient.js";
 import { AudioPipeline } from "../api/audioPipeline.js";
-import type { VoiceServerEvent } from "../api/voiceTypes.js";
+import type { OmniServerEvent } from "../api/voiceTypes.js";
 import { isVoiceAudioDeltaEvent, isVoiceTranscriptDeltaEvent, isVoiceTranscriptDoneEvent, isVoiceIntentReceivedEvent, isVoiceActionResultEvent, isVoiceErrorEvent, isVoiceConnectedEvent, isVoiceAssistantMessageEvent } from "../api/voiceTypes.js";
 import { useAppState } from "../state/store.js";
-import { getConfig, getVoiceHistory, type VoiceConversationMessage } from "../api/client.js";
+import { getConfig, getOmniHistory, type OmniConversationMessage } from "../api/client.js";
 import "../styles/ai-assistant.css";
 
 const LEVEL_SEGMENTS = 12;
@@ -29,7 +29,7 @@ function formatRole(role: string): string {
 	return role === "user" ? "You" : "AI";
 }
 
-function voiceComposerText(status: string): string {
+function omniComposerText(status: string): string {
 	switch (status) {
 		case "connecting":
 			return "Connecting to AI...";
@@ -48,39 +48,39 @@ function voiceComposerText(status: string): string {
 
 export function AiAssistant() {
 	const {
-		voiceStatus,
-		voiceTranscript,
-		voicePendingConfirmation,
-		voiceError,
-		setVoiceStatus,
+		omniStatus,
+		omniTranscript,
+		omniPendingConfirmation,
+		omniError,
+		setOmniStatus,
 		appendVoiceTranscript,
-		setVoiceTranscript,
-		setVoiceConfirmation,
-		setVoiceError,
+		setOmniTranscript,
+		setOmniConfirmation,
+		setOmniError,
 		setShowSettingsPanel,
 	} = useAppState();
 
 	const audioLevel = useRef(0);
 	const [audioBars, setAudioBars] = useState<boolean[]>(new Array(LEVEL_SEGMENTS).fill(false));
-	const wsRef = useRef<VoiceWebSocket | null>(null);
+	const wsRef = useRef<OmniWebSocket | null>(null);
 	const pipelineRef = useRef<AudioPipeline | null>(null);
 	const isMutedRef = useRef(false);
 	const wsConnectingRef = useRef(false);
-	const voiceStatusRef = useRef(voiceStatus);
+	const omniStatusRef = useRef(omniStatus);
 	const [micDisabled, setMicDisabled] = useState(false);
-	const [history, setHistory] = useState<VoiceConversationMessage[]>([]);
+	const [history, setHistory] = useState<OmniConversationMessage[]>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
 	const [isHidden, setIsHidden] = useState(true);
 
 	useEffect(() => {
-		voiceStatusRef.current = voiceStatus;
-	}, [voiceStatus]);
+		omniStatusRef.current = omniStatus;
+	}, [omniStatus]);
 	useEffect(() => {
-		if (voiceStatus === "disabled" && getRuntimeFlags().voiceAvailable) {
-			setVoiceStatus("idle");
+		if (omniStatus === "disabled" && getRuntimeFlags().omniAvailable) {
+			setOmniStatus("idle");
 		}
-	}, [setVoiceStatus, voiceStatus]);
+	}, [setOmniStatus, omniStatus]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -103,7 +103,7 @@ export function AiAssistant() {
 		const loadHistory = async () => {
 			setHistoryLoading(true);
 			try {
-				const messages = await getVoiceHistory({ conversationId: "default", limit: 20 });
+				const messages = await getOmniHistory({ conversationId: "default", limit: 20 });
 				if (!cancelled) {
 					setHistory(messages);
 				}
@@ -119,23 +119,23 @@ export function AiAssistant() {
 		return () => { cancelled = true; };
 	}, []);
 
-	const handleServerMessage = useCallback((event: VoiceServerEvent) => {
+	const handleServerMessage = useCallback((event: OmniServerEvent) => {
 		if (isVoiceConnectedEvent(event)) {
-			if (voiceStatusRef.current === "connecting") {
-				setVoiceStatus("listening");
+			if (omniStatusRef.current === "connecting") {
+				setOmniStatus("listening");
 			}
 			return;
 		}
 
 		if (isVoiceTranscriptDeltaEvent(event)) {
 			appendVoiceTranscript(event.text);
-			setVoiceError(null);
+			setOmniError(null);
 			return;
 		}
 
 		if (isVoiceTranscriptDoneEvent(event)) {
-			setVoiceTranscript(event.text);
-			setVoiceStatus("processing");
+			setOmniTranscript(event.text);
+			setOmniStatus("processing");
 			setHistory((prev) => [
 				...prev,
 				{
@@ -156,21 +156,21 @@ export function AiAssistant() {
 				window.history.pushState(null, "", `${window.location.pathname}?view=settings`);
 			}
 			if (event.confirmationRequired && event.confirmationId) {
-				setVoiceConfirmation({
+				setOmniConfirmation({
 					confirmationId: event.confirmationId,
 					skill: event.skill,
 				});
-				setVoiceStatus("confirming");
+				setOmniStatus("confirming");
 			} else {
-				setVoiceStatus("processing");
+				setOmniStatus("processing");
 			}
 			return;
 		}
 
 		if (isVoiceActionResultEvent(event)) {
-			setVoiceConfirmation(null);
+			setOmniConfirmation(null);
 			if (event.success) {
-				setVoiceStatus("listening");
+				setOmniStatus("listening");
 				setHistory((prev) => [
 					...prev,
 					{
@@ -183,14 +183,14 @@ export function AiAssistant() {
 					},
 				]);
 			} else {
-				setVoiceError(event.error ?? `Action failed: ${event.skill}`);
-				setVoiceStatus("error");
+				setOmniError(event.error ?? `Action failed: ${event.skill}`);
+				setOmniStatus("error");
 			}
 			return;
 		}
 
 		if (isVoiceAssistantMessageEvent(event)) {
-			setVoiceStatus("idle");
+			setOmniStatus("idle");
 			setHistory((prev) => [
 				...prev,
 				{
@@ -206,16 +206,16 @@ export function AiAssistant() {
 		}
 
 		if (isVoiceAudioDeltaEvent(event)) {
-			setVoiceStatus("speaking");
+			setOmniStatus("speaking");
 			pipelineRef.current?.enqueuePlayback(event.pcm16Base64, event.sampleRate);
 			return;
 		}
 
 		if (isVoiceErrorEvent(event)) {
-			setVoiceError(event.message);
-			setVoiceStatus("error");
+			setOmniError(event.message);
+			setOmniStatus("error");
 		}
-	}, [appendVoiceTranscript, setVoiceTranscript, setVoiceConfirmation, setVoiceError, setVoiceStatus, setShowSettingsPanel]);
+	}, [appendVoiceTranscript, setOmniTranscript, setOmniConfirmation, setOmniError, setOmniStatus, setShowSettingsPanel]);
 
 	const connectVoice = useCallback(() => {
 		if (wsConnectingRef.current || wsRef.current) return;
@@ -224,40 +224,40 @@ export function AiAssistant() {
 		if (!token) return;
 
 		wsConnectingRef.current = true;
-		voiceStatusRef.current = "connecting";
-		setVoiceStatus("connecting");
-		setVoiceTranscript("");
-		setVoiceError(null);
+		omniStatusRef.current = "connecting";
+		setOmniStatus("connecting");
+		setOmniTranscript("");
+		setOmniError(null);
 
-		const ws = new VoiceWebSocket({
+		const ws = new OmniWebSocket({
 			token,
-			onMessage: (event: VoiceServerEvent) => {
+			onMessage: (event: OmniServerEvent) => {
 				handleServerMessage(event);
 			},
 			onOpen: () => {
 				wsConnectingRef.current = false;
-				if (voiceStatusRef.current === "connecting") {
-					setVoiceStatus("listening");
+				if (omniStatusRef.current === "connecting") {
+					setOmniStatus("listening");
 				}
-				setVoiceError(null);
+				setOmniError(null);
 			},
 			onClose: () => {
 				wsConnectingRef.current = false;
-				if (!isMutedRef.current && voiceStatusRef.current !== "disabled") {
-					setVoiceStatus("idle");
+				if (!isMutedRef.current && omniStatusRef.current !== "disabled") {
+					setOmniStatus("idle");
 				}
 				wsRef.current = null;
 			},
 			onError: () => {
 				wsConnectingRef.current = false;
-				setVoiceError("Connection failed");
-				setVoiceStatus("error");
+				setOmniError("Connection failed");
+				setOmniStatus("error");
 			},
 		});
 
 		ws.connect();
 		wsRef.current = ws;
-	}, [handleServerMessage, setVoiceStatus, setVoiceTranscript, setVoiceError]);
+	}, [handleServerMessage, setOmniStatus, setOmniTranscript, setOmniError]);
 
 	const startListening = useCallback(async () => {
 		if (isMutedRef.current) return;
@@ -295,13 +295,13 @@ export function AiAssistant() {
 					},
 				},
 			);
-			setVoiceTranscript("");
-			setVoiceError(null);
+			setOmniTranscript("");
+			setOmniError(null);
 		} catch {
-			setVoiceError("Microphone access denied");
-			setVoiceStatus("error");
+			setOmniError("Microphone access denied");
+			setOmniStatus("error");
 		}
-	}, [connectVoice, setVoiceTranscript, setVoiceError, setVoiceStatus, micDisabled]);
+	}, [connectVoice, setOmniTranscript, setOmniError, setOmniStatus, micDisabled]);
 
 	const stopListening = useCallback(() => {
 		pipelineRef.current?.stopCapture();
@@ -310,8 +310,8 @@ export function AiAssistant() {
 		wsRef.current = null;
 		wsConnectingRef.current = false;
 		setAudioBars(new Array(LEVEL_SEGMENTS).fill(false));
-		setVoiceStatus("idle");
-	}, [setVoiceStatus]);
+		setOmniStatus("idle");
+	}, [setOmniStatus]);
 
 	const toggleMute = useCallback(() => {
 		isMutedRef.current = !isMutedRef.current;
@@ -323,30 +323,30 @@ export function AiAssistant() {
 	}, [startListening, stopListening]);
 
 	const handleConfirm = useCallback(() => {
-		if (voicePendingConfirmation && wsRef.current?.isConnected()) {
+		if (omniPendingConfirmation && wsRef.current?.isConnected()) {
 			wsRef.current.send({
 				type: "confirm_action",
-				confirmationId: voicePendingConfirmation.confirmationId,
+				confirmationId: omniPendingConfirmation.confirmationId,
 			});
 		}
-	}, [voicePendingConfirmation]);
+	}, [omniPendingConfirmation]);
 
 	const handleCancel = useCallback(() => {
-		if (voicePendingConfirmation && wsRef.current?.isConnected()) {
+		if (omniPendingConfirmation && wsRef.current?.isConnected()) {
 			wsRef.current.send({
 				type: "cancel_action",
-				confirmationId: voicePendingConfirmation.confirmationId,
+				confirmationId: omniPendingConfirmation.confirmationId,
 			});
 		}
-		setVoiceConfirmation(null);
-		setVoiceStatus("listening");
-	}, [voicePendingConfirmation, setVoiceConfirmation, setVoiceStatus]);
+		setOmniConfirmation(null);
+		setOmniStatus("listening");
+	}, [omniPendingConfirmation, setOmniConfirmation, setOmniStatus]);
 
 	const handleReconnect = useCallback(() => {
 		stopListening();
-		setVoiceStatus("idle");
+		setOmniStatus("idle");
 		void startListening();
-	}, [startListening, stopListening, setVoiceStatus]);
+	}, [startListening, stopListening, setOmniStatus]);
 
 	const handleTextSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -355,15 +355,15 @@ export function AiAssistant() {
 
 		const token = getAuthToken();
 		if (!token) {
-			setVoiceError("Authentication token is missing");
-			setVoiceStatus("error");
+			setOmniError("Authentication token is missing");
+			setOmniStatus("error");
 			return;
 		}
 
 		connectVoice();
 		if (!wsRef.current) {
-			setVoiceError("Connection failed");
-			setVoiceStatus("error");
+			setOmniError("Connection failed");
+			setOmniStatus("error");
 			return;
 		}
 
@@ -380,12 +380,12 @@ export function AiAssistant() {
 			},
 		]);
 		setInputText("");
-		setVoiceTranscript("");
-		setVoiceError(null);
-		voiceStatusRef.current = "processing";
-		setVoiceStatus("processing");
+		setOmniTranscript("");
+		setOmniError(null);
+		omniStatusRef.current = "processing";
+		setOmniStatus("processing");
 		wsRef.current.send({ type: "text_message", text });
-	}, [connectVoice, inputText, setVoiceError, setVoiceStatus, setVoiceTranscript]);
+	}, [connectVoice, inputText, setOmniError, setOmniStatus, setOmniTranscript]);
 
 	useEffect(() => {
 		return () => {
@@ -396,10 +396,10 @@ export function AiAssistant() {
 		};
 	}, []);
 
-	const isListening = voiceStatus === "listening" || voiceStatus === "processing" || voiceStatus === "speaking" || voiceStatus === "confirming";
-	const isDisabled = voiceStatus === "disabled";
+	const isListening = omniStatus === "listening" || omniStatus === "processing" || omniStatus === "speaking" || omniStatus === "confirming";
+	const isDisabled = omniStatus === "disabled";
 	const visibleHistory = history.slice(-10);
-	const showEmptyState = !historyLoading && visibleHistory.length === 0 && !voiceTranscript && !voiceError && !voicePendingConfirmation;
+	const showEmptyState = !historyLoading && visibleHistory.length === 0 && !omniTranscript && !omniError && !omniPendingConfirmation;
 
 	if (isHidden) {
 		return (
@@ -415,13 +415,13 @@ export function AiAssistant() {
 	}
 
 	return (
-		<div className="ai-assistant" data-ai-assistant-state={voiceStatus}>
+		<div className="ai-assistant" data-ai-assistant-state={omniStatus}>
 			<div className="voice-header">
 				<div className="voice-title">
 					<span className="voice-status-dot" />
 				</div>
 				<div className="voice-status-label">
-					<span>{voiceStatus}</span>
+					<span>{omniStatus}</span>
 				</div>
 				<button
 					type="button"
@@ -448,20 +448,20 @@ export function AiAssistant() {
 					</div>
 				))}
 
-				{voiceTranscript && (
+				{omniTranscript && (
 					<div className="voice-message voice-message--user voice-message--live">
 						<div className="voice-message-meta">
 							<span>You</span>
 							<span>Live</span>
 						</div>
-						<div className="voice-message-bubble">{voiceTranscript}</div>
+						<div className="voice-message-bubble">{omniTranscript}</div>
 					</div>
 				)}
 
-				{voicePendingConfirmation && (
+				{omniPendingConfirmation && (
 					<div className="voice-confirmation">
 						<div className="voice-confirmation-text">
-							Confirm action: <strong>{voicePendingConfirmation.skill}</strong>?
+							Confirm action: <strong>{omniPendingConfirmation.skill}</strong>?
 						</div>
 						<div className="voice-confirmation-actions">
 							<button type="button" className="voice-confirm-btn" onClick={handleConfirm}>
@@ -474,8 +474,8 @@ export function AiAssistant() {
 					</div>
 				)}
 
-				{voiceError && (
-					<div className="voice-error">{voiceError}</div>
+				{omniError && (
+					<div className="voice-error">{omniError}</div>
 				)}
 
 				{(isDisabled || micDisabled) && (
@@ -497,7 +497,7 @@ export function AiAssistant() {
 					<textarea
 						className="voice-input"
 						aria-label="Message AI Assistant"
-						placeholder={voiceComposerText(voiceStatus)}
+						placeholder={omniComposerText(omniStatus)}
 						value={inputText}
 						rows={1}
 						onChange={(event) => setInputText(event.target.value)}
@@ -508,7 +508,7 @@ export function AiAssistant() {
 							}
 						}}
 					/>
-					{(isListening || voiceStatus === "connecting") && (
+					{(isListening || omniStatus === "connecting") && (
 						<div className="voice-level-bar" aria-hidden="true">
 							{audioBars.map((active, i) => (
 								<span key={i} className={`voice-level-segment${active ? " voice-level-segment--active" : ""}`} />
@@ -554,7 +554,7 @@ export function AiAssistant() {
 					>
 						{isMutedRef.current ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
 					</button>
-					{voiceStatus === "error" && (
+					{omniStatus === "error" && (
 						<button
 							type="button"
 							className="voice-btn"

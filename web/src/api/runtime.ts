@@ -5,7 +5,7 @@ interface WmuxRuntime {
 
 interface RuntimeFlags {
 	isTauri: boolean;
-	voiceAvailable: boolean;
+	omniAvailable: boolean;
 }
 
 declare global {
@@ -29,7 +29,7 @@ export function getRuntimeFlags(): RuntimeFlags {
 
 	return {
 		isTauri: Boolean(window.__WMUX_RUNTIME__?.baseUrl),
-		voiceAvailable: typeof mediaDevices?.getUserMedia === "function",
+		omniAvailable: typeof mediaDevices?.getUserMedia === "function",
 	};
 }
 

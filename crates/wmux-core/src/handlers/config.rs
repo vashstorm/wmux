@@ -3,7 +3,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use wmux_core::config::{
     AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig,
-    UIConfig, VoiceSkillConfig,
+    UIConfig, OmniSkillConfig,
 };
 
 use crate::http::{ApiError, ApiResult};
@@ -21,7 +21,8 @@ pub struct ConfigResponse {
     ui: UIConfig,
     intelligence: ConfigIntelligenceResponse,
     logs: LogsConfig,
-    voice: ConfigVoiceResponse,
+    #[serde(rename = "voice")]
+    omni: ConfigOmniResponse,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,14 +61,14 @@ struct ConfigIntelligenceResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ConfigVoiceResponse {
+struct ConfigOmniResponse {
     enabled: bool,
     dashscope_api_key_configured: bool,
     microphone_disabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     voice: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    skills: Vec<VoiceSkillConfig>,
+    skills: Vec<OmniSkillConfig>,
     model: String,
     endpoint: String,
     continuous_listening: bool,
@@ -101,7 +102,7 @@ pub async fn update(
         .validate_auth()
         .map_err(|error| ApiError::bad_request(error.to_string()))?;
     payload
-        .validate_voice()
+        .validate_omni()
         .map_err(|error| ApiError::bad_request(error.to_string()))?;
 
     if let Err(error) = state.store.replace(payload) {
@@ -133,7 +134,7 @@ pub fn sanitized_config(config: &Config) -> Config {
     for provider in &mut sanitized.intelligence.providers {
         provider.api_key.clear();
     }
-    sanitized.voice.dashscope_api_key = None;
+    sanitized.omni.dashscope_api_key = None;
     sanitized
 }
 
@@ -177,23 +178,23 @@ fn new_config_response(config: &Config) -> ConfigResponse {
             cache_ttl_sec: sanitized.intelligence.cache_ttl_sec,
         },
         logs: sanitized.logs,
-        voice: ConfigVoiceResponse {
-            enabled: sanitized.voice.enabled,
+        omni: ConfigOmniResponse {
+            enabled: sanitized.omni.enabled,
             dashscope_api_key_configured: config
-                .voice
+                .omni
                 .dashscope_api_key
                 .as_deref()
                 .is_some_and(|key| !key.trim().is_empty()),
-            microphone_disabled: sanitized.voice.microphone_disabled,
-            voice: sanitized.voice.voice,
-            skills: sanitized.voice.skills,
-            model: sanitized.voice.model,
-            endpoint: sanitized.voice.endpoint,
-            continuous_listening: sanitized.voice.continuous_listening,
-            store_raw_audio: sanitized.voice.store_raw_audio,
-            audit_log_path: sanitized.voice.audit_log_path,
-            vad_enabled: sanitized.voice.vad_enabled,
-            vad_threshold: sanitized.voice.vad_threshold,
+            microphone_disabled: sanitized.omni.microphone_disabled,
+            voice: sanitized.omni.voice,
+            skills: sanitized.omni.skills,
+            model: sanitized.omni.model,
+            endpoint: sanitized.omni.endpoint,
+            continuous_listening: sanitized.omni.continuous_listening,
+            store_raw_audio: sanitized.omni.store_raw_audio,
+            audit_log_path: sanitized.omni.audit_log_path,
+            vad_enabled: sanitized.omni.vad_enabled,
+            vad_threshold: sanitized.omni.vad_threshold,
         },
     }
 }
@@ -206,12 +207,12 @@ fn preserve_secret_fields(current: &Config, payload: &mut Config) {
         payload.intelligence.api_key = current.intelligence.api_key.clone();
     }
     if payload
-        .voice
+        .omni
         .dashscope_api_key
         .as_deref()
         .is_none_or(|key| key.trim().is_empty())
     {
-        payload.voice.dashscope_api_key = current.voice.dashscope_api_key.clone();
+        payload.omni.dashscope_api_key = current.omni.dashscope_api_key.clone();
     }
 
     let payload_names: Vec<String> = payload
@@ -266,12 +267,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn config_api_sanitizes_voice_secret_in_response() {
+    fn config_api_sanitizes_omni_secret_in_response() {
         let mut config = Config::default();
-        config.voice.enabled = true;
-        config.voice.dashscope_api_key = Some("sk-secret".to_string());
-        config.voice.microphone_disabled = true;
-        config.voice.voice = Some("Cherry".to_string());
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = Some("sk-secret".to_string());
+        config.omni.microphone_disabled = true;
+        config.omni.voice = Some("Cherry".to_string());
 
         let response = new_config_response(&config);
         let value = serde_json::to_value(response).expect("serialize response");
@@ -285,35 +286,35 @@ mod tests {
     }
 
     #[test]
-    fn config_api_preserves_voice_secret_when_payload_key_empty() {
+    fn config_api_preserves_omni_secret_when_payload_key_empty() {
         let mut current = Config::default();
-        current.voice.dashscope_api_key = Some("sk-existing".to_string());
+        current.omni.dashscope_api_key = Some("sk-existing".to_string());
 
         let mut payload = Config::default();
-        payload.voice.enabled = true;
-        payload.voice.dashscope_api_key = Some(String::new());
+        payload.omni.enabled = true;
+        payload.omni.dashscope_api_key = Some(String::new());
 
         preserve_secret_fields(&current, &mut payload);
 
         assert_eq!(
-            payload.voice.dashscope_api_key,
+            payload.omni.dashscope_api_key,
             Some("sk-existing".to_string())
         );
     }
 
     #[test]
-    fn config_api_preserves_voice_secret_when_payload_key_absent() {
+    fn config_api_preserves_omni_secret_when_payload_key_absent() {
         let mut current = Config::default();
-        current.voice.dashscope_api_key = Some("sk-existing".to_string());
+        current.omni.dashscope_api_key = Some("sk-existing".to_string());
 
         let mut payload = Config::default();
-        payload.voice.enabled = true;
-        payload.voice.dashscope_api_key = None;
+        payload.omni.enabled = true;
+        payload.omni.dashscope_api_key = None;
 
         preserve_secret_fields(&current, &mut payload);
 
         assert_eq!(
-            payload.voice.dashscope_api_key,
+            payload.omni.dashscope_api_key,
             Some("sk-existing".to_string())
         );
     }

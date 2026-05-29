@@ -4,12 +4,12 @@ use serde::Deserialize;
 
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
-use crate::storage::models::VoiceHistoryListResponse;
-use crate::storage::{VoiceHistoryRepoError, VoiceHistoryRepository};
+use crate::storage::models::OmniHistoryListResponse;
+use crate::storage::{OmniHistoryRepoError, OmniHistoryRepository};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VoiceHistoryQuery {
+pub struct OmniHistoryQuery {
     pub conversation_id: Option<String>,
     pub limit: Option<i64>,
     pub before: Option<String>,
@@ -17,27 +17,27 @@ pub struct VoiceHistoryQuery {
 
 pub async fn list(
     State(state): State<AppState>,
-    Query(query): Query<VoiceHistoryQuery>,
-) -> ApiResult<VoiceHistoryListResponse> {
+    Query(query): Query<OmniHistoryQuery>,
+) -> ApiResult<OmniHistoryListResponse> {
     let conversation_id = query
         .conversation_id
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| ApiError::bad_request("conversationId is required"))?;
-    let repo = VoiceHistoryRepository::new(storage(&state)?);
+    let repo = OmniHistoryRepository::new(storage(&state)?);
     let data = repo
         .list(conversation_id, query.limit, query.before.as_deref())
         .await
-        .map_err(map_voice_history_error)?;
+        .map_err(map_omni_history_error)?;
 
-    Ok(Json(VoiceHistoryListResponse { data }))
+    Ok(Json(OmniHistoryListResponse { data }))
 }
 
-pub async fn clear(State(state): State<AppState>) -> ApiResult<VoiceHistoryListResponse> {
-    let repo = VoiceHistoryRepository::new(storage(&state)?);
-    repo.clear().await.map_err(map_voice_history_error)?;
+pub async fn clear(State(state): State<AppState>) -> ApiResult<OmniHistoryListResponse> {
+    let repo = OmniHistoryRepository::new(storage(&state)?);
+    repo.clear().await.map_err(map_omni_history_error)?;
 
-    Ok(Json(VoiceHistoryListResponse { data: Vec::new() }))
+    Ok(Json(OmniHistoryListResponse { data: Vec::new() }))
 }
 
 fn storage(state: &AppState) -> Result<sqlx::SqlitePool, ApiError> {
@@ -47,9 +47,9 @@ fn storage(state: &AppState) -> Result<sqlx::SqlitePool, ApiError> {
         .ok_or_else(|| ApiError::internal("storage not initialized"))
 }
 
-fn map_voice_history_error(err: VoiceHistoryRepoError) -> ApiError {
+fn map_omni_history_error(err: OmniHistoryRepoError) -> ApiError {
     match err {
-        VoiceHistoryRepoError::Database(sqlx_err) => {
+        OmniHistoryRepoError::Database(sqlx_err) => {
             tracing::error!(raw_error = %sqlx_err, "database error handling voice history");
             ApiError::internal("database error")
         }

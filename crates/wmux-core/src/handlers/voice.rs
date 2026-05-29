@@ -21,13 +21,13 @@ use tokio_tungstenite::{
 };
 use uuid::Uuid;
 
-use wmux_core::config::VoiceConfig;
-use wmux_core::protocol::{VoiceClientMessage, VoiceServerEvent, generate_qwen_tools};
-use wmux_core::storage::{models::VoiceConversationMessage, voice_history::VoiceHistoryRepository};
+use wmux_core::config::OmniConfig;
+use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, generate_qwen_tools};
+use wmux_core::storage::{models::OmniConversationMessage, voice_history::OmniHistoryRepository};
 
 use crate::state::AppState;
 use crate::voice::audit::redact_secrets;
-use crate::voice::{ConfirmationState, VoiceSkillExecutor, is_dangerous};
+use crate::voice::{ConfirmationState, OmniSkillExecutor, is_dangerous};
 
 /// Session timeout constants
 const SESSION_TIMEOUT_MINUTES: u64 = 120;
@@ -45,7 +45,7 @@ struct FunctionCallAccumulator {
 }
 
 /// Active voice session state
-struct VoiceSessionState {
+struct OmniSessionState {
     conversation_id: String,
     /// Confirmation state manager for dangerous actions
     confirmation_state: ConfirmationState,
@@ -55,7 +55,7 @@ struct VoiceSessionState {
     started_at: Instant,
 }
 
-impl VoiceSessionState {
+impl OmniSessionState {
     fn new() -> Self {
         Self {
             conversation_id: Uuid::new_v4().to_string(),
@@ -99,7 +99,7 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
     tracing::debug!("voice websocket connecting");
 
     // Validate voice config
-    let voice_config = match get_voice_config(&state) {
+    let voice_config = match get_omni_config(&state) {
         Ok(config) => config,
         Err(error) => {
             tracing::error!("voice config read failed: {}", error);
@@ -147,7 +147,7 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
     }
 
     // Send Connected event to client
-    if send_voice_event(&mut socket, &VoiceServerEvent::Connected)
+    if send_omni_event(&mut socket, &OmniServerEvent::Connected)
         .await
         .is_err()
     {
@@ -185,26 +185,26 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
     tracing::debug!("voice session established with Qwen");
 
     // Create session state
-    let session_state = VoiceSessionState::new();
+    let session_state = OmniSessionState::new();
 
     // Bridge bidirectional messages
     bridge_voice(socket, upstream, state, session_state).await;
 }
 
 /// Get voice config from AppState
-fn get_voice_config(state: &AppState) -> Result<VoiceConfig, String> {
+fn get_omni_config(state: &AppState) -> Result<OmniConfig, String> {
     state
         .store
         .snapshot()
-        .map(|config| config.voice.clone())
+        .map(|config| config.omni.clone())
         .map_err(|e| format!("failed to read config: {}", e))
 }
 
-async fn persist_history_message(state: &AppState, message: VoiceConversationMessage) {
+async fn persist_omni_history_message(state: &AppState, message: OmniConversationMessage) {
     let Some(pool) = &state.storage else {
         return;
     };
-    let repository = VoiceHistoryRepository::new(pool.clone());
+    let repository = OmniHistoryRepository::new(pool.clone());
     if let Err(error) = repository.insert(&message).await {
         tracing::error!(
             conversation_id = %message.conversation_id,
@@ -222,8 +222,8 @@ fn history_message(
     kind: &str,
     text: String,
     event_json: Option<String>,
-) -> VoiceConversationMessage {
-    VoiceConversationMessage {
+) -> OmniConversationMessage {
+    OmniConversationMessage {
         id: String::new(),
         conversation_id: conversation_id.to_string(),
         role: role.to_string(),
@@ -244,12 +244,12 @@ fn redacted_json(value: serde_json::Value) -> Option<String> {
 
 async fn persist_voice_event(
     state: &AppState,
-    session_state: &VoiceSessionState,
-    event: &VoiceServerEvent,
+    session_state: &OmniSessionState,
+    event: &OmniServerEvent,
 ) {
     match event {
-        VoiceServerEvent::TranscriptDone { text } => {
-            persist_history_message(
+        OmniServerEvent::TranscriptDone { text } => {
+            persist_omni_history_message(
                 state,
                 history_message(
                     &session_state.conversation_id,
@@ -261,9 +261,9 @@ async fn persist_voice_event(
             )
             .await;
         }
-        VoiceServerEvent::ActionResult { skill, .. } => {
+        OmniServerEvent::ActionResult { skill, .. } => {
             let event_json = serde_json::to_value(event).ok().and_then(redacted_json);
-            persist_history_message(
+            persist_omni_history_message(
                 state,
                 history_message(
                     &session_state.conversation_id,
@@ -279,8 +279,8 @@ async fn persist_voice_event(
     }
 }
 
-async fn persist_assistant_text(state: &AppState, session_state: &VoiceSessionState, text: String) {
-    persist_history_message(
+async fn persist_assistant_text(state: &AppState, session_state: &OmniSessionState, text: String) {
+    persist_omni_history_message(
         state,
         history_message(
             &session_state.conversation_id,
@@ -295,7 +295,7 @@ async fn persist_assistant_text(state: &AppState, session_state: &VoiceSessionSt
 
 async fn persist_tool_call(
     state: &AppState,
-    session_state: &VoiceSessionState,
+    session_state: &OmniSessionState,
     skill: &str,
     params: &serde_json::Value,
 ) {
@@ -303,7 +303,7 @@ async fn persist_tool_call(
         "skill": skill,
         "params": params,
     }));
-    persist_history_message(
+    persist_omni_history_message(
         state,
         history_message(
             &session_state.conversation_id,
@@ -318,12 +318,12 @@ async fn persist_tool_call(
 
 async fn persist_tool_result(
     state: &AppState,
-    session_state: &VoiceSessionState,
+    session_state: &OmniSessionState,
     skill: &str,
     success: bool,
     error: Option<String>,
 ) {
-    let event = VoiceServerEvent::ActionResult {
+    let event = OmniServerEvent::ActionResult {
         skill: skill.to_string(),
         success,
         error,
@@ -358,7 +358,7 @@ async fn connect_to_qwen(
 /// Send session.update event to Qwen with tools configuration.
 async fn send_session_update(
     upstream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
-    config: &VoiceConfig,
+    config: &OmniConfig,
 ) -> Result<(), String> {
     let tools = generate_qwen_tools(&config.skills);
 
@@ -404,7 +404,7 @@ async fn bridge_voice(
     client: WebSocket,
     upstream: WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     state: AppState,
-    session_state: VoiceSessionState,
+    session_state: OmniSessionState,
 ) {
     let (mut upstream_tx, mut upstream_rx) = upstream.split();
     let (mut client_tx, mut client_rx) = client.split();
@@ -431,7 +431,7 @@ async fn bridge_voice(
                             }
                             Err(error) => {
                                 tracing::error!("client message handling failed: {}", error);
-                                let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::Error {
+                                let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                                     code: "message_handling_error".to_string(),
                                     message: error,
                                 }).await;
@@ -456,14 +456,14 @@ async fn bridge_voice(
                     Some(Ok(TungsteniteMessage::Text(text))) => {
                         match handle_qwen_message(&text, &session_state, &state, &tool_result_tx).await {
                             Ok(Some(event)) => {
-                                if let Err(error) = send_voice_event_raw(&mut client_tx, &event).await {
+                                if let Err(error) = send_omni_event_raw(&mut client_tx, &event).await {
                                     tracing::error!("failed to send to client: {}", error);
                                 }
                             }
                             Ok(None) => {} // No event to forward
                             Err(error) => {
                                 tracing::error!("Qwen message handling failed: {}", error);
-                                let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::Error {
+                                let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                                     code: "qwen_message_error".to_string(),
                                     message: error,
                                 }).await;
@@ -477,7 +477,7 @@ async fn bridge_voice(
                     Some(Ok(_)) => {} // Ignore binary/ping messages
                     Some(Err(error)) => {
                         tracing::error!("Qwen receive error: {}", error);
-                        let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::Error {
+                        let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                             code: "qwen_connection_error".to_string(),
                             message: error.to_string(),
                         }).await;
@@ -528,14 +528,14 @@ async fn bridge_voice(
                     timeout_warning_sent = true;
                     let remaining = session_state.remaining_seconds();
                     tracing::warn!("voice session timeout warning: {} seconds remaining", remaining);
-                    let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::SessionTimeout {
+                    let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::SessionTimeout {
                         remaining_seconds: remaining,
                     }).await;
                 }
 
                 if session_state.is_timed_out() {
                     tracing::warn!("voice session timed out after {} minutes", SESSION_TIMEOUT_MINUTES);
-                    let _ = send_voice_event_raw(&mut client_tx, &VoiceServerEvent::Error {
+                    let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                         code: "session_timeout".to_string(),
                         message: format!("Voice session timed out after {} minutes", SESSION_TIMEOUT_MINUTES),
                     }).await;
@@ -554,15 +554,15 @@ async fn bridge_voice(
 /// Handle client message, returns optional Qwen message to forward.
 async fn handle_client_message(
     text: &str,
-    session_state: &VoiceSessionState,
+    session_state: &OmniSessionState,
     state: &AppState,
     tool_result_tx: &mpsc::Sender<serde_json::Value>,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let msg: VoiceClientMessage =
+    let msg: OmniClientMessage =
         serde_json::from_str(text).map_err(|e| format!("invalid client message: {}", e))?;
 
     match msg {
-        VoiceClientMessage::AudioFrame {
+        OmniClientMessage::AudioFrame {
             pcm16_base64,
             sample_rate,
         } => Ok(vec![serde_json::json!({
@@ -575,7 +575,7 @@ async fn handle_client_message(
             }
         })]),
 
-        VoiceClientMessage::TextMessage { text } => {
+        OmniClientMessage::TextMessage { text } => {
             let trimmed = text.trim();
             if trimmed.is_empty() {
                 return Err("text is required".to_string());
@@ -584,7 +584,7 @@ async fn handle_client_message(
             persist_voice_event(
                 state,
                 session_state,
-                &VoiceServerEvent::TranscriptDone {
+                &OmniServerEvent::TranscriptDone {
                     text: trimmed.to_string(),
                 },
             )
@@ -610,7 +610,7 @@ async fn handle_client_message(
             ])
         }
 
-        VoiceClientMessage::ConfirmAction { confirmation_id } => {
+        OmniClientMessage::ConfirmAction { confirmation_id } => {
             let id = Uuid::parse_str(&confirmation_id)
                 .map_err(|e| format!("invalid confirmation ID: {}", e))?;
 
@@ -651,7 +651,7 @@ async fn handle_client_message(
             Ok(Vec::new())
         }
 
-        VoiceClientMessage::CancelAction { confirmation_id } => {
+        OmniClientMessage::CancelAction { confirmation_id } => {
             persist_tool_result(
                 state,
                 session_state,
@@ -669,23 +669,23 @@ async fn handle_client_message(
             Ok(Vec::new())
         }
 
-        VoiceClientMessage::StopListening => Ok(vec![serde_json::json!({
+        OmniClientMessage::StopListening => Ok(vec![serde_json::json!({
             "type": "input_audio_buffer.clear"
         })]),
 
-        VoiceClientMessage::StartListening => Ok(vec![serde_json::json!({
+        OmniClientMessage::StartListening => Ok(vec![serde_json::json!({
             "type": "input_audio_buffer.commit"
         })]),
     }
 }
 
-/// Handle Qwen message, returns optional VoiceServerEvent to forward.
+/// Handle Qwen message, returns optional OmniServerEvent to forward.
 async fn handle_qwen_message(
     text: &str,
-    session_state: &VoiceSessionState,
+    session_state: &OmniSessionState,
     state: &AppState,
     tool_result_tx: &mpsc::Sender<serde_json::Value>,
-) -> Result<Option<VoiceServerEvent>, String> {
+) -> Result<Option<OmniServerEvent>, String> {
     let value: serde_json::Value =
         serde_json::from_str(text).map_err(|e| format!("invalid Qwen message: {}", e))?;
 
@@ -699,7 +699,7 @@ async fn handle_qwen_message(
                 .or_else(|| value.get("delta"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            Ok(Some(VoiceServerEvent::AudioDelta {
+            Ok(Some(OmniServerEvent::AudioDelta {
                 pcm16_base64: audio.to_string(),
                 sample_rate: 24000,
             }))
@@ -713,7 +713,7 @@ async fn handle_qwen_message(
                 .or_else(|| value.get("delta"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            Ok(Some(VoiceServerEvent::TranscriptDelta {
+            Ok(Some(OmniServerEvent::TranscriptDelta {
                 text: text_content.to_string(),
             }))
         }
@@ -725,7 +725,7 @@ async fn handle_qwen_message(
                 .or_else(|| value.get("text"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let event = VoiceServerEvent::TranscriptDone {
+            let event = OmniServerEvent::TranscriptDone {
                 text: text_content.to_string(),
             };
             persist_voice_event(state, session_state, &event).await;
@@ -740,7 +740,7 @@ async fn handle_qwen_message(
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             persist_assistant_text(state, session_state, text_content.to_string()).await;
-            Ok(Some(VoiceServerEvent::AssistantMessage {
+            Ok(Some(OmniServerEvent::AssistantMessage {
                 text: text_content.to_string(),
             }))
         }
@@ -820,7 +820,7 @@ async fn handle_qwen_message(
                         .request_confirmation(skill.clone(), params_with_skill)
                         .await;
 
-                    Ok(Some(VoiceServerEvent::IntentReceived {
+                    Ok(Some(OmniServerEvent::IntentReceived {
                         skill: skill.clone(),
                         params,
                         confirmation_required: true,
@@ -843,7 +843,7 @@ async fn handle_qwen_message(
                     });
                     let _ = tool_result_tx.try_send(tool_result);
 
-                    Ok(Some(VoiceServerEvent::IntentReceived {
+                    Ok(Some(OmniServerEvent::IntentReceived {
                         skill: skill.clone(),
                         params,
                         confirmation_required: false,
@@ -865,7 +865,7 @@ async fn handle_qwen_message(
                 .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown Qwen error");
-            Ok(Some(VoiceServerEvent::Error {
+            Ok(Some(OmniServerEvent::Error {
                 code: error_code.to_string(),
                 message: error_msg.to_string(),
             }))
@@ -890,8 +890,8 @@ async fn execute_voice_action(
     params: &serde_json::Value,
     state: &AppState,
 ) -> Result<(), String> {
-    let voice_config = get_voice_config(state)?;
-    let executor = VoiceSkillExecutor::new(state.clone());
+    let voice_config = get_omni_config(state)?;
+    let executor = OmniSkillExecutor::new(state.clone());
     executor
         .execute_with_overlay(skill, params.clone(), &voice_config.skills)
         .await
@@ -899,8 +899,8 @@ async fn execute_voice_action(
         .map_err(|e| e.to_string())
 }
 
-/// Send a VoiceServerEvent to client WebSocket.
-async fn send_voice_event(socket: &mut WebSocket, event: &VoiceServerEvent) -> Result<(), String> {
+/// Send a OmniServerEvent to client WebSocket.
+async fn send_omni_event(socket: &mut WebSocket, event: &OmniServerEvent) -> Result<(), String> {
     let text =
         serde_json::to_string(event).map_err(|e| format!("failed to serialize event: {}", e))?;
     socket
@@ -910,10 +910,10 @@ async fn send_voice_event(socket: &mut WebSocket, event: &VoiceServerEvent) -> R
     Ok(())
 }
 
-/// Send a VoiceServerEvent to client WebSocket (split sink version).
-async fn send_voice_event_raw(
+/// Send a OmniServerEvent to client WebSocket (split sink version).
+async fn send_omni_event_raw(
     tx: &mut futures_util::stream::SplitSink<WebSocket, Message>,
-    event: &VoiceServerEvent,
+    event: &OmniServerEvent,
 ) -> Result<(), String> {
     let text =
         serde_json::to_string(event).map_err(|e| format!("failed to serialize event: {}", e))?;
@@ -940,9 +940,9 @@ async fn send_qwen_json(
 
 /// Send error message and close WebSocket.
 async fn send_error_and_close(socket: &mut WebSocket, code: &str, message: String) {
-    let _ = send_voice_event(
+    let _ = send_omni_event(
         socket,
-        &VoiceServerEvent::Error {
+        &OmniServerEvent::Error {
             code: code.to_string(),
             message,
         },
@@ -971,7 +971,7 @@ mod tests {
     };
     use wmux_core::config::Config;
     use wmux_core::logging::LoggingHandle;
-    use wmux_core::storage::{db, models::VoiceConversationMessage};
+    use wmux_core::storage::{db, models::OmniConversationMessage};
 
     const TOKEN: &str = "test-token";
 
@@ -979,10 +979,10 @@ mod tests {
         let mut config = Config::default();
         config.server.bind = "127.0.0.1:0".to_string();
         config.auth.token = TOKEN.to_string();
-        config.voice.enabled = enabled;
-        config.voice.dashscope_api_key = api_key.map(ToString::to_string);
-        config.voice.endpoint = endpoint;
-        config.voice.model = "qwen3.5-omni-flash-realtime".to_string();
+        config.omni.enabled = enabled;
+        config.omni.dashscope_api_key = api_key.map(ToString::to_string);
+        config.omni.endpoint = endpoint;
+        config.omni.model = "qwen3.5-omni-flash-realtime".to_string();
         config
     }
 
@@ -1108,7 +1108,7 @@ mod tests {
 
     async fn next_client_event(
         client: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
-    ) -> VoiceServerEvent {
+    ) -> OmniServerEvent {
         let message = tokio::time::timeout(Duration::from_secs(5), client.next())
             .await
             .expect("client event timeout")
@@ -1141,7 +1141,7 @@ mod tests {
 
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::Connected
+            OmniServerEvent::Connected
         );
 
         let handshake = next_mock_message(&mut qwen_rx).await;
@@ -1177,7 +1177,7 @@ mod tests {
             9
         );
 
-        let client_audio = VoiceClientMessage::AudioFrame {
+        let client_audio = OmniClientMessage::AudioFrame {
             pcm16_base64: "client-audio".to_string(),
             sample_rate: 16000,
         };
@@ -1196,26 +1196,26 @@ mod tests {
 
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::AudioDelta {
+            OmniServerEvent::AudioDelta {
                 pcm16_base64: "qwen-audio".to_string(),
                 sample_rate: 24000,
             }
         );
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::TranscriptDelta {
+            OmniServerEvent::TranscriptDelta {
                 text: "hel".to_string(),
             }
         );
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::TranscriptDone {
+            OmniServerEvent::TranscriptDone {
                 text: "hello".to_string(),
             }
         );
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::IntentReceived {
+            OmniServerEvent::IntentReceived {
                 skill: "navigate_frontend".to_string(),
                 params: json!({ "route": "home" }),
                 confirmation_required: false,
@@ -1249,7 +1249,7 @@ mod tests {
 
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::Error {
+            OmniServerEvent::Error {
                 code: "voice_disabled".to_string(),
                 message: "Voice feature is not enabled in configuration".to_string(),
             }
@@ -1263,7 +1263,7 @@ mod tests {
     async fn microphone_disabled_returns_error_without_qwen_connection() {
         let (qwen_endpoint, mut qwen_rx, qwen_handle) = spawn_mock_qwen().await;
         let mut config = test_voice_config(qwen_endpoint, true, Some("dashscope-test-key"));
-        config.voice.microphone_disabled = true;
+        config.omni.microphone_disabled = true;
         let (app_url, app_handle, _dir) = spawn_test_app(config).await;
         let request = authorized_request(&app_url);
         let (mut client, _) = connect_async(request)
@@ -1272,7 +1272,7 @@ mod tests {
 
         assert_eq!(
             next_client_event(&mut client).await,
-            VoiceServerEvent::Error {
+            OmniServerEvent::Error {
                 code: "microphone_disabled".to_string(),
                 message: "Microphone disabled in Settings".to_string(),
             }
@@ -1293,7 +1293,7 @@ mod tests {
     async fn transcript_done_event_inserts_history_with_session_conversation_id() {
         let config = test_voice_config("ws://127.0.0.1:9/realtime".to_string(), true, Some("key"));
         let (state, _dir, pool) = test_state_with_storage(config).await;
-        let session_state = VoiceSessionState::new();
+        let session_state = OmniSessionState::new();
 
         let event = handle_qwen_message(
             &json!({ "type": "input_audio_transcription.done", "text": "hello history" })
@@ -1307,11 +1307,11 @@ mod tests {
 
         assert_eq!(
             event,
-            Some(VoiceServerEvent::TranscriptDone {
+            Some(OmniServerEvent::TranscriptDone {
                 text: "hello history".to_string(),
             })
         );
-        let rows = sqlx::query_as::<_, VoiceConversationMessage>(
+        let rows = sqlx::query_as::<_, OmniConversationMessage>(
             "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages",
         )
         .fetch_all(&pool)
@@ -1330,7 +1330,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_disabled_validation() {
         // Create minimal voice config with disabled=true
-        let config = VoiceConfig {
+        let config = OmniConfig {
             enabled: false,
             dashscope_api_key: None,
             microphone_disabled: false,
@@ -1355,7 +1355,7 @@ mod tests {
     /// Test voice config returns error when API key missing.
     #[tokio::test]
     async fn test_voice_api_key_missing_validation() {
-        let config = VoiceConfig {
+        let config = OmniConfig {
             enabled: true,
             dashscope_api_key: None,
             microphone_disabled: false,
@@ -1377,7 +1377,7 @@ mod tests {
     /// Test session.update structure is correct.
     #[test]
     fn test_session_update_structure() {
-        let config = VoiceConfig {
+        let config = OmniConfig {
             enabled: true,
             dashscope_api_key: Some("test-key".to_string()),
             microphone_disabled: false,
@@ -1461,7 +1461,7 @@ mod tests {
         let store = Config::load(&config_path).expect("load config");
         let state = AppState::new(store, assets_dir, LoggingHandle::empty());
 
-        let client_msg = VoiceClientMessage::AudioFrame {
+        let client_msg = OmniClientMessage::AudioFrame {
             pcm16_base64: "test-audio".to_string(),
             sample_rate: 16000,
         };
@@ -1469,7 +1469,7 @@ mod tests {
         let text = serde_json::to_string(&client_msg).unwrap();
         let result = handle_client_message(
             &text,
-            &VoiceSessionState::new(),
+            &OmniSessionState::new(),
             &state,
             &mpsc::channel(1).0,
         )
@@ -1505,14 +1505,14 @@ mod tests {
         let store = Config::load(&config_path).expect("load config");
         let state = AppState::new(store, assets_dir, LoggingHandle::empty());
 
-        let client_msg = VoiceClientMessage::TextMessage {
+        let client_msg = OmniClientMessage::TextMessage {
             text: "hello ai".to_string(),
         };
 
         let text = serde_json::to_string(&client_msg).unwrap();
         let result = handle_client_message(
             &text,
-            &VoiceSessionState::new(),
+            &OmniSessionState::new(),
             &state,
             &mpsc::channel(1).0,
         )
@@ -1537,7 +1537,7 @@ mod tests {
     /// Test function call accumulation.
     #[tokio::test]
     async fn test_function_call_accumulation() {
-        let session_state = VoiceSessionState::new();
+        let session_state = OmniSessionState::new();
 
         // Simulate delta events
         {
@@ -1576,7 +1576,7 @@ mod tests {
     /// Test session timeout tracking.
     #[test]
     fn test_session_timeout_tracking() {
-        let session_state = VoiceSessionState::new();
+        let session_state = OmniSessionState::new();
 
         // Fresh session should not need warning
         assert!(!session_state.should_send_timeout_warning());
@@ -1687,28 +1687,28 @@ mod tests {
             "sampleRate": 16000
         });
         let text = serde_json::to_string(&audio_msg).unwrap();
-        let msg: VoiceClientMessage = serde_json::from_str(&text).unwrap();
-        assert!(matches!(msg, VoiceClientMessage::AudioFrame { .. }));
+        let msg: OmniClientMessage = serde_json::from_str(&text).unwrap();
+        assert!(matches!(msg, OmniClientMessage::AudioFrame { .. }));
 
         let stop_msg = serde_json::json!({"type": "stop_listening"});
         let text = serde_json::to_string(&stop_msg).unwrap();
-        let msg: VoiceClientMessage = serde_json::from_str(&text).unwrap();
-        assert!(matches!(msg, VoiceClientMessage::StopListening));
+        let msg: OmniClientMessage = serde_json::from_str(&text).unwrap();
+        assert!(matches!(msg, OmniClientMessage::StopListening));
 
         let start_msg = serde_json::json!({"type": "start_listening"});
         let text = serde_json::to_string(&start_msg).unwrap();
-        let msg: VoiceClientMessage = serde_json::from_str(&text).unwrap();
-        assert!(matches!(msg, VoiceClientMessage::StartListening));
+        let msg: OmniClientMessage = serde_json::from_str(&text).unwrap();
+        assert!(matches!(msg, OmniClientMessage::StartListening));
     }
 
     /// Test server event serialization.
     #[test]
     fn test_server_event_serialization() {
-        let connected = VoiceServerEvent::Connected;
+        let connected = OmniServerEvent::Connected;
         let text = serde_json::to_string(&connected).unwrap();
         assert!(text.contains("connected"));
 
-        let audio_delta = VoiceServerEvent::AudioDelta {
+        let audio_delta = OmniServerEvent::AudioDelta {
             pcm16_base64: "test".to_string(),
             sample_rate: 24000,
         };
@@ -1716,7 +1716,7 @@ mod tests {
         assert!(text.contains("audio_delta"));
         assert!(text.contains("pcm16Base64"));
 
-        let error = VoiceServerEvent::Error {
+        let error = OmniServerEvent::Error {
             code: "test_error".to_string(),
             message: "Test message".to_string(),
         };
