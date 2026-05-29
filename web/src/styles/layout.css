@@ -28,7 +28,7 @@
 	min-height: var(--app-shell-header-height);
 	display: flex;
 	align-items: center;
-	padding: 0 var(--spacing-lg);
+	padding: 0 var(--spacing-md);
 }
 
 .sidebar-header-row {
@@ -44,7 +44,7 @@
 	font-size: var(--font-size-md);
 	font-weight: var(--font-weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0;
+	letter-spacing: 0.08em;
 }
 
 .sidebar-header-actions {

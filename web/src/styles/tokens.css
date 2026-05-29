@@ -8,7 +8,7 @@
   --font-size-xs: 12px;
   --font-size-sm: 13px;
   --font-size-md: 14px;
-  --font-size-base: 16px;
+  --font-size-base: 15px;
   --font-size-lg: 18px;
   --font-size-xl: 20px;
   --font-size-2xl: 24px;
@@ -23,31 +23,31 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --font-stack: 'Inter', 'Geist Sans', -apple-system, BlinkMacSystemFont,
+  --font-stack: 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
-  --font-display: 'Inter', 'Geist Sans', -apple-system, BlinkMacSystemFont,
+  --font-display: 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
-  --font-mono: 'CaskaydiaCove Nerd Font', 'Geist Mono', 'Berkeley Mono',
+  --font-mono: 'Geist Mono', 'CaskaydiaCove Nerd Font', 'Berkeley Mono',
     'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC',
     'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular,
     Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
-  /* --- Spacing scale (8px base) --- */
+  /* --- Spacing scale (4px/8px hybrid) --- */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-2xl: 48px;
-  --spacing-3xl: 64px;
-  --spacing-4xl: 80px;
-  --spacing-5xl: 96px;
+  --spacing-md: 12px;
+  --spacing-lg: 20px;
+  --spacing-xl: 28px;
+  --spacing-2xl: 40px;
+  --spacing-3xl: 56px;
+  --spacing-4xl: 72px;
+  --spacing-5xl: 88px;
 
   /* --- Border radius --- */
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-full: 9999px;
@@ -157,12 +157,12 @@
    ============================================================ */
 [data-mui-color-scheme="dark"] {
   /* Background layers */
-  --color-background: #0d1117;
-  --color-panel: #141a22;
-  --color-panel-border: rgba(255, 255, 255, 0.07);
-  --color-surface: #1a202b;
-  --color-surface-hover: #212836;
-  --color-surface-border: rgba(255, 255, 255, 0.07);
+  --color-background: #0b0f17;
+  --color-panel: #121824;
+  --color-panel-border: rgba(255, 255, 255, 0.05);
+  --color-surface: #1b2335;
+  --color-surface-hover: #243048;
+  --color-surface-border: rgba(255, 255, 255, 0.05);
   --color-surface-border-hover: rgba(100, 116, 139, 0.28);
 
   /* Accent (neutral blue) */
@@ -184,7 +184,7 @@
   --color-glass-blur: blur(12px) saturate(160%);
 
   /* Inputs */
-  --color-input-bg: #1a202b;
+  --color-input-bg: #1b2335;
   --color-input-border: rgba(255, 255, 255, 0.1);
   --color-input-border-focus: #6b82f5;
   --color-input-text: #f1f5f9;
@@ -218,9 +218,9 @@
   --shadow-footer-top: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 -2px 12px rgba(0, 0, 0, 0.2);
 
   /* Session card */
-  --color-session-card-bg: #1a202b;
-  --color-session-card-border: rgba(255, 255, 255, 0.06);
-  --color-session-card-hover: #212836;
+  --color-session-card-bg: #1b2335;
+  --color-session-card-border: rgba(255, 255, 255, 0.05);
+  --color-session-card-hover: #243048;
   --color-session-card-selected: rgba(107, 130, 245, 0.1);
   --color-session-card-selected-border: rgba(107, 130, 245, 0.28);
   --color-session-card-selected-glow: 0 0 0 3px rgba(107, 130, 245, 0.18), var(--shadow-sm);

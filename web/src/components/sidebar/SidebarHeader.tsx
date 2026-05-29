@@ -77,7 +77,7 @@ export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) 
 							WebkitTextFillColor: "transparent",
 							backgroundClip: "text",
 							textTransform: "uppercase",
-							letterSpacing: "0.04em",
+							letterSpacing: "0.08em",
 							flexShrink: 0,
 							lineHeight: 1,
 						}}

@@ -454,7 +454,7 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 										fontWeight: "var(--font-weight-semibold)",
 										color: "text.secondary",
 										textTransform: "uppercase",
-										letterSpacing: "0",
+										letterSpacing: "0.06em",
 									}}
 								>
 									Sessions
