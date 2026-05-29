@@ -1,5 +1,5 @@
 import type { Page } from "../../../web/node_modules/@playwright/test/index.js";
-import type { VoiceClientMessage, VoiceServerEvent } from "../../../web/src/api/voiceTypes.js";
+import type { OmniClientMessage, OmniServerEvent } from "../../../web/src/api/voiceTypes.js";
 
 export async function installVoiceMock(page: Page) {
 	await page.addInitScript({
@@ -96,17 +96,17 @@ export async function installVoiceMock(page: Page) {
 	});
 }
 
-export async function emitVoiceEvent(page: Page, event: VoiceServerEvent) {
-	await page.evaluate((payload) => (window as unknown as { __wmuxVoiceMock: { emit: (event: VoiceServerEvent) => void } }).__wmuxVoiceMock.emit(payload), event);
+export async function emitVoiceEvent(page: Page, event: OmniServerEvent) {
+	await page.evaluate((payload) => (window as unknown as { __wmuxVoiceMock: { emit: (event: OmniServerEvent) => void } }).__wmuxVoiceMock.emit(payload), event);
 }
 
-export async function getVoiceClientMessages(page: Page): Promise<VoiceClientMessage[]> {
-	return page.evaluate(() => (window as unknown as { __wmuxVoiceMock: { sentMessages: () => VoiceClientMessage[] } }).__wmuxVoiceMock.sentMessages());
+export async function getVoiceClientMessages(page: Page): Promise<OmniClientMessage[]> {
+	return page.evaluate(() => (window as unknown as { __wmuxVoiceMock: { sentMessages: () => OmniClientMessage[] } }).__wmuxVoiceMock.sentMessages());
 }
 
-export async function waitForVoiceClientMessage(page: Page, type: VoiceClientMessage["type"]) {
+export async function waitForVoiceClientMessage(page: Page, type: OmniClientMessage["type"]) {
 	await page.waitForFunction(
-		(expectedType) => (window as unknown as { __wmuxVoiceMock: { sentMessages: () => VoiceClientMessage[] } }).__wmuxVoiceMock.sentMessages().some((message) => message?.type === expectedType),
+		(expectedType) => (window as unknown as { __wmuxVoiceMock: { sentMessages: () => OmniClientMessage[] } }).__wmuxVoiceMock.sentMessages().some((message) => message?.type === expectedType),
 		type,
 	);
 }

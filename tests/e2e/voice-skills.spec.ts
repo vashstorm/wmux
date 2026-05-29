@@ -86,6 +86,7 @@ async function listFirstPane(request: APIRequestContext, sessionName: string) {
 }
 
 async function startVoice(page: Page) {
+	await page.getByRole("button", { name: "Show AI Assistant" }).click();
 	const voiceControl = page.locator("[data-ai-assistant-state]");
 	await expect(voiceControl).toHaveAttribute("data-ai-assistant-state", "idle");
 	await page.getByRole("button", { name: "Start listening" }).click();
@@ -140,10 +141,6 @@ test.describe("voice skills", () => {
 
 	test("renders AiAssistant with voice state when voice is enabled", async ({ page }) => {
 		await page.goto("/");
-
-		const voiceControl = page.locator("[data-ai-assistant-state]");
-		await expect(voiceControl).toBeVisible();
-		await expect(voiceControl).toHaveAttribute("data-ai-assistant-state", "idle");
 
 		await startVoice(page);
 	});
@@ -243,16 +240,16 @@ test.describe("voice skills", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await page.getByTestId("settings-tab-voice-skills").click();
+		await page.getByTestId("settings-tab-omni-skills").click();
 
-		const navigateToggle = page.getByTestId("voice-skill-navigate_frontend-enabled");
+		const navigateToggle = page.getByTestId("omni-skill-navigate_frontend-enabled");
 		await expect(navigateToggle).toBeVisible();
 		await expect(navigateToggle).toBeChecked();
 
 		await navigateToggle.click();
 		await expect(navigateToggle).not.toBeChecked();
 
-		const descriptionInput = page.getByTestId("voice-skill-navigate_frontend-description");
+		const descriptionInput = page.getByTestId("omni-skill-navigate_frontend-description");
 		await descriptionInput.fill("Navigate to frontend pages with custom routes");
 
 		await page.getByRole("button", { name: /Save/i }).click();
@@ -262,13 +259,12 @@ test.describe("voice skills", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.getByTestId("settings-tab-voice-skills").click();
+		await page.getByTestId("settings-tab-omni-skills").click();
+		await expect(page.getByTestId("omni-skill-navigate_frontend-enabled")).not.toBeChecked();
+		await expect(page.getByTestId("omni-skill-navigate_frontend-description")).toHaveValue("Navigate to frontend pages with custom routes");
 
-		await expect(page.getByTestId("voice-skill-navigate_frontend-enabled")).not.toBeChecked();
-		await expect(page.getByTestId("voice-skill-navigate_frontend-description")).toHaveValue("Navigate to frontend pages with custom routes");
-
-		await page.getByTestId("voice-skill-navigate_frontend-enabled").click();
-		await expect(page.getByTestId("voice-skill-navigate_frontend-enabled")).toBeChecked();
+		await page.getByTestId("omni-skill-navigate_frontend-enabled").click();
+		await expect(page.getByTestId("omni-skill-navigate_frontend-enabled")).toBeChecked();
 		await page.getByRole("button", { name: /Save/i }).click();
 		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
 	});
@@ -283,8 +279,8 @@ test.describe("voice skills", () => {
 		await emitIntent(page, "navigate_frontend", { route: "settings" });
 		await emitActionResult(page, "navigate_frontend");
 
-		await expect(page.locator(".voice-history")).toBeVisible({ timeout: 5000 });
-		await expect(page.locator(".voice-history")).toContainText("test history transcript");
-		await expect(page.locator(".voice-history")).toContainText("Executed: navigate_frontend");
+		await expect(page.locator(".voice-chat")).toBeVisible({ timeout: 5000 });
+		await expect(page.locator(".voice-chat")).toContainText("test history transcript");
+		await expect(page.locator(".voice-chat")).toContainText("Executed: navigate_frontend");
 	});
 });

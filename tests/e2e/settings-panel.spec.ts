@@ -8,6 +8,10 @@ test.describe("settings panel", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.addInitScript(() => {
 			window.sessionStorage.setItem("wmux-auth-token", "playwright-token");
+			Object.defineProperty(navigator, "mediaDevices", {
+				configurable: true,
+				value: { getUserMedia: async () => ({ getTracks: () => [{ stop: () => {} }] }) },
+			});
 		});
 	});
 
@@ -186,12 +190,12 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await page.getByTestId("settings-tab-voice").click();
-		await expect(page.getByTestId("voice-enabled-toggle")).toBeVisible();
+		await page.getByTestId("settings-tab-omni").click();
+		await expect(page.getByTestId("omni-enabled-toggle")).toBeVisible();
 
-		await page.getByTestId("voice-base-url-input").fill("wss://dashscope.aliyuncs.com/api-ws/v1/realtime");
-		await page.getByTestId("voice-model-input").fill("qwen3.5-omni-plus-realtime");
-		await page.getByTestId("voice-voice-input").fill("TestVoice");
+		await page.getByTestId("omni-base-url-input").fill("wss://dashscope.aliyuncs.com/api-ws/v1/realtime");
+		await page.getByTestId("omni-model-input").fill("qwen3.5-omni-plus-realtime");
+		await page.getByTestId("omni-voice-input").fill("TestVoice");
 
 		const saveButton = page.getByRole("button", { name: /^Save$/i });
 		await expect(saveButton).not.toBeDisabled();
@@ -220,10 +224,10 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await page.getByTestId("settings-tab-voice").click();
-		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeVisible();
+		await page.getByTestId("settings-tab-omni").click();
+		await expect(page.getByTestId("omni-microphone-disabled-toggle")).toBeVisible();
 
-		const toggle = page.getByTestId("voice-microphone-disabled-toggle");
+		const toggle = page.getByTestId("omni-microphone-disabled-toggle");
 		await expect(toggle).not.toBeChecked();
 
 		await toggle.click();
@@ -236,13 +240,13 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.getByTestId("settings-tab-voice").click();
+		await page.getByTestId("settings-tab-omni").click();
 
-		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeChecked();
+		await expect(page.getByTestId("omni-microphone-disabled-toggle")).toBeChecked();
 
 		// Toggle back to enabled for cleanup
-		await page.getByTestId("voice-microphone-disabled-toggle").click();
-		await expect(page.getByTestId("voice-microphone-disabled-toggle")).not.toBeChecked();
+		await page.getByTestId("omni-microphone-disabled-toggle").click();
+		await expect(page.getByTestId("omni-microphone-disabled-toggle")).not.toBeChecked();
 		await page.getByRole("button", { name: /Save/i }).click();
 		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
 	});
@@ -253,10 +257,10 @@ test.describe("settings panel", () => {
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 
-		await page.getByTestId("settings-tab-voice").click();
-		await expect(page.getByTestId("voice-microphone-disabled-toggle")).toBeVisible();
+		await page.getByTestId("settings-tab-omni").click();
+		await expect(page.getByTestId("omni-microphone-disabled-toggle")).toBeVisible();
 
-		const toggle = page.getByTestId("voice-microphone-disabled-toggle");
+		const toggle = page.getByTestId("omni-microphone-disabled-toggle");
 		await toggle.click();
 		await expect(toggle).toBeChecked();
 
@@ -265,6 +269,7 @@ test.describe("settings panel", () => {
 
 		await page.goto("/");
 
+		await page.getByRole("button", { name: "Show AI Assistant" }).click();
 		const voiceControl = page.locator("[data-ai-assistant-state]");
 		await expect(voiceControl).toBeVisible();
 
@@ -285,8 +290,8 @@ test.describe("settings panel", () => {
 
 		await page.getByTestId("open-settings-button").click();
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
-		await page.getByTestId("settings-tab-voice").click();
-		await page.getByTestId("voice-microphone-disabled-toggle").click();
+		await page.getByTestId("settings-tab-omni").click();
+		await page.getByTestId("omni-microphone-disabled-toggle").click();
 		await page.getByRole("button", { name: /Save/i }).click();
 		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
 	});
