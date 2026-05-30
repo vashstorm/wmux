@@ -106,8 +106,8 @@ export function StatsView() {
 
 	const handleCleanup = useCallback(() => {
 		showConfirm({
-			title: "Clean AI Usage Logs",
-			message: "This will delete all AI usage records older than 5 minutes. Records within the last 5 minutes will be kept.",
+			title: "Clean Tmux Analysis Logs",
+			message: "This will delete all Tmux analysis records older than 5 minutes. Records within the last 5 minutes will be kept.",
 			confirmText: "Clean",
 			confirmVariant: "danger",
 			onConfirm: () => {
@@ -120,7 +120,7 @@ export function StatsView() {
 		<Box data-testid="stats-view" sx={{ minHeight: 1 }}>
 			<Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
 				<Typography variant="subtitle2" sx={{ fontSize: STATS_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}>
-					AI Usage Stats
+					Tmux Analysis
 				</Typography>
 				<Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
 					<FormControlLabel
@@ -144,7 +144,7 @@ export function StatsView() {
 								size="small"
 								onClick={handleCleanup}
 								data-testid="stats-cleanup-button"
-								aria-label="Clean AI usage logs"
+								aria-label="Clean Tmux analysis logs"
 								disabled={loading || cleaning || events.length === 0}
 							>
 								<DeleteSweepIcon fontSize="small" />
@@ -229,7 +229,7 @@ export function StatsView() {
 			{loading && events.length === 0 ? (
 				<Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 2 }}>Loading...</Typography>
 			) : error && events.length === 0 ? null : events.length === 0 ? (
-				<Typography variant="body2" color="text.secondary" data-testid="stats-empty" sx={{ textAlign: "center", py: 2 }}>No AI usage events yet</Typography>
+				<Typography variant="body2" color="text.secondary" data-testid="stats-empty" sx={{ textAlign: "center", py: 2 }}>No Tmux analysis events yet</Typography>
 			) : (
 				<List disablePadding dense>
 					{events.map((event) => (

@@ -15,7 +15,7 @@ interface SidebarHeaderProps {
 const NAV_ITEMS: { view: SidebarView; Icon: typeof FolderIcon; label: string; testId: string }[] = [
 	{ view: "projects", Icon: FolderIcon, label: "Projects", testId: "open-projects-button" },
 	{ view: "session", Icon: TerminalIcon, label: "Session", testId: "open-session-button" },
-	{ view: "stats", Icon: BarChartIcon, label: "Stats", testId: "open-stats-button" },
+	{ view: "stats", Icon: BarChartIcon, label: "Analysis", testId: "open-stats-button" },
 ];
 
 export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) {

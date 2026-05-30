@@ -18,6 +18,7 @@ interface ProviderFormState extends IntelligenceProviderConfig {
 
 interface SkillFormState {
 	id: string;
+	name: string;
 	enabled: boolean;
 	description: string;
 	isNew: boolean;
@@ -513,13 +514,14 @@ export function SettingsPanel() {
 		setShowNewConnectionForm(true);
 	};
 
-	const skillToEditor = (skill?: OmniSkillDef): SkillFormState => ({
-		id: skill?.id ?? "",
-		enabled: skill?.enabled ?? true,
-		description: skill?.description ?? "",
-		isNew: !skill,
-		originalId: skill?.id ?? "",
-	});
+		const skillToEditor = (skill?: OmniSkillDef): SkillFormState => ({
+			id: skill?.id ?? "",
+			name: skill?.name ?? "",
+			enabled: skill?.enabled ?? true,
+			description: skill?.description ?? "",
+			isNew: !skill,
+			originalId: skill?.id ?? "",
+			});
 
 	const replaceSkillInState = (skill: OmniSkillDef) => {
 		setFormState((current) => {
@@ -551,9 +553,9 @@ export function SettingsPanel() {
 		if (!formState?.editingSkill) return;
 		const editor = formState.editingSkill;
 		const payload: OmniSkillDef = {
-			id: editor.id.trim(),
-			name: "",
-			enabled: editor.enabled,
+				id: editor.id.trim(),
+				name: editor.name.trim(),
+				enabled: editor.enabled,
 			description: editor.description.trim(),
 		};
 		if (!payload.id || !payload.description) {
@@ -885,45 +887,41 @@ export function SettingsPanel() {
 				fullWidth
 				data-testid="skill-editor-dialog"
 			>
-				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-					<Typography variant="h6">{editor?.isNew ? "New Skill" : "Edit Skill"}</Typography>
-					<IconButton
-						aria-label="Close skill editor"
-						onClick={() => setFormState((current) => current ? { ...current, editingSkill: null } : current)}
-						size="small"
-					>
-						<CloseIcon fontSize="small" />
-					</IconButton>
-				</DialogTitle>
+					<Box sx={{ display: "flex", justifyContent: "flex-end", p: 2, pb: 0 }}>
+						<IconButton
+							aria-label="Close skill editor"
+							onClick={() => setFormState((current) => current ? { ...current, editingSkill: null } : current)}
+							size="small"
+						>
+							<CloseIcon fontSize="small" />
+						</IconButton>
+					</Box>
 				<DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
 					{editor && (
 						<>
-							<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-								<TextField
-									label="Skill ID"
-									value={editor.id}
-									onChange={(event) => setFormState((current) => current?.editingSkill ? {
-										...current,
-										editingSkill: { ...current.editingSkill, id: event.target.value },
-									} : current)}
-									disabled={!editor.isNew}
-									fullWidth
-									slotProps={{ htmlInput: { "data-testid": "skill-editor-id-input" } }}
-								/>
-							</Box>
-							<FormControlLabel
-								control={
-									<Switch
-										checked={editor.enabled}
+								<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+									<TextField
+										label="Skill ID"
+										value={editor.id}
 										onChange={(event) => setFormState((current) => current?.editingSkill ? {
 											...current,
-											editingSkill: { ...current.editingSkill, enabled: event.target.checked },
+											editingSkill: { ...current.editingSkill, id: event.target.value },
 										} : current)}
-										slotProps={{ input: { "data-testid": "skill-editor-enabled-input" } as React.InputHTMLAttributes<HTMLInputElement> }}
+										disabled={!editor.isNew}
+										fullWidth
+										slotProps={{ htmlInput: { "data-testid": "skill-editor-id-input" } }}
 									/>
-								}
-								label="Enabled"
-							/>
+									<TextField
+										label="Name"
+										value={editor.name}
+										onChange={(event) => setFormState((current) => current?.editingSkill ? {
+											...current,
+											editingSkill: { ...current.editingSkill, name: event.target.value },
+										} : current)}
+										fullWidth
+										slotProps={{ htmlInput: { "data-testid": "skill-editor-name-input" } }}
+									/>
+								</Box>
 							<TextField
 								label="Markdown Prompt"
 								value={editor.description}
