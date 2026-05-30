@@ -5,15 +5,16 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import ReplayIcon from "@mui/icons-material/Replay";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
 import AssistantIcon from "@mui/icons-material/Assistant";
 import SendIcon from "@mui/icons-material/Send";
 import { getAuthToken, getRuntimeFlags } from "../api/runtime.js";
 import { OmniWebSocket } from "../api/voiceClient.js";
 import { AudioPipeline } from "../api/audioPipeline.js";
-import type { OmniServerEvent } from "../api/voiceTypes.js";
+import type { OmniServerEvent, VoiceSessionContextMessage } from "../api/voiceTypes.js";
 import { isVoiceAudioDeltaEvent, isVoiceTranscriptDeltaEvent, isVoiceTranscriptDoneEvent, isVoiceIntentReceivedEvent, isVoiceActionResultEvent, isVoiceErrorEvent, isVoiceConnectedEvent, isVoiceAssistantMessageEvent } from "../api/voiceTypes.js";
 import { useAppState } from "../state/store.js";
-import { getConfig, getOmniHistory, type OmniConversationMessage } from "../api/client.js";
+import { getConfig, getOmniHistory, clearOmniHistory, type OmniConversationMessage } from "../api/client.js";
 import "../styles/ai-assistant.css";
 
 const LEVEL_SEGMENTS = 12;
@@ -68,6 +69,9 @@ export function AiAssistant() {
 		setOmniConfirmation,
 		setOmniError,
 		setShowSettingsPanel,
+		connections,
+		selectedTargetName,
+		selectedPane,
 	} = useAppState();
 
 	const audioLevel = useRef(0);
@@ -83,6 +87,30 @@ export function AiAssistant() {
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
 	const [isHidden, setIsHidden] = useState(true);
+
+	const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
+		const targetName = selectedPane?.targetName ?? selectedTargetName;
+		if (!targetName) return null;
+
+		const connection = connections.find((conn) => conn.targetName === targetName);
+		return {
+			type: "session_context",
+			target: {
+				targetName,
+				session: selectedPane?.session,
+				window: selectedPane?.window,
+				pane: selectedPane?.pane,
+			},
+			connectionType: connection?.type,
+		};
+	}, [connections, selectedPane, selectedTargetName]);
+
+	const sendSessionContext = useCallback((ws: OmniWebSocket) => {
+		const context = buildSessionContextMessage();
+		if (context) {
+			ws.send(context);
+		}
+	}, [buildSessionContextMessage]);
 
 	useEffect(() => {
 		omniStatusRef.current = omniStatus;
@@ -126,6 +154,14 @@ export function AiAssistant() {
 		};
 		void loadHistory();
 		return () => { cancelled = true; };
+	}, []);
+
+	const handleNewChat = useCallback(async () => {
+		try {
+			await clearOmniHistory();
+		} catch {
+		}
+		setHistory([]);
 	}, []);
 
 	const handleServerMessage = useCallback((event: OmniServerEvent) => {
@@ -263,9 +299,10 @@ export function AiAssistant() {
 			},
 		});
 
+		sendSessionContext(ws);
 		ws.connect();
 		wsRef.current = ws;
-	}, [handleServerMessage, setOmniStatus, setOmniTranscript, setOmniError]);
+	}, [handleServerMessage, sendSessionContext, setOmniStatus, setOmniTranscript, setOmniError]);
 
 	const startListening = useCallback(async () => {
 		if (isMutedRef.current) return;
@@ -361,6 +398,7 @@ export function AiAssistant() {
 		const text = inputText.trim();
 		if (!text) return;
 
+		const existingWs = wsRef.current;
 		connectVoice();
 		if (!wsRef.current) {
 			setOmniError("Connection failed");
@@ -388,8 +426,11 @@ export function AiAssistant() {
 		setOmniError(null);
 		omniStatusRef.current = "processing";
 		setOmniStatus("processing");
+		if (existingWs) {
+			sendSessionContext(wsRef.current);
+		}
 		wsRef.current.send({ type: "text_message", text });
-	}, [connectVoice, inputText, setOmniError, setOmniStatus, setOmniTranscript]);
+	}, [connectVoice, inputText, sendSessionContext, setOmniError, setOmniStatus, setOmniTranscript]);
 
 	useEffect(() => {
 		return () => {
@@ -427,6 +468,14 @@ export function AiAssistant() {
 				<div className="voice-status-label">
 					<span>{omniStatus}</span>
 				</div>
+				<button
+					type="button"
+					className="voice-btn voice-btn--ghost"
+					aria-label="New chat"
+					onClick={handleNewChat}
+				>
+					<AddIcon fontSize="small" />
+				</button>
 				<button
 					type="button"
 					className="voice-btn voice-btn--ghost"

@@ -6,10 +6,12 @@ use sqlx::SqlitePool;
 use tokio::task::JoinHandle;
 
 use wmux_core::config::{ConnectionConfig, Store};
-use wmux_core::skills::OmniSkillDef;
 use wmux_core::intelligence::IntelligenceStore;
 use wmux_core::logging::LoggingHandle;
 use wmux_core::session::SessionManager;
+use wmux_core::skills::{
+    OmniSkillDef, delete_skill_from_dir, load_skills_from_dir, save_skill_to_dir,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -22,7 +24,7 @@ pub struct AppState {
     pub storage: Option<SqlitePool>,
     pub cleanup_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
     pub sync_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
-    pub skills: Vec<OmniSkillDef>,
+    pub skills: RuntimeSkills,
 }
 
 impl AppState {
@@ -41,7 +43,7 @@ impl AppState {
             storage: None,
             cleanup_handle: None,
             sync_handle: None,
-            skills: Vec::new(),
+            skills: RuntimeSkills::default(),
         }
     }
 
@@ -73,7 +75,7 @@ impl AppState {
             storage: Some(pool),
             cleanup_handle: None,
             sync_handle: None,
-            skills: Vec::new(),
+            skills: RuntimeSkills::default(),
         })
     }
 
@@ -83,6 +85,81 @@ impl AppState {
 
     pub fn set_sync_handle(&mut self, handle: Arc<Mutex<Option<JoinHandle<()>>>>) {
         self.sync_handle = Some(handle);
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeSkills {
+    inner: Arc<Mutex<Vec<OmniSkillDef>>>,
+    dir: Arc<Mutex<PathBuf>>,
+}
+
+impl RuntimeSkills {
+    pub fn load_from_dir(&self, dir: impl AsRef<Path>) -> Vec<OmniSkillDef> {
+        let dir = dir.as_ref().to_path_buf();
+        let skills = load_skills_from_dir(&dir);
+        if let Ok(mut path) = self.dir.lock() {
+            *path = dir;
+        }
+        if let Ok(mut inner) = self.inner.lock() {
+            *inner = skills.clone();
+        }
+        skills
+    }
+
+    pub fn list(&self) -> Vec<OmniSkillDef> {
+        self.inner
+            .lock()
+            .map(|skills| skills.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn get(&self, id: &str) -> Option<OmniSkillDef> {
+        self.inner
+            .lock()
+            .ok()?
+            .iter()
+            .find(|skill| skill.id == id)
+            .cloned()
+    }
+
+    pub fn upsert(&self, skill: &OmniSkillDef) -> anyhow::Result<OmniSkillDef> {
+        let dir = self.dir();
+        let saved = save_skill_to_dir(&dir, skill)?;
+        if let Ok(mut inner) = self.inner.lock() {
+            if let Some(existing) = inner.iter_mut().find(|item| item.id == saved.id) {
+                *existing = saved.clone();
+            } else {
+                inner.push(saved.clone());
+            }
+            inner.sort_by(|a, b| a.id.cmp(&b.id));
+        }
+        Ok(saved)
+    }
+
+    pub fn delete(&self, id: &str) -> anyhow::Result<bool> {
+        let dir = self.dir();
+        delete_skill_from_dir(&dir, id)?;
+        let mut removed = false;
+        if let Ok(mut inner) = self.inner.lock() {
+            let original_len = inner.len();
+            inner.retain(|skill| skill.id != id);
+            removed = inner.len() != original_len;
+        }
+        Ok(removed)
+    }
+
+    fn dir(&self) -> PathBuf {
+        self.dir
+            .lock()
+            .map(|dir| {
+                if dir.as_os_str().is_empty() {
+                    PathBuf::from("skills")
+                } else {
+                    dir.clone()
+                }
+            })
+            .unwrap_or_else(|_| PathBuf::from("skills"))
     }
 }
 

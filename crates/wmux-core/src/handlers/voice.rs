@@ -22,7 +22,8 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use wmux_core::config::OmniConfig;
-use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, generate_qwen_tools};
+use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, OmniTarget, generate_qwen_tools};
+use wmux_core::state::RuntimeSkills;
 use wmux_core::storage::{models::OmniConversationMessage, voice_history::OmniHistoryRepository};
 
 use crate::state::AppState;
@@ -44,6 +45,11 @@ struct FunctionCallAccumulator {
     call_id: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct VoiceSessionContext {
+    target: OmniTarget,
+}
+
 /// Active voice session state
 struct OmniSessionState {
     conversation_id: String,
@@ -51,6 +57,8 @@ struct OmniSessionState {
     confirmation_state: ConfirmationState,
     /// Pending function call accumulators by call_id
     function_calls: Arc<RwLock<HashMap<String, FunctionCallAccumulator>>>,
+    /// Current frontend workspace context supplied by the client
+    context: Arc<RwLock<Option<VoiceSessionContext>>>,
     /// Session start time for timeout tracking
     started_at: Instant,
 }
@@ -61,8 +69,13 @@ impl OmniSessionState {
             conversation_id: Uuid::new_v4().to_string(),
             confirmation_state: ConfirmationState::new(),
             function_calls: Arc::new(RwLock::new(HashMap::new())),
+            context: Arc::new(RwLock::new(None)),
             started_at: Instant::now(),
         }
+    }
+
+    async fn set_context(&self, target: OmniTarget, _connection_type: Option<String>) {
+        *self.context.write().await = Some(VoiceSessionContext { target });
     }
 
     /// Check if timeout warning should be sent (at 110 minutes)
@@ -348,9 +361,9 @@ async fn connect_to_qwen(
 async fn send_session_update(
     upstream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     config: &OmniConfig,
-    skill_defs: &[wmux_core::skills::OmniSkillDef],
+    skills: &RuntimeSkills,
 ) -> Result<(), String> {
-    let tools = generate_qwen_tools(skill_defs);
+    let tools = generate_qwen_tools(&skills.list());
 
     let turn_detection = if config.vad_enabled {
         serde_json::json!({
@@ -628,6 +641,21 @@ async fn handle_client_message(
             ]))
         }
 
+        OmniClientMessage::SessionContext {
+            target,
+            connection_type,
+        } => {
+            session_state
+                .set_context(target.clone(), connection_type.clone())
+                .await;
+            Ok(ClientMessageEffects::qwen(vec![serde_json::json!({
+                "type": "session.update",
+                "session": {
+                    "instructions": context_prompt_text(&target, connection_type.as_deref())
+                }
+            })]))
+        }
+
         OmniClientMessage::ConfirmAction { confirmation_id } => {
             let id = Uuid::parse_str(&confirmation_id)
                 .map_err(|e| format!("invalid confirmation ID: {}", e))?;
@@ -861,6 +889,7 @@ async fn handle_qwen_message(
                     serde_json::from_str(&args_str)
                         .map_err(|e| format!("invalid function arguments: {}", e))?
                 };
+                let params = apply_session_context_defaults(&skill, params, session_state).await;
 
                 let dangerous = is_dangerous(&skill, &params);
                 persist_tool_call(state, session_state, &skill, &params).await;
@@ -965,6 +994,132 @@ async fn execute_voice_action(
     execution.map(|_| ()).map_err(|e| e.to_string())
 }
 
+async fn apply_session_context_defaults(
+    skill: &str,
+    params: serde_json::Value,
+    session_state: &OmniSessionState,
+) -> serde_json::Value {
+    let Some(context) = session_state.context.read().await.clone() else {
+        return params;
+    };
+    let Some(target_name) = context
+        .target
+        .target_name
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    else {
+        return params;
+    };
+
+    if skill == "invoke_backend_route" {
+        return apply_context_to_route_params(params, target_name);
+    }
+
+    if !skill_uses_tmux_target(skill) {
+        return params;
+    }
+
+    let Some(mut object) = params.as_object().cloned() else {
+        return params;
+    };
+    if !has_string_alias(
+        &serde_json::Value::Object(object.clone()),
+        &["target_name", "targetName"],
+    ) {
+        object.insert(
+            "target_name".to_string(),
+            serde_json::Value::String(target_name.to_string()),
+        );
+    }
+    serde_json::Value::Object(object)
+}
+
+fn apply_context_to_route_params(
+    params: serde_json::Value,
+    target_name: &str,
+) -> serde_json::Value {
+    let route_id = params
+        .get("route_id")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default();
+    if !route_uses_tmux_target(route_id) {
+        return params;
+    }
+    let Some(mut object) = params.as_object().cloned() else {
+        return params;
+    };
+    let route_params = object
+        .get("params")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+    let Some(mut route_object) = route_params.as_object().cloned() else {
+        return serde_json::Value::Object(object);
+    };
+    if !has_string_alias(
+        &serde_json::Value::Object(route_object.clone()),
+        &["target_name", "targetName"],
+    ) {
+        route_object.insert(
+            "target_name".to_string(),
+            serde_json::Value::String(target_name.to_string()),
+        );
+        object.insert(
+            "params".to_string(),
+            serde_json::Value::Object(route_object),
+        );
+    }
+    serde_json::Value::Object(object)
+}
+
+fn skill_uses_tmux_target(skill: &str) -> bool {
+    matches!(
+        skill,
+        "list_sessions" | "create_session" | "rename_session" | "delete_session" | "send_to_pane"
+    )
+}
+
+fn route_uses_tmux_target(route_id: &str) -> bool {
+    route_id.starts_with("sessions.")
+        || route_id.starts_with("windows.")
+        || route_id.starts_with("panes.")
+}
+
+fn has_string_alias(params: &serde_json::Value, fields: &[&str]) -> bool {
+    fields.iter().any(|field| {
+        params
+            .get(*field)
+            .and_then(|value| value.as_str())
+            .is_some_and(|value| !value.trim().is_empty())
+    })
+}
+
+fn context_prompt_text(target: &OmniTarget, connection_type: Option<&str>) -> String {
+    let mut parts = Vec::new();
+    if let Some(target_name) = target
+        .target_name
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        parts.push(format!("target_name={target_name}"));
+    }
+    if let Some(connection_type) = connection_type.filter(|value| !value.is_empty()) {
+        parts.push(format!("connection_type={connection_type}"));
+    }
+    if let Some(session) = target.session.as_deref().filter(|value| !value.is_empty()) {
+        parts.push(format!("session={session}"));
+    }
+    if let Some(window) = target.window.as_deref().filter(|value| !value.is_empty()) {
+        parts.push(format!("window={window}"));
+    }
+    if let Some(pane) = target.pane.as_deref().filter(|value| !value.is_empty()) {
+        parts.push(format!("pane={pane}"));
+    }
+    format!(
+        "Current Wmux context: {}. Use target_name as the default connection for tmux actions when the user does not name a connection.",
+        parts.join(", ")
+    )
+}
+
 /// Send a OmniServerEvent to client WebSocket.
 async fn send_omni_event(socket: &mut WebSocket, event: &OmniServerEvent) -> Result<(), String> {
     let text =
@@ -1039,7 +1194,6 @@ mod tests {
     };
     use wmux_core::config::Config;
     use wmux_core::logging::LoggingHandle;
-    use wmux_core::skills::load_skills_from_dir;
     use wmux_core::storage::{db, models::OmniConversationMessage};
 
     const TOKEN: &str = "test-token";
@@ -1116,12 +1270,12 @@ mod tests {
         fs::create_dir_all(&assets_dir).expect("create assets dir");
         fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
         let store = Config::load(config_path).expect("load real config");
-        let mut state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
         let skills_dir = config_path
             .parent()
             .map(|parent| parent.join("skills"))
             .unwrap_or_else(|| PathBuf::from("skills"));
-        state.skills = load_skills_from_dir(skills_dir);
+        state.skills.load_from_dir(skills_dir);
         let app = crate::routes::router(state);
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind app");
         let addr = listener.local_addr().expect("app addr");
@@ -2090,6 +2244,83 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn session_context_message_is_forwarded_without_creating_response() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&Config::default()).expect("serialize config"),
+        )
+        .expect("write config");
+        let store = Config::load(&config_path).expect("load config");
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        let session_state = OmniSessionState::new();
+        let client_msg = OmniClientMessage::SessionContext {
+            target: wmux_core::protocol::OmniTarget {
+                target_name: Some("local".to_string()),
+                session: Some("main".to_string()),
+                window: Some("@1".to_string()),
+                pane: Some("%2".to_string()),
+            },
+            connection_type: Some("local".to_string()),
+        };
+
+        let effects = handle_client_message(
+            &serde_json::to_string(&client_msg).expect("serialize context"),
+            &session_state,
+            &state,
+            &mpsc::channel(1).0,
+        )
+        .await
+        .expect("handle context message");
+
+        assert_eq!(effects.qwen_messages.len(), 1);
+        assert_eq!(
+            effects.qwen_messages[0]
+                .get("type")
+                .and_then(|v| v.as_str()),
+            Some("session.update")
+        );
+        assert_eq!(
+            effects.qwen_messages[0]["session"]["instructions"].as_str(),
+            Some(
+                "Current Wmux context: target_name=local, connection_type=local, session=main, window=@1, pane=%2. Use target_name as the default connection for tmux actions when the user does not name a connection."
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_tool_target_name_is_filled_from_session_context() {
+        let session_state = OmniSessionState::new();
+        session_state
+            .set_context(
+                wmux_core::protocol::OmniTarget {
+                    target_name: Some("local".to_string()),
+                    session: Some("main".to_string()),
+                    window: None,
+                    pane: None,
+                },
+                Some("local".to_string()),
+            )
+            .await;
+
+        let params = apply_session_context_defaults(
+            "create_session",
+            serde_json::json!({ "session_name": "hana" }),
+            &session_state,
+        )
+        .await;
+
+        assert_eq!(
+            params,
+            serde_json::json!({ "target_name": "local", "session_name": "hana" })
+        );
+    }
+
+    #[tokio::test]
     async fn dangerous_action_cancel_uses_original_qwen_call_id() {
         let dir = tempfile::tempdir().expect("tempdir");
         let config_path = dir.path().join("config.jsonc");
@@ -2333,11 +2564,22 @@ esac
             id: "delete_session".to_string(),
             name: "Delete Session".to_string(),
             risk_level: crate::protocol::OmniSkillRiskLevel::Dangerous,
+            enabled: true,
+            prompt_mode: crate::skills::OmniSkillPromptMode::Description,
             description: "Delete a tmux session. WARNING: This is a destructive operation."
                 .to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string" },
+                    "session_name": { "type": "string" }
+                },
+                "required": ["target_name", "session_name"]
+            }),
+            full_prompt: String::new(),
         }];
         let tools = generate_qwen_tools(&skill_defs);
-        assert_eq!(tools.len(), 9);
+        assert_eq!(tools.len(), 1);
 
         for tool in &tools {
             assert_eq!(tool.get("type").and_then(|v| v.as_str()), Some("function"));

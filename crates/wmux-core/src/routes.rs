@@ -6,7 +6,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::handlers::{
-    ai_stats, config, connections, health, logs, projects, sessions, terminal, voice, voice_history,
+    ai_stats, config, connections, health, logs, projects, sessions, skills, terminal, voice,
+    voice_history,
 };
 use crate::http::api_not_found;
 use crate::state::AppState;
@@ -90,6 +91,11 @@ pub fn router(state: AppState) -> Router {
             delete(sessions::delete_pane),
         )
         .route("/config", get(config::get).put(config::update))
+        .route("/skills", get(skills::list).post(skills::create))
+        .route(
+            "/skills/{id}",
+            get(skills::get).put(skills::update).delete(skills::delete),
+        )
         .route("/projects", get(projects::list).post(projects::create))
         .route(
             "/projects/{id}",
@@ -425,17 +431,14 @@ mod tests {
             .expect("response");
         let body = json_body(response).await;
 
-	        assert_eq!(body["auth"]["token"], "");
-	        assert_eq!(body["auth"]["tokenConfigured"], true);
-	        assert_eq!(
-	            body["intelligence"]["providers"][0]["apiKeyConfigured"],
-	            true
-	        );
-	        // Provider API keys ARE returned (same behavior as Omni dashscopeApiKey)
-	        assert_eq!(
-	            body["intelligence"]["providers"][0]["apiKey"],
-	            "secret-key"
-	        );
+        assert_eq!(body["auth"]["token"], "");
+        assert_eq!(body["auth"]["tokenConfigured"], true);
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKeyConfigured"],
+            true
+        );
+        // Provider API keys ARE returned (same behavior as Omni dashscopeApiKey)
+        assert_eq!(body["intelligence"]["providers"][0]["apiKey"], "secret-key");
     }
 
     #[tokio::test]
@@ -454,12 +457,11 @@ mod tests {
             true
         );
 
-	        // Verify response contains the raw secret key (same as Omni dashscopeApiKey)
-	        assert_eq!(
-	            body["intelligence"]["providers"][0]["apiKey"],
-	            "secret-key",
-	            "apiKey should contain the actual key"
-	        );
+        // Verify response contains the raw secret key (same as Omni dashscopeApiKey)
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKey"], "secret-key",
+            "apiKey should contain the actual key"
+        );
     }
 
     #[tokio::test]
@@ -513,12 +515,11 @@ mod tests {
             "apiKey should be preserved when blank was sent"
         );
 
-	        // Verify response contains the preserved key
-	        assert_eq!(
-	            body["intelligence"]["providers"][0]["apiKey"],
-	            "secret-key",
-	            "apiKey should contain the preserved key after update"
-	        );
+        // Verify response contains the preserved key
+        assert_eq!(
+            body["intelligence"]["providers"][0]["apiKey"], "secret-key",
+            "apiKey should contain the preserved key after update"
+        );
     }
 
     #[tokio::test]

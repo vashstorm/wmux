@@ -8,6 +8,7 @@ import {
 	isVoiceCancelActionMessage,
 	isVoiceStopListeningMessage,
 	isVoiceStartListeningMessage,
+	isVoiceSessionContextMessage,
 	isVoiceConnectedEvent,
 	isVoiceAudioDeltaEvent,
 	isVoiceTranscriptDeltaEvent,
@@ -52,6 +53,14 @@ describe("voiceTypes", () => {
 			expect(isOmniClientMessage(msg)).toBe(true);
 			if (isOmniClientMessage(msg)) {
 				expect(isVoiceTextMessage(msg)).toBe(true);
+			}
+		});
+
+		it("recognizes session_context message", () => {
+			const msg = { type: "session_context", target: { targetName: "local", session: "main" } };
+			expect(isOmniClientMessage(msg)).toBe(true);
+			if (isOmniClientMessage(msg)) {
+				expect(isVoiceSessionContextMessage(msg)).toBe(true);
 			}
 		});
 
@@ -342,6 +351,7 @@ describe("voiceTypes", () => {
 		it("narrows OmniClientMessage union correctly", () => {
 			const messages: OmniClientMessage[] = [
 				{ type: "audio_frame", pcm16Base64: "AUDIO", sampleRate: 16000 },
+				{ type: "session_context", target: { targetName: "local", session: "main" } },
 				{ type: "confirm_action", confirmationId: "uuid-1" },
 				{ type: "cancel_action", confirmationId: "uuid-2" },
 				{ type: "stop_listening" },
@@ -354,6 +364,8 @@ describe("voiceTypes", () => {
 				if (isVoiceAudioFrameMessage(msg)) {
 					expect(msg.pcm16Base64).toBeDefined();
 					expect(msg.sampleRate).toBeGreaterThan(0);
+				} else if (isVoiceSessionContextMessage(msg)) {
+					expect(msg.target.targetName).toBe("local");
 				} else if (isVoiceConfirmActionMessage(msg)) {
 					expect(msg.confirmationId).toBeDefined();
 				} else if (isVoiceCancelActionMessage(msg)) {

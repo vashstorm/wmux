@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use wmux_core::skills::load_skills_from_dir;
 use std::process::ExitCode;
 
 use anyhow::Context;
@@ -69,10 +68,11 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     .context("failed to initialize SQLite storage")?;
 
     // Load skills from skills/ directory next to config file
-    let skills_dir = config_path.parent()
+    let skills_dir = config_path
+        .parent()
         .map(|p| p.join("skills"))
         .unwrap_or_else(|| PathBuf::from("skills"));
-    state.skills = load_skills_from_dir(&skills_dir);
+    state.skills.load_from_dir(&skills_dir);
 
     if let Some(pool) = state.storage.clone() {
         let cleanup_holder = wmux_core::storage::cleanup::spawn_cleanup_task(pool.clone());

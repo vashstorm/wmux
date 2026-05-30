@@ -87,6 +87,13 @@ export interface VoiceTextMessage extends OmniClientMessageBase {
 	text: string;
 }
 
+/** Provide the current Wmux workspace context to Qwen without creating a response */
+export interface VoiceSessionContextMessage extends OmniClientMessageBase {
+	type: "session_context";
+	target: VoiceTarget;
+	connectionType?: string;
+}
+
 /** Confirm a pending dangerous action */
 export interface VoiceConfirmActionMessage extends OmniClientMessageBase {
 	type: "confirm_action";
@@ -113,6 +120,7 @@ export interface VoiceStartListeningMessage extends OmniClientMessageBase {
 export type OmniClientMessage =
 	| VoiceAudioFrameMessage
 	| VoiceTextMessage
+	| VoiceSessionContextMessage
 	| VoiceConfirmActionMessage
 	| VoiceCancelActionMessage
 	| VoiceStopListeningMessage
@@ -207,6 +215,7 @@ export type OmniServerEvent =
 const CLIENT_MESSAGE_TYPES = [
 	"audio_frame",
 	"text_message",
+	"session_context",
 	"confirm_action",
 	"cancel_action",
 	"stop_listening",
@@ -262,6 +271,13 @@ export function isVoiceAudioFrameMessage(msg: OmniClientMessage): msg is VoiceAu
  */
 export function isVoiceTextMessage(msg: OmniClientMessage): msg is VoiceTextMessage {
 	return msg.type === "text_message";
+}
+
+/**
+ * Type guard for VoiceSessionContextMessage.
+ */
+export function isVoiceSessionContextMessage(msg: OmniClientMessage): msg is VoiceSessionContextMessage {
+	return msg.type === "session_context";
 }
 
 /**

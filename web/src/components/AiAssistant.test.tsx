@@ -22,6 +22,7 @@ const audioPipelineMocks = vi.hoisted(() => ({
 vi.mock("../api/client.js", () => ({
 	getConfig: vi.fn(),
 	getOmniHistory: vi.fn(),
+	clearOmniHistory: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../api/voiceClient.js", () => ({
@@ -315,6 +316,36 @@ describe("AiAssistant", () => {
 		});
 	});
 
+	test("sends current connection context before typed text messages", () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setConnections([{ id: "local", targetName: "local", type: "local" }]);
+			ctx.setSelectedTargetName("local");
+			ctx.setSelectedPane({ targetName: "local", session: "main", window: "@1", pane: "%2" });
+			ctx.setOmniStatus("idle");
+		});
+		showAssistant();
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "新建 Session, hana" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		expect(voiceClientMocks.send).toHaveBeenNthCalledWith(1, {
+			type: "session_context",
+			target: {
+				targetName: "local",
+				session: "main",
+				window: "@1",
+				pane: "%2",
+			},
+			connectionType: "local",
+		});
+		expect(voiceClientMocks.send).toHaveBeenNthCalledWith(2, {
+			type: "text_message",
+			text: "新建 Session, hana",
+		});
+	});
+
 	test("sends typed text messages when wmux auth token is empty on localhost", () => {
 		sessionStorage.removeItem("wmux-auth-token");
 		renderWithStateSetup((ctx) => {
@@ -368,5 +399,28 @@ describe("AiAssistant", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Hide AI Assistant" }));
 		expect(document.querySelector(".ai-assistant")).toBeNull();
+	});
+
+	test("clears history when new chat button is clicked", async () => {
+		vi.mocked(client.getOmniHistory).mockResolvedValueOnce([
+			{
+				id: "msg-1",
+				conversationId: "default",
+				role: "user",
+				kind: "transcript",
+				text: "old message",
+				createdAt: "2026-05-28T10:00:00Z",
+			},
+		]);
+		renderWithProvider();
+		showAssistant();
+
+		expect(await screen.findByText("old message")).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole("button", { name: "New chat" }));
+
+		expect(client.clearOmniHistory).toHaveBeenCalledOnce();
+		await screen.findByText("Ask AI with your voice");
+		expect(screen.queryByText("old message")).not.toBeInTheDocument();
 	});
 });

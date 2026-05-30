@@ -5,6 +5,7 @@ pub mod health;
 pub mod logs;
 pub mod projects;
 pub mod sessions;
+pub mod skills;
 pub mod terminal;
 pub mod voice;
 pub mod voice_history;

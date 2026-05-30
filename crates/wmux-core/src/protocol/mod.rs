@@ -2,7 +2,7 @@ use serde::de::{Error as DeError, Unexpected};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::skills::OmniSkillDef;
+use crate::skills::{OmniSkillDef, builtin_skill_defs, skill_prompt};
 
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not_found";
@@ -210,6 +210,14 @@ pub enum OmniClientMessage {
         /// User text input.
         text: String,
     },
+    /// Provide current workspace context to Qwen without prompting a response.
+    SessionContext {
+        /// Current selected target/session/window/pane.
+        target: OmniTarget,
+        /// Connection type for the selected target (e.g. "local").
+        #[serde(rename = "connectionType", skip_serializing_if = "Option::is_none")]
+        connection_type: Option<String>,
+    },
     /// Confirm a pending dangerous action.
     ConfirmAction {
         /// Confirmation ID from intent_received event.
@@ -339,224 +347,29 @@ pub fn find_skill<'a>(skills: &'a [OmniSkillDef], id: &str) -> Option<&'a OmniSk
     skills.iter().find(|skill| skill.id == id)
 }
 
-fn omni_skill_description<'a>(skill_defs: &'a [OmniSkillDef], skill_id: &str) -> &'a str {
-    find_skill(skill_defs, skill_id)
-        .map(|skill| skill.description.as_str())
-        .unwrap_or("No description available.")
-}
-
 /// Generate Qwen function-call tool definitions for all V1 voice skills.
 ///
 /// Returns JSON array of tool definitions compatible with Qwen Realtime API.
 /// Each tool has: type="function", function={name, description, parameters}.
 pub fn generate_qwen_tools(skill_defs: &[OmniSkillDef]) -> Vec<serde_json::Value> {
-    let tools = vec![
-        // navigate_frontend
-        serde_json::json!({
-            "type": "function",
-            "name": "navigate_frontend",
-            "description": omni_skill_description(skill_defs, "navigate_frontend"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "route": {
-                        "type": "string",
-                        "enum": VOICE_FRONTEND_ROUTES,
-                        "description": "Target frontend route/page."
-                    }
-                },
-                "required": ["route"]
-            }
-        }),
-        // invoke_backend_route
-        serde_json::json!({
-            "type": "function",
-            "name": "invoke_backend_route",
-            "description": omni_skill_description(skill_defs, "invoke_backend_route"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "route_id": {
-                        "type": "string",
-                        "enum": VOICE_BACKEND_ROUTES,
-                        "description": "Backend route to invoke (allowlist enforced)."
-                    },
-                    "params": {
-                        "type": "object",
-                        "description": "Route-specific parameters (e.g., target_name, session_name).",
-                        "additionalProperties": true
-                    }
-                },
-                "required": ["route_id"]
-            }
-        }),
-        // list_sessions
-        serde_json::json!({
-            "type": "function",
-            "name": "list_sessions",
-            "description": omni_skill_description(skill_defs, "list_sessions"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_name": {
-                        "type": "string",
-                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
-                    }
-                },
-                "required": ["target_name"]
-            }
-        }),
-        // create_session
-        serde_json::json!({
-            "type": "function",
-            "name": "create_session",
-            "description": omni_skill_description(skill_defs, "create_session"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_name": {
-                        "type": "string",
-                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
-                    },
-                    "session_name": {
-                        "type": "string",
-                        "description": "Name for the new session."
-                    }
-                },
-                "required": ["target_name", "session_name"]
-            }
-        }),
-        // rename_session
-        serde_json::json!({
-            "type": "function",
-            "name": "rename_session",
-            "description": omni_skill_description(skill_defs, "rename_session"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_name": {
-                        "type": "string",
-                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
-                    },
-                    "old_name": {
-                        "type": "string",
-                        "description": "Current session name."
-                    },
-                    "new_name": {
-                        "type": "string",
-                        "description": "New session name."
-                    }
-                },
-                "required": ["target_name", "old_name", "new_name"]
-            }
-        }),
-        // delete_session (dangerous)
-        serde_json::json!({
-            "type": "function",
-            "name": "delete_session",
-            "description": omni_skill_description(skill_defs, "delete_session"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_name": {
-                        "type": "string",
-                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
-                    },
-                    "session_name": {
-                        "type": "string",
-                        "description": "Session to delete."
-                    }
-                },
-                "required": ["target_name", "session_name"]
-            }
-        }),
-        // send_to_pane (dangerous)
-        serde_json::json!({
-            "type": "function",
-            "name": "send_to_pane",
-            "description": omni_skill_description(skill_defs, "send_to_pane"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target_name": {
-                        "type": "string",
-                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
-                    },
-                    "session_name": {
-                        "type": "string",
-                        "description": "Session name."
-                    },
-                    "window_name": {
-                        "type": "string",
-                        "description": "Window name or index."
-                    },
-                    "pane_index": {
-                        "type": "integer",
-                        "description": "Pane index within window."
-                    },
-                    "text": {
-                        "type": "string",
-                        "description": "Text to send to the pane."
-                    },
-                    "execute": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, execute as command (dangerous)."
-                    },
-                    "append_enter": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, append Enter key after text (dangerous)."
-                    },
-                    "control": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, send as control sequence (dangerous)."
-                    },
-                    "multiline": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "If true, text contains multiple lines (dangerous)."
-                    }
-                },
-                "required": ["target_name", "session_name", "window_name", "pane_index", "text"]
-            }
-        }),
-        // confirm_action
-        serde_json::json!({
-            "type": "function",
-            "name": "confirm_action",
-            "description": omni_skill_description(skill_defs, "confirm_action"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "confirmation_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Confirmation ID from intent_received event."
-                    }
-                },
-                "required": ["confirmation_id"]
-            }
-        }),
-        // cancel_action
-        serde_json::json!({
-            "type": "function",
-            "name": "cancel_action",
-            "description": omni_skill_description(skill_defs, "cancel_action"),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "confirmation_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Confirmation ID to cancel."
-                    }
-                },
-                "required": ["confirmation_id"]
-            }
-        }),
-    ];
+    let effective_skills = if skill_defs.is_empty() {
+        builtin_skill_defs()
+    } else {
+        skill_defs.to_vec()
+    };
+
+    let tools = effective_skills
+        .iter()
+        .filter(|skill| skill.enabled)
+        .map(|skill| {
+            serde_json::json!({
+                "type": "function",
+                "name": skill.id,
+                "description": skill_prompt(skill),
+                "parameters": skill.parameters,
+            })
+        })
+        .collect::<Vec<_>>();
 
     tools.into_iter().map(qwen_realtime_tool).collect()
 }
@@ -691,6 +504,15 @@ mod tests {
             OmniClientMessage::TextMessage {
                 text: "hello from keyboard".to_string(),
             },
+            OmniClientMessage::SessionContext {
+                target: OmniTarget {
+                    target_name: Some("local".to_string()),
+                    session: Some("main".to_string()),
+                    window: Some("@1".to_string()),
+                    pane: Some("%2".to_string()),
+                },
+                connection_type: Some("local".to_string()),
+            },
             OmniClientMessage::ConfirmAction {
                 confirmation_id: "uuid-confirmation-id".to_string(),
             },
@@ -732,6 +554,29 @@ mod tests {
             serde_json::json!({
                 "type": "text_message",
                 "text": "hello"
+            })
+        );
+
+        assert_eq!(
+            serde_json::to_value(OmniClientMessage::SessionContext {
+                target: OmniTarget {
+                    target_name: Some("local".to_string()),
+                    session: Some("main".to_string()),
+                    window: Some("@1".to_string()),
+                    pane: Some("%2".to_string()),
+                },
+                connection_type: Some("local".to_string()),
+            })
+            .expect("serialize"),
+            serde_json::json!({
+                "type": "session_context",
+                "target": {
+                    "targetName": "local",
+                    "session": "main",
+                    "window": "@1",
+                    "pane": "%2"
+                },
+                "connectionType": "local"
             })
         );
 

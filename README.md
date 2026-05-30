@@ -158,7 +158,7 @@ Voice configuration is managed through the Settings UI and persisted server-side
 
 ### Built-in Voice Skills
 
-Wmux ships with predefined voice skills. You can enable/disable them and customize their descriptions through **Settings > Voice Control > Skills**:
+Wmux ships with predefined voice skills. You can enable/disable them and customize their Markdown prompts through **Settings > Voice Control > Skills**:
 
 | Skill ID | What it does |
 |----------|-------------|

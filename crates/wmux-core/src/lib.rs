@@ -12,11 +12,11 @@ pub mod project_runtime;
 pub mod protocol;
 pub mod routes;
 pub mod session;
+pub mod skills;
 pub mod state;
 pub mod storage;
 pub mod tmux;
 pub mod voice;
-pub mod skills;
 
 pub fn version() -> &'static str {
     match option_env!("WMUX_VERSION") {

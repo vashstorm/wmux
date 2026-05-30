@@ -211,8 +211,9 @@ export interface AppConfig {
 export interface OmniSkillDef {
 	id: string;
 	name: string;
-	riskLevel: string;
+	enabled: boolean;
 	description: string;
+	fullPrompt?: string;
 }
 
 export interface OmniConfig {
@@ -255,6 +256,10 @@ export interface ErrorLogsResponse {
 	lines: string[];
 	truncated: boolean;
 	maxLines: number;
+}
+
+export interface SkillsListResponse {
+	data: OmniSkillDef[];
 }
 
 // --- Projects ---
@@ -353,6 +358,35 @@ export interface AiStatsCleanupResponse {
 
 export async function fetchHealth(): Promise<HealthResponse> {
 	return (await apiFetch("/api/health")) as HealthResponse;
+}
+
+export async function listSkills(): Promise<OmniSkillDef[]> {
+	const response = (await apiFetch("/api/skills")) as SkillsListResponse;
+	return response.data ?? [];
+}
+
+export async function getSkill(id: string): Promise<OmniSkillDef> {
+	return (await apiFetch(`/api/skills/${encodeURIComponent(id)}`)) as OmniSkillDef;
+}
+
+export async function createSkill(skill: OmniSkillDef): Promise<OmniSkillDef> {
+	return (await apiFetch("/api/skills", {
+		method: "POST",
+		body: JSON.stringify(skill),
+	})) as OmniSkillDef;
+}
+
+export async function updateSkill(id: string, skill: OmniSkillDef): Promise<OmniSkillDef> {
+	return (await apiFetch(`/api/skills/${encodeURIComponent(id)}`, {
+		method: "PUT",
+		body: JSON.stringify(skill),
+	})) as OmniSkillDef;
+}
+
+export async function deleteSkill(id: string): Promise<void> {
+	await apiFetch(`/api/skills/${encodeURIComponent(id)}`, {
+		method: "DELETE",
+	});
 }
 
 export async function listConnections(): Promise<ConnectionConfig[]> {

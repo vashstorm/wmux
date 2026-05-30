@@ -10,7 +10,6 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
 const DEFAULT_BASE_PATH: &str = ".";
@@ -233,7 +232,6 @@ pub struct OmniConfig {
     pub vad_threshold: f32,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Store {
     inner: Arc<Mutex<StoreInner>>,
@@ -455,7 +453,7 @@ impl Default for OmniConfig {
             dashscope_api_key: None,
             microphone_disabled: false,
             voice: None,
-                        model: default_omni_model(),
+            model: default_omni_model(),
             endpoint: default_omni_endpoint(),
             continuous_listening: default_omni_continuous_listening(),
             store_raw_audio: false,
@@ -748,8 +746,8 @@ pub fn is_localhost_bind(bind: &str) -> bool {
 }
 
 fn validate_omni_endpoint(endpoint: &str) -> Result<()> {
-    let parsed = Url::parse(endpoint)
-        .map_err(|_| ConfigError::InvalidOmniEndpoint(endpoint.to_string()))?;
+    let parsed =
+        Url::parse(endpoint).map_err(|_| ConfigError::InvalidOmniEndpoint(endpoint.to_string()))?;
     if parsed.scheme() != "wss" {
         return Err(ConfigError::InvalidOmniEndpoint(endpoint.to_string()));
     }
@@ -1353,7 +1351,7 @@ mod tests {
         assert_eq!(config.omni.dashscope_api_key, None);
         assert!(!config.omni.microphone_disabled);
         assert_eq!(config.omni.voice, None);
-                assert_eq!(config.omni.model, "qwen3.5-omni-flash-realtime");
+        assert_eq!(config.omni.model, "qwen3.5-omni-flash-realtime");
         assert_eq!(
             config.omni.endpoint,
             "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
@@ -1377,7 +1375,7 @@ mod tests {
 
         assert!(!config.omni.microphone_disabled);
         assert_eq!(config.omni.voice, None);
-            }
+    }
 
     #[test]
     fn omni_config_serializes_new_camel_case_fields() {
@@ -1388,7 +1386,6 @@ mod tests {
 
         assert_eq!(value["omni"]["microphoneDisabled"], true);
         assert_eq!(value["omni"]["voice"], "Cherry");
-
     }
 
     #[test]

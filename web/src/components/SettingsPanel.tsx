@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip, SvgIcon } from "@mui/material";
 import { Add as AddIcon, Analytics as AnalyticsIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Extension as ExtensionIcon, Lan as LanIcon, Memory as MemoryIcon, SettingsOutlined as SettingsOutlinedIcon, SmartToy as SmartToyIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
-import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearOmniHistory } from "../api/client.js";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type OmniSkillDef, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, listSkills, createSkill, updateSkill, deleteSkill } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
@@ -14,6 +14,14 @@ interface ProviderFormState extends IntelligenceProviderConfig {
 	isNew: boolean;
 	apiKeyInput: string;
 	originalName: string;
+}
+
+interface SkillFormState {
+	id: string;
+	enabled: boolean;
+	description: string;
+	isNew: boolean;
+	originalId: string;
 }
 
 interface SettingsFormState {
@@ -44,10 +52,12 @@ interface SettingsFormState {
 	omniModel: string;
 	omniVoice: string;
 	omniMicrophoneDisabled: boolean;
+	omniSkills: OmniSkillDef[];
+	editingSkill: SkillFormState | null;
 
 }
 
-type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "omni";
+type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "omni" | "omni-skills";
 
 const SETTINGS_SECTIONS: Array<{
 	key: SettingsTabKey;
@@ -78,6 +88,11 @@ const SETTINGS_SECTIONS: Array<{
 		key: "omni",
 		label: "AI Assistant",
 		icon: SmartToyIcon,
+	},
+	{
+		key: "omni-skills",
+		label: "Skills",
+		icon: ExtensionIcon,
 	},
 ];
 
@@ -118,6 +133,8 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		omniModel: config.omni?.model ?? "qwen3.5-omni-flash-realtime",
 		omniVoice: config.omni?.voice ?? "",
 		omniMicrophoneDisabled: config.omni?.microphoneDisabled ?? false,
+		omniSkills: config.omni?.skillDefinitions ?? [],
+		editingSkill: null,
 				omniSkValue: config.omni?.dashscopeApiKey ?? (config.omni?.dashscopeApiKeyConfigured ? "••••••••••••••••••••••••••••••••••••••••••••••••••" : ""),
 		};
 }
@@ -160,10 +177,14 @@ export function SettingsPanel() {
 		setIsLoading(true);
 		try {
 			const response = await getConfig();
+			const skills = await listSkills();
 			const baseState = buildFormState(response);
 			const restoredSk = sessionStorage.getItem(SK_STORAGE_KEY) ?? baseState.omniSkValue;
-			setFormState({ ...baseState, omniSkValue: restoredSk });
-			setConfig(response);
+			setFormState({ ...baseState, omniSkValue: restoredSk, omniSkills: skills });
+			setConfig({
+				...response,
+				omni: response.omni ? { ...response.omni, skillDefinitions: skills } : response.omni,
+			});
 			setConnections(response.connections);
 			setConfigConflict(null);
 		} catch (err) {
@@ -461,13 +482,6 @@ export function SettingsPanel() {
 		closePanel();
 	};
 
-	const handleClearOmniHistory = async () => {
-		try {
-			await clearOmniHistory();
-		} catch {
-		}
-	};
-
 	const handleDeleteConnection = (connection: ConnectionConfig) => {
 			showConfirm({
 				title: "Delete Connection",
@@ -497,6 +511,105 @@ export function SettingsPanel() {
 	const handleNewConnection = () => {
 		setEditingConnection(null);
 		setShowNewConnectionForm(true);
+	};
+
+	const skillToEditor = (skill?: OmniSkillDef): SkillFormState => ({
+		id: skill?.id ?? "",
+		enabled: skill?.enabled ?? true,
+		description: skill?.description ?? "",
+		isNew: !skill,
+		originalId: skill?.id ?? "",
+	});
+
+	const replaceSkillInState = (skill: OmniSkillDef) => {
+		setFormState((current) => {
+			if (!current) return current;
+			const existingIndex = current.omniSkills.findIndex((item) => item.id === skill.id);
+			const omniSkills = existingIndex >= 0
+				? current.omniSkills.map((item) => item.id === skill.id ? skill : item)
+				: [...current.omniSkills, skill].sort((a, b) => a.id.localeCompare(b.id));
+			return { ...current, omniSkills, editingSkill: null };
+		});
+		setConfig((current) => current ? {
+			...current,
+			omni: current.omni ? {
+				...current.omni,
+				skillDefinitions: [...(current.omni.skillDefinitions ?? []).filter((item) => item.id !== skill.id), skill].sort((a, b) => a.id.localeCompare(b.id)),
+			} : current.omni,
+		} : current);
+	};
+
+	const handleNewSkill = () => {
+		setFormState((current) => current ? { ...current, editingSkill: skillToEditor() } : current);
+	};
+
+	const handleEditSkill = (skill: OmniSkillDef) => {
+		setFormState((current) => current ? { ...current, editingSkill: skillToEditor(skill) } : current);
+	};
+
+	const handleSaveSkill = async () => {
+		if (!formState?.editingSkill) return;
+		const editor = formState.editingSkill;
+		const payload: OmniSkillDef = {
+			id: editor.id.trim(),
+			name: "",
+			enabled: editor.enabled,
+			description: editor.description.trim(),
+		};
+		if (!payload.id || !payload.description) {
+			setError({ code: "bad_request", message: "Skill id and markdown prompt are required" });
+			return;
+		}
+		try {
+			const saved = editor.isNew
+				? await createSkill(payload)
+				: await updateSkill(editor.originalId, payload);
+			replaceSkillInState(saved);
+		} catch (err) {
+			if (err instanceof ApiError) {
+				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
+			}
+		}
+	};
+
+	const handleDeleteSkill = (skill: OmniSkillDef) => {
+		showConfirm({
+			title: "Delete Skill",
+			message: `Delete skill "${skill.name}"? This removes its markdown definition.`,
+			confirmText: "Delete Skill",
+			confirmVariant: "danger",
+			onConfirm: async () => {
+				try {
+					await deleteSkill(skill.id);
+					setFormState((current) => current ? {
+						...current,
+						omniSkills: current.omniSkills.filter((item) => item.id !== skill.id),
+					} : current);
+					setConfig((current) => current ? {
+						...current,
+						omni: current.omni ? {
+							...current.omni,
+							skillDefinitions: (current.omni.skillDefinitions ?? []).filter((item) => item.id !== skill.id),
+						} : current.omni,
+					} : current);
+				} catch (err) {
+					if (err instanceof ApiError) {
+						setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
+					}
+				}
+			},
+		});
+	};
+
+	const handleToggleSkill = async (skill: OmniSkillDef, enabled: boolean) => {
+		try {
+			const saved = await updateSkill(skill.id, { ...skill, enabled });
+			replaceSkillInState(saved);
+		} catch (err) {
+			if (err instanceof ApiError) {
+				setError({ code: err.code, message: getErrorMessage(err.code, err.message) });
+			}
+		}
 	};
 
 	const renderProviderEditor = (editor: ProviderFormState) => {
@@ -762,7 +875,93 @@ export function SettingsPanel() {
 		);
 	};
 
+	const renderSkillEditorDialog = () => {
+		const editor = formState?.editingSkill;
+		return (
+			<Dialog
+				open={Boolean(editor)}
+				onClose={() => setFormState((current) => current ? { ...current, editingSkill: null } : current)}
+				maxWidth="md"
+				fullWidth
+				data-testid="skill-editor-dialog"
+			>
+				<DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+					<Typography variant="h6">{editor?.isNew ? "New Skill" : "Edit Skill"}</Typography>
+					<IconButton
+						aria-label="Close skill editor"
+						onClick={() => setFormState((current) => current ? { ...current, editingSkill: null } : current)}
+						size="small"
+					>
+						<CloseIcon fontSize="small" />
+					</IconButton>
+				</DialogTitle>
+				<DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+					{editor && (
+						<>
+							<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+								<TextField
+									label="Skill ID"
+									value={editor.id}
+									onChange={(event) => setFormState((current) => current?.editingSkill ? {
+										...current,
+										editingSkill: { ...current.editingSkill, id: event.target.value },
+									} : current)}
+									disabled={!editor.isNew}
+									fullWidth
+									slotProps={{ htmlInput: { "data-testid": "skill-editor-id-input" } }}
+								/>
+							</Box>
+							<FormControlLabel
+								control={
+									<Switch
+										checked={editor.enabled}
+										onChange={(event) => setFormState((current) => current?.editingSkill ? {
+											...current,
+											editingSkill: { ...current.editingSkill, enabled: event.target.checked },
+										} : current)}
+										slotProps={{ input: { "data-testid": "skill-editor-enabled-input" } as React.InputHTMLAttributes<HTMLInputElement> }}
+									/>
+								}
+								label="Enabled"
+							/>
+							<TextField
+								label="Markdown Prompt"
+								value={editor.description}
+								onChange={(event) => setFormState((current) => current?.editingSkill ? {
+									...current,
+									editingSkill: { ...current.editingSkill, description: event.target.value },
+								} : current)}
+								minRows={5}
+								multiline
+								fullWidth
+								slotProps={{ htmlInput: { "data-testid": "skill-editor-description-input" } }}
+							/>
+							<Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, pt: 1 }}>
+								<Button
+									type="button"
+									variant="outlined"
+									onClick={() => setFormState((current) => current ? { ...current, editingSkill: null } : current)}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									variant="contained"
+									onClick={() => { void handleSaveSkill(); }}
+									data-testid="skill-editor-save-btn"
+								>
+									Save Skill
+								</Button>
+							</Box>
+						</>
+					)}
+				</DialogContent>
+			</Dialog>
+		);
+	};
+
 	return (
+		<>
 		<Dialog
 			open={showSettingsPanel}
 			onClose={handleCancel}
@@ -837,7 +1036,7 @@ export function SettingsPanel() {
 												{item.label}
 											</Typography>
 											<Typography variant="caption" color="text.secondary" className="settings-panel-subtitle" sx={{ display: "block", mt: 0.125, lineHeight: 1.2 }}>
-												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : (formState.omniEnabled ? "Enabled" : "Disabled")}
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : item.key === "omni-skills" ? `${formState.omniSkills.length} skills` : (formState.omniEnabled ? "Enabled" : "Disabled")}
 											</Typography>
 										</Box>
 									</ListItemButton>
@@ -1456,27 +1655,101 @@ export function SettingsPanel() {
 													}
 													label="Disable Microphone"
 												/>
-											</Box>
-										</Box>
-
-										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice History</Typography>
-											<Button
-												type="button"
-												variant="outlined"
-												color="error"
-												onClick={() => {
-													void handleClearOmniHistory();
-												}}
-												startIcon={<DeleteIcon />}
-												data-testid="omni-history-clear"
-											>
-												CLEAR HISTORY
-											</Button>
+</Box>
 										</Box>
 									</Box>
 								)}
 
+
+								{activeTab === "omni-skills" && (
+									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+										<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
+											<Box>
+												<Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Skills</Typography>
+												<Typography variant="caption" color="text.secondary">
+													Function tools and prompts loaded by the AI Assistant.
+												</Typography>
+											</Box>
+											<Button
+												type="button"
+												variant="contained"
+												size="small"
+												startIcon={<AddIcon />}
+												onClick={handleNewSkill}
+												data-testid="skill-add-btn"
+											>
+												NEW SKILL
+											</Button>
+										</Box>
+
+										{formState.omniSkills.length === 0 ? (
+											<Box sx={{ textAlign: "center", py: 4 }}>
+												<Typography>No skills configured yet.</Typography>
+												<Button sx={{ mt: 1 }} variant="contained" size="small" onClick={handleNewSkill} startIcon={<AddIcon />}>NEW SKILL</Button>
+											</Box>
+										) : (
+											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+												{formState.omniSkills.map((skill) => (
+													<Box
+														key={skill.id}
+														component="li"
+														sx={{
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "space-between",
+															gap: 2,
+															p: 1.5,
+															border: 1,
+															borderColor: "divider",
+															borderRadius: 1,
+															bgcolor: "background.paper",
+														}}
+													>
+														<Box sx={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 0.5 }}>
+															<Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+																<Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{skill.name}</Typography>
+																<Chip label={skill.id} size="small" variant="outlined" />
+															</Stack>
+															<Typography variant="caption" color="text.secondary" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+																{skill.description}
+															</Typography>
+														</Box>
+														<Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+															<Switch
+																checked={skill.enabled}
+																onChange={(event) => { void handleToggleSkill(skill, event.target.checked); }}
+																slotProps={{ input: { "data-testid": `omni-skill-${skill.id}-enabled` } as React.InputHTMLAttributes<HTMLInputElement> }}
+															/>
+															<Tooltip title="Edit skill">
+																<IconButton
+																	type="button"
+																	onClick={() => handleEditSkill(skill)}
+																	aria-label={`Edit ${skill.name}`}
+																	size="small"
+																	data-testid={`omni-skill-${skill.id}-edit`}
+																>
+																	<EditIcon fontSize="small" />
+																</IconButton>
+															</Tooltip>
+															<Tooltip title="Delete skill">
+																<IconButton
+																	type="button"
+																	onClick={() => handleDeleteSkill(skill)}
+																	aria-label={`Delete ${skill.name}`}
+																	size="small"
+																	color="error"
+																	data-testid={`omni-skill-${skill.id}-delete`}
+																>
+																	<DeleteIcon fontSize="small" />
+																</IconButton>
+															</Tooltip>
+														</Box>
+													</Box>
+												))}
+											</Box>
+										)}
+									</Box>
+								)}
 
 								{activeTab === "typography" && (
 									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1605,5 +1878,7 @@ ui: scale ${formState.uiScaleStep > 0 ? "+" : ""}${formState.uiScaleStep}`}</Typ
 				</Box>
 			)}
 		</Dialog>
+		{renderSkillEditorDialog()}
+		</>
 	);
 }

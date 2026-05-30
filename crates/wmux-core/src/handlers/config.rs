@@ -1,11 +1,11 @@
 use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
-use wmux_core::skills::OmniSkillDef;
 use wmux_core::config::{
     AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig,
     UIConfig,
 };
+use wmux_core::skills::OmniSkillDef;
 
 use crate::http::{ApiError, ApiResult};
 use crate::state::AppState;
@@ -38,11 +38,11 @@ struct ConfigIntelligenceProviderResponse {
     name: String,
     provider: String,
     model: String,
-	    #[serde(rename = "baseURL", skip_serializing_if = "String::is_empty")]
-	    base_url: String,
-	    api_key_configured: bool,
-	    #[serde(skip_serializing_if = "Option::is_none")]
-	    api_key: Option<String>,
+    #[serde(rename = "baseURL", skip_serializing_if = "String::is_empty")]
+    base_url: String,
+    api_key_configured: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -87,7 +87,7 @@ pub async fn get(State(state): State<AppState>) -> ApiResult<ConfigResponse> {
         .store
         .snapshot()
         .map_err(|_| ApiError::internal("failed to read configuration"))?;
-    Ok(Json(new_config_response(&config, &state.skills)))
+    Ok(Json(new_config_response(&config, &state.skills.list())))
 }
 
 pub async fn update(
@@ -125,7 +125,7 @@ pub async fn update(
         .store
         .snapshot()
         .map_err(|_| ApiError::internal("failed to read configuration"))?;
-    Ok(Json(new_config_response(&latest, &state.skills)))
+    Ok(Json(new_config_response(&latest, &state.skills.list())))
 }
 
 pub fn sanitized_config(config: &Config) -> Config {
@@ -149,18 +149,18 @@ fn new_config_response(config: &Config, skill_defs: &[OmniSkillDef]) -> ConfigRe
         .iter()
         .zip(config.intelligence.providers.iter())
         .map(
-	            |(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
-	                name: sanitized_provider.name.clone(),
-	                provider: sanitized_provider.provider.clone(),
-	                model: sanitized_provider.model.clone(),
-	                base_url: sanitized_provider.base_url.clone(),
-	                api_key_configured: !original_provider.api_key.trim().is_empty(),
-	                api_key: if original_provider.api_key.trim().is_empty() {
-	                    None
-	                } else {
-	                    Some(original_provider.api_key.clone())
-	                },
-	            },
+            |(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
+                name: sanitized_provider.name.clone(),
+                provider: sanitized_provider.provider.clone(),
+                model: sanitized_provider.model.clone(),
+                base_url: sanitized_provider.base_url.clone(),
+                api_key_configured: !original_provider.api_key.trim().is_empty(),
+                api_key: if original_provider.api_key.trim().is_empty() {
+                    None
+                } else {
+                    Some(original_provider.api_key.clone())
+                },
+            },
         )
         .collect();
 
@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(value["omni"]["dashscopeApiKeyConfigured"], true);
         assert_eq!(value["omni"]["microphoneDisabled"], true);
         assert_eq!(value["omni"]["voice"], "Cherry");
-		assert_eq!(value["omni"]["dashscopeApiKey"], "sk-secret");
+        assert_eq!(value["omni"]["dashscopeApiKey"], "sk-secret");
     }
 
     #[test]

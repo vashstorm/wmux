@@ -1,14 +1,23 @@
-//! Skill definition loader for Omni voice skills.
+//! Skill definition loader and persistence for Omni voice skills.
 //!
 //! Loads skill definitions from markdown files in a `skills/` directory.
 //! Each `.md` file contains YAML frontmatter with metadata and markdown body
 //! for the description.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
-use crate::protocol::OmniSkillRiskLevel;
+use crate::protocol::{OmniSkillRiskLevel, VOICE_BACKEND_ROUTES, VOICE_FRONTEND_ROUTES};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum OmniSkillPromptMode {
+    #[default]
+    Description,
+    Full,
+}
 
 /// A skill definition loaded from a markdown file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,18 +27,41 @@ pub struct OmniSkillDef {
     pub id: String,
     /// Human-readable display name.
     pub name: String,
-    /// Risk classification for this skill.
+    /// Risk classification for this skill. This is derived internally and is not user-editable.
+    #[serde(default = "default_risk_level", skip_serializing)]
     pub risk_level: OmniSkillRiskLevel,
+    /// Whether this skill is exposed to the realtime model.
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    /// Prompt loading mode for backwards compatibility with older skill files.
+    #[serde(default, skip_serializing)]
+    pub prompt_mode: OmniSkillPromptMode,
     /// Description text (from markdown body).
     pub description: String,
+    /// JSON schema for Qwen function-call parameters.
+    #[serde(default = "default_parameters", skip_serializing)]
+    pub parameters: serde_json::Value,
+    /// Original markdown file text.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub full_prompt: String,
 }
 
 /// Raw frontmatter parsed from a markdown skill file.
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 struct SkillFrontmatter {
-    id: String,
-    name: String,
-    risk_level: OmniSkillRiskLevel,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default = "default_enabled")]
+    enabled: bool,
+    #[serde(default)]
+    prompt_mode: OmniSkillPromptMode,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct SkillFrontmatterOut {
+    enabled: bool,
 }
 
 /// Load all skill definitions from the given directory.
@@ -75,17 +107,228 @@ pub fn load_skills_from_dir(dir: impl AsRef<Path>) -> Vec<OmniSkillDef> {
     skills
 }
 
+pub fn get_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<OmniSkillDef> {
+    validate_skill_id(id)?;
+    let path = skill_path(dir.as_ref(), id);
+    load_skill_file(&path)
+}
+
+pub fn save_skill_to_dir(
+    dir: impl AsRef<Path>,
+    skill: &OmniSkillDef,
+) -> anyhow::Result<OmniSkillDef> {
+    validate_skill_id(&skill.id)?;
+    std::fs::create_dir_all(dir.as_ref())?;
+    let path = skill_path(dir.as_ref(), &skill.id);
+    let frontmatter = SkillFrontmatterOut {
+        enabled: skill.enabled,
+    };
+    let yaml = serde_yaml::to_string(&frontmatter)?;
+    let content = format!("---\n{}---\n\n{}\n", yaml, skill.description.trim());
+    std::fs::write(&path, content)?;
+    load_skill_file(&path)
+}
+
+pub fn delete_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<()> {
+    validate_skill_id(id)?;
+    let path = skill_path(dir.as_ref(), id);
+    if path.exists() {
+        std::fs::remove_file(path)?;
+    }
+    Ok(())
+}
+
+pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
+    vec![
+        builtin_skill(
+            "navigate_frontend",
+            "Navigate Frontend",
+            OmniSkillRiskLevel::Safe,
+            "Navigate to frontend pages.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "route": {
+                        "type": "string",
+                        "enum": VOICE_FRONTEND_ROUTES,
+                        "description": "Target frontend route/page."
+                    }
+                },
+                "required": ["route"]
+            }),
+        ),
+        builtin_skill(
+            "invoke_backend_route",
+            "Invoke Backend Route",
+            OmniSkillRiskLevel::Dynamic,
+            "Invoke an allowlisted backend route.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "route_id": {
+                        "type": "string",
+                        "enum": VOICE_BACKEND_ROUTES,
+                        "description": "Backend route to invoke (allowlist enforced)."
+                    },
+                    "params": {
+                        "type": "object",
+                        "description": "Route-specific parameters (e.g., target_name, session_name).",
+                        "additionalProperties": true
+                    }
+                },
+                "required": ["route_id"]
+            }),
+        ),
+        builtin_skill(
+            "list_sessions",
+            "List Sessions",
+            OmniSkillRiskLevel::Safe,
+            "List all tmux sessions for a target connection.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
+                    }
+                },
+                "required": ["target_name"]
+            }),
+        ),
+        builtin_skill(
+            "create_session",
+            "Create Session",
+            OmniSkillRiskLevel::Write,
+            "Create a new tmux session on a target connection.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
+                    },
+                    "session_name": {
+                        "type": "string",
+                        "description": "Name for the new session."
+                    }
+                },
+                "required": ["target_name", "session_name"]
+            }),
+        ),
+        builtin_skill(
+            "rename_session",
+            "Rename Session",
+            OmniSkillRiskLevel::Write,
+            "Rename an existing tmux session.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
+                    },
+                    "old_name": { "type": "string", "description": "Current session name." },
+                    "new_name": { "type": "string", "description": "New session name." }
+                },
+                "required": ["target_name", "old_name", "new_name"]
+            }),
+        ),
+        builtin_skill(
+            "delete_session",
+            "Delete Session",
+            OmniSkillRiskLevel::Dangerous,
+            "Delete a tmux session. This is destructive and requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
+                    },
+                    "session_name": { "type": "string", "description": "Session to delete." }
+                },
+                "required": ["target_name", "session_name"]
+            }),
+        ),
+        builtin_skill(
+            "send_to_pane",
+            "Send To Pane",
+            OmniSkillRiskLevel::Dynamic,
+            "Send text or commands to a tmux pane.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
+                    },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "integer", "description": "Pane index within window." },
+                    "text": { "type": "string", "description": "Text to send to the pane." },
+                    "execute": { "type": "boolean", "default": false, "description": "If true, execute as command (dangerous)." },
+                    "append_enter": { "type": "boolean", "default": false, "description": "If true, append Enter key after text (dangerous)." },
+                    "control": { "type": "boolean", "default": false, "description": "If true, send as control sequence (dangerous)." },
+                    "multiline": { "type": "boolean", "default": false, "description": "If true, text contains multiple lines (dangerous)." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index", "text"]
+            }),
+        ),
+        builtin_skill(
+            "confirm_action",
+            "Confirm Action",
+            OmniSkillRiskLevel::FlowControl,
+            "Confirm a pending dangerous action.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "confirmation_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmation ID from intent_received event."
+                    }
+                },
+                "required": ["confirmation_id"]
+            }),
+        ),
+        builtin_skill(
+            "cancel_action",
+            "Cancel Action",
+            OmniSkillRiskLevel::FlowControl,
+            "Cancel a pending dangerous action.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "confirmation_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmation ID to cancel."
+                    }
+                },
+                "required": ["confirmation_id"]
+            }),
+        ),
+    ]
+}
+
+pub fn skill_prompt(skill: &OmniSkillDef) -> &str {
+    match skill.prompt_mode {
+        OmniSkillPromptMode::Description => skill.description.as_str(),
+        OmniSkillPromptMode::Full => skill.full_prompt.as_str(),
+    }
+}
+
 /// Parse a single markdown skill file.
 ///
 /// Expects the format:
 /// ```markdown
 /// ---
-/// id: skill_id
-/// name: Skill Name
-/// risk_level: Safe
+/// enabled: true
 /// ---
 ///
-/// Description text...
+/// # Skill Name
+///
+/// Markdown prompt text...
 /// ```
 fn load_skill_file(path: &Path) -> anyhow::Result<OmniSkillDef> {
     let content = std::fs::read_to_string(path)?;
@@ -95,13 +338,29 @@ fn load_skill_file(path: &Path) -> anyhow::Result<OmniSkillDef> {
 
     let frontmatter: SkillFrontmatter = serde_yaml::from_str(frontmatter_yaml)?;
 
+    let file_id = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or_else(|| anyhow::anyhow!("skill file has no valid stem: {}", path.display()))?
+        .to_string();
+    let id = file_id;
+    validate_skill_id(&id)?;
     let description = body.trim().to_string();
+    let name = frontmatter.name.unwrap_or_else(|| {
+        display_name_from_markdown(&description).unwrap_or_else(|| titleize_skill_id(&id))
+    });
+    let risk_level = builtin_risk_level(&id).unwrap_or_else(default_risk_level);
+    let parameters = parameters_for_loaded_skill(&id, &description)?;
 
     Ok(OmniSkillDef {
-        id: frontmatter.id,
-        name: frontmatter.name,
-        risk_level: frontmatter.risk_level,
+        id,
+        name,
+        risk_level,
+        enabled: frontmatter.enabled,
+        prompt_mode: frontmatter.prompt_mode,
         description,
+        parameters,
+        full_prompt: content.trim().to_string(),
     })
 }
 
@@ -125,6 +384,137 @@ fn parse_frontmatter(content: &str) -> anyhow::Result<(&str, &str)> {
     Ok((yaml, body))
 }
 
+fn skill_path(dir: &Path, id: &str) -> PathBuf {
+    dir.join(format!("{id}.md"))
+}
+
+fn validate_skill_id(id: &str) -> anyhow::Result<()> {
+    let valid = !id.is_empty()
+        && id.len() <= 64
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_');
+    if valid {
+        Ok(())
+    } else {
+        anyhow::bail!("invalid skill id: {id}")
+    }
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+fn default_parameters() -> serde_json::Value {
+    json!({ "type": "object" })
+}
+
+fn default_risk_level() -> OmniSkillRiskLevel {
+    OmniSkillRiskLevel::Safe
+}
+
+fn builtin_skill(
+    id: &str,
+    name: &str,
+    risk_level: OmniSkillRiskLevel,
+    description: &str,
+    parameters: serde_json::Value,
+) -> OmniSkillDef {
+    OmniSkillDef {
+        id: id.to_string(),
+        name: name.to_string(),
+        risk_level,
+        enabled: true,
+        prompt_mode: OmniSkillPromptMode::Description,
+        description: description.to_string(),
+        parameters,
+        full_prompt: description.to_string(),
+    }
+}
+
+fn builtin_risk_level(id: &str) -> Option<OmniSkillRiskLevel> {
+    builtin_skill_defs()
+        .into_iter()
+        .find(|skill| skill.id == id)
+        .map(|skill| skill.risk_level)
+}
+
+fn parameters_for_loaded_skill(id: &str, markdown: &str) -> anyhow::Result<serde_json::Value> {
+    if let Some(parameters) = parameters_from_markdown(markdown)? {
+        return Ok(parameters);
+    }
+    Ok(builtin_skill_defs()
+        .into_iter()
+        .find(|skill| skill.id == id)
+        .map(|skill| skill.parameters)
+        .unwrap_or_else(default_parameters))
+}
+
+fn parameters_from_markdown(markdown: &str) -> anyhow::Result<Option<serde_json::Value>> {
+    let mut in_parameters_section = false;
+    let mut in_json_fence = false;
+    let mut json_lines = Vec::new();
+
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("## ") {
+            in_parameters_section = trimmed.eq_ignore_ascii_case("## Parameters");
+            continue;
+        }
+
+        if !in_parameters_section {
+            continue;
+        }
+
+        if !in_json_fence {
+            if trimmed.starts_with("```json") || trimmed == "```" {
+                in_json_fence = true;
+            }
+            continue;
+        }
+
+        if trimmed == "```" {
+            let json = json_lines.join("\n");
+            let parameters = serde_json::from_str(&json)?;
+            return Ok(Some(parameters));
+        }
+
+        json_lines.push(line);
+    }
+
+    if in_json_fence {
+        anyhow::bail!("unterminated parameters JSON code fence");
+    }
+
+    Ok(None)
+}
+
+fn display_name_from_markdown(markdown: &str) -> Option<String> {
+    markdown.lines().find_map(|line| {
+        let heading = line.strip_prefix("# ")?;
+        let heading = heading.trim();
+        (!heading.is_empty()).then(|| heading.to_string())
+    })
+}
+
+fn titleize_skill_id(id: &str) -> String {
+    id.split('_')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => {
+                    let mut word = first.to_uppercase().collect::<String>();
+                    word.push_str(chars.as_str());
+                    word
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,45 +522,59 @@ mod tests {
 
     #[test]
     fn parse_frontmatter_extracts_yaml_and_body() {
-        let text = "---\nid: test_skill\nname: Test Skill\nrisk_level: Safe\n---\n\nThis is the description.\n";
+        let text = "---\nenabled: true\n---\n\n# Test Skill\n\nThis is the description.\n";
         let (yaml, body) = parse_frontmatter(text).unwrap();
-        assert!(yaml.contains("id: test_skill"));
-        assert_eq!(body.trim(), "This is the description.");
+        assert!(yaml.contains("enabled: true"));
+        assert_eq!(body.trim(), "# Test Skill\n\nThis is the description.");
     }
 
     #[test]
     fn load_skill_file_parses_correctly() {
-        let mut tmp = tempfile::NamedTempFile::with_suffix(".md").unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("list_sessions.md");
+        let mut tmp = std::fs::File::create(&path).unwrap();
         write!(
             tmp,
-            "---\nid: list_sessions\nname: List Sessions\nrisk_level: Safe\n---\n\nList all tmux sessions.\n"
+            "{}",
+            r#"---
+enabled: true
+---
+
+# List Sessions
+
+List all tmux sessions.
+
+## Parameters
+
+```json
+{"type":"object","required":["target_name"],"properties":{"target_name":{"type":"string"}}}
+```
+"#
         )
         .unwrap();
 
-        let skill = load_skill_file(tmp.path()).unwrap();
+        let skill = load_skill_file(&path).unwrap();
         assert_eq!(skill.id, "list_sessions");
         assert_eq!(skill.name, "List Sessions");
         assert_eq!(skill.risk_level, OmniSkillRiskLevel::Safe);
-        assert_eq!(skill.description, "List all tmux sessions.");
+        assert!(skill.enabled);
+        assert_eq!(skill.prompt_mode, OmniSkillPromptMode::Description);
+        assert_eq!(
+            skill.description,
+            "# List Sessions\n\nList all tmux sessions.\n\n## Parameters\n\n```json\n{\"type\":\"object\",\"required\":[\"target_name\"],\"properties\":{\"target_name\":{\"type\":\"string\"}}}\n```"
+        );
+        assert_eq!(skill.parameters["required"][0], "target_name");
     }
 
     #[test]
     fn load_skills_from_dir_reads_multiple_files() {
         let dir = tempfile::tempdir().unwrap();
 
-        let mut f1 = std::fs::File::create(dir.path().join("a.md")).unwrap();
-        write!(
-            f1,
-            "---\nid: skill_a\nname: Skill A\nrisk_level: Safe\n---\n\nDesc A.\n"
-        )
-        .unwrap();
+        let mut f1 = std::fs::File::create(dir.path().join("skill_a.md")).unwrap();
+        write!(f1, "---\nenabled: true\n---\n\n# Skill A\n\nDesc A.\n").unwrap();
 
-        let mut f2 = std::fs::File::create(dir.path().join("b.md")).unwrap();
-        write!(
-            f2,
-            "---\nid: skill_b\nname: Skill B\nrisk_level: Dangerous\n---\n\nDesc B.\n"
-        )
-        .unwrap();
+        let mut f2 = std::fs::File::create(dir.path().join("skill_b.md")).unwrap();
+        write!(f2, "---\nenabled: true\n---\n\n# Skill B\n\nDesc B.\n").unwrap();
 
         // non-md file should be ignored
         let mut _f3 = std::fs::File::create(dir.path().join("ignore.txt")).unwrap();
@@ -180,5 +584,42 @@ mod tests {
         assert_eq!(skills.len(), 2);
         assert_eq!(skills[0].id, "skill_a");
         assert_eq!(skills[1].id, "skill_b");
+    }
+
+    #[test]
+    fn save_skill_to_dir_round_trips_parameters() {
+        let dir = tempfile::tempdir().unwrap();
+        let skill = OmniSkillDef {
+            id: "custom_skill".to_string(),
+            name: "Custom Skill".to_string(),
+            risk_level: OmniSkillRiskLevel::Write,
+            enabled: false,
+            prompt_mode: OmniSkillPromptMode::Full,
+            description: "# Custom Skill\n\nUse this custom skill.\n\n## Parameters\n\n```json\n{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}\n```".to_string(),
+            parameters: default_parameters(),
+            full_prompt: String::new(),
+        };
+
+        let saved = save_skill_to_dir(dir.path(), &skill).unwrap();
+        assert_eq!(saved.id, "custom_skill");
+        assert_eq!(saved.name, "Custom Skill");
+        assert!(!saved.enabled);
+        assert_eq!(saved.prompt_mode, OmniSkillPromptMode::Description);
+        assert_eq!(saved.parameters["required"][0], "name");
+        let saved_text = std::fs::read_to_string(dir.path().join("custom_skill.md")).unwrap();
+        assert!(!saved_text.contains("\nid:"));
+        assert!(!saved_text.contains("\nname:"));
+        assert!(!saved_text.contains("\nrisk_level:"));
+        assert!(!saved_text.contains("\nprompt_mode:"));
+        assert!(!saved_text.contains("\nparameters:"));
+        assert!(saved_text.contains("## Parameters"));
+    }
+
+    #[test]
+    fn parameters_from_markdown_reads_json_fence() {
+        let markdown = "# Example\n\n## Parameters\n\n```json\n{\"type\":\"object\",\"required\":[\"query\"]}\n```";
+        let parameters = parameters_from_markdown(markdown).unwrap().unwrap();
+        assert_eq!(parameters["type"], "object");
+        assert_eq!(parameters["required"][0], "query");
     }
 }
