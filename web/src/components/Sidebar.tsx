@@ -40,7 +40,7 @@ function isApiError(err: unknown): err is Error & { code: string; message: strin
 	return err instanceof Error && "code" in err && "message" in err;
 }
 
-export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
+export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: React.ReactNode; terminalThemeToggle?: React.ReactNode }) {
 	const {
 		connections,
 		setConnections,
@@ -557,12 +557,13 @@ export function Sidebar({ themeToggle }: { themeToggle?: React.ReactNode }) {
 				)}
 			</Box>
 
-			<SidebarFooter
-				errorLogCount={errorLogCount}
-				onOpenSettings={() => setShowSettingsPanel(true)}
-				onOpenErrorLogs={() => setShowErrorLogsPanel(true)}
-				themeToggle={themeToggle}
-			/>
+				<SidebarFooter
+					errorLogCount={errorLogCount}
+					onOpenSettings={() => setShowSettingsPanel(true)}
+					onOpenErrorLogs={() => setShowErrorLogsPanel(true)}
+					themeToggle={themeToggle}
+					terminalThemeToggle={terminalThemeToggle}
+				/>
 		</Paper>
 	);
 }

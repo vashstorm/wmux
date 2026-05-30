@@ -8,6 +8,7 @@ interface SidebarFooterProps {
   onOpenSettings: () => void;
   onOpenErrorLogs: () => void;
   themeToggle?: React.ReactNode;
+  terminalThemeToggle?: React.ReactNode;
 }
 
 export function SidebarFooter({
@@ -15,6 +16,7 @@ export function SidebarFooter({
   onOpenSettings,
   onOpenErrorLogs,
   themeToggle,
+  terminalThemeToggle,
 }: SidebarFooterProps) {
   return (
     <Box
@@ -87,11 +89,8 @@ export function SidebarFooter({
           }}
         />
       </Badge>
-      {themeToggle && (
-        <>
-          {themeToggle}
-        </>
-      )}
+      {themeToggle && <>{themeToggle}</>}
+      {terminalThemeToggle && <>{terminalThemeToggle}</>}
       </Stack>
     </Box>
   );

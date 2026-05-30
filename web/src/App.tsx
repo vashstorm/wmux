@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
 import { ThemeProvider, CssBaseline, IconButton } from "@mui/material";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig, updateConfig } from "./api/client.js";
 import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE } from "./ui/fontSize.js";
@@ -73,12 +75,11 @@ function ThemeToggle() {
 	const handleToggle = async () => {
 		if (updatingRef.current) return;
 		const newTheme = isDark ? "light" : "dark";
-		setUISettings({ ...uiSettings, theme: newTheme, windowTheme: newTheme });
+		setUISettings({ ...uiSettings, theme: newTheme });
 		updatingRef.current = true;
 		try {
 			const config = await getConfig();
 			config.ui.theme = newTheme;
-			config.ui.windowTheme = newTheme;
 			await updateConfig(config);
 		} catch (err) {
 			console.error("Failed to persist theme:", err);
@@ -100,6 +101,40 @@ function ThemeToggle() {
 	);
 }
 
+function TerminalThemeToggle() {
+	const { uiSettings, setUISettings } = useAppState();
+	const isDark = uiSettings.windowTheme === "dark";
+	const updatingRef = useRef(false);
+
+	const handleToggle = async () => {
+		if (updatingRef.current) return;
+		const newTheme = isDark ? "light" : "dark";
+		setUISettings({ ...uiSettings, windowTheme: newTheme });
+		updatingRef.current = true;
+		try {
+			const config = await getConfig();
+			config.ui.windowTheme = newTheme;
+			await updateConfig(config);
+		} catch (err) {
+			console.error("Failed to persist terminal theme:", err);
+		} finally {
+			updatingRef.current = false;
+		}
+	};
+
+	return (
+		<IconButton
+			data-testid="terminal-theme-toggle"
+			aria-label={isDark ? "Switch terminal to light" : "Switch terminal to dark"}
+			onClick={handleToggle}
+			size="small"
+			sx={{ width: 30, height: 30 }}
+		>
+				{isDark ? <TerminalIcon fontSize="small" /> : <TerminalOutlinedIcon fontSize="small" />}
+			</IconButton>
+		);
+}
+
 function WorkspaceNavigationSync() {
 	useWorkspaceNavigation();
 	return null;
@@ -111,10 +146,13 @@ export function App() {
 			<UISettingsInit />
 			<WorkspaceNavigationSync />
 			<MuiThemeShell>
-				<div className="app-shell" data-testid="app-shell">
-					<ConfigConflictBanner />
-					<Sidebar themeToggle={<ThemeToggle />} />
-					<MainPanel />
+					<div className="app-shell" data-testid="app-shell">
+						<ConfigConflictBanner />
+						<Sidebar
+							themeToggle={<ThemeToggle />}
+							terminalThemeToggle={<TerminalThemeToggle />}
+						/>
+						<MainPanel />
 					<ErrorBanner />
 					<ConfirmDialog />
 					<NewConnectionForm />
