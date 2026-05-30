@@ -161,7 +161,8 @@ export interface IntelligenceProviderConfig {
 	provider: string;
 	model: string;
 	baseURL?: string;
-	apiKeyConfigured?: boolean;
+		apiKeyConfigured?: boolean;
+		apiKey?: string;
 }
 
 export interface IntelligenceConfig {

@@ -38,9 +38,11 @@ struct ConfigIntelligenceProviderResponse {
     name: String,
     provider: String,
     model: String,
-    #[serde(rename = "baseURL", skip_serializing_if = "String::is_empty")]
-    base_url: String,
-    api_key_configured: bool,
+	    #[serde(rename = "baseURL", skip_serializing_if = "String::is_empty")]
+	    base_url: String,
+	    api_key_configured: bool,
+	    #[serde(skip_serializing_if = "Option::is_none")]
+	    api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -147,13 +149,18 @@ fn new_config_response(config: &Config, skill_defs: &[OmniSkillDef]) -> ConfigRe
         .iter()
         .zip(config.intelligence.providers.iter())
         .map(
-            |(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
-                name: sanitized_provider.name.clone(),
-                provider: sanitized_provider.provider.clone(),
-                model: sanitized_provider.model.clone(),
-                base_url: sanitized_provider.base_url.clone(),
-                api_key_configured: !original_provider.api_key.trim().is_empty(),
-            },
+	            |(sanitized_provider, original_provider)| ConfigIntelligenceProviderResponse {
+	                name: sanitized_provider.name.clone(),
+	                provider: sanitized_provider.provider.clone(),
+	                model: sanitized_provider.model.clone(),
+	                base_url: sanitized_provider.base_url.clone(),
+	                api_key_configured: !original_provider.api_key.trim().is_empty(),
+	                api_key: if original_provider.api_key.trim().is_empty() {
+	                    None
+	                } else {
+	                    Some(original_provider.api_key.clone())
+	                },
+	            },
         )
         .collect();
 

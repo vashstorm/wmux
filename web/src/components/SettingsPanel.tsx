@@ -143,7 +143,8 @@ export function SettingsPanel() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 	const [activeTab, setActiveTab] = useState<SettingsTabKey>("general");
-	const [omniSkShowPlain, setOmniSkShowPlain] = useState(false);
+		const [omniSkShowPlain, setOmniSkShowPlain] = useState(false);
+		const [providerSkShowPlain, setProviderSkShowPlain] = useState(false);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		if (scrollContainerRef.current) {
@@ -151,7 +152,8 @@ export function SettingsPanel() {
 		}
 	}, [activeTab]);
 
-	const SK_STORAGE_KEY = "wmux-omni-sk";
+		const SK_STORAGE_KEY = "wmux-omni-sk";
+		const MASKED_API_KEY = "••••••••••••••••••••••••••••••••••••••••••••••••••";
 	const knownHostsPlaceholder = useMemo(() => "~/.ssh/known_hosts", []);
 
 	const loadConfig = async () => {
@@ -566,33 +568,78 @@ export function SettingsPanel() {
 						},
 					}}
 				/>
-				<TextField
-					id="provider-editor-api-key"
-					label="API Key"
-					type="password"
-					value={editor.apiKeyInput}
-					onChange={(event) => setFormState((current) =>
-						current && current.editingProvider
-							? {
-								...current,
-								editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
-							}
-							: current
-					)}
-					placeholder={editor.apiKeyConfigured && !editor.isNew ? "•••••••••••••••• (leave blank to keep existing)" : "sk-..."}
-					autoComplete="new-password"
-					fullWidth
-					helperText={
-						editor.apiKeyConfigured && !editor.isNew
-							? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
-							: "API key is required for new providers."
-					}
-					slotProps={{
-						htmlInput: {
-							"data-testid": "provider-editor-api-key-input",
-						},
-					}}
-				/>
+					<TextField
+						id="provider-editor-api-key"
+						label="API Key"
+						type={providerSkShowPlain ? "text" : "password"}
+						value={editor.apiKeyInput}
+							onChange={(event) => {
+								setFormState((current) =>
+									current && current.editingProvider
+										? {
+											...current,
+											editingProvider: { ...current.editingProvider, apiKeyInput: event.target.value },
+										}
+										: current
+								);
+								const val = event.target.value;
+								if (val && val !== MASKED_API_KEY) {
+									const editor = formState?.editingProvider;
+									const key = editor?.name ? `provider-sk-${editor.name}` : 'provider-sk-new';
+									sessionStorage.setItem(key, val);
+								}
+							}}
+							placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+						autoComplete="new-password"
+						fullWidth
+						className="password-input-wrapper"
+						helperText={
+							editor.apiKeyConfigured && !editor.isNew
+								? "A key is configured. Enter a new value to replace it, or leave blank to keep existing."
+								: "API key is required for new providers."
+						}
+						slotProps={{
+							htmlInput: {
+								"data-testid": "provider-editor-api-key-input",
+								sx: { fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace' },
+							},
+							input: {
+								endAdornment: (
+									<IconButton
+										type="button"
+										tabIndex={-1}
+										onMouseDown={(e) => e.preventDefault()}
+										onClick={() => {
+												if (!providerSkShowPlain && editor.apiKeyInput === MASKED_API_KEY) {
+													const restored = sessionStorage.getItem(`provider-sk-${editor.name}`);
+												if (restored) {
+													setFormState((current) =>
+														current && current.editingProvider
+															? { ...current, editingProvider: { ...current.editingProvider, apiKeyInput: restored } }
+															: current
+													);
+												}
+											}
+											setProviderSkShowPlain((v) => !v);
+										}}
+										size="small"
+										sx={{ mr: 0.5 }}
+										aria-label={providerSkShowPlain ? "Hide API Key" : "Show API Key"}
+									>
+										{providerSkShowPlain ? (
+											<SvgIcon fontSize="small">
+												<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.8 11.8 0 001 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>
+											</SvgIcon>
+										) : (
+											<SvgIcon fontSize="small">
+												<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+											</SvgIcon>
+										)}
+									</IconButton>
+								),
+							},
+						}}
+					/>
 				<TextField
 					id="provider-editor-base-url"
 					label="Base URL"
@@ -619,9 +666,12 @@ export function SettingsPanel() {
 					<Button
 						type="button"
 						variant="outlined"
-						onClick={() => setFormState((current) =>
-							current ? { ...current, editingProvider: null } : current
-						)}
+						onClick={() => {
+							setProviderSkShowPlain(false);
+							setFormState((current) =>
+								current ? { ...current, editingProvider: null } : current
+							)}
+						}
 					>
 						CANCEL
 					</Button>
@@ -629,6 +679,7 @@ export function SettingsPanel() {
 						type="button"
 						variant="contained"
 						onClick={() => {
+							setProviderSkShowPlain(false);
 							if (!formState) return;
 							const editor = formState.editingProvider;
 							if (!editor) return;
@@ -640,7 +691,7 @@ export function SettingsPanel() {
 								setError({ code: "bad_request", message: "Provider model is required" });
 								return;
 							}
-							if (editor.isNew && !editor.apiKeyInput.trim()) {
+								if (editor.isNew && !editor.apiKeyInput.trim() && editor.apiKeyInput !== MASKED_API_KEY) {
 								setError({ code: "bad_request", message: "API key is required for new providers" });
 								return;
 							}
@@ -661,12 +712,23 @@ export function SettingsPanel() {
 								model: editor.model.trim(),
 								baseURL: editor.baseURL?.trim() || undefined,
 								apiKeyConfigured: editor.apiKeyConfigured || (editor.apiKeyInput.trim().length > 0),
-							};
-							if (editor.apiKeyInput.trim()) {
-								updatedProvider.apiKey = editor.apiKeyInput.trim();
-							}
+												};
+												// Try to find the real key: first by current name, then by "new" fallback
+												let realKey = sessionStorage.getItem(`provider-sk-${editor.name}`);
+												if (!realKey && editor.isNew) {
+													realKey = sessionStorage.getItem('provider-sk-new');
+												}
+												let saveKey = editor.apiKeyInput;
+												if (saveKey === MASKED_API_KEY) {
+													saveKey = realKey ?? "";
+												}
+												if (saveKey.trim()) {
+													updatedProvider.apiKey = saveKey.trim();
+													sessionStorage.setItem(`provider-sk-${updatedProvider.name}`, saveKey.trim());
+													sessionStorage.removeItem('provider-sk-new');
+												}
 
-							setFormState((current) => {
+									setFormState((current) => {
 								if (!current || !current.editingProvider) return current;
 								const isNew = current.editingProvider.isNew;
 								const existingIndex = current.intelligenceProviders.findIndex(
@@ -1119,7 +1181,7 @@ export function SettingsPanel() {
 																							editingProvider: {
 																								...provider,
 																								isNew: false,
-																								apiKeyInput: "",
+																	apiKeyInput: provider.apiKey ?? (provider.apiKeyConfigured ? MASKED_API_KEY : ""),
 																								originalName: provider.name,
 																							},
 																						} : current
@@ -1317,16 +1379,17 @@ export function SettingsPanel() {
 														type={omniSkShowPlain ? "text" : "password"}
 														value={formState.omniSkValue}
 														onChange={(event) => updateField("omniSkValue", event.target.value)}
-														placeholder={"sk-..."}
+															placeholder={"sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
 														fullWidth
 														autoComplete="new-password"
 														className="password-input-wrapper"
 														sx={{ mt: 2 }}
-														slotProps={{
-															htmlInput: {
-																"data-testid": "omni-sk-input",
-															},
-															input: {
+													slotProps={{
+														htmlInput: {
+															"data-testid": "omni-sk-input",
+															sx: { fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace' },
+														},
+														input: {
 																endAdornment: (
 																	<IconButton
 																		type="button"

@@ -425,13 +425,17 @@ mod tests {
             .expect("response");
         let body = json_body(response).await;
 
-        assert_eq!(body["auth"]["token"], "");
-        assert_eq!(body["auth"]["tokenConfigured"], true);
-        assert_eq!(
-            body["intelligence"]["providers"][0]["apiKeyConfigured"],
-            true
-        );
-        assert!(!body.to_string().contains("secret-key"));
+	        assert_eq!(body["auth"]["token"], "");
+	        assert_eq!(body["auth"]["tokenConfigured"], true);
+	        assert_eq!(
+	            body["intelligence"]["providers"][0]["apiKeyConfigured"],
+	            true
+	        );
+	        // Provider API keys ARE returned (same behavior as Omni dashscopeApiKey)
+	        assert_eq!(
+	            body["intelligence"]["providers"][0]["apiKey"],
+	            "secret-key"
+	        );
     }
 
     #[tokio::test]
@@ -450,15 +454,12 @@ mod tests {
             true
         );
 
-        // Verify response does not contain raw secret key
-        assert!(!body.to_string().contains("secret-key"));
-
-        // Verify apiKey field is absent or empty in response
-        let provider = &body["intelligence"]["providers"][0];
-        assert!(
-            provider.get("apiKey").is_none() || provider["apiKey"].as_str() == Some(""),
-            "apiKey should be absent or empty in response"
-        );
+	        // Verify response contains the raw secret key (same as Omni dashscopeApiKey)
+	        assert_eq!(
+	            body["intelligence"]["providers"][0]["apiKey"],
+	            "secret-key",
+	            "apiKey should contain the actual key"
+	        );
     }
 
     #[tokio::test]
@@ -512,8 +513,12 @@ mod tests {
             "apiKey should be preserved when blank was sent"
         );
 
-        // Verify response still does not contain raw key
-        assert!(!body.to_string().contains("secret-key"));
+	        // Verify response contains the preserved key
+	        assert_eq!(
+	            body["intelligence"]["providers"][0]["apiKey"],
+	            "secret-key",
+	            "apiKey should contain the preserved key after update"
+	        );
     }
 
     #[tokio::test]
