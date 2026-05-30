@@ -138,6 +138,26 @@ describe("OmniWebSocket", () => {
 		);
 	});
 
+	test("flushes queued messages when connection opens", () => {
+		const ws = mockWebSocket("");
+		ws.readyState = WebSocket.CONNECTING;
+		const client = new OmniWebSocket({
+			token: "t",
+			onMessage: vi.fn(),
+		});
+		client.connect();
+
+		client.send({ type: "text_message", text: "show sessions" });
+		expect(ws.send).not.toHaveBeenCalled();
+
+		ws.readyState = WebSocket.OPEN;
+		ws.onopen?.(new Event("open"));
+
+		expect(ws.send).toHaveBeenCalledWith(
+			JSON.stringify({ type: "text_message", text: "show sessions" }),
+		);
+	});
+
 	test("does not send after close", () => {
 		const ws = mockWebSocket("");
 		const client = new OmniWebSocket({

@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
-use crate::protocol::{VOICE_FRONTEND_ROUTES, OmniServerEvent, OmniSkill};
+use crate::protocol::{OmniServerEvent, OmniSkill, VOICE_FRONTEND_ROUTES};
 use crate::state::AppState;
 use crate::tmux::{Adapter, TmuxError};
 use crate::voice::audit::{
@@ -119,14 +119,11 @@ impl OmniSkillExecutor {
         params: Value,
     ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let start = Instant::now();
-        let result = self
-            .execute_unconfirmed(skill, params.clone())
-            .await;
+        let result = self.execute_unconfirmed(skill, params.clone()).await;
         self.audit(skill, &params, audit_target(&params), &result, false, start)
             .await;
         result
     }
-
 
     pub async fn execute_confirmed(
         &self,
@@ -139,6 +136,18 @@ impl OmniSkillExecutor {
             .verify_confirmation(confirmation_id)
             .await
             .map_err(confirmation_error)?;
+        let result = self.execute_confirmed_params(skill, params.clone()).await;
+        self.audit(skill, &params, audit_target(&params), &result, true, start)
+            .await;
+        result
+    }
+
+    pub async fn execute_preconfirmed(
+        &self,
+        skill: &str,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let start = Instant::now();
         let result = self.execute_confirmed_params(skill, params.clone()).await;
         self.audit(skill, &params, audit_target(&params), &result, true, start)
             .await;
@@ -202,10 +211,7 @@ impl OmniSkillExecutor {
         })
     }
 
-    async fn list_sessions(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn list_sessions(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string(&params, "target_name")?;
         self.execute_backend_request(
             "list_sessions",
@@ -216,12 +222,12 @@ impl OmniSkillExecutor {
         .await
     }
 
-    async fn create_session(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        let target_name = required_string(&params, "target_name")?;
+    async fn create_session(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session_name = required_string(&params, "session_name")?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session_name,
+        );
         self.execute_backend_request(
             "create_session",
             Method::POST,
@@ -231,12 +237,12 @@ impl OmniSkillExecutor {
         .await
     }
 
-    async fn rename_session(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        let target_name = required_string(&params, "target_name")?;
+    async fn rename_session(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "old_name", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
         let new_name = required_string(&params, "new_name")?;
         self.execute_backend_request(
             "rename_session",
@@ -260,8 +266,11 @@ impl OmniSkillExecutor {
             return self.confirmation_required("delete_session", params).await;
         }
 
-        let target_name = required_string(&params, "target_name")?;
         let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
         self.execute_backend_request(
             "delete_session",
             Method::DELETE,
@@ -280,8 +289,11 @@ impl OmniSkillExecutor {
         params: Value,
         confirmed: bool,
     ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        let target_name = required_string_alias(&params, &["target_name", "targetName"])?;
         let session = required_string_alias(&params, &["session", "session_name", "sessionName"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string_alias(&params, &["target_name", "targetName"])?,
+            &session,
+        );
         let window = required_string_alias(&params, &["window", "window_name", "windowName"])?;
         let pane = required_string_alias(&params, &["pane", "pane_index", "paneIndex"])?;
         let text = required_text(&params, "text")?;
@@ -352,7 +364,10 @@ impl OmniSkillExecutor {
         let route = backend_route(&route_id).ok_or_else(|| {
             OmniExecutorError::bad_request(format!("backend route not allowed: {route_id}"))
         })?;
-        let route_params = params.get("params").cloned().unwrap_or_else(|| json!({}));
+        let route_params = self.normalize_route_params_for_local_session(
+            route.id,
+            params.get("params").cloned().unwrap_or_else(|| json!({})),
+        );
 
         let policy_params = json!({
             "route_id": route.id,
@@ -518,6 +533,42 @@ impl OmniSkillExecutor {
         }
         let config = current_config(&self.state).map_err(api_error)?;
         Ok(Adapter::new(config.tmux.path))
+    }
+
+    fn local_target_when_model_used_session_as_target(
+        &self,
+        target_name: String,
+        session_name: &str,
+    ) -> String {
+        if target_name == "local" || self.state.connections.find(&target_name).is_some() {
+            return target_name;
+        }
+        if target_name == session_name {
+            return "local".to_string();
+        }
+        target_name
+    }
+
+    fn normalize_route_params_for_local_session(&self, route_id: &str, params: Value) -> Value {
+        if !route_id.starts_with("sessions.")
+            && !route_id.starts_with("windows.")
+            && !route_id.starts_with("panes.")
+        {
+            return params;
+        }
+        let Some(mut object) = params.as_object().cloned() else {
+            return params;
+        };
+        let Ok(target_name) = required_string(&params, "target_name") else {
+            return params;
+        };
+        let Ok(session_name) = required_string_alias(&params, &["session", "session_name"]) else {
+            return params;
+        };
+        let normalized =
+            self.local_target_when_model_used_session_as_target(target_name, &session_name);
+        object.insert("target_name".to_string(), Value::String(normalized));
+        Value::Object(object)
     }
 }
 
@@ -849,7 +900,21 @@ fn tmux_pane_target(session: &str, window: &str, pane: &str) -> String {
     if pane.starts_with('%') || pane.contains(':') || pane.contains('.') {
         pane.to_string()
     } else {
+        let window = exact_tmux_window_segment(window);
         format!("{session}:{window}.{pane}")
+    }
+}
+
+fn exact_tmux_window_segment(window: &str) -> String {
+    if window.starts_with('@')
+        || window.starts_with('=')
+        || window.starts_with('%')
+        || window.contains(':')
+        || window.parse::<usize>().is_ok()
+    {
+        window.to_string()
+    } else {
+        format!("={window}")
     }
 }
 
@@ -1095,6 +1160,10 @@ case "$cmd" in
     exit 0
     ;;
   kill-session)
+    for arg in "$@"; do
+      printf '[%s]' "$arg" >> "$log"
+    done
+    printf '\n' >> "$log"
     exit 0
     ;;
   list-windows|new-window)
@@ -1238,6 +1307,42 @@ esac
             .await
             .expect("confirmed delete");
         assert_eq!(confirmed.output["data"]["operation"], "delete_session");
+        assert_eq!(tmux_log(&test), "[kill-session][-t][alpha]\n");
+    }
+
+    #[tokio::test]
+    async fn executor_delete_session_treats_session_like_target_as_local() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute_preconfirmed(
+                "delete_session",
+                json!({ "target_name": "945", "session_name": "945" }),
+            )
+            .await
+            .expect("delete local numeric session");
+
+        assert_eq!(result.output["data"]["operation"], "delete_session");
+        assert_eq!(tmux_log(&test), "[kill-session][-t][945]\n");
+    }
+
+    #[tokio::test]
+    async fn executor_invoke_backend_route_treats_session_like_target_as_local() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute_preconfirmed(
+                "invoke_backend_route",
+                json!({
+                    "route_id": "sessions.delete",
+                    "params": { "target_name": "945", "session_name": "945" }
+                }),
+            )
+            .await
+            .expect("delete local numeric session through backend route");
+
+        assert_eq!(result.output["data"]["operation"], "delete_session");
+        assert_eq!(tmux_log(&test), "[kill-session][-t][945]\n");
     }
 
     #[tokio::test]
@@ -1260,7 +1365,7 @@ esac
 
         assert_eq!(result.output["skill"], "send_to_pane");
         assert_eq!(result.output["success"], true);
-        assert_eq!(tmux_log(&test), "[send-keys][-t][alpha:editor.0][hello]\n");
+        assert_eq!(tmux_log(&test), "[send-keys][-t][alpha:=editor.0][hello]\n");
         let audit = audit_log(&test);
         assert!(audit.contains("\"target\":\"local/alpha/editor/0\""));
         assert!(audit.contains("\"transcript_text\":\"hello\""));
@@ -1303,7 +1408,7 @@ esac
         assert_eq!(confirmed.output["success"], true);
         assert_eq!(
             tmux_log(&test),
-            "[send-keys][-t][alpha:editor.0][cargo test][Enter]\n"
+            "[send-keys][-t][alpha:=editor.0][cargo test][Enter]\n"
         );
     }
 

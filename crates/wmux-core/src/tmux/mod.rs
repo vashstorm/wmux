@@ -597,10 +597,19 @@ fn build_pane_target(session: &str, window: &str) -> Result<String> {
     if window.starts_with('@') || window.starts_with('%') || window.contains(':') {
         return Ok(window.to_string());
     }
+    let window = exact_window_segment(window);
     if session.trim().is_empty() {
-        Ok(window.to_string())
+        Ok(window)
     } else {
         Ok(format!("{session}:{window}"))
+    }
+}
+
+fn exact_window_segment(window: &str) -> String {
+    if window.starts_with('=') || window.parse::<usize>().is_ok() {
+        window.to_string()
+    } else {
+        format!("={window}")
     }
 }
 

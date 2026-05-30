@@ -9,6 +9,14 @@ const voiceClientMocks = vi.hoisted(() => ({
 	send: vi.fn(),
 	connect: vi.fn(),
 	close: vi.fn(),
+	onMessage: undefined as ((event: unknown) => void) | undefined,
+}));
+
+const audioPipelineMocks = vi.hoisted(() => ({
+	enqueuePlayback: vi.fn(),
+	startCapture: vi.fn(),
+	stopCapture: vi.fn(),
+	stopPlayback: vi.fn(),
 }));
 
 vi.mock("../api/client.js", () => ({
@@ -17,11 +25,23 @@ vi.mock("../api/client.js", () => ({
 }));
 
 vi.mock("../api/voiceClient.js", () => ({
-	OmniWebSocket: vi.fn().mockImplementation(() => ({
-		connect: voiceClientMocks.connect,
-		send: voiceClientMocks.send,
-		close: voiceClientMocks.close,
-		isConnected: () => true,
+	OmniWebSocket: vi.fn().mockImplementation((options: { onMessage?: (event: unknown) => void }) => {
+		voiceClientMocks.onMessage = options.onMessage;
+		return {
+			connect: voiceClientMocks.connect,
+			send: voiceClientMocks.send,
+			close: voiceClientMocks.close,
+			isConnected: () => true,
+		};
+	}),
+}));
+
+vi.mock("../api/audioPipeline.js", () => ({
+	AudioPipeline: vi.fn().mockImplementation(() => ({
+		enqueuePlayback: audioPipelineMocks.enqueuePlayback,
+		startCapture: audioPipelineMocks.startCapture,
+		stopCapture: audioPipelineMocks.stopCapture,
+		stopPlayback: audioPipelineMocks.stopPlayback,
 	})),
 }));
 
@@ -29,6 +49,11 @@ beforeEach(() => {
 	voiceClientMocks.send.mockClear();
 	voiceClientMocks.connect.mockClear();
 	voiceClientMocks.close.mockClear();
+	voiceClientMocks.onMessage = undefined;
+	audioPipelineMocks.enqueuePlayback.mockClear();
+	audioPipelineMocks.startCapture.mockClear();
+	audioPipelineMocks.stopCapture.mockClear();
+	audioPipelineMocks.stopPlayback.mockClear();
 	vi.mocked(client.getConfig).mockResolvedValue({
 		schemaVersion: 1,
 		path: ".",
@@ -288,6 +313,46 @@ describe("AiAssistant", () => {
 			type: "text_message",
 			text: "show sessions",
 		});
+	});
+
+	test("sends typed text messages when wmux auth token is empty on localhost", () => {
+		sessionStorage.removeItem("wmux-auth-token");
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+		showAssistant();
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "show sessions" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		expect(screen.queryByText("Authentication token is missing")).not.toBeInTheDocument();
+		expect(screen.getByText("show sessions")).toBeInTheDocument();
+		expect(voiceClientMocks.send).toHaveBeenCalledWith({
+			type: "text_message",
+			text: "show sessions",
+		});
+	});
+
+	test("plays audio replies during typed text conversations", () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+		showAssistant();
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "say hello" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		voiceClientMocks.onMessage?.({
+			type: "audio_delta",
+			pcm16Base64: "AAAA",
+			sampleRate: 24000,
+		});
+
+		expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("AAAA", 24000);
 	});
 
 	test("can show and hide the full assistant", () => {

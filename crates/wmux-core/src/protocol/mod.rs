@@ -339,10 +339,7 @@ pub fn find_skill<'a>(skills: &'a [OmniSkillDef], id: &str) -> Option<&'a OmniSk
     skills.iter().find(|skill| skill.id == id)
 }
 
-fn omni_skill_description<'a>(
-    skill_defs: &'a [OmniSkillDef],
-    skill_id: &str,
-) -> &'a str {
+fn omni_skill_description<'a>(skill_defs: &'a [OmniSkillDef], skill_id: &str) -> &'a str {
     find_skill(skill_defs, skill_id)
         .map(|skill| skill.description.as_str())
         .unwrap_or("No description available.")
@@ -351,11 +348,9 @@ fn omni_skill_description<'a>(
 /// Generate Qwen function-call tool definitions for all V1 voice skills.
 ///
 /// Returns JSON array of tool definitions compatible with Qwen Realtime API.
-/// Each tool has: type="function", name (snake_case), description, parameters (JSON Schema).
-pub fn generate_qwen_tools(
-    skill_defs: &[OmniSkillDef],
-) -> Vec<serde_json::Value> {
-    let mut tools = vec![
+/// Each tool has: type="function", function={name, description, parameters}.
+pub fn generate_qwen_tools(skill_defs: &[OmniSkillDef]) -> Vec<serde_json::Value> {
+    let tools = vec![
         // navigate_frontend
         serde_json::json!({
             "type": "function",
@@ -405,7 +400,7 @@ pub fn generate_qwen_tools(
                 "properties": {
                     "target_name": {
                         "type": "string",
-                        "description": "Target connection name (e.g., 'local' or SSH host)."
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
                     }
                 },
                 "required": ["target_name"]
@@ -421,7 +416,7 @@ pub fn generate_qwen_tools(
                 "properties": {
                     "target_name": {
                         "type": "string",
-                        "description": "Target connection name."
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
                     },
                     "session_name": {
                         "type": "string",
@@ -441,7 +436,7 @@ pub fn generate_qwen_tools(
                 "properties": {
                     "target_name": {
                         "type": "string",
-                        "description": "Target connection name."
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
                     },
                     "old_name": {
                         "type": "string",
@@ -465,7 +460,7 @@ pub fn generate_qwen_tools(
                 "properties": {
                     "target_name": {
                         "type": "string",
-                        "description": "Target connection name."
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
                     },
                     "session_name": {
                         "type": "string",
@@ -485,7 +480,7 @@ pub fn generate_qwen_tools(
                 "properties": {
                     "target_name": {
                         "type": "string",
-                        "description": "Target connection name."
+                        "description": "Target connection name. Use 'local' for the local tmux server. Do not put the session name here."
                     },
                     "session_name": {
                         "type": "string",
@@ -563,13 +558,36 @@ pub fn generate_qwen_tools(
         }),
     ];
 
-    tools
+    tools.into_iter().map(qwen_realtime_tool).collect()
+}
+
+fn qwen_realtime_tool(tool: serde_json::Value) -> serde_json::Value {
+    let Some(mut object) = tool.as_object().cloned() else {
+        return tool;
+    };
+    let parameters = object
+        .remove("parameters")
+        .unwrap_or_else(|| serde_json::json!({ "type": "object" }));
+    let description = object
+        .remove("description")
+        .unwrap_or_else(|| serde_json::Value::String(String::new()));
+    let name = object
+        .remove("name")
+        .unwrap_or_else(|| serde_json::Value::String(String::new()));
+
+    serde_json::json!({
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": parameters
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::skills::OmniSkillDef;
 
     #[test]
     fn protocol_terminal_message_round_trips() {
@@ -889,9 +907,9 @@ mod tests {
         // Verify each tool has required structure
         for tool in &tools {
             assert_eq!(tool["type"], "function");
-            assert!(tool.get("name").is_some());
-            assert!(tool.get("description").is_some());
-            assert!(tool.get("parameters").is_some());
+            assert!(tool["function"].get("name").is_some());
+            assert!(tool["function"].get("description").is_some());
+            assert!(tool["function"].get("parameters").is_some());
         }
     }
 
@@ -900,10 +918,10 @@ mod tests {
         let tools = generate_qwen_tools(&[]);
         let invoke_route = tools
             .iter()
-            .find(|t| t["name"] == "invoke_backend_route")
+            .find(|t| t["function"]["name"] == "invoke_backend_route")
             .expect("invoke_backend_route tool should exist");
 
-        let route_enum = invoke_route["parameters"]["properties"]["route_id"]["enum"]
+        let route_enum = invoke_route["function"]["parameters"]["properties"]["route_id"]["enum"]
             .as_array()
             .expect("route_id should have enum allowlist");
 
@@ -936,10 +954,10 @@ mod tests {
         let tools = generate_qwen_tools(&[]);
         let navigate = tools
             .iter()
-            .find(|t| t["name"] == "navigate_frontend")
+            .find(|t| t["function"]["name"] == "navigate_frontend")
             .expect("navigate_frontend tool should exist");
 
-        let route_enum = navigate["parameters"]["properties"]["route"]["enum"]
+        let route_enum = navigate["function"]["parameters"]["properties"]["route"]["enum"]
             .as_array()
             .expect("route should have enum");
 
@@ -968,11 +986,11 @@ mod tests {
         let tools = generate_qwen_tools(&[]);
         let send_to_pane = tools
             .iter()
-            .find(|t| t["name"] == "send_to_pane")
+            .find(|t| t["function"]["name"] == "send_to_pane")
             .expect("send_to_pane tool should exist");
 
         // Verify dangerous flag parameters exist
-        let props = &send_to_pane["parameters"]["properties"];
+        let props = &send_to_pane["function"]["parameters"]["properties"];
         assert!(props.get("execute").is_some());
         assert!(props.get("append_enter").is_some());
         assert!(props.get("control").is_some());
@@ -982,7 +1000,4 @@ mod tests {
         assert_eq!(props["execute"]["type"], "boolean");
         assert_eq!(props["execute"]["default"], false);
     }
-
-
-
 }

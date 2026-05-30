@@ -17,6 +17,12 @@ import { getConfig, getOmniHistory, type OmniConversationMessage } from "../api/
 import "../styles/ai-assistant.css";
 
 const LEVEL_SEGMENTS = 12;
+const AUDIO_PIPELINE_CONFIG = {
+	sampleRateInput: 16000,
+	sampleRateOutput: 24000,
+	vadEnabled: true,
+	vadThreshold: 50,
+};
 
 function formatTime(iso: string): string {
 	const d = new Date(iso);
@@ -46,6 +52,10 @@ function omniComposerText(status: string): string {
 	}
 }
 
+function createAudioPipeline(): AudioPipeline {
+	return new AudioPipeline(AUDIO_PIPELINE_CONFIG);
+}
+
 export function AiAssistant() {
 	const {
 		omniStatus,
@@ -68,6 +78,7 @@ export function AiAssistant() {
 	const wsConnectingRef = useRef(false);
 	const omniStatusRef = useRef(omniStatus);
 	const [micDisabled, setMicDisabled] = useState(false);
+	const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable);
 	const [history, setHistory] = useState<OmniConversationMessage[]>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
@@ -77,26 +88,24 @@ export function AiAssistant() {
 		omniStatusRef.current = omniStatus;
 	}, [omniStatus]);
 	useEffect(() => {
-		if (omniStatus === "disabled" && getRuntimeFlags().omniAvailable) {
-			setOmniStatus("idle");
-		}
-	}, [setOmniStatus, omniStatus]);
-
-	useEffect(() => {
 		let cancelled = false;
 		const loadMicState = async () => {
 			try {
 				const cfg = await getConfig();
 				if (!cancelled) {
-						setMicDisabled(cfg.omni?.microphoneDisabled ?? false);
+					setMicDisabled(cfg.omni?.microphoneDisabled ?? false);
+					setMicAvailable(getRuntimeFlags().omniAvailable);
+					setOmniStatus(cfg.omni?.enabled ? "idle" : "disabled");
 				}
 			} catch {
-				// Config fetch failed — default to not disabled
+				if (!cancelled) {
+					setMicAvailable(getRuntimeFlags().omniAvailable);
+				}
 			}
 		};
 		void loadMicState();
 		return () => { cancelled = true; };
-	}, []);
+	}, [setOmniStatus]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -220,8 +229,7 @@ export function AiAssistant() {
 	const connectVoice = useCallback(() => {
 		if (wsConnectingRef.current || wsRef.current) return;
 
-		const token = getAuthToken();
-		if (!token) return;
+		const token = getAuthToken() ?? "";
 
 		wsConnectingRef.current = true;
 		omniStatusRef.current = "connecting";
@@ -262,16 +270,16 @@ export function AiAssistant() {
 	const startListening = useCallback(async () => {
 		if (isMutedRef.current) return;
 		if (micDisabled) return;
+		if (!micAvailable) {
+			setOmniError("Microphone is unavailable in this browser");
+			setOmniStatus("error");
+			return;
+		}
 
 		connectVoice();
 
 		if (!pipelineRef.current) {
-			pipelineRef.current = new AudioPipeline({
-				sampleRateInput: 16000,
-				sampleRateOutput: 24000,
-				vadEnabled: true,
-				vadThreshold: 50,
-			});
+			pipelineRef.current = createAudioPipeline();
 		}
 
 		try {
@@ -301,7 +309,7 @@ export function AiAssistant() {
 			setOmniError("Microphone access denied");
 			setOmniStatus("error");
 		}
-	}, [connectVoice, setOmniTranscript, setOmniError, setOmniStatus, micDisabled]);
+	}, [connectVoice, setOmniTranscript, setOmniError, setOmniStatus, micDisabled, micAvailable]);
 
 	const stopListening = useCallback(() => {
 		pipelineRef.current?.stopCapture();
@@ -353,18 +361,14 @@ export function AiAssistant() {
 		const text = inputText.trim();
 		if (!text) return;
 
-		const token = getAuthToken();
-		if (!token) {
-			setOmniError("Authentication token is missing");
-			setOmniStatus("error");
-			return;
-		}
-
 		connectVoice();
 		if (!wsRef.current) {
 			setOmniError("Connection failed");
 			setOmniStatus("error");
 			return;
+		}
+		if (!pipelineRef.current) {
+			pipelineRef.current = createAudioPipeline();
 		}
 
 		const now = new Date().toISOString();
@@ -531,7 +535,7 @@ export function AiAssistant() {
 							className="voice-btn voice-btn--start"
 							aria-label="Start listening"
 							onClick={startListening}
-							disabled={wsConnectingRef.current || micDisabled}
+							disabled={wsConnectingRef.current || micDisabled || !micAvailable}
 						>
 							<PlayArrowIcon fontSize="small" />
 						</button>

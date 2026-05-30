@@ -38,6 +38,7 @@ export class OmniWebSocket {
 
 		this.ws.onopen = () => {
 			this.reconnectAttempts = 0;
+			this.flushQueue();
 			this.options.onOpen?.();
 		};
 
