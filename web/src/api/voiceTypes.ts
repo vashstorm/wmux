@@ -10,19 +10,7 @@
 // ============================================================================
 
 /** Voice skill identifiers matching Qwen function-call tool names */
-export const VOICE_SKILLS = {
-	NAVIGATE_FRONTEND: "navigate_frontend",
-	INVOKE_BACKEND_ROUTE: "invoke_backend_route",
-	LIST_SESSIONS: "list_sessions",
-	CREATE_SESSION: "create_session",
-	RENAME_SESSION: "rename_session",
-	DELETE_SESSION: "delete_session",
-	SEND_TO_PANE: "send_to_pane",
-	CONFIRM_ACTION: "confirm_action",
-	CANCEL_ACTION: "cancel_action",
-} as const;
-
-export type VoiceSkill = (typeof VOICE_SKILLS)[keyof typeof VOICE_SKILLS];
+export type VoiceSkill = string;
 
 /** Allowed frontend routes for navigate_frontend skill */
 export const FRONTEND_ROUTES = {
@@ -371,7 +359,7 @@ export function isVoiceSessionTimeoutEvent(event: OmniServerEvent): event is Voi
  * Check if a skill name is a valid voice skill.
  */
 export function isValidVoiceSkill(skill: unknown): skill is VoiceSkill {
-	return typeof skill === "string" && (Object.values(VOICE_SKILLS) as string[]).includes(skill);
+	return typeof skill === "string";
 }
 
 /**

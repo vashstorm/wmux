@@ -1,9 +1,10 @@
 use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
+use wmux_core::skills::OmniSkillDef;
 use wmux_core::config::{
     AuthConfig, Config, ConfigError, ConnectionConfig, LogsConfig, ServerConfig, TmuxConfig,
-    UIConfig, OmniSkillConfig,
+    UIConfig,
 };
 
 use crate::http::{ApiError, ApiResult};
@@ -21,7 +22,6 @@ pub struct ConfigResponse {
     ui: UIConfig,
     intelligence: ConfigIntelligenceResponse,
     logs: LogsConfig,
-    #[serde(rename = "voice")]
     omni: ConfigOmniResponse,
 }
 
@@ -63,12 +63,13 @@ struct ConfigIntelligenceResponse {
 #[serde(rename_all = "camelCase")]
 struct ConfigOmniResponse {
     enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dashscope_api_key: Option<String>,
     dashscope_api_key_configured: bool,
     microphone_disabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     voice: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    skills: Vec<OmniSkillConfig>,
+    skill_definitions: Vec<OmniSkillDef>,
     model: String,
     endpoint: String,
     continuous_listening: bool,
@@ -84,7 +85,7 @@ pub async fn get(State(state): State<AppState>) -> ApiResult<ConfigResponse> {
         .store
         .snapshot()
         .map_err(|_| ApiError::internal("failed to read configuration"))?;
-    Ok(Json(new_config_response(&config)))
+    Ok(Json(new_config_response(&config, &state.skills)))
 }
 
 pub async fn update(
@@ -122,7 +123,7 @@ pub async fn update(
         .store
         .snapshot()
         .map_err(|_| ApiError::internal("failed to read configuration"))?;
-    Ok(Json(new_config_response(&latest)))
+    Ok(Json(new_config_response(&latest, &state.skills)))
 }
 
 pub fn sanitized_config(config: &Config) -> Config {
@@ -138,7 +139,7 @@ pub fn sanitized_config(config: &Config) -> Config {
     sanitized
 }
 
-fn new_config_response(config: &Config) -> ConfigResponse {
+fn new_config_response(config: &Config, skill_defs: &[OmniSkillDef]) -> ConfigResponse {
     let sanitized = sanitized_config(config);
     let providers = sanitized
         .intelligence
@@ -180,6 +181,7 @@ fn new_config_response(config: &Config) -> ConfigResponse {
         logs: sanitized.logs,
         omni: ConfigOmniResponse {
             enabled: sanitized.omni.enabled,
+            dashscope_api_key: config.omni.dashscope_api_key.clone(),
             dashscope_api_key_configured: config
                 .omni
                 .dashscope_api_key
@@ -187,7 +189,7 @@ fn new_config_response(config: &Config) -> ConfigResponse {
                 .is_some_and(|key| !key.trim().is_empty()),
             microphone_disabled: sanitized.omni.microphone_disabled,
             voice: sanitized.omni.voice,
-            skills: sanitized.omni.skills,
+            skill_definitions: skill_defs.to_vec(),
             model: sanitized.omni.model,
             endpoint: sanitized.omni.endpoint,
             continuous_listening: sanitized.omni.continuous_listening,
@@ -274,15 +276,14 @@ mod tests {
         config.omni.microphone_disabled = true;
         config.omni.voice = Some("Cherry".to_string());
 
-        let response = new_config_response(&config);
+        let response = new_config_response(&config, &[]);
         let value = serde_json::to_value(response).expect("serialize response");
 
-        assert_eq!(value["voice"]["enabled"], true);
-        assert_eq!(value["voice"]["dashscopeApiKeyConfigured"], true);
-        assert_eq!(value["voice"]["microphoneDisabled"], true);
-        assert_eq!(value["voice"]["voice"], "Cherry");
-        assert!(value["voice"].get("dashscopeApiKey").is_none());
-        assert!(!value.to_string().contains("sk-secret"));
+        assert_eq!(value["omni"]["enabled"], true);
+        assert_eq!(value["omni"]["dashscopeApiKeyConfigured"], true);
+        assert_eq!(value["omni"]["microphoneDisabled"], true);
+        assert_eq!(value["omni"]["voice"], "Cherry");
+		assert_eq!(value["omni"]["dashscopeApiKey"], "sk-secret");
     }
 
     #[test]

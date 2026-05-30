@@ -203,12 +203,14 @@ export interface AppConfig {
 		rotationSizeBytes?: number;
 		retentionDays?: number;
 	};
-	voice?: OmniConfig;
+		omni?: OmniConfig;
 }
 
-export interface OmniSkillConfig {
+
+export interface OmniSkillDef {
 	id: string;
-	enabled: boolean;
+	name: string;
+	riskLevel: string;
 	description: string;
 }
 
@@ -218,7 +220,7 @@ export interface OmniConfig {
 	dashscopeApiKey?: string;
 	microphoneDisabled: boolean;
 	voice?: string;
-	skills: OmniSkillConfig[];
+	skillDefinitions?: OmniSkillDef[];
 	model: string;
 	endpoint: string;
 	continuousListening: boolean;

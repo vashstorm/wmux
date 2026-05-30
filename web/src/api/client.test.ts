@@ -573,11 +573,11 @@ describe("api client", () => {
 					maxConcurrency: 3,
 					cacheTTLSec: 300,
 				},
-				voice: {
+					omni: {
 					enabled: true,
 					dashscopeApiKeyConfigured: true,
 					microphoneDisabled: false,
-					skills: [],
+						skillDefinitions: [],
 					model: "qwen3.5-omni-flash-realtime",
 					endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
 					continuousListening: false,
@@ -587,11 +587,11 @@ describe("api client", () => {
 				},
 			});
 			const result = await getConfig();
-			expect(result.voice?.enabled).toBe(true);
-			expect(result.voice?.dashscopeApiKeyConfigured).toBe(true);
-			expect(result.voice?.microphoneDisabled).toBe(false);
-			expect(result.voice?.model).toBe("qwen3.5-omni-flash-realtime");
-			expect(result.voice?.endpoint).toBe(
+				expect(result.omni?.enabled).toBe(true);
+				expect(result.omni?.dashscopeApiKeyConfigured).toBe(true);
+				expect(result.omni?.microphoneDisabled).toBe(false);
+				expect(result.omni?.model).toBe("qwen3.5-omni-flash-realtime");
+				expect(result.omni?.endpoint).toBe(
 				"wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
 			);
 		});
@@ -622,7 +622,7 @@ describe("api client", () => {
 				},
 			});
 			const result = await getConfig();
-			expect(result.voice).toBeUndefined();
+				expect(result.omni).toBeUndefined();
 		});
 	});
 });

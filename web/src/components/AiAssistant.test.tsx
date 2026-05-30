@@ -51,11 +51,10 @@ beforeEach(() => {
 			maxConcurrency: 2,
 			cacheTTLSec: 300,
 		},
-		voice: {
+			omni: {
 			enabled: true,
 			dashscopeApiKeyConfigured: false,
 			microphoneDisabled: false,
-			skills: [],
 			model: "qwen-omni",
 			endpoint: "wss://example.com",
 			continuousListening: false,
@@ -185,11 +184,10 @@ describe("AiAssistant", () => {
 				maxConcurrency: 2,
 				cacheTTLSec: 300,
 			},
-			voice: {
+				omni: {
 				enabled: true,
 				dashscopeApiKeyConfigured: false,
 				microphoneDisabled: true,
-				skills: [],
 				model: "qwen-omni",
 				endpoint: "wss://example.com",
 				continuousListening: false,
@@ -227,11 +225,10 @@ describe("AiAssistant", () => {
 				maxConcurrency: 2,
 				cacheTTLSec: 300,
 			},
-			voice: {
+				omni: {
 				enabled: true,
 				dashscopeApiKeyConfigured: false,
 				microphoneDisabled: true,
-				skills: [],
 				model: "qwen-omni",
 				endpoint: "wss://example.com",
 				continuousListening: false,

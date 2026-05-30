@@ -88,7 +88,7 @@ export function AiAssistant() {
 			try {
 				const cfg = await getConfig();
 				if (!cancelled) {
-					setMicDisabled(cfg.voice?.microphoneDisabled ?? false);
+						setMicDisabled(cfg.omni?.microphoneDisabled ?? false);
 				}
 			} catch {
 				// Config fetch failed — default to not disabled

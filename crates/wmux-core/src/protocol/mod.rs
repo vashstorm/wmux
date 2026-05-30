@@ -2,7 +2,7 @@ use serde::de::{Error as DeError, Unexpected};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::config::OmniSkillConfig;
+use crate::skills::OmniSkillDef;
 
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not_found";
@@ -324,7 +324,8 @@ pub const VOICE_BACKEND_ROUTES: [&str; 11] = [
     "panes.delete",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum OmniSkillRiskLevel {
     Safe,
     Write,
@@ -333,124 +334,33 @@ pub enum OmniSkillRiskLevel {
     FlowControl,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BuiltInOmniSkill {
-    pub id: &'static str,
-    pub default_name: &'static str,
-    pub default_description: &'static str,
-    pub risk_level: OmniSkillRiskLevel,
+/// Find a skill definition by id in the loaded skills list.
+pub fn find_skill<'a>(skills: &'a [OmniSkillDef], id: &str) -> Option<&'a OmniSkillDef> {
+    skills.iter().find(|skill| skill.id == id)
 }
 
-pub const VALID_OMNI_SKILL_IDS: [&str; 9] = [
-    "navigate_frontend",
-    "invoke_backend_route",
-    "list_sessions",
-    "create_session",
-    "rename_session",
-    "delete_session",
-    "send_to_pane",
-    "confirm_action",
-    "cancel_action",
-];
-
-pub const BUILT_IN_OMNI_SKILLS: [BuiltInOmniSkill; 9] = [
-    BuiltInOmniSkill {
-        id: "navigate_frontend",
-        default_name: "Navigate Frontend",
-        default_description: "Navigate the frontend UI to a specific page. Allowed routes: home, settings, projects, connections, session, window, pane.",
-        risk_level: OmniSkillRiskLevel::Safe,
-    },
-    BuiltInOmniSkill {
-        id: "invoke_backend_route",
-        default_name: "Invoke Backend Route",
-        default_description: "Invoke a backend REST API route. Only read-only routes are allowed for safety.",
-        risk_level: OmniSkillRiskLevel::Dynamic,
-    },
-    BuiltInOmniSkill {
-        id: "list_sessions",
-        default_name: "List Sessions",
-        default_description: "List all tmux sessions for a target connection.",
-        risk_level: OmniSkillRiskLevel::Safe,
-    },
-    BuiltInOmniSkill {
-        id: "create_session",
-        default_name: "Create Session",
-        default_description: "Create a new tmux session on a target connection.",
-        risk_level: OmniSkillRiskLevel::Write,
-    },
-    BuiltInOmniSkill {
-        id: "rename_session",
-        default_name: "Rename Session",
-        default_description: "Rename an existing tmux session.",
-        risk_level: OmniSkillRiskLevel::Write,
-    },
-    BuiltInOmniSkill {
-        id: "delete_session",
-        default_name: "Delete Session",
-        default_description: "Delete a tmux session. WARNING: This is a destructive operation that requires confirmation.",
-        risk_level: OmniSkillRiskLevel::Dangerous,
-    },
-    BuiltInOmniSkill {
-        id: "send_to_pane",
-        default_name: "Send To Pane",
-        default_description: "Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=true, control=true, or multiline=true, this is dangerous and requires confirmation.",
-        risk_level: OmniSkillRiskLevel::Dynamic,
-    },
-    BuiltInOmniSkill {
-        id: "confirm_action",
-        default_name: "Confirm Action",
-        default_description: "Confirm a pending dangerous action using the confirmation ID provided by the intent_received event.",
-        risk_level: OmniSkillRiskLevel::FlowControl,
-    },
-    BuiltInOmniSkill {
-        id: "cancel_action",
-        default_name: "Cancel Action",
-        default_description: "Cancel a pending dangerous action using the confirmation ID.",
-        risk_level: OmniSkillRiskLevel::FlowControl,
-    },
-];
-
-pub fn built_in_omni_skill(id: &str) -> Option<&'static BuiltInOmniSkill> {
-    BUILT_IN_OMNI_SKILLS.iter().find(|skill| skill.id == id)
-}
-
-pub fn omni_skill_enabled(skill_overlay: &[OmniSkillConfig], skill_id: &str) -> bool {
-    skill_overlay
-        .iter()
-        .find(|skill| skill.id == skill_id)
-        .map(|skill| skill.enabled)
-        .unwrap_or(true)
-}
-
-fn omni_skill_description<'a>(skill_overlay: &'a [OmniSkillConfig], skill_id: &str) -> &'a str {
-    skill_overlay
-        .iter()
-        .find(|skill| skill.id == skill_id)
-        .and_then(|skill| {
-            if skill.description.trim().is_empty() {
-                None
-            } else {
-                Some(skill.description.as_str())
-            }
-        })
-        .unwrap_or_else(|| {
-            built_in_omni_skill(skill_id)
-                .expect("built-in voice skill must exist")
-                .default_description
-        })
+fn omni_skill_description<'a>(
+    skill_defs: &'a [OmniSkillDef],
+    skill_id: &str,
+) -> &'a str {
+    find_skill(skill_defs, skill_id)
+        .map(|skill| skill.description.as_str())
+        .unwrap_or("No description available.")
 }
 
 /// Generate Qwen function-call tool definitions for all V1 voice skills.
 ///
 /// Returns JSON array of tool definitions compatible with Qwen Realtime API.
 /// Each tool has: type="function", name (snake_case), description, parameters (JSON Schema).
-pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json::Value> {
+pub fn generate_qwen_tools(
+    skill_defs: &[OmniSkillDef],
+) -> Vec<serde_json::Value> {
     let mut tools = vec![
         // navigate_frontend
         serde_json::json!({
             "type": "function",
             "name": "navigate_frontend",
-            "description": omni_skill_description(skill_overlay, "navigate_frontend"),
+            "description": omni_skill_description(skill_defs, "navigate_frontend"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -467,7 +377,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "invoke_backend_route",
-            "description": omni_skill_description(skill_overlay, "invoke_backend_route"),
+            "description": omni_skill_description(skill_defs, "invoke_backend_route"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -489,7 +399,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "list_sessions",
-            "description": omni_skill_description(skill_overlay, "list_sessions"),
+            "description": omni_skill_description(skill_defs, "list_sessions"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -505,7 +415,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "create_session",
-            "description": omni_skill_description(skill_overlay, "create_session"),
+            "description": omni_skill_description(skill_defs, "create_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -525,7 +435,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "rename_session",
-            "description": omni_skill_description(skill_overlay, "rename_session"),
+            "description": omni_skill_description(skill_defs, "rename_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -549,7 +459,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "delete_session",
-            "description": omni_skill_description(skill_overlay, "delete_session"),
+            "description": omni_skill_description(skill_defs, "delete_session"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -569,7 +479,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "send_to_pane",
-            "description": omni_skill_description(skill_overlay, "send_to_pane"),
+            "description": omni_skill_description(skill_defs, "send_to_pane"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -621,7 +531,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "confirm_action",
-            "description": omni_skill_description(skill_overlay, "confirm_action"),
+            "description": omni_skill_description(skill_defs, "confirm_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -638,7 +548,7 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
         serde_json::json!({
             "type": "function",
             "name": "cancel_action",
-            "description": omni_skill_description(skill_overlay, "cancel_action"),
+            "description": omni_skill_description(skill_defs, "cancel_action"),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -652,19 +562,14 @@ pub fn generate_qwen_tools(skill_overlay: &[OmniSkillConfig]) -> Vec<serde_json:
             }
         }),
     ];
-    tools.retain(|tool| {
-        tool["name"]
-            .as_str()
-            .map(|skill_id| omni_skill_enabled(skill_overlay, skill_id))
-            .unwrap_or(false)
-    });
+
     tools
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OmniSkillConfig;
+    use crate::skills::OmniSkillDef;
 
     #[test]
     fn protocol_terminal_message_round_trips() {
@@ -1078,34 +983,6 @@ mod tests {
         assert_eq!(props["execute"]["default"], false);
     }
 
-    #[test]
-    fn generate_qwen_tools_omits_disabled_skills() {
-        let tools = generate_qwen_tools(&[OmniSkillConfig {
-            id: "delete_session".to_string(),
-            enabled: false,
-            description: String::new(),
-        }]);
 
-        assert_eq!(tools.len(), 8);
-        assert!(tools.iter().all(|tool| tool["name"] != "delete_session"));
-        assert!(tools.iter().any(|tool| tool["name"] == "list_sessions"));
-    }
 
-    #[test]
-    fn generate_qwen_tools_uses_description_overrides() {
-        let tools = generate_qwen_tools(&[OmniSkillConfig {
-            id: "list_sessions".to_string(),
-            enabled: true,
-            description: "List active workspaces for the current machine.".to_string(),
-        }]);
-        let list_sessions = tools
-            .iter()
-            .find(|tool| tool["name"] == "list_sessions")
-            .expect("list_sessions tool");
-
-        assert_eq!(
-            list_sessions["description"],
-            "List active workspaces for the current machine."
-        );
-    }
 }

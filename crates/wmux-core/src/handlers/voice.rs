@@ -168,7 +168,7 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
     };
 
     // Send session.update to Qwen with tools
-    if send_session_update(&mut upstream, &voice_config)
+    if send_session_update(&mut upstream, &voice_config, &state.skills)
         .await
         .is_err()
     {
@@ -359,8 +359,9 @@ async fn connect_to_qwen(
 async fn send_session_update(
     upstream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     config: &OmniConfig,
+    skill_defs: &[wmux_core::skills::OmniSkillDef],
 ) -> Result<(), String> {
-    let tools = generate_qwen_tools(&config.skills);
+    let tools = generate_qwen_tools(skill_defs);
 
     let session_update = serde_json::json!({
         "type": "session.update",
@@ -893,7 +894,7 @@ async fn execute_voice_action(
     let voice_config = get_omni_config(state)?;
     let executor = OmniSkillExecutor::new(state.clone());
     executor
-        .execute_with_overlay(skill, params.clone(), &voice_config.skills)
+        .execute(skill, params.clone())
         .await
         .map(|_| ())
         .map_err(|e| e.to_string())
@@ -1335,7 +1336,7 @@ mod tests {
             dashscope_api_key: None,
             microphone_disabled: false,
             voice: None,
-            skills: Vec::new(),
+
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1360,7 +1361,7 @@ mod tests {
             dashscope_api_key: None,
             microphone_disabled: false,
             voice: None,
-            skills: Vec::new(),
+
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1382,7 +1383,7 @@ mod tests {
             dashscope_api_key: Some("test-key".to_string()),
             microphone_disabled: false,
             voice: None,
-            skills: Vec::new(),
+
             model: "qwen3.5-omni-flash-realtime".to_string(),
             endpoint: "wss://test".to_string(),
             continuous_listening: true,
@@ -1611,7 +1612,15 @@ mod tests {
     /// Test generate_qwen_tools.
     #[test]
     fn test_generate_qwen_tools() {
-        let tools = generate_qwen_tools(&[]);
+        let skill_defs = vec![
+            crate::skills::OmniSkillDef {
+                id: "delete_session".to_string(),
+                name: "Delete Session".to_string(),
+                risk_level: crate::protocol::OmniSkillRiskLevel::Dangerous,
+                description: "Delete a tmux session. WARNING: This is a destructive operation.".to_string(),
+            },
+        ];
+        let tools = generate_qwen_tools(&skill_defs);
         assert_eq!(tools.len(), 9);
 
         for tool in &tools {

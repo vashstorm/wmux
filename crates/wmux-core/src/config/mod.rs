@@ -10,7 +10,6 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::protocol::VALID_OMNI_SKILL_IDS;
 
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
@@ -83,7 +82,7 @@ pub struct Config {
     pub intelligence: IntelligenceConfig,
     #[serde(default)]
     pub logs: LogsConfig,
-    #[serde(default, rename = "voice")]
+    #[serde(default)]
     pub omni: OmniConfig,
 }
 
@@ -218,8 +217,6 @@ pub struct OmniConfig {
     pub microphone_disabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub skills: Vec<OmniSkillConfig>,
     #[serde(default = "default_omni_model")]
     pub model: String,
     #[serde(default = "default_omni_endpoint")]
@@ -236,16 +233,6 @@ pub struct OmniConfig {
     pub vad_threshold: f32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OmniSkillConfig {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub description: String,
-}
 
 #[derive(Debug, Clone)]
 pub struct Store {
@@ -272,12 +259,6 @@ impl Config {
     }
 
     pub fn validate_omni(&self) -> Result<()> {
-        for skill in &self.omni.skills {
-            if !VALID_OMNI_SKILL_IDS.contains(&skill.id.as_str()) {
-                return Err(ConfigError::InvalidOmniSkillId(skill.id.clone()));
-            }
-        }
-
         if !VALID_OMNI_MODELS.contains(&self.omni.model.as_str()) {
             return Err(ConfigError::InvalidOmniModel(self.omni.model.clone()));
         }
@@ -474,8 +455,7 @@ impl Default for OmniConfig {
             dashscope_api_key: None,
             microphone_disabled: false,
             voice: None,
-            skills: Vec::new(),
-            model: default_omni_model(),
+                        model: default_omni_model(),
             endpoint: default_omni_endpoint(),
             continuous_listening: default_omni_continuous_listening(),
             store_raw_audio: false,
@@ -1373,8 +1353,7 @@ mod tests {
         assert_eq!(config.omni.dashscope_api_key, None);
         assert!(!config.omni.microphone_disabled);
         assert_eq!(config.omni.voice, None);
-        assert!(config.omni.skills.is_empty());
-        assert_eq!(config.omni.model, "qwen3.5-omni-flash-realtime");
+                assert_eq!(config.omni.model, "qwen3.5-omni-flash-realtime");
         assert_eq!(
             config.omni.endpoint,
             "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
@@ -1389,7 +1368,7 @@ mod tests {
     #[test]
     fn omni_config_old_shape_loads_new_defaults() {
         let data = r#"{
-          "voice": {
+          "omni": {
             "enabled": false,
             "model": "qwen3.5-omni-flash-realtime"
           }
@@ -1398,30 +1377,18 @@ mod tests {
 
         assert!(!config.omni.microphone_disabled);
         assert_eq!(config.omni.voice, None);
-        assert!(config.omni.skills.is_empty());
-    }
+            }
 
     #[test]
     fn omni_config_serializes_new_camel_case_fields() {
         let mut config = Config::default();
         config.omni.microphone_disabled = true;
         config.omni.voice = Some("Cherry".to_string());
-        config.omni.skills = vec![OmniSkillConfig {
-            id: "session.switch".to_string(),
-            enabled: true,
-            description: "Switch sessions".to_string(),
-        }];
-
         let value = serde_json::to_value(config).expect("serialize");
 
-        assert_eq!(value["voice"]["microphoneDisabled"], true);
-        assert_eq!(value["voice"]["voice"], "Cherry");
-        assert_eq!(value["voice"]["skills"][0]["id"], "session.switch");
-        assert_eq!(value["voice"]["skills"][0]["enabled"], true);
-        assert_eq!(
-            value["voice"]["skills"][0]["description"],
-            "Switch sessions"
-        );
+        assert_eq!(value["omni"]["microphoneDisabled"], true);
+        assert_eq!(value["omni"]["voice"], "Cherry");
+
     }
 
     #[test]
@@ -1466,21 +1433,6 @@ mod tests {
 
             config.validate_omni().expect("valid endpoint should pass");
         }
-    }
-
-    #[test]
-    fn omni_config_rejects_unknown_skill_ids() {
-        let mut config = Config::default();
-        config.omni.skills = vec![OmniSkillConfig {
-            id: "run_arbitrary_shell".to_string(),
-            enabled: true,
-            description: String::new(),
-        }];
-
-        assert!(matches!(
-            config.validate_omni(),
-            Err(ConfigError::InvalidOmniSkillId(id)) if id == "run_arbitrary_shell"
-        ));
     }
 
     #[test]
@@ -1551,7 +1503,7 @@ mod tests {
     #[test]
     fn omni_config_omitted_enabled_defaults_to_disabled() {
         let data = r#"{
-          "voice": {
+          "omni": {
             "dashscopeApiKey": "test-key"
           }
         }"#;
@@ -1562,7 +1514,7 @@ mod tests {
     #[test]
     fn omni_config_deserializes_from_jsonc() {
         let data = r#"{
-          "voice": {
+          "omni": {
             "enabled": true,
             "dashscopeApiKey": "sk-test",
             "model": "qwen3.5-omni-plus-realtime",

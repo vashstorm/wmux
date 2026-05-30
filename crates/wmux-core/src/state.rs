@@ -6,6 +6,7 @@ use sqlx::SqlitePool;
 use tokio::task::JoinHandle;
 
 use wmux_core::config::{ConnectionConfig, Store};
+use wmux_core::skills::OmniSkillDef;
 use wmux_core::intelligence::IntelligenceStore;
 use wmux_core::logging::LoggingHandle;
 use wmux_core::session::SessionManager;
@@ -21,6 +22,7 @@ pub struct AppState {
     pub storage: Option<SqlitePool>,
     pub cleanup_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
     pub sync_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
+    pub skills: Vec<OmniSkillDef>,
 }
 
 impl AppState {
@@ -39,6 +41,7 @@ impl AppState {
             storage: None,
             cleanup_handle: None,
             sync_handle: None,
+            skills: Vec::new(),
         }
     }
 
@@ -70,6 +73,7 @@ impl AppState {
             storage: Some(pool),
             cleanup_handle: None,
             sync_handle: None,
+            skills: Vec::new(),
         })
     }
 

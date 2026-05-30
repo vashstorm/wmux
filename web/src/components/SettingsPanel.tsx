@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip, SvgIcon } from "@mui/material";
 import { Add as AddIcon, Analytics as AnalyticsIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Extension as ExtensionIcon, Lan as LanIcon, Memory as MemoryIcon, SettingsOutlined as SettingsOutlinedIcon, SmartToy as SmartToyIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
-import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type OmniSkillConfig, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearOmniHistory } from "../api/client.js";
+import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, clearOmniHistory } from "../api/client.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
@@ -44,10 +44,10 @@ interface SettingsFormState {
 	omniModel: string;
 	omniVoice: string;
 	omniMicrophoneDisabled: boolean;
-	omniSkills: OmniSkillConfig[];
+
 }
 
-type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "omni" | "omni-skills";
+type SettingsTabKey = "general" | "connections" | "typography" | "intelligence" | "omni";
 
 const SETTINGS_SECTIONS: Array<{
 	key: SettingsTabKey;
@@ -79,23 +79,6 @@ const SETTINGS_SECTIONS: Array<{
 		label: "AI Assistant",
 		icon: SmartToyIcon,
 	},
-	{
-		key: "omni-skills",
-		label: "Assistant Skills",
-		icon: ExtensionIcon,
-	},
-];
-
-const BUILTIN_OMNI_SKILLS: OmniSkillConfig[] = [
-	{ id: "navigate_frontend", enabled: true, description: "" },
-	{ id: "invoke_backend_route", enabled: true, description: "" },
-	{ id: "list_sessions", enabled: true, description: "" },
-	{ id: "create_session", enabled: true, description: "" },
-	{ id: "rename_session", enabled: true, description: "" },
-	{ id: "delete_session", enabled: true, description: "" },
-	{ id: "send_to_pane", enabled: true, description: "" },
-	{ id: "confirm_action", enabled: true, description: "" },
-	{ id: "cancel_action", enabled: true, description: "" },
 ];
 
 function buildFormState(config: AppConfig): SettingsFormState {
@@ -129,14 +112,13 @@ function buildFormState(config: AppConfig): SettingsFormState {
 		intelligenceMaxConcurrency: intel?.maxConcurrency ?? 3,
 		intelligenceCacheTTLSec: intel?.cacheTTLSec ?? 300,
 		editingProvider: null,
-		omniEnabled: config.voice?.enabled ?? false,
-			omniEndpoint: config.voice?.endpoint ?? "",
-			omniSkConfigured: config.voice?.dashscopeApiKeyConfigured ?? false,
-		omniModel: config.voice?.model ?? "qwen3.5-omni-flash-realtime",
-		omniVoice: config.voice?.voice ?? "",
-		omniMicrophoneDisabled: config.voice?.microphoneDisabled ?? false,
-			omniSkills: config.voice?.skills && config.voice.skills.length > 0 ? config.voice.skills : BUILTIN_OMNI_SKILLS,
-			omniSkValue: "",
+		omniEnabled: config.omni?.enabled ?? false,
+			omniEndpoint: config.omni?.endpoint ?? "",
+			omniSkConfigured: config.omni?.dashscopeApiKeyConfigured ?? false,
+		omniModel: config.omni?.model ?? "qwen3.5-omni-flash-realtime",
+		omniVoice: config.omni?.voice ?? "",
+		omniMicrophoneDisabled: config.omni?.microphoneDisabled ?? false,
+				omniSkValue: config.omni?.dashscopeApiKey ?? (config.omni?.dashscopeApiKeyConfigured ? "••••••••••••••••••••••••••••••••••••••••••••••••••" : ""),
 		};
 }
 
@@ -176,8 +158,8 @@ export function SettingsPanel() {
 		setIsLoading(true);
 		try {
 			const response = await getConfig();
-			const restoredSk = sessionStorage.getItem(SK_STORAGE_KEY) ?? "";
 			const baseState = buildFormState(response);
+			const restoredSk = sessionStorage.getItem(SK_STORAGE_KEY) ?? baseState.omniSkValue;
 			setFormState({ ...baseState, omniSkValue: restoredSk });
 			setConfig(response);
 			setConnections(response.connections);
@@ -302,19 +284,18 @@ export function SettingsPanel() {
 				maxConcurrency: formState.intelligenceMaxConcurrency,
 				cacheTTLSec: formState.intelligenceCacheTTLSec,
 			},
-				voice: {
+				omni: {
 					enabled: formState.omniEnabled,
-					dashscopeApiKeyConfigured: formState.omniSkConfigured || (formState.omniSkValue.trim().length > 0),
-					dashscopeApiKey: formState.omniSkValue.trim() || undefined,
+					dashscopeApiKeyConfigured: formState.omniSkConfigured || (formState.omniSkValue.trim().length > 0 && formState.omniSkValue !== "••••••••••••••••••••••••••••••••••••••••••••••••••"),
+					dashscopeApiKey: (formState.omniSkValue.trim() && formState.omniSkValue !== "••••••••••••••••••••••••••••••••••••••••••••••••••") ? formState.omniSkValue.trim() : undefined,
 					microphoneDisabled: formState.omniMicrophoneDisabled,
 					voice: formState.omniVoice || undefined,
-					skills: formState.omniSkills,
 					model: formState.omniModel,
 					endpoint: formState.omniEndpoint,
-					continuousListening: config.voice?.continuousListening ?? false,
-					storeRawAudio: config.voice?.storeRawAudio ?? false,
-					vadEnabled: config.voice?.vadEnabled ?? true,
-					vadThreshold: config.voice?.vadThreshold ?? 0.5,
+					continuousListening: config.omni?.continuousListening ?? false,
+					storeRawAudio: config.omni?.storeRawAudio ?? false,
+					vadEnabled: config.omni?.vadEnabled ?? true,
+					vadThreshold: config.omni?.vadThreshold ?? 0.5,
 				},
 		};
 	};
@@ -326,7 +307,7 @@ export function SettingsPanel() {
 				const savedTheme = normalizeThemeId(saved.ui.theme);
 				const savedWindowTheme = normalizeThemeId(saved.ui.windowTheme, savedTheme);
 				setConfig(saved);
-				if (formState?.omniSkValue.trim()) {
+				if (formState?.omniSkValue.trim() && formState.omniSkValue !== "••••••••••••••••••••••••••••••••••••••••••••••••••") {
 					sessionStorage.setItem(SK_STORAGE_KEY, formState.omniSkValue.trim());
 				}
 				setFormState(buildFormState(saved));
@@ -379,7 +360,7 @@ export function SettingsPanel() {
 								maxConcurrency: payload.intelligence.maxConcurrency,
 								cacheTTLSec: payload.intelligence.cacheTTLSec,
 							},
-							voice: payload.voice,
+							omni: payload.omni,
 							connections: latest.connections.map((connection) => {
 								if (connection.type !== "ssh") {
 									return connection;
@@ -794,7 +775,7 @@ export function SettingsPanel() {
 												{item.label}
 											</Typography>
 											<Typography variant="caption" color="text.secondary" className="settings-panel-subtitle" sx={{ display: "block", mt: 0.125, lineHeight: 1.2 }}>
-												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : item.key === "omni" ? (formState.omniEnabled ? "Enabled" : "Disabled") : `${formState.omniSkills.filter((s) => s.enabled).length}/${formState.omniSkills.length}`}
+												{item.key === "general" ? "Core config" : item.key === "connections" ? `${connections.length} configured` : item.key === "typography" ? `scale ${formState.uiScaleStep}` : item.key === "intelligence" ? (formState.intelligenceEnabled ? "Enabled" : "Disabled") : (formState.omniEnabled ? "Enabled" : "Disabled")}
 											</Typography>
 										</Box>
 									</ListItemButton>
@@ -1336,7 +1317,7 @@ export function SettingsPanel() {
 														type={omniSkShowPlain ? "text" : "password"}
 														value={formState.omniSkValue}
 														onChange={(event) => updateField("omniSkValue", event.target.value)}
-														placeholder={formState.omniSkConfigured && !formState.omniSkValue ? "•••••••• (configured)" : "sk-..."}
+														placeholder={"sk-..."}
 														fullWidth
 														autoComplete="new-password"
 														className="password-input-wrapper"
@@ -1351,7 +1332,15 @@ export function SettingsPanel() {
 																		type="button"
 																		tabIndex={-1}
 																		onMouseDown={(e) => e.preventDefault()}
-																		onClick={() => setOmniSkShowPlain((v) => !v)}
+															onClick={() => {
+																	if (!omniSkShowPlain && formState?.omniSkValue === "••••••••••••••••••••••••••••••••••••••••••••••••••") {
+																		const restored = sessionStorage.getItem(SK_STORAGE_KEY);
+																		if (restored) {
+																			updateField("omniSkValue", restored);
+																		}
+																	}
+																	setOmniSkShowPlain((v) => !v);
+																}}
 																		size="small"
 																		sx={{ mr: 0.5 }}
 																		aria-label={omniSkShowPlain ? "Hide API Key" : "Show API Key"}
@@ -1425,72 +1414,6 @@ export function SettingsPanel() {
 									</Box>
 								)}
 
-								{activeTab === "omni-skills" && (
-									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Assistant Skills</Typography>
-											<Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-												Configure which skills are available to the AI assistant. Each skill has a description used by the AI to determine when to invoke it.
-											</Typography>
-											<Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-												{formState.omniSkills.map((skill) => (
-													<Box
-														key={skill.id}
-														component="li"
-														sx={{
-															display: "flex",
-															alignItems: "flex-start",
-															gap: 2,
-															p: 1.5,
-															border: 1,
-															borderColor: "divider",
-															borderRadius: 1,
-															bgcolor: skill.enabled ? "action.selected" : "background.paper",
-														}}
-													>
-														<Switch
-															id={`omni-skill-${skill.id}`}
-															checked={skill.enabled}
-															onChange={(event) => {
-																const updated = formState.omniSkills.map((s) =>
-																	s.id === skill.id ? { ...s, enabled: event.target.checked } : s
-																);
-																updateField("omniSkills", updated);
-															}}
-															size="small"
-															slotProps={{
-																input: {
-																	"data-testid": `omni-skill-${skill.id}-enabled`,
-																} as React.InputHTMLAttributes<HTMLInputElement>,
-															}}
-															sx={{ mt: 0.25, flexShrink: 0 }}
-														/>
-														<TextField
-															id={`omni-skill-desc-${skill.id}`}
-															label={skill.id}
-															type="text"
-															value={skill.description}
-															onChange={(event) => {
-																const updated = formState.omniSkills.map((s) =>
-																	s.id === skill.id ? { ...s, description: event.target.value } : s
-																);
-																updateField("omniSkills", updated);
-															}}
-															placeholder="Skill description..."
-															size="small"
-															fullWidth
-															slotProps={{
-																htmlInput: {
-																	"data-testid": `omni-skill-${skill.id}-description`,
-																},
-															}}
-														/>
-													</Box>
-												))}
-											</Box>
-										</Box>
-									</Box>
-								)}
 
 								{activeTab === "typography" && (
 									<Box className="settings-tab-content" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>

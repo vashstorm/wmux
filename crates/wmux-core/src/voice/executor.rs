@@ -6,10 +6,9 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use crate::config::OmniSkillConfig;
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
-use crate::protocol::{VOICE_FRONTEND_ROUTES, OmniServerEvent, OmniSkill, omni_skill_enabled};
+use crate::protocol::{VOICE_FRONTEND_ROUTES, OmniServerEvent, OmniSkill};
 use crate::state::AppState;
 use crate::tmux::{Adapter, TmuxError};
 use crate::voice::audit::{
@@ -119,23 +118,15 @@ impl OmniSkillExecutor {
         skill: &str,
         params: Value,
     ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        self.execute_with_overlay(skill, params, &[]).await
-    }
-
-    pub async fn execute_with_overlay(
-        &self,
-        skill: &str,
-        params: Value,
-        skill_overlay: &[OmniSkillConfig],
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let start = Instant::now();
         let result = self
-            .execute_unconfirmed(skill, params.clone(), skill_overlay)
+            .execute_unconfirmed(skill, params.clone())
             .await;
         self.audit(skill, &params, audit_target(&params), &result, false, start)
             .await;
         result
     }
+
 
     pub async fn execute_confirmed(
         &self,
@@ -158,12 +149,7 @@ impl OmniSkillExecutor {
         &self,
         skill: &str,
         params: Value,
-        skill_overlay: &[OmniSkillConfig],
     ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        if !omni_skill_enabled(skill_overlay, skill) {
-            return Err(OmniExecutorError::bad_request("skill is disabled"));
-        }
-
         match skill {
             "navigate_frontend" => self.navigate_frontend(params).await,
             "invoke_backend_route" => self.invoke_backend_route(params, false).await,
@@ -1010,7 +996,7 @@ fn audit_target(params: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, OmniSkillConfig};
+    use crate::config::Config;
     use crate::logging::LoggingHandle;
     use crate::state::AppState;
     use std::fs;
@@ -1176,29 +1162,6 @@ esac
 
         assert_eq!(error.code, "bad_request");
     }
-
-    #[tokio::test]
-    async fn executor_rejects_disabled_skill_before_dispatch() {
-        let test = test_executor();
-        let error = test
-            .executor
-            .execute_with_overlay(
-                "navigate_frontend",
-                json!({ "route": "settings" }),
-                &[OmniSkillConfig {
-                    id: "navigate_frontend".to_string(),
-                    enabled: false,
-                    description: String::new(),
-                }],
-            )
-            .await
-            .expect_err("disabled skill");
-
-        assert_eq!(error.code, "bad_request");
-        assert_eq!(error.message, "skill is disabled");
-    }
-
-    #[tokio::test]
     async fn executor_list_sessions_returns_session_list() {
         let test = test_executor();
         let result = test

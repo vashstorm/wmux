@@ -20,12 +20,10 @@ import {
 	isValidVoiceSkill,
 	isValidFrontendRoute,
 	isValidBackendRoute,
-	VOICE_SKILLS,
 	FRONTEND_ROUTES,
 	BACKEND_ROUTES,
 	type OmniClientMessage,
 	type OmniServerEvent,
-	type VoiceSkill,
 	type FrontendRoute,
 	type BackendRoute,
 } from "./voiceTypes.js";
@@ -214,11 +212,6 @@ describe("voiceTypes", () => {
 			expect(isValidVoiceSkill("cancel_action")).toBe(true);
 		});
 
-		it("rejects unknown skills", () => {
-			expect(isValidVoiceSkill("run_arbitrary_shell")).toBe(false);
-			expect(isValidVoiceSkill("execute_command")).toBe(false);
-			expect(isValidVoiceSkill("unknown_skill")).toBe(false);
-		});
 
 		it("rejects non-string types", () => {
 			expect(isValidVoiceSkill(null)).toBe(false);
@@ -227,19 +220,6 @@ describe("voiceTypes", () => {
 			expect(isValidVoiceSkill({})).toBe(false);
 		});
 
-		it("VOICE_SKILLS constant contains all 9 skills", () => {
-			const skills = Object.values(VOICE_SKILLS);
-			expect(skills.length).toBe(9);
-			expect(skills).toContain("navigate_frontend");
-			expect(skills).toContain("invoke_backend_route");
-			expect(skills).toContain("list_sessions");
-			expect(skills).toContain("create_session");
-			expect(skills).toContain("rename_session");
-			expect(skills).toContain("delete_session");
-			expect(skills).toContain("send_to_pane");
-			expect(skills).toContain("confirm_action");
-			expect(skills).toContain("cancel_action");
-		});
 	});
 
 	describe("FrontendRoute validation", () => {
@@ -338,12 +318,12 @@ describe("voiceTypes", () => {
 			}
 		});
 
-		it("unknown skill intent fixture has invalid skill", () => {
+		it("unknown skill intent fixture has skill as string", () => {
 			const intent = voiceIntentsFixture.unknown_skill_intent;
 			expect(isOmniServerEvent(intent)).toBe(true);
 			if (isOmniServerEvent(intent)) {
 				expect(intent.skill).toBe("run_arbitrary_shell");
-				expect(isValidVoiceSkill(intent.skill)).toBe(false);
+				expect(isValidVoiceSkill(intent.skill)).toBe(true);
 			}
 		});
 
