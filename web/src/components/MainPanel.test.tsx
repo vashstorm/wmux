@@ -901,10 +901,54 @@ describe("visibility gating for active window sync", () => {
 		});
 		document.dispatchEvent(new Event("visibilitychange"));
 
-		await act(async () => {
-			await vi.advanceTimersByTimeAsync(0);
-		});
-
 		expect(listWindows).toHaveBeenCalledTimes(2);
 	});
+
+	test("renders AiLogDetail when selectedAiLog is active", () => {
+		const mockLog = {
+			id: "log-1",
+			conversationId: "conv-1",
+			eventKind: "llm_call",
+			model: "gpt-4",
+			status: "success",
+			promptText: "Hello MainPanel",
+			toolName: null,
+			toolCallId: null,
+			toolArgumentsJson: null,
+			toolResultJson: null,
+			metricsJson: null,
+			durationMs: 1200,
+			rawEventJson: null,
+			errorMessage: null,
+			createdAt: "2026-05-31T10:00:00Z",
+		};
+
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane: null,
+			selectedAiEvent: null,
+			selectedAiLog: mockLog,
+			selectedProject: null,
+			setSelectedAiEvent: vi.fn(),
+			setSelectedAiLog: vi.fn(),
+			sessions: {},
+			windows: {},
+			setSelectedPane: vi.fn(),
+			setWindows: vi.fn(),
+			setPanes: vi.fn(),
+			setError: vi.fn(),
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		expect(screen.getByTestId("ai-log-detail")).toBeInTheDocument();
+		expect(screen.getByText("Hello MainPanel")).toBeInTheDocument();
+	});
 });
+

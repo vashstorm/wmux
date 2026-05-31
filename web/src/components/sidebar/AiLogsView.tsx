@@ -1,24 +1,17 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
 	Box,
 	Typography,
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableRow,
 	Button,
 	CircularProgress,
 	Chip,
 	Alert,
-	Collapse,
-	IconButton,
 	Stack,
+	List,
+	ListItem,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { listAiLogs, clearAiLogs } from "../../api/client.js";
 import type { AiLogEntry } from "../../api/client.js";
 import { useAppState } from "../../state/store.js";
@@ -27,7 +20,6 @@ const AI_LOGS_FONT_SIZE = {
 	title: "var(--font-size-sm)",
 	body: "var(--font-size-sm)",
 	meta: "var(--font-size-xs)",
-	code: "var(--font-size-xs)",
 };
 
 const PAGE_LIMIT = 50;
@@ -49,46 +41,22 @@ function getEventKindColor(eventKind: string): "primary" | "secondary" | "succes
 	}
 }
 
-function getStatusColor(status: string): "success" | "error" | "warning" | "default" {
-	switch (status) {
-		case "success":
-			return "success";
-		case "error":
-			return "error";
-		case "pending":
-			return "warning";
-		default:
-			return "default";
-	}
-}
-
-function formatTimestamp(timestamp: string): string {
+function formatTimestampShort(timestamp: string): string {
 	try {
 		const date = new Date(timestamp);
-		return date.toLocaleString();
+		return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 	} catch {
 		return timestamp;
 	}
 }
 
-function formatJson(jsonStr: string | null | undefined): string {
-	if (!jsonStr) return "";
-	try {
-		const parsed = JSON.parse(jsonStr);
-		return JSON.stringify(parsed, null, 2);
-	} catch {
-		return jsonStr;
-	}
-}
-
 export function AiLogsView() {
-	const { showConfirm } = useAppState();
+	const { showConfirm, selectedAiLog, setSelectedAiLog } = useAppState();
 	const [logs, setLogs] = useState<AiLogEntry[]>([]);
 	const [nextCursor, setNextCursor] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
 	const loadLogs = useCallback(async (replace = true) => {
 		if (replace) {
@@ -131,9 +99,9 @@ export function AiLogsView() {
 	}, [nextCursor]);
 
 	const refresh = useCallback(() => {
-		setExpandedIds(new Set());
+		setSelectedAiLog(null);
 		void loadLogs(true);
-	}, [loadLogs]);
+	}, [loadLogs, setSelectedAiLog]);
 
 	const handleClear = useCallback(() => {
 		showConfirm({
@@ -146,7 +114,7 @@ export function AiLogsView() {
 					await clearAiLogs();
 					setLogs([]);
 					setNextCursor(null);
-					setExpandedIds(new Set());
+					setSelectedAiLog(null);
 					void loadLogs(true);
 				} catch (err) {
 					const message = err instanceof Error ? err.message : "Failed to clear AI logs";
@@ -154,160 +122,11 @@ export function AiLogsView() {
 				}
 			},
 		});
-	}, [showConfirm, loadLogs]);
-
-	const toggleExpand = useCallback((id: string) => {
-		setExpandedIds((prev) => {
-			const next = new Set(prev);
-			if (next.has(id)) {
-				next.delete(id);
-			} else {
-				next.add(id);
-			}
-			return next;
-		});
-	}, []);
+	}, [showConfirm, loadLogs, setSelectedAiLog]);
 
 	useEffect(() => {
 		void loadLogs(true);
 	}, [loadLogs]);
-
-	const renderExpandedDetails = (entry: AiLogEntry) => {
-		return (
-			<Box sx={{ p: 2, bgcolor: "action.hover", borderRadius: "var(--radius-sm)" }}>
-				{entry.promptText && (
-					<Box sx={{ mb: 1.5 }}>
-						<Typography variant="subtitle2" sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, fontWeight: 600, mb: 0.5 }}>
-							Prompt
-						</Typography>
-						<Box
-							sx={{
-								p: 1,
-								bgcolor: "background.paper",
-								borderRadius: "var(--radius-sm)",
-								fontFamily: "var(--font-mono)",
-								fontSize: AI_LOGS_FONT_SIZE.code,
-								whiteSpace: "pre-wrap",
-								wordBreak: "break-word",
-								maxHeight: 150,
-								overflow: "auto",
-							}}
-						>
-							{entry.promptText}
-						</Box>
-					</Box>
-				)}
-
-				{entry.toolName && (
-					<Box sx={{ mb: 1.5 }}>
-						<Typography variant="subtitle2" sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, fontWeight: 600, mb: 0.5 }}>
-							Tool: {entry.toolName}
-						</Typography>
-						{entry.toolCallId && (
-							<Typography sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, color: "text.secondary", mb: 0.5 }}>
-								Call ID: {entry.toolCallId}
-							</Typography>
-						)}
-						{entry.toolArgumentsJson && (
-							<Box sx={{ mb: 0.5 }}>
-								<Typography sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, color: "text.secondary", mb: 0.25 }}>
-									Arguments:
-								</Typography>
-								<Box
-									sx={{
-										p: 1,
-										bgcolor: "background.paper",
-										borderRadius: "var(--radius-sm)",
-										fontFamily: "var(--font-mono)",
-										fontSize: AI_LOGS_FONT_SIZE.code,
-										whiteSpace: "pre-wrap",
-										maxHeight: 100,
-										overflow: "auto",
-									}}
-								>
-									{formatJson(entry.toolArgumentsJson)}
-								</Box>
-							</Box>
-						)}
-						{entry.toolResultJson && (
-							<Box>
-								<Typography sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, color: "text.secondary", mb: 0.25 }}>
-									Result:
-								</Typography>
-								<Box
-									sx={{
-										p: 1,
-										bgcolor: "background.paper",
-										borderRadius: "var(--radius-sm)",
-										fontFamily: "var(--font-mono)",
-										fontSize: AI_LOGS_FONT_SIZE.code,
-										whiteSpace: "pre-wrap",
-										maxHeight: 150,
-										overflow: "auto",
-									}}
-								>
-									{formatJson(entry.toolResultJson)}
-								</Box>
-							</Box>
-						)}
-					</Box>
-				)}
-
-				{entry.metricsJson && (
-					<Box sx={{ mb: 1.5 }}>
-						<Typography variant="subtitle2" sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, fontWeight: 600, mb: 0.5 }}>
-							Metrics
-						</Typography>
-						<Box
-							sx={{
-								p: 1,
-								bgcolor: "background.paper",
-								borderRadius: "var(--radius-sm)",
-								fontFamily: "var(--font-mono)",
-								fontSize: AI_LOGS_FONT_SIZE.code,
-								whiteSpace: "pre-wrap",
-							}}
-						>
-							{formatJson(entry.metricsJson)}
-						</Box>
-					</Box>
-				)}
-
-				{entry.errorMessage && (
-					<Box sx={{ mb: 1.5 }}>
-						<Typography variant="subtitle2" sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, fontWeight: 600, mb: 0.5, color: "error.main" }}>
-							Error
-						</Typography>
-						<Alert severity="error" sx={{ fontSize: AI_LOGS_FONT_SIZE.body }}>
-							{entry.errorMessage}
-						</Alert>
-					</Box>
-				)}
-
-				{entry.rawEventJson && (
-					<Box>
-						<Typography variant="subtitle2" sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, fontWeight: 600, mb: 0.5 }}>
-							Raw Event
-						</Typography>
-						<Box
-							sx={{
-								p: 1,
-								bgcolor: "background.paper",
-								borderRadius: "var(--radius-sm)",
-								fontFamily: "var(--font-mono)",
-								fontSize: AI_LOGS_FONT_SIZE.code,
-								whiteSpace: "pre-wrap",
-								maxHeight: 200,
-								overflow: "auto",
-							}}
-						>
-							{formatJson(entry.rawEventJson)}
-						</Box>
-					</Box>
-				)}
-			</Box>
-		);
-	};
 
 	return (
 		<Box data-testid="ai-logs-view" sx={{ minHeight: 1, p: 2 }}>
@@ -357,65 +176,76 @@ export function AiLogsView() {
 					</Typography>
 				</Box>
 			) : (
-				<Box sx={{ overflow: "auto" }}>
-					<Table size="small">
-						<TableHead>
-							<TableRow>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta, width: 40 }}></TableCell>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>Event</TableCell>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>Model</TableCell>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>Status</TableCell>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>Duration</TableCell>
-								<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>Time</TableCell>
-							</TableRow>
-						</TableHead>
-						<TableBody>
-							{logs.map((entry) => (
-								<Fragment key={entry.id}>
-									<TableRow data-testid={`ai-log-row-${entry.id}`}>
-										<TableCell sx={{ width: 40 }}>
-											<IconButton
-												size="small"
-												onClick={() => toggleExpand(entry.id)}
-												data-testid={`ai-log-expand-${entry.id}`}
-												aria-label={expandedIds.has(entry.id) ? "Collapse" : "Expand"}
-											>
-												{expandedIds.has(entry.id) ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-											</IconButton>
-										</TableCell>
-										<TableCell>
+				<Box>
+					<List disablePadding dense>
+						{logs.map((entry) => (
+							<ListItem
+								key={entry.id}
+								onClick={() => setSelectedAiLog(entry)}
+								data-testid={`ai-log-row-${entry.id}`}
+								sx={{
+									px: 1,
+									py: 1,
+									my: 0.5,
+									borderRadius: "var(--radius-sm)",
+									cursor: "pointer",
+									bgcolor: selectedAiLog?.id === entry.id ? "action.selected" : "transparent",
+									"&:hover": { bgcolor: "action.hover" },
+									transition: "background-color 0.15s",
+									overflow: "hidden",
+								}}
+							>
+								<Stack direction="row" spacing={1.5} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
+									<Box
+										sx={{
+											width: 8,
+											height: 8,
+											borderRadius: "50%",
+											flexShrink: 0,
+											backgroundColor: entry.status === "success" ? "success.main" : entry.status === "error" ? "error.main" : "text.disabled",
+											boxShadow: entry.status === "success"
+												? "0 0 8px var(--color-success)"
+												: entry.status === "error"
+													? "0 0 8px var(--color-danger)"
+													: "none",
+										}}
+									/>
+									<Stack direction="column" sx={{ flex: 1, minWidth: 0, gap: 0.25 }}>
+										<Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}>
 											<Chip
 												label={entry.eventKind}
 												size="small"
 												color={getEventKindColor(entry.eventKind)}
-												sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}
+												sx={{ fontSize: "10px", height: 18, px: 0.5 }}
 											/>
-										</TableCell>
-										<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.body }}>{entry.model}</TableCell>
-										<TableCell>
-											<Chip
-												label={entry.status}
-												size="small"
-												color={getStatusColor(entry.status)}
-												sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}
-											/>
-										</TableCell>
-										<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.body }}>{entry.durationMs}ms</TableCell>
-										<TableCell sx={{ fontSize: AI_LOGS_FONT_SIZE.meta }}>{formatTimestamp(entry.createdAt)}</TableCell>
-									</TableRow>
-									<TableRow key={`${entry.id}-details`}>
-										<TableCell sx={{ p: 0 }} colSpan={6}>
-											<Collapse in={expandedIds.has(entry.id)}>
-												<Box data-testid={`ai-log-details-${entry.id}`}>
-													{renderExpandedDetails(entry)}
-												</Box>
-											</Collapse>
-										</TableCell>
-									</TableRow>
-								</Fragment>
-							))}
-						</TableBody>
-					</Table>
+											<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px", whiteSpace: "nowrap" }}>
+												{formatTimestampShort(entry.createdAt)}
+											</Typography>
+										</Stack>
+										<Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+											<Typography
+												variant="body2"
+												sx={{
+													fontSize: "var(--font-size-xs)",
+													fontWeight: 500,
+													whiteSpace: "nowrap",
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													color: "text.primary",
+												}}
+												title={entry.toolName ? `Tool: ${entry.toolName}` : entry.model}
+											>
+												{entry.toolName ? `Tool: ${entry.toolName}` : entry.model}
+											</Typography>
+											<Typography variant="caption" color="text.secondary" sx={{ fontSize: "10px" }}>
+												{entry.durationMs}ms
+											</Typography>
+										</Stack>
+									</Stack>
+								</Stack>
+							</ListItem>
+						))}
+					</List>
 
 					{nextCursor && (
 						<Box sx={{ mt: 2, textAlign: "center" }}>

@@ -17,6 +17,24 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
 	return <AppProvider>{children}</AppProvider>;
 }
 
+function LogInspector() {
+	const { selectedAiLog } = useAppState();
+	return selectedAiLog ? (
+		<div data-testid="selected-log-inspector">{selectedAiLog.id}</div>
+	) : (
+		<div data-testid="selected-log-inspector">none</div>
+	);
+}
+
+function TestWrapperWithDetail() {
+	return (
+		<AppProvider>
+			<AiLogsView />
+			<LogInspector />
+		</AppProvider>
+	);
+}
+
 function createMockLogEntry(id: string): client.AiLogEntry {
 	return {
 		id,
@@ -45,15 +63,13 @@ describe("AiLogsView", () => {
 	});
 
 	test("shows loading state on mount", async () => {
-		// Slow down the mock to ensure loading state is visible
 		mockListAiLogs.mockImplementation(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 100));
+			await new Promise((resolve) => setTimeout(resolve, 10));
 			return { data: [], nextCursor: null };
 		});
 
 		render(<TestWrapper><AiLogsView /></TestWrapper>);
 
-		// Should show loading initially - check for the loading spinner in the main content area
 		expect(screen.getByText("Loading AI logs...")).toBeInTheDocument();
 
 		await waitFor(() => {
@@ -85,11 +101,10 @@ describe("AiLogsView", () => {
 			expect(screen.getByText(/Failed to fetch logs/i)).toBeInTheDocument();
 		});
 
-		// Retry button should be visible
 		expect(screen.getByTestId("ai-logs-refresh")).toBeInTheDocument();
 	});
 
-	test("renders table with log entries", async () => {
+	test("renders list with log entries", async () => {
 		const entries = [
 			createMockLogEntry("log-1"),
 			createMockLogEntry("log-2"),
@@ -103,103 +118,26 @@ describe("AiLogsView", () => {
 		});
 		expect(screen.getByTestId("ai-log-row-log-2")).toBeInTheDocument();
 
-		// Check summary columns (use getAllByText since there are 2 entries with same values)
 		expect(screen.getAllByText("llm_call")).toHaveLength(2);
 		expect(screen.getAllByText("gpt-4")).toHaveLength(2);
-		expect(screen.getAllByText("success")).toHaveLength(2);
 		expect(screen.getAllByText("1500ms")).toHaveLength(2);
 	});
 
-	test("expands row to show details", async () => {
-		const entry = createMockLogEntry("log-expand");
+	test("clicking a log entry selects it in the app state", async () => {
+		const entry = createMockLogEntry("log-click");
 		mockListAiLogs.mockResolvedValue({ data: [entry], nextCursor: null });
 
-		render(<TestWrapper><AiLogsView /></TestWrapper>);
+		render(<TestWrapperWithDetail />);
 
 		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-row-log-expand")).toBeInTheDocument();
+			expect(screen.getByTestId("ai-log-row-log-click")).toBeInTheDocument();
 		});
 
-		// Click expand button
-		fireEvent.click(screen.getByTestId("ai-log-expand-log-expand"));
+		expect(screen.getByTestId("selected-log-inspector")).toHaveTextContent("none");
 
-		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-details-log-expand")).toBeInTheDocument();
-		});
+		fireEvent.click(screen.getByTestId("ai-log-row-log-click"));
 
-		// Should show prompt text
-		expect(screen.getByText(/Prompt for log-expand/i)).toBeInTheDocument();
-	});
-
-	test("shows tool info when toolName exists", async () => {
-		const entry: client.AiLogEntry = {
-			id: "log-tool",
-			conversationId: "conv-tool",
-			eventKind: "tool_call",
-			model: "gpt-4",
-			status: "success",
-			promptText: null,
-			toolName: "bash",
-			toolCallId: "call-123",
-			toolArgumentsJson: JSON.stringify({ command: "ls" }),
-			toolResultJson: JSON.stringify({ output: "file1 file2" }),
-			metricsJson: null,
-			durationMs: 500,
-			rawEventJson: null,
-			errorMessage: null,
-			createdAt: new Date().toISOString(),
-		};
-		mockListAiLogs.mockResolvedValue({ data: [entry], nextCursor: null });
-
-		render(<TestWrapper><AiLogsView /></TestWrapper>);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-row-log-tool")).toBeInTheDocument();
-		});
-
-		fireEvent.click(screen.getByTestId("ai-log-expand-log-tool"));
-
-		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-details-log-tool")).toBeInTheDocument();
-		});
-
-		// Tool name appears in "Tool: bash" heading
-		expect(screen.getByText(/Tool: bash/)).toBeInTheDocument();
-	});
-
-	test("shows error message in red when errorMessage exists", async () => {
-		const entry: client.AiLogEntry = {
-			id: "log-err",
-			conversationId: "conv-err",
-			eventKind: "llm_call",
-			model: "gpt-4",
-			status: "error",
-			promptText: null,
-			toolName: null,
-			toolCallId: null,
-			toolArgumentsJson: null,
-			toolResultJson: null,
-			metricsJson: null,
-			durationMs: 200,
-			rawEventJson: null,
-			errorMessage: "API rate limit exceeded",
-			createdAt: new Date().toISOString(),
-		};
-		mockListAiLogs.mockResolvedValue({ data: [entry], nextCursor: null });
-
-		render(<TestWrapper><AiLogsView /></TestWrapper>);
-
-		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-row-log-err")).toBeInTheDocument();
-		});
-
-		fireEvent.click(screen.getByTestId("ai-log-expand-log-err"));
-
-		await waitFor(() => {
-			expect(screen.getByTestId("ai-log-details-log-err")).toBeInTheDocument();
-		});
-
-		expect(screen.getByText("API rate limit exceeded")).toBeInTheDocument();
+		expect(screen.getByTestId("selected-log-inspector")).toHaveTextContent("log-click");
 	});
 
 	test("load more button appears when nextCursor exists", async () => {
@@ -352,7 +290,6 @@ describe("AiLogsView", () => {
 			expect(screen.getByTestId("ai-log-row-log-chip")).toBeInTheDocument();
 		});
 
-		// Chip should be present with eventKind text
 		const chip = screen.getByText("tool_call");
 		expect(chip).toBeInTheDocument();
 	});

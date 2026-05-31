@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project, OmniConversationMessage } from "../api/client.js";
+import type { AppConfig, ConnectionConfig, ConnectionHealth, SessionInfoData, WindowInfo, PaneInfo, AiUsageEvent, Project, OmniConversationMessage, AiLogEntry } from "../api/client.js";
 import { normalizeThemeId } from "../ui/themes.js";
 import { fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE, clampUIScaleStep } from "../ui/fontSize.js";
 
@@ -229,6 +229,7 @@ export interface AppState {
 	confirmDialog: ConfirmDialogState | null;
 	selectedPane: SelectedPane | null;
 	selectedAiEvent: AiUsageEvent | null;
+	selectedAiLog: AiLogEntry | null;
 	selectedProject: Project | null;
 	connectionHealth: Record<string, ConnectionHealth>;
 	editingConnection: ConnectionConfig | null;
@@ -273,6 +274,7 @@ interface AppContextValue extends AppState {
 	showConfirm: (options: Omit<ConfirmDialogState, "onConfirm"> & { onConfirm: () => void }) => void;
 	setSelectedPane: (pane: SelectedPane | null) => void;
 	setSelectedAiEvent: (event: AiUsageEvent | null) => void;
+	setSelectedAiLog: (log: AiLogEntry | null) => void;
 	setSelectedProject: (project: Project | null) => void;
 	setConnectionHealth: (health: Record<string, ConnectionHealth>) => void;
 	setEditingConnection: (connection: ConnectionConfig | null) => void;
@@ -308,6 +310,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 	const [selectedPane, setSelectedPaneState] = useState<SelectedPane | null>(null);
 	const [selectedAiEvent, setSelectedAiEventState] = useState<AiUsageEvent | null>(null);
+	const [selectedAiLog, setSelectedAiLogState] = useState<AiLogEntry | null>(null);
 	const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
 	const [connectionHealth, setConnectionHealth] = useState<Record<string, ConnectionHealth>>({});
 	const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
@@ -424,6 +427,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setSelectedPaneState(pane);
 		if (pane !== null) {
 			setSelectedAiEventState(null);
+			setSelectedAiLogState(null);
 			setSelectedProjectState(null);
 		}
 	}, []);
@@ -432,6 +436,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setSelectedAiEventState(event);
 		if (event !== null) {
 			setSelectedPaneState(null);
+			setSelectedAiLogState(null);
+			setSelectedProjectState(null);
+		}
+	}, []);
+
+	const setSelectedAiLog = useCallback((log: AiLogEntry | null) => {
+		setSelectedAiLogState(log);
+		if (log !== null) {
+			setSelectedPaneState(null);
+			setSelectedAiEventState(null);
 			setSelectedProjectState(null);
 		}
 	}, []);
@@ -441,6 +455,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		if (project !== null) {
 			setSelectedPaneState(null);
 			setSelectedAiEventState(null);
+			setSelectedAiLogState(null);
 		}
 	}, []);
 
@@ -460,6 +475,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		confirmDialog,
 		selectedPane,
 		selectedAiEvent,
+		selectedAiLog,
 		selectedProject,
 		connectionHealth,
 		editingConnection,
@@ -481,6 +497,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		showConfirm,
 		setSelectedPane,
 		setSelectedAiEvent,
+		setSelectedAiLog,
 		setSelectedProject,
 		setConnectionHealth,
 		setEditingConnection,

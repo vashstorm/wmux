@@ -4,6 +4,7 @@ import { useAppState } from "../state/store.js";
 import { WindowTabs } from "./WindowTabs.js";
 import { PaneCanvas } from "./PaneCanvas.js";
 import { AiEventDetail } from "./AiEventDetail.js";
+import { AiLogDetail } from "./AiLogDetail.js";
 import { ProjectDashboard } from "./ProjectDashboard.js";
 import { listPanes, listWindows, type AiUsageEvent } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
@@ -76,8 +77,10 @@ export function MainPanel() {
 	const {
 		selectedPane,
 		selectedAiEvent,
+		selectedAiLog = null,
 		selectedProject,
 		setSelectedAiEvent,
+		setSelectedAiLog = () => {},
 		sessions,
 		windows,
 		setSelectedPane,
@@ -285,6 +288,18 @@ export function MainPanel() {
 			return segments;
 		}
 
+		if (selectedAiLog) {
+			const segments: TitleSegment[] = [];
+			segments.push({ key: "app", value: selectedAiLog.eventKind });
+			segments.push({ key: "status", value: selectedAiLog.status });
+			if (selectedAiLog.toolName) {
+				segments.push({ key: "summary", value: `Tool: ${selectedAiLog.toolName}` });
+			} else {
+				segments.push({ key: "summary", value: selectedAiLog.model });
+			}
+			return segments;
+		}
+
 		if (!hasSelectedPane || !selectedPane) {
 			return [];
 		}
@@ -355,9 +370,11 @@ export function MainPanel() {
 				</Box>
 			</header>
 
-			<main className={`main-content${hasSelectedPane || selectedProject ? " has-workspace" : " is-empty"}`}>
+			<main className={`main-content${hasSelectedPane || selectedProject || selectedAiEvent || selectedAiLog ? " has-workspace" : " is-empty"}`}>
 				{selectedAiEvent ? (
 					<AiEventDetail event={selectedAiEvent} onClose={() => setSelectedAiEvent(null)} />
+				) : selectedAiLog ? (
+					<AiLogDetail log={selectedAiLog} onClose={() => setSelectedAiLog(null)} />
 				) : selectedProject ? (
 					<ProjectDashboard />
 				) : hasSelectedPane ? (
