@@ -4,11 +4,9 @@ import "./styles/components.css";
 import "./styles/fonts.css";
 
 import { useEffect, useRef } from "react";
-import { ThemeProvider, CssBaseline, IconButton } from "@mui/material";
+import { ThemeProvider, CssBaseline, IconButton, Tooltip } from "@mui/material";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
-import TerminalIcon from "@mui/icons-material/Terminal";
-import TerminalOutlinedIcon from "@mui/icons-material/TerminalOutlined";
 import { AppProvider, useAppState } from "./state/store.js";
 import { getConfig, updateConfig } from "./api/client.js";
 import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE } from "./ui/fontSize.js";
@@ -88,16 +86,58 @@ function ThemeToggle() {
 		}
 	};
 
+	const toggleLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
+
 	return (
-		<IconButton
-			data-testid="theme-toggle"
-			aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-			onClick={handleToggle}
-			size="small"
-			sx={{ width: 30, height: 30 }}
-		>
-			{isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-		</IconButton>
+		<Tooltip title={toggleLabel} arrow placement="top">
+			<IconButton
+				data-testid="theme-toggle"
+				aria-label={toggleLabel}
+				onClick={handleToggle}
+				size="small"
+				sx={{ width: 30, height: 30 }}
+			>
+				{isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+			</IconButton>
+		</Tooltip>
+	);
+}
+
+function DarkTerminalIcon() {
+	return (
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+			{/* Dark terminal window */}
+			<rect x="2" y="4" width="20" height="16" rx="3" fill="#0f172a" stroke="#6366f1" strokeWidth="1.5" />
+			{/* Header line */}
+			<path d="M2 9h20" stroke="#1e293b" strokeWidth="1.5" />
+			{/* Dot indicators in header */}
+			<circle cx="5" cy="6.5" r="1" fill="#ef4444" />
+			<circle cx="8" cy="6.5" r="1" fill="#eab308" />
+			<circle cx="11" cy="6.5" r="1" fill="#22c55e" />
+			{/* Prompt `>` */}
+			<path d="M6 12.5l2.5 1.5L6 15.5" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+			{/* Cursor `_` */}
+			<path d="M10 15.5h3" stroke="#a5b4fc" strokeWidth="1.5" strokeLinecap="round" />
+		</svg>
+	);
+}
+
+function LightTerminalIcon() {
+	return (
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+			{/* Light terminal window */}
+			<rect x="2" y="4" width="20" height="16" rx="3" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+			{/* Header line */}
+			<path d="M2 9h20" stroke="#e2e8f0" strokeWidth="1.5" />
+			{/* Dot indicators in header */}
+			<circle cx="5" cy="6.5" r="1" fill="#cbd5e1" />
+			<circle cx="8" cy="6.5" r="1" fill="#cbd5e1" />
+			<circle cx="11" cy="6.5" r="1" fill="#cbd5e1" />
+			{/* Prompt `>` */}
+			<path d="M6 12.5l2.5 1.5L6 15.5" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+			{/* Cursor `_` */}
+			<path d="M10 15.5h3" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" />
+		</svg>
 	);
 }
 
@@ -122,17 +162,21 @@ function TerminalThemeToggle() {
 		}
 	};
 
+	const toggleLabel = isDark ? "Switch terminal to light" : "Switch terminal to dark";
+
 	return (
-		<IconButton
-			data-testid="terminal-theme-toggle"
-			aria-label={isDark ? "Switch terminal to light" : "Switch terminal to dark"}
-			onClick={handleToggle}
-			size="small"
-			sx={{ width: 30, height: 30 }}
-		>
-				{isDark ? <TerminalIcon fontSize="small" /> : <TerminalOutlinedIcon fontSize="small" />}
+		<Tooltip title={toggleLabel} arrow placement="top">
+			<IconButton
+				data-testid="terminal-theme-toggle"
+				aria-label={toggleLabel}
+				onClick={handleToggle}
+				size="small"
+				sx={{ width: 30, height: 30 }}
+			>
+				{isDark ? <DarkTerminalIcon /> : <LightTerminalIcon />}
 			</IconButton>
-		);
+		</Tooltip>
+	);
 }
 
 function WorkspaceNavigationSync() {

@@ -290,10 +290,12 @@ export function MainPanel() {
 								data-testid={`main-title-${segment.key}`}
 								title={segment.value}
 								sx={{
-									color: segment.key === "summary" ? "text.disabled" : "text.secondary",
-									fontWeight: 500,
+									color: segment.key === "summary" ? "text.primary" : "text.secondary",
+									fontWeight: segment.key === "summary" ? 500 : 500,
+									fontSize: "var(--font-size-base)",
+									letterSpacing: "-0.01em",
 									...(segment.key === "summary" ? {
-										opacity: 0.7,
+										opacity: 0.95,
 										overflow: "hidden",
 										textOverflow: "ellipsis",
 										whiteSpace: "nowrap",

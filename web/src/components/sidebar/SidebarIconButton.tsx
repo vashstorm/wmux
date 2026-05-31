@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { IconButton } from "@mui/material";
 import type { IconButtonProps } from "@mui/material/IconButton";
 import type { SvgIconProps } from "@mui/material/SvgIcon";
@@ -12,27 +13,32 @@ interface SidebarIconButtonProps extends Omit<IconButtonProps, "children" | "siz
 	danger?: boolean;
 }
 
-export function SidebarIconButton({
-	icon: Icon,
-	variant = "nav",
-	active = false,
-	danger = false,
-	className,
-	...props
-}: SidebarIconButtonProps) {
-	const classes = [
-		"sidebar-icon-button",
-		`sidebar-icon-button-${variant}`,
-		active ? "is-active" : "",
-		danger ? "is-danger" : "",
-		className ?? "",
-	]
-		.filter(Boolean)
-		.join(" ");
+export const SidebarIconButton = forwardRef<HTMLButtonElement, SidebarIconButtonProps>(
+	function SidebarIconButton(
+		{
+			icon: Icon,
+			variant = "nav",
+			active = false,
+			danger = false,
+			className,
+			...props
+		},
+		ref
+	) {
+		const classes = [
+			"sidebar-icon-button",
+			`sidebar-icon-button-${variant}`,
+			active ? "is-active" : "",
+			danger ? "is-danger" : "",
+			className ?? "",
+		]
+			.filter(Boolean)
+			.join(" ");
 
-	return (
-		<IconButton className={classes} size="small" {...props}>
-			<Icon className="sidebar-icon" fontSize="inherit" />
-		</IconButton>
-	);
-}
+		return (
+			<IconButton ref={ref} className={classes} size="small" {...props}>
+				<Icon className="sidebar-icon" fontSize="inherit" />
+			</IconButton>
+		);
+	}
+);
