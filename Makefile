@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build dev clean test typecheck e2e tauri-build tauri-e2e tauri-dev build-app
+.PHONY: build dev clean test typecheck e2e tauri-build tauri-e2e tauri-dev app icons
 
 PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 TAURI_DRIVER ?= tauri-driver
@@ -31,6 +31,37 @@ bin/wmux: target/release/wmux-server web/dist/index.html
 dev: bin/wmux
 	exec ./bin/wmux
 
+# SVG source → Tauri icon assets (icon.png + icon.icns)
+ICON_SVG := web/public/favicon.svg
+ICON_OUT := src-tauri/icons
+
+icons: $(ICON_SVG)
+	@echo "Generating icons from $(ICON_SVG)…"
+	@command -v rsvg-convert >/dev/null 2>&1 || { echo "rsvg-convert not found. Install with: brew install librsvg"; exit 1; }
+	@mkdir -p /tmp/wmux.iconset
+	@# Render master 1024px PNG
+	@rsvg-convert -w 1024 -h 1024 $(ICON_SVG) -o /tmp/wmux-icon-1024.png
+	@# Generate all iconset sizes
+	@for spec in \
+		"icon_16x16.png:16" \
+		"icon_16x16@2x.png:32" \
+		"icon_32x32.png:32" \
+		"icon_32x32@2x.png:64" \
+		"icon_128x128.png:128" \
+		"icon_128x128@2x.png:256" \
+		"icon_256x256.png:256" \
+		"icon_256x256@2x.png:512" \
+		"icon_512x512.png:512" \
+		"icon_512x512@2x.png:1024"; do \
+			name=$${spec%%:*}; size=$${spec##*:}; \
+			rsvg-convert -w $$size -h $$size $(ICON_SVG) -o /tmp/wmux.iconset/$$name; \
+		done
+	@# Copy 512px as the canonical icon.png used by Tauri
+	@cp /tmp/wmux.iconset/icon_512x512.png $(ICON_OUT)/icon.png
+	@# Pack .icns
+	@iconutil -c icns /tmp/wmux.iconset -o $(ICON_OUT)/icon.icns
+	@echo "Done → $(ICON_OUT)/icon.png  $(ICON_OUT)/icon.icns"
+
 clean:
 	rm -rf bin web/dist web/.bun-install-stamp target src-tauri/target
 
@@ -47,12 +78,12 @@ e2e:
 tauri-dev:
 	cargo tauri dev
 
-tauri-build:
+tauri-build: icons
 	cargo tauri build
 
-build-app:
+app:
 	@if [ "$$(uname -s)" != "Darwin" ]; then \
-		echo "build-app DMG install flow is only supported on macOS."; \
+		echo "build app DMG install flow is only supported on macOS."; \
 		exit 1; \
 	fi
 	cargo tauri build --bundles dmg
