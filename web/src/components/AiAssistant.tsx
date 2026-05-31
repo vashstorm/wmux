@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState, useCallback, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import MicIcon from "@mui/icons-material/Mic";
 import MicOffIcon from "@mui/icons-material/MicOff";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import StopIcon from "@mui/icons-material/Stop";
-import ReplayIcon from "@mui/icons-material/Replay";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import SendIcon from "@mui/icons-material/Send";
@@ -20,9 +17,54 @@ const LEVEL_SEGMENTS = 12;
 const AUDIO_PIPELINE_CONFIG = {
 	sampleRateInput: 16000,
 	sampleRateOutput: 24000,
-	vadEnabled: true,
-	vadThreshold: 50,
+	vadEnabled: false,
+	vadThreshold: 0,
 };
+const ASSISTANT_SIZE_STORAGE_KEY = "wmux-ai-assistant-size";
+const DEFAULT_ASSISTANT_SIZE = { width: 380, height: 520 };
+const MIN_ASSISTANT_SIZE = { width: 320, height: 360 };
+const VIEWPORT_MARGIN_PX = 16;
+
+type AssistantSize = typeof DEFAULT_ASSISTANT_SIZE;
+type ResizeStart = {
+	pointerId: number | "mouse";
+	startX: number;
+	startY: number;
+	startWidth: number;
+	startHeight: number;
+	direction: "width" | "height" | "both";
+};
+
+function clampAssistantSize(size: AssistantSize): AssistantSize {
+	if (typeof window === "undefined") return size;
+	const maxWidth = Math.max(MIN_ASSISTANT_SIZE.width, window.innerWidth - (VIEWPORT_MARGIN_PX * 2));
+	const maxHeight = Math.max(MIN_ASSISTANT_SIZE.height, window.innerHeight - (VIEWPORT_MARGIN_PX * 2));
+	return {
+		width: Math.min(maxWidth, Math.max(MIN_ASSISTANT_SIZE.width, Math.round(size.width))),
+		height: Math.min(maxHeight, Math.max(MIN_ASSISTANT_SIZE.height, Math.round(size.height))),
+	};
+}
+
+function loadAssistantSize(): AssistantSize {
+	try {
+		const raw = localStorage.getItem(ASSISTANT_SIZE_STORAGE_KEY);
+		if (!raw) return DEFAULT_ASSISTANT_SIZE;
+		const parsed = JSON.parse(raw) as Partial<AssistantSize>;
+		if (typeof parsed.width !== "number" || typeof parsed.height !== "number") {
+			return DEFAULT_ASSISTANT_SIZE;
+		}
+		return clampAssistantSize({ width: parsed.width, height: parsed.height });
+	} catch {
+		return DEFAULT_ASSISTANT_SIZE;
+	}
+}
+
+function saveAssistantSize(size: AssistantSize): void {
+	try {
+		localStorage.setItem(ASSISTANT_SIZE_STORAGE_KEY, JSON.stringify(size));
+	} catch {
+	}
+}
 
 function formatTime(iso: string): string {
 	const d = new Date(iso);
@@ -78,14 +120,18 @@ export function AiAssistant() {
 	const [audioBars, setAudioBars] = useState<boolean[]>(new Array(LEVEL_SEGMENTS).fill(false));
 	const wsRef = useRef<OmniWebSocket | null>(null);
 	const pipelineRef = useRef<AudioPipeline | null>(null);
-	const isMutedRef = useRef(false);
 	const wsConnectingRef = useRef(false);
 	const omniStatusRef = useRef(omniStatus);
+	const [wsConnecting, setWsConnecting] = useState(false);
+	const [micCapturing, setMicCapturing] = useState(false);
 	const [micDisabled, setMicDisabled] = useState(false);
 	const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable);
 	const [history, setHistory] = useState<OmniConversationMessage[]>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
+	const [assistantSize, setAssistantSize] = useState(loadAssistantSize);
+	const chatRef = useRef<HTMLDivElement | null>(null);
+	const resizeStartRef = useRef<ResizeStart | null>(null);
 
 	const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
 		const targetName = selectedPane?.targetName ?? selectedTargetName;
@@ -161,6 +207,54 @@ export function AiAssistant() {
 		} catch {
 		}
 		setHistory([]);
+	}, []);
+
+	const scrollChatToBottom = useCallback(() => {
+		const chat = chatRef.current;
+		if (!chat) return;
+		chat.scrollTop = chat.scrollHeight;
+	}, []);
+
+	const startAssistantResize = useCallback((clientX: number, clientY: number, pointerId: number | "mouse", direction: "width" | "height" | "both") => {
+		resizeStartRef.current = {
+			pointerId,
+			startX: clientX,
+			startY: clientY,
+			startWidth: assistantSize.width,
+			startHeight: assistantSize.height,
+			direction,
+		};
+		const cursorMap = {
+			both: "nwse-resize",
+			width: "ew-resize",
+			height: "ns-resize",
+		};
+		document.body.style.cursor = cursorMap[direction];
+		document.body.style.userSelect = "none";
+	}, [assistantSize]);
+
+	const updateAssistantResize = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		const start = resizeStartRef.current;
+		if (!start || start.pointerId !== pointerId) return;
+		const deltaX = start.startX - clientX;
+		const deltaY = start.startY - clientY;
+		const nextSize = clampAssistantSize({
+			width: start.direction === "height" ? start.startWidth : start.startWidth + deltaX,
+			height: start.direction === "width" ? start.startHeight : start.startHeight + deltaY,
+		});
+		setAssistantSize(nextSize);
+	}, []);
+
+	const finishAssistantResize = useCallback((pointerId: number | "mouse") => {
+		const start = resizeStartRef.current;
+		if (!start || start.pointerId !== pointerId) return;
+		resizeStartRef.current = null;
+		document.body.style.cursor = "";
+		document.body.style.userSelect = "";
+		setAssistantSize((current) => {
+			saveAssistantSize(current);
+			return current;
+		});
 	}, []);
 
 	const handleServerMessage = useCallback((event: OmniServerEvent) => {
@@ -267,6 +361,7 @@ export function AiAssistant() {
 		const token = getAuthToken() ?? "";
 
 		wsConnectingRef.current = true;
+		setWsConnecting(true);
 		omniStatusRef.current = "connecting";
 		setOmniStatus("connecting");
 		setOmniTranscript("");
@@ -279,6 +374,7 @@ export function AiAssistant() {
 			},
 			onOpen: () => {
 				wsConnectingRef.current = false;
+				setWsConnecting(false);
 				if (omniStatusRef.current === "connecting") {
 					setOmniStatus("listening");
 				}
@@ -286,13 +382,16 @@ export function AiAssistant() {
 			},
 			onClose: () => {
 				wsConnectingRef.current = false;
-				if (!isMutedRef.current && omniStatusRef.current !== "disabled") {
+				setWsConnecting(false);
+				setMicCapturing(false);
+				if (omniStatusRef.current !== "disabled") {
 					setOmniStatus("idle");
 				}
 				wsRef.current = null;
 			},
 			onError: () => {
 				wsConnectingRef.current = false;
+				setWsConnecting(false);
 				setOmniError("Connection failed");
 				setOmniStatus("error");
 			},
@@ -304,7 +403,6 @@ export function AiAssistant() {
 	}, [handleServerMessage, sendSessionContext, setOmniStatus, setOmniTranscript, setOmniError]);
 
 	const startListening = useCallback(async () => {
-		if (isMutedRef.current) return;
 		if (micDisabled) return;
 		if (!micAvailable) {
 			setOmniError("Microphone is unavailable in this browser");
@@ -339,9 +437,11 @@ export function AiAssistant() {
 					},
 				},
 			);
+			setMicCapturing(true);
 			setOmniTranscript("");
 			setOmniError(null);
 		} catch {
+			setMicCapturing(false);
 			setOmniError("Microphone access denied");
 			setOmniStatus("error");
 		}
@@ -353,18 +453,11 @@ export function AiAssistant() {
 		wsRef.current?.close();
 		wsRef.current = null;
 		wsConnectingRef.current = false;
+		setWsConnecting(false);
+		setMicCapturing(false);
 		setAudioBars(new Array(LEVEL_SEGMENTS).fill(false));
 		setOmniStatus("idle");
 	}, [setOmniStatus]);
-
-	const toggleMute = useCallback(() => {
-		isMutedRef.current = !isMutedRef.current;
-		if (isMutedRef.current) {
-			stopListening();
-		} else {
-			void startListening();
-		}
-	}, [startListening, stopListening]);
 
 	const handleConfirm = useCallback(() => {
 		if (omniPendingConfirmation && wsRef.current?.isConnected()) {
@@ -440,13 +533,116 @@ export function AiAssistant() {
 		};
 	}, []);
 
+	const beginResize = useCallback((direction: "width" | "height" | "both") => (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		startAssistantResize(event.clientX, event.clientY, event.pointerId, direction);
+		event.currentTarget.setPointerCapture?.(event.pointerId);
+	}, [startAssistantResize]);
+
+	const beginMouseResize = useCallback((direction: "width" | "height" | "both") => (event: ReactMouseEvent<HTMLDivElement>) => {
+		if (resizeStartRef.current || event.button !== 0) return;
+		event.preventDefault();
+		startAssistantResize(event.clientX, event.clientY, "mouse", direction);
+	}, [startAssistantResize]);
+
+	const updateResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+		updateAssistantResize(event.clientX, event.clientY, event.pointerId);
+	}, [updateAssistantResize]);
+
+	const endResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+		event.currentTarget.releasePointerCapture?.(event.pointerId);
+		finishAssistantResize(event.pointerId);
+	}, [finishAssistantResize]);
+
+	useEffect(() => {
+		const handleWindowResize = () => {
+			setAssistantSize((current) => clampAssistantSize(current));
+		};
+		window.addEventListener("resize", handleWindowResize);
+		return () => window.removeEventListener("resize", handleWindowResize);
+	}, []);
+
+	useEffect(() => {
+		const handlePointerMove = (event: PointerEvent) => {
+			updateAssistantResize(event.clientX, event.clientY, event.pointerId);
+		};
+		const handlePointerUp = (event: PointerEvent) => {
+			finishAssistantResize(event.pointerId);
+		};
+		const handleMouseMove = (event: MouseEvent) => {
+			updateAssistantResize(event.clientX, event.clientY, "mouse");
+		};
+		const handleMouseUp = () => {
+			finishAssistantResize("mouse");
+		};
+		window.addEventListener("pointermove", handlePointerMove);
+		window.addEventListener("pointerup", handlePointerUp);
+		window.addEventListener("pointercancel", handlePointerUp);
+		window.addEventListener("mousemove", handleMouseMove);
+		window.addEventListener("mouseup", handleMouseUp);
+		return () => {
+			window.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("pointerup", handlePointerUp);
+			window.removeEventListener("pointercancel", handlePointerUp);
+			window.removeEventListener("mousemove", handleMouseMove);
+			window.removeEventListener("mouseup", handleMouseUp);
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+		};
+	}, [finishAssistantResize, updateAssistantResize]);
+
 	const isListening = omniStatus === "listening" || omniStatus === "processing" || omniStatus === "speaking" || omniStatus === "confirming";
 	const isDisabled = omniStatus === "disabled";
 	const visibleHistory = history.slice(-10);
+	const latestHistoryId = history[history.length - 1]?.id ?? "";
 	const showEmptyState = !historyLoading && visibleHistory.length === 0 && !omniTranscript && !omniError && !omniPendingConfirmation;
+	const handleMicToggle = micCapturing ? stopListening : (omniStatus === "error" ? handleReconnect : startListening);
+
+	useLayoutEffect(() => {
+		scrollChatToBottom();
+		const animationFrame = window.requestAnimationFrame(scrollChatToBottom);
+		const timeout = window.setTimeout(scrollChatToBottom, 60);
+		return () => {
+			window.cancelAnimationFrame(animationFrame);
+			window.clearTimeout(timeout);
+		};
+	}, [historyLoading, latestHistoryId, omniTranscript, omniPendingConfirmation?.confirmationId, omniError, showEmptyState, scrollChatToBottom]);
 
 	return (
-		<div className="ai-assistant" data-ai-assistant-state={omniStatus}>
+		<div
+			className="ai-assistant"
+			data-ai-assistant-state={omniStatus}
+			style={{
+				"--ai-assistant-width": `${assistantSize.width}px`,
+				"--ai-assistant-height": `${assistantSize.height}px`,
+			} as CSSProperties}
+		>
+			{/* Border Drag Handles for Resizing */}
+			<div
+				className="voice-resize-edge voice-resize-edge--top"
+				onPointerDown={beginResize("height")}
+				onPointerMove={updateResize}
+				onPointerUp={endResize}
+				onPointerCancel={endResize}
+				onMouseDown={beginMouseResize("height")}
+			/>
+			<div
+				className="voice-resize-edge voice-resize-edge--left"
+				onPointerDown={beginResize("width")}
+				onPointerMove={updateResize}
+				onPointerUp={endResize}
+				onPointerCancel={endResize}
+				onMouseDown={beginMouseResize("width")}
+			/>
+			<div
+				className="voice-resize-corner voice-resize-corner--top-left"
+				onPointerDown={beginResize("both")}
+				onPointerMove={updateResize}
+				onPointerUp={endResize}
+				onPointerCancel={endResize}
+				onMouseDown={beginMouseResize("both")}
+			/>
 			<div className="voice-header">
 				<div className="voice-title">
 					<span className="voice-status-dot" />
@@ -472,7 +668,7 @@ export function AiAssistant() {
 				</button>
 			</div>
 
-			<div className="voice-chat">
+			<div className="voice-chat" ref={chatRef}>
 				{historyLoading && (
 					<div className="voice-history-loading">Loading conversation...</div>
 				)}
@@ -547,7 +743,7 @@ export function AiAssistant() {
 							}
 						}}
 					/>
-					{(isListening || omniStatus === "connecting") && (
+					{(micCapturing || omniStatus === "connecting") && (
 						<div className="voice-level-bar" aria-hidden="true">
 							{audioBars.map((active, i) => (
 								<span key={i} className={`voice-level-segment${active ? " voice-level-segment--active" : ""}`} />
@@ -564,45 +760,15 @@ export function AiAssistant() {
 					>
 						<SendIcon fontSize="small" />
 					</button>
-					{!isListening && !isDisabled && (
-						<button
-							type="button"
-							className="voice-btn voice-btn--start"
-							aria-label="Start listening"
-							onClick={startListening}
-							disabled={wsConnectingRef.current || micDisabled || !micAvailable}
-						>
-							<PlayArrowIcon fontSize="small" />
-						</button>
-					)}
-					{isListening && (
-						<button
-							type="button"
-							className="voice-btn voice-btn--stop"
-							aria-label="Stop listening"
-							onClick={stopListening}
-						>
-							<StopIcon fontSize="small" />
-						</button>
-					)}
 					<button
 						type="button"
-						className="voice-btn"
-						aria-label={isMutedRef.current ? "Unmute" : "Mute"}
-						onClick={toggleMute}
+						className={`voice-btn ${micCapturing ? "voice-btn--stop" : "voice-btn--start"}`}
+						aria-label={micCapturing ? "Stop listening" : "Start listening"}
+						onClick={handleMicToggle}
+						disabled={!micCapturing && (isDisabled || wsConnecting || micDisabled || !micAvailable)}
 					>
-						{isMutedRef.current ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
+						{micCapturing ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
 					</button>
-					{omniStatus === "error" && (
-						<button
-							type="button"
-							className="voice-btn"
-							aria-label="Reconnect"
-							onClick={handleReconnect}
-						>
-							<ReplayIcon fontSize="small" />
-						</button>
-					)}
 				</div>
 			</form>
 		</div>

@@ -500,8 +500,8 @@ async fn send_session_update(
         "modalities": ["text", "audio"],
         "tools": tools,
         "enable_search": false,
-        "input_audio_format": "pcm16",
-        "output_audio_format": "pcm24",
+        "input_audio_format": "pcm",
+        "output_audio_format": "pcm",
         "turn_detection": turn_detection
     });
     if let Some(voice) = config.voice.as_deref().filter(|voice| !voice.is_empty()) {
@@ -711,19 +711,14 @@ async fn handle_client_message(
     match msg {
         OmniClientMessage::AudioFrame {
             pcm16_base64,
-            sample_rate,
+            sample_rate: _,
         } => {
             if get_omni_config(state)?.microphone_disabled {
                 return Err("Microphone disabled in Settings".to_string());
             }
             Ok(ClientMessageEffects::qwen(vec![serde_json::json!({
                 "type": "input_audio_buffer.append",
-                "audio": pcm16_base64,
-                "format": {
-                    "format": "pcm16",
-                    "sample_rate": sample_rate,
-                    "channels": 1
-                }
+                "audio": pcm16_base64
             })]))
         }
 
@@ -1363,7 +1358,6 @@ async fn send_error_and_close(socket: &mut WebSocket, code: &str, message: Strin
     .await;
     let _ = socket.send(Message::Close(None)).await;
 }
-
 
 // ============================================================================
 // Tests with Mock Qwen WebSocket Server

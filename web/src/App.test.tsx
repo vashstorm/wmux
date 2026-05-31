@@ -42,7 +42,7 @@ vi.mock("./api/client.js", () => ({
 		connections: [],
 		ui: { theme: "dark", windowTheme: "dark" },
 		intelligence: { enabled: false, providers: [], maxBytes: 4096, timeoutSec: 30, minSessionIntervalSec: 60, maxConcurrency: 2, cacheTTLSec: 300 },
-		omni: { enabled: true, dashscopeApiKeyConfigured: false, microphoneDisabled: false, model: "qwen-omni", endpoint: "wss://example.com", continuousListening: false, storeRawAudio: false, vadEnabled: true, vadThreshold: 50 },
+		omni: { enabled: true, dashscopeApiKeyConfigured: false, microphoneDisabled: false, model: "qwen-omni", endpoint: "wss://example.com", continuousListening: false, storeRawAudio: false, vadEnabled: true, vadThreshold: 0.5 },
 	}),
 	getOmniHistory: vi.fn().mockResolvedValue([]),
 }));

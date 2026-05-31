@@ -412,8 +412,8 @@ async fn voice_proxy_uses_mock_qwen_and_maps_events() {
     let session_update = next_mock_message(&mut qwen_rx).await;
     assert_eq!(session_update["type"], "session.update");
     assert_eq!(session_update["session"]["enable_search"], false);
-    assert_eq!(session_update["session"]["input_audio_format"], "pcm16");
-    assert_eq!(session_update["session"]["output_audio_format"], "pcm24");
+    assert_eq!(session_update["session"]["input_audio_format"], "pcm");
+    assert_eq!(session_update["session"]["output_audio_format"], "pcm");
     assert_eq!(
         session_update["session"]["turn_detection"]["type"],
         "server_vad"
@@ -439,6 +439,7 @@ async fn voice_proxy_uses_mock_qwen_and_maps_events() {
     let qwen_audio = next_mock_message(&mut qwen_rx).await;
     assert_eq!(qwen_audio["type"], "input_audio_buffer.append");
     assert_eq!(qwen_audio["audio"], "client-audio");
+    assert!(qwen_audio.get("format").is_none());
 
     assert_eq!(
         next_client_event(&mut client).await,
@@ -536,8 +537,7 @@ async fn real_omni_text_assistant_runs_tmux_session_crud_from_config() {
     let suffix = Uuid::new_v4().simple().to_string();
     let session = format!("wmux-omni-crud-{}", &suffix[..12]);
     let renamed = format!("wmux-omni-crud-renamed-{}", &suffix[..8]);
-    let _guard =
-        TmuxSessionGuard::new(tmux_path.clone(), vec![session.clone(), renamed.clone()]);
+    let _guard = TmuxSessionGuard::new(tmux_path.clone(), vec![session.clone(), renamed.clone()]);
     ensure_tmux_session_absent(&tmux_path, &session);
     ensure_tmux_session_absent(&tmux_path, &renamed);
 
@@ -783,8 +783,7 @@ async fn transcript_done_event_inserts_history_with_session_conversation_id() {
     let session_state = OmniSessionState::new();
 
     let event = handle_qwen_message(
-        &json!({ "type": "input_audio_transcription.done", "text": "hello history" })
-            .to_string(),
+        &json!({ "type": "input_audio_transcription.done", "text": "hello history" }).to_string(),
         &session_state,
         &state,
         &mpsc::channel(1).0,
@@ -870,8 +869,7 @@ async fn test_voice_disabled_validation() {
 
     assert!(!config.enabled, "voice should be disabled");
     assert!(
-        config.dashscope_api_key.is_none()
-            || config.dashscope_api_key.as_ref().unwrap().is_empty()
+        config.dashscope_api_key.is_none() || config.dashscope_api_key.as_ref().unwrap().is_empty()
     );
 }
 
@@ -922,8 +920,8 @@ fn test_session_update_structure() {
             "modalities": ["text", "audio"],
             "tools": tools,
             "enable_search": false,
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm24",
+            "input_audio_format": "pcm",
+            "output_audio_format": "pcm",
             "turn_detection": {
                 "type": "server_vad",
                 "threshold": config.vad_threshold,
@@ -940,11 +938,11 @@ fn test_session_update_structure() {
 
     assert_eq!(
         session.get("input_audio_format").and_then(|v| v.as_str()),
-        Some("pcm16")
+        Some("pcm")
     );
     assert_eq!(
         session.get("output_audio_format").and_then(|v| v.as_str()),
-        Some("pcm24")
+        Some("pcm")
     );
     assert_eq!(
         session
@@ -971,8 +969,7 @@ async fn test_audio_frame_conversion() {
 
     let text = serde_json::to_string(&client_msg).unwrap();
     let result =
-        handle_client_message(&text, &OmniSessionState::new(), &state, &mpsc::channel(1).0)
-            .await;
+        handle_client_message(&text, &OmniSessionState::new(), &state, &mpsc::channel(1).0).await;
 
     assert!(result.is_ok());
     let qwen_messages = result.unwrap().qwen_messages;
@@ -986,6 +983,7 @@ async fn test_audio_frame_conversion() {
         qwen_msg.get("audio").and_then(|v| v.as_str()),
         Some("test-audio")
     );
+    assert!(qwen_msg.get("format").is_none());
 }
 
 #[tokio::test]
@@ -1010,10 +1008,9 @@ async fn test_audio_frame_rejected_when_microphone_disabled() {
         sample_rate: 16000,
     };
     let text = serde_json::to_string(&client_msg).unwrap();
-    let error =
-        handle_client_message(&text, &OmniSessionState::new(), &state, &mpsc::channel(1).0)
-            .await
-            .expect_err("microphone disabled");
+    let error = handle_client_message(&text, &OmniSessionState::new(), &state, &mpsc::channel(1).0)
+        .await
+        .expect_err("microphone disabled");
 
     assert_eq!(error, "Microphone disabled in Settings");
 }
@@ -1382,8 +1379,7 @@ fn test_generate_qwen_tools() {
         risk_level: crate::protocol::OmniSkillRiskLevel::Dangerous,
         enabled: true,
         prompt_mode: crate::skills::OmniSkillPromptMode::Description,
-        description: "Delete a tmux session. WARNING: This is a destructive operation."
-            .to_string(),
+        description: "Delete a tmux session. WARNING: This is a destructive operation.".to_string(),
         parameters: serde_json::json!({
             "type": "object",
             "properties": {
@@ -1410,9 +1406,7 @@ fn test_generate_qwen_tools() {
     // Check dangerous tools have warning
     let delete_session = tools
         .iter()
-        .find(|t| {
-            t.pointer("/function/name").and_then(|v| v.as_str()) == Some("delete_session")
-        })
+        .find(|t| t.pointer("/function/name").and_then(|v| v.as_str()) == Some("delete_session"))
         .unwrap();
     let desc = delete_session
         .pointer("/function/description")
@@ -1466,8 +1460,7 @@ async fn test_voice_action_allowlist() {
     assert!(result.is_ok());
 
     // Unknown skill is rejected
-    let result =
-        execute_voice_action("unknown_skill", &serde_json::json!({}), &state, false).await;
+    let result = execute_voice_action("unknown_skill", &serde_json::json!({}), &state, false).await;
     assert!(result.is_err(), "unknown skill should be rejected");
 }
 

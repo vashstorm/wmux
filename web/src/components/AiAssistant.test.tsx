@@ -11,9 +11,11 @@ const voiceClientMocks = vi.hoisted(() => ({
 	connect: vi.fn(),
 	close: vi.fn(),
 	onMessage: undefined as ((event: unknown) => void) | undefined,
+	onOpen: undefined as (() => void) | undefined,
 }));
 
 const audioPipelineMocks = vi.hoisted(() => ({
+	constructor: vi.fn(),
 	enqueuePlayback: vi.fn(),
 	startCapture: vi.fn(),
 	stopCapture: vi.fn(),
@@ -27,8 +29,9 @@ vi.mock("../api/client.js", () => ({
 }));
 
 vi.mock("../api/voiceClient.js", () => ({
-	OmniWebSocket: vi.fn().mockImplementation((options: { onMessage?: (event: unknown) => void }) => {
+	OmniWebSocket: vi.fn().mockImplementation((options: { onMessage?: (event: unknown) => void; onOpen?: () => void }) => {
 		voiceClientMocks.onMessage = options.onMessage;
+		voiceClientMocks.onOpen = options.onOpen;
 		return {
 			connect: voiceClientMocks.connect,
 			send: voiceClientMocks.send,
@@ -39,19 +42,25 @@ vi.mock("../api/voiceClient.js", () => ({
 }));
 
 vi.mock("../api/audioPipeline.js", () => ({
-	AudioPipeline: vi.fn().mockImplementation(() => ({
-		enqueuePlayback: audioPipelineMocks.enqueuePlayback,
-		startCapture: audioPipelineMocks.startCapture,
-		stopCapture: audioPipelineMocks.stopCapture,
-		stopPlayback: audioPipelineMocks.stopPlayback,
-	})),
+	AudioPipeline: vi.fn().mockImplementation((config: unknown) => {
+		audioPipelineMocks.constructor(config);
+		return {
+			enqueuePlayback: audioPipelineMocks.enqueuePlayback,
+			startCapture: audioPipelineMocks.startCapture,
+			stopCapture: audioPipelineMocks.stopCapture,
+			stopPlayback: audioPipelineMocks.stopPlayback,
+		};
+	}),
 }));
 
 beforeEach(() => {
+	localStorage.removeItem("wmux-ai-assistant-size");
 	voiceClientMocks.send.mockClear();
 	voiceClientMocks.connect.mockClear();
 	voiceClientMocks.close.mockClear();
 	voiceClientMocks.onMessage = undefined;
+	voiceClientMocks.onOpen = undefined;
+	audioPipelineMocks.constructor.mockClear();
 	audioPipelineMocks.enqueuePlayback.mockClear();
 	audioPipelineMocks.startCapture.mockClear();
 	audioPipelineMocks.stopCapture.mockClear();
@@ -87,7 +96,7 @@ beforeEach(() => {
 			continuousListening: false,
 			storeRawAudio: false,
 			vadEnabled: true,
-			vadThreshold: 50,
+			vadThreshold: 0.5,
 		},
 	});
 	vi.mocked(client.getOmniHistory).mockResolvedValue([]);
@@ -137,13 +146,37 @@ describe("AiAssistant", () => {
 		});
 	});
 
-	test("shows start button when idle", () => {
+	test("shows only send and mic buttons when idle", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
 
 		const el = document.querySelector("[data-ai-assistant-state]");
 		expect(el?.getAttribute("data-ai-assistant-state")).toBe("idle");
+		const controls = document.querySelector(".ai-assistant-controls");
+		expect(controls?.querySelectorAll("button")).toHaveLength(2);
+		expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Start listening" })).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Mute" })).not.toBeInTheDocument();
+	});
+
+	test("resizes dialog from the top-left drag handle", () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+
+		const dialog = document.querySelector(".ai-assistant") as HTMLElement;
+		const handle = document.querySelector(".voice-resize-corner--top-left") as HTMLElement;
+		fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+		fireEvent.pointerMove(handle, { pointerId: 1, clientX: 40, clientY: 20 });
+		fireEvent.pointerUp(handle, { pointerId: 1, clientX: 40, clientY: 20 });
+
+		expect(dialog.style.getPropertyValue("--ai-assistant-width")).toBe("440px");
+		expect(dialog.style.getPropertyValue("--ai-assistant-height")).toBe("600px");
+		expect(JSON.parse(localStorage.getItem("wmux-ai-assistant-size") ?? "{}")).toEqual({
+			width: 440,
+			height: 600,
+		});
 	});
 
 	test("shows transcript when present", () => {
@@ -223,7 +256,7 @@ describe("AiAssistant", () => {
 				continuousListening: false,
 				storeRawAudio: false,
 				vadEnabled: true,
-				vadThreshold: 50,
+				vadThreshold: 0.5,
 			},
 		});
 		renderWithProvider();
@@ -263,7 +296,7 @@ describe("AiAssistant", () => {
 				continuousListening: false,
 				storeRawAudio: false,
 				vadEnabled: true,
-				vadThreshold: 50,
+				vadThreshold: 0.5,
 			},
 		});
 		renderWithStateSetup((ctx) => {
@@ -314,6 +347,84 @@ describe("AiAssistant", () => {
 			type: "text_message",
 			text: "show sessions",
 		});
+	});
+
+	test("keeps mic start available after sending typed text", async () => {
+		Object.defineProperty(navigator, "mediaDevices", {
+			configurable: true,
+			value: { getUserMedia: vi.fn() },
+		});
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "show sessions" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+		voiceClientMocks.onOpen?.();
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Start listening" })).toBeEnabled();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Start listening" }));
+
+		await waitFor(() => {
+			expect(audioPipelineMocks.startCapture).toHaveBeenCalledOnce();
+		});
+		expect(screen.getByRole("button", { name: "Stop listening" })).toBeInTheDocument();
+	});
+
+	test("leaves client VAD disabled so server VAD receives silence", async () => {
+		vi.mocked(client.getConfig).mockResolvedValueOnce({
+			schemaVersion: 1,
+			path: ".",
+			server: { bind: "127.0.0.1:7331" },
+			auth: { token: "", tokenConfigured: false },
+			tmux: { path: "tmux" },
+			connections: [],
+			ui: {
+				theme: "dark",
+				windowTheme: "dark",
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+			intelligence: {
+				enabled: false,
+				providers: [],
+				maxBytes: 4096,
+				timeoutSec: 30,
+				minSessionIntervalSec: 60,
+				maxConcurrency: 2,
+				cacheTTLSec: 300,
+			},
+			omni: {
+				enabled: true,
+				dashscopeApiKeyConfigured: false,
+				microphoneDisabled: false,
+				model: "qwen-omni",
+				endpoint: "wss://example.com",
+				continuousListening: false,
+				storeRawAudio: false,
+				vadEnabled: true,
+				vadThreshold: 0.25,
+			},
+		});
+		renderWithProvider();
+		await waitFor(() => {
+			expect(document.querySelector("[data-ai-assistant-state]")?.getAttribute("data-ai-assistant-state")).toBe("idle");
+		});
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "show sessions" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		expect(audioPipelineMocks.constructor).toHaveBeenCalledWith(expect.objectContaining({
+			vadEnabled: false,
+			vadThreshold: 0,
+		}));
 	});
 
 	test("sends current connection context before typed text messages", () => {
@@ -381,6 +492,33 @@ describe("AiAssistant", () => {
 		});
 
 		expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("AAAA", 24000);
+	});
+
+	test("scrolls to the newest message during text conversations", async () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+
+		const chat = document.querySelector(".voice-chat") as HTMLDivElement;
+		Object.defineProperty(chat, "scrollHeight", { configurable: true, value: 750 });
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "show sessions" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		await waitFor(() => {
+			expect(chat.scrollTop).toBe(750);
+		});
+
+		Object.defineProperty(chat, "scrollHeight", { configurable: true, value: 900 });
+		voiceClientMocks.onMessage?.({
+			type: "assistant_message",
+			text: "Done",
+		});
+
+		await waitFor(() => {
+			expect(chat.scrollTop).toBe(900);
+		});
 	});
 
 	test("Hide AI Assistant button renders and is clickable", () => {
