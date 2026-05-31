@@ -25,6 +25,8 @@ import {
 	syncProjectFromTmux,
 	getOmniHistory,
 	clearOmniHistory,
+	listAiLogs,
+	clearAiLogs,
 } from "./client.js";
 import { ApiError } from "./errors.js";
 
@@ -623,6 +625,77 @@ describe("api client", () => {
 			});
 			const result = await getConfig();
 				expect(result.omni).toBeUndefined();
+	});
+	});
+
+	describe("ai logs", () => {
+		test("listAiLogs returns data array", async () => {
+			mockJsonResponse(200, {
+				data: [
+					{
+						id: "log1",
+						conversationId: "conv1",
+						eventKind: "tool_call",
+						model: "gpt-4",
+						status: "success",
+						durationMs: 120,
+						createdAt: "2024-01-01T00:00:00Z",
+					},
+				],
+				nextCursor: null,
+			});
+			const result = await listAiLogs();
+			expect(result.data).toHaveLength(1);
+			expect(result.data[0]!.id).toBe("log1");
+			expect(result.data[0]!.conversationId).toBe("conv1");
+			expect(result.nextCursor).toBeNull();
+		});
+
+		test("listAiLogs sends limit and before params", async () => {
+			mockJsonResponse(200, { data: [], nextCursor: null });
+			await listAiLogs({
+				limit: 50,
+				before: "2024-01-01T00:00:00Z",
+			});
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toContain("/api/ai/logs");
+			expect(call[0]).toContain("limit=50");
+			expect(call[0]).toContain("before=");
+		});
+
+		test("listAiLogs omits undefined params", async () => {
+			mockJsonResponse(200, { data: [], nextCursor: null });
+			await listAiLogs({});
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[0]).toBe("/api/ai/logs");
+		});
+
+		test("listAiLogs URL-encodes before param", async () => {
+			mockJsonResponse(200, { data: [], nextCursor: null });
+			await listAiLogs({
+				before: "2024-01-01T10:00:00+08:00",
+			});
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			const url = call[0] as string;
+			expect(url).toContain("before=");
+			expect(url).toContain(encodeURIComponent("+08:00"));
+		});
+
+		test("clearAiLogs sends DELETE request", async () => {
+			mockFetch(new Response(null, { status: 204 }));
+			await clearAiLogs();
+
+			const call = vi.mocked(fetch).mock.calls[0]!;
+			expect(call[1]?.method).toBe("DELETE");
+			expect(call[0]).toContain("/api/ai/logs");
+		});
+
+		test("clearAiLogs does not throw on 204", async () => {
+			mockFetch(new Response(null, { status: 204 }));
+			await expect(clearAiLogs()).resolves.toBeUndefined();
 		});
 	});
 });

@@ -1,3 +1,4 @@
+pub mod ai_logs;
 pub mod ai_usage;
 pub mod cleanup;
 pub mod db;
@@ -6,6 +7,7 @@ pub mod projects;
 pub mod sync;
 pub mod voice_history;
 
+pub use ai_logs::{AiLogRepoError, AiLogRepository};
 pub use ai_usage::AiUsageRepository;
 pub use models::*;
 pub use projects::{ProjectRepoError, ProjectRepository};

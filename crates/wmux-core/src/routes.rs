@@ -6,7 +6,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::handlers::{
-    ai_stats, config, connections, health, logs, projects, sessions, skills, terminal, voice,
+    ai_logs, ai_stats, config, connections, health, logs, projects, sessions, skills, terminal, voice,
     voice_history,
 };
 use crate::http::api_not_found;
@@ -116,6 +116,7 @@ pub fn router(state: AppState) -> Router {
             "/logs/errors",
             get(logs::get_error_logs).delete(logs::clear_error_logs),
         )
+        .route("/ai/logs", get(ai_logs::list).delete(ai_logs::clear))
         .route("/ai/stats", get(ai_stats::get_stats))
         .route(
             "/ai/stats/cleanup",
@@ -1135,6 +1136,154 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ai_logs_route_rejects_unauthenticated_requests() {
+        let (app, _dir, _pool) = test_app_with_memory_storage().await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/ai/logs")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(json_body(response).await["error"]["code"], "unauthorized");
+    }
+
+    #[tokio::test]
+    async fn ai_logs_route_empty_list_returns_200_with_empty_data() {
+        let (app, _dir, _pool) = test_app_with_memory_storage().await;
+
+        let response = app
+            .oneshot(request("GET", "/api/ai/logs", None))
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = json_body(response).await;
+        assert_eq!(body["data"].as_array().expect("data array").len(), 0);
+        assert_eq!(body["nextCursor"], json!(null));
+    }
+
+    #[tokio::test]
+    async fn ai_logs_route_seeded_list_returns_rows_with_cursor_when_more_exist() {
+        let (app, _dir, pool) = test_app_with_memory_storage().await;
+
+        for i in 0..55 {
+            let created_at = format!("2026-05-28T10:{i:02}:00Z");
+            sqlx::query(
+                "INSERT INTO ai_logs (id, conversation_id, event_kind, model, status, prompt_text, tool_name, tool_call_id, tool_arguments_json, tool_result_json, metrics_json, duration_ms, raw_event_json, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(format!("log-{i}"))
+            .bind("conv-a")
+            .bind("request")
+            .bind("qwen-omni")
+            .bind("success")
+            .bind(Some("test prompt"))
+            .bind(None::<String>)
+            .bind(None::<String>)
+            .bind(None::<String>)
+            .bind(None::<String>)
+            .bind("{}")
+            .bind(Some(100_i64))
+            .bind("{}")
+            .bind(None::<String>)
+            .bind(created_at)
+            .execute(&pool)
+            .await
+            .expect("insert ai log");
+        }
+
+        let list = app
+            .clone()
+            .oneshot(request("GET", "/api/ai/logs?limit=50", None))
+            .await
+            .expect("response");
+        assert_eq!(list.status(), StatusCode::OK);
+        let body = json_body(list).await;
+        let data = body["data"].as_array().expect("data array");
+        assert_eq!(data.len(), 50);
+        assert_eq!(data[0]["conversationId"], "conv-a");
+        assert!(body["nextCursor"].is_string());
+
+        let cursor = body["nextCursor"].as_str().expect("cursor string");
+        let next_page = app
+            .oneshot(request("GET", &format!("/api/ai/logs?limit=50&before={cursor}"), None))
+            .await
+            .expect("response");
+        assert_eq!(next_page.status(), StatusCode::OK);
+        let next_body = json_body(next_page).await;
+        assert_eq!(next_body["data"].as_array().expect("data array").len(), 5);
+        assert_eq!(next_body["nextCursor"], json!(null));
+    }
+
+    #[tokio::test]
+    async fn ai_logs_route_invalid_before_returns_400_bad_request() {
+        let (app, _dir, _pool) = test_app_with_memory_storage().await;
+
+        let response = app
+            .oneshot(request("GET", "/api/ai/logs?before=invalid-timestamp", None))
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = json_body(response).await;
+        assert_eq!(body["error"]["code"], "bad_request");
+    }
+
+    #[tokio::test]
+    async fn ai_logs_route_clear_returns_204_and_empties_data() {
+        let (app, _dir, pool) = test_app_with_memory_storage().await;
+
+        sqlx::query(
+            "INSERT INTO ai_logs (id, conversation_id, event_kind, model, status, prompt_text, tool_name, tool_call_id, tool_arguments_json, tool_result_json, metrics_json, duration_ms, raw_event_json, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind("log-1")
+        .bind("conv-a")
+        .bind("request")
+        .bind("qwen-omni")
+        .bind("success")
+        .bind(Some("test prompt"))
+        .bind(None::<String>)
+        .bind(None::<String>)
+        .bind(None::<String>)
+        .bind(None::<String>)
+        .bind("{}")
+        .bind(Some(100_i64))
+        .bind("{}")
+        .bind(None::<String>)
+        .bind("2026-05-28T10:00:00Z")
+        .execute(&pool)
+        .await
+        .expect("insert ai log");
+
+        let clear = app
+            .clone()
+            .oneshot(request("DELETE", "/api/ai/logs", None))
+            .await
+            .expect("response");
+        assert_eq!(clear.status(), StatusCode::NO_CONTENT);
+
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ai_logs")
+            .fetch_one(&pool)
+            .await
+            .expect("count ai logs");
+        assert_eq!(count, 0);
+
+        let list = app
+            .oneshot(request("GET", "/api/ai/logs", None))
+            .await
+            .expect("response");
+        assert_eq!(list.status(), StatusCode::OK);
+        let body = json_body(list).await;
+        assert_eq!(body["data"].as_array().expect("data array").len(), 0);
+    }
+
+    #[tokio::test]
     async fn project_launch_not_found_returns_404() {
         let (app, _dir) = test_app_with_storage().await;
 
@@ -1200,7 +1349,7 @@ mod tests {
             .expect("response");
         assert_eq!(create_resp.status(), StatusCode::CREATED);
         let created = json_body(create_resp).await;
-        let id = created["id"].as_str().unwrap().to_string();
+        let _id = created["id"].as_str().unwrap().to_string();
 
         let config_without_provider = json!({
             "schemaVersion": 1,
@@ -1216,7 +1365,7 @@ mod tests {
             }
         });
 
-        let (app_no_provider, dir2) = test_app_with_storage().await;
+        let (_, dir2) = test_app_with_storage().await;
         let config_path2 = dir2.path().join("config.jsonc");
         std::fs::write(
             &config_path2,

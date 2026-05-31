@@ -1,3 +1,4 @@
+pub mod ai_logs;
 pub mod ai_stats;
 pub mod config;
 pub mod connections;

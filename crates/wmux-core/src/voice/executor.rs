@@ -1231,6 +1231,7 @@ esac
 
         assert_eq!(error.code, "bad_request");
     }
+    #[tokio::test]
     async fn executor_list_sessions_returns_session_list() {
         let test = test_executor();
         let result = test

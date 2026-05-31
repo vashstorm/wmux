@@ -73,6 +73,27 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_voice_history_conv_created ON voice_conversation_messages(conversation_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_voice_history_created ON voice_conversation_messages(created_at);
+
+        CREATE TABLE IF NOT EXISTS ai_logs (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            event_kind TEXT NOT NULL,
+            model TEXT NOT NULL,
+            status TEXT NOT NULL,
+            prompt_text TEXT,
+            tool_name TEXT,
+            tool_call_id TEXT,
+            tool_arguments_json TEXT,
+            tool_result_json TEXT,
+            metrics_json TEXT NOT NULL DEFAULT '{}',
+            duration_ms INTEGER,
+            raw_event_json TEXT NOT NULL DEFAULT '{}',
+            error_message TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ai_logs_created_at ON ai_logs(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_ai_logs_conversation_created ON ai_logs(conversation_id, created_at DESC);
         "#,
     )
     .execute(&mut *tx)

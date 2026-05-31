@@ -33,6 +33,7 @@ import { SessionCard } from "./sidebar/SessionCard.js";
 import { SidebarIconButton } from "./sidebar/SidebarIconButton.js";
 import { ProjectsView } from "./sidebar/ProjectsView.js";
 import { StatsView } from "./sidebar/StatsView.js";
+import { AiLogsView } from "./sidebar/AiLogsView.js";
 
 const SESSION_SYNC_INTERVAL_MS = 2000;
 
@@ -68,7 +69,7 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 	const [searchQuery, setSearchQuery] = useState("");
 	const [newSessionName, setNewSessionName] = useState("");
 	const [showNewSessionForm, setShowNewSessionForm] = useState(false);
-	const [activeView, setActiveView] = useState<"projects" | "session" | "stats">("session");
+	const [activeView, setActiveView] = useState<"projects" | "session" | "stats" | "ai_logs">("session");
 	const [projects, setProjects] = useState<Project[]>([]);
 	const prevSelectedRef = useRef<string | null>(null);
 
@@ -420,6 +421,8 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 				<ProjectsView />
 		) : activeView === "stats" ? (
 				<StatsView />
+			) : activeView === "ai_logs" ? (
+				<AiLogsView />
 			) : selectedTargetName ? (
 					<>
 						<SessionSearch value={searchQuery} onChange={setSearchQuery} />

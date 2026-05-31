@@ -255,6 +255,7 @@ mod tests {
             stderr: String,
             code: i32,
         },
+        #[allow(dead_code)]
         NotFound,
     }
 

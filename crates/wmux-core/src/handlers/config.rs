@@ -22,6 +22,7 @@ pub struct ConfigResponse {
     ui: UIConfig,
     intelligence: ConfigIntelligenceResponse,
     logs: LogsConfig,
+    #[serde(rename = "voice")]
     omni: ConfigOmniResponse,
 }
 
@@ -286,11 +287,11 @@ mod tests {
         let response = new_config_response(&config, &[]);
         let value = serde_json::to_value(response).expect("serialize response");
 
-        assert_eq!(value["omni"]["enabled"], true);
-        assert_eq!(value["omni"]["dashscopeApiKeyConfigured"], true);
-        assert_eq!(value["omni"]["microphoneDisabled"], true);
-        assert_eq!(value["omni"]["voice"], "Cherry");
-        assert_eq!(value["omni"]["dashscopeApiKey"], "sk-secret");
+        assert_eq!(value["voice"]["enabled"], true);
+        assert_eq!(value["voice"]["dashscopeApiKeyConfigured"], true);
+        assert_eq!(value["voice"]["microphoneDisabled"], true);
+        assert_eq!(value["voice"]["voice"], "Cherry");
+        assert_eq!(value["voice"]["dashscopeApiKey"], "sk-secret");
     }
 
     #[test]

@@ -190,3 +190,58 @@ pub struct OmniConversationMessage {
 pub struct OmniHistoryListResponse {
     pub data: Vec<OmniConversationMessage>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct AiLogEntry {
+    pub id: String,
+    pub conversation_id: String,
+    pub event_kind: String,
+    pub model: String,
+    pub status: String,
+    pub prompt_text: Option<String>,
+    pub tool_name: Option<String>,
+    pub tool_call_id: Option<String>,
+    pub tool_arguments_json: Option<String>,
+    pub tool_result_json: Option<String>,
+    #[serde(default = "default_empty_json_object")]
+    pub metrics_json: String,
+    pub duration_ms: Option<i64>,
+    #[serde(default = "default_empty_json_object")]
+    pub raw_event_json: String,
+    pub error_message: Option<String>,
+    pub created_at: String,
+}
+
+fn default_empty_json_object() -> String {
+    "{}".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAiLogEntry {
+    pub id: Option<String>,
+    pub conversation_id: String,
+    pub event_kind: String,
+    pub model: String,
+    pub status: String,
+    pub prompt_text: Option<String>,
+    pub tool_name: Option<String>,
+    pub tool_call_id: Option<String>,
+    pub tool_arguments_json: Option<String>,
+    pub tool_result_json: Option<String>,
+    #[serde(default = "default_empty_json_object")]
+    pub metrics_json: String,
+    pub duration_ms: Option<i64>,
+    #[serde(default = "default_empty_json_object")]
+    pub raw_event_json: String,
+    pub error_message: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiLogListResponse {
+    pub data: Vec<AiLogEntry>,
+    pub next_cursor: Option<String>,
+}

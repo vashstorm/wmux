@@ -2,10 +2,11 @@ import { Stack, Typography, Box } from "@mui/material";
 import FolderIcon from "@mui/icons-material/Folder";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import BarChartIcon from "@mui/icons-material/BarChart";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 import { alpha } from "@mui/material/styles";
 import { SidebarIconButton } from "./SidebarIconButton.js";
 
-type SidebarView = "projects" | "session" | "stats";
+type SidebarView = "projects" | "session" | "stats" | "ai_logs";
 
 interface SidebarHeaderProps {
 	activeView: SidebarView;
@@ -16,6 +17,7 @@ const NAV_ITEMS: { view: SidebarView; Icon: typeof FolderIcon; label: string; te
 	{ view: "projects", Icon: FolderIcon, label: "Projects", testId: "open-projects-button" },
 	{ view: "session", Icon: TerminalIcon, label: "Session", testId: "open-session-button" },
 	{ view: "stats", Icon: BarChartIcon, label: "Analysis", testId: "open-stats-button" },
+	{ view: "ai_logs", Icon: SmartToyIcon, label: "AI Logs", testId: "open-ai-logs-button" },
 ];
 
 export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) {

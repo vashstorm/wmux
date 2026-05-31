@@ -424,6 +424,10 @@ describe("sidebar navigation and logs features", () => {
 
 		fireEvent.click(screen.getByTestId("open-session-button"));
 		expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
+
+		fireEvent.click(screen.getByTestId("open-ai-logs-button"));
+		expect(screen.getByTestId("ai-logs-view")).toBeInTheDocument();
+		expect(screen.queryByTestId("session-card-session1")).not.toBeInTheDocument();
 	});
 
 	test("sidebar icon controls use consistent sizing classes", async () => {
@@ -443,7 +447,7 @@ describe("sidebar navigation and logs features", () => {
 			expect(screen.getByTestId("session-card-session1")).toBeInTheDocument();
 		});
 
-		for (const testId of ["open-projects-button", "open-session-button", "open-stats-button", "open-settings-button", "open-error-logs-button"]) {
+		for (const testId of ["open-projects-button", "open-session-button", "open-stats-button", "open-ai-logs-button", "open-settings-button", "open-error-logs-button"]) {
 			const button = screen.getByTestId(testId);
 			expect(button).toHaveClass("sidebar-icon-button", "sidebar-icon-button-nav");
 			expect(button.querySelector(".sidebar-icon")).toBeInTheDocument();

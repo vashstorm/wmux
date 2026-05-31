@@ -24,7 +24,11 @@ use uuid::Uuid;
 use wmux_core::config::OmniConfig;
 use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, OmniTarget, generate_qwen_tools};
 use wmux_core::state::RuntimeSkills;
-use wmux_core::storage::{models::OmniConversationMessage, voice_history::OmniHistoryRepository};
+use wmux_core::storage::{
+    models::{NewAiLogEntry, OmniConversationMessage},
+    voice_history::OmniHistoryRepository,
+    AiLogRepository,
+};
 
 use crate::state::AppState;
 use crate::voice::audit::redact_secrets;
@@ -218,6 +222,21 @@ async fn persist_omni_history_message(state: &AppState, message: OmniConversatio
     }
 }
 
+async fn persist_ai_log(state: &AppState, entry: NewAiLogEntry) {
+    let Some(pool) = &state.storage else {
+        return;
+    };
+    let repository = AiLogRepository::new(pool.clone());
+    if let Err(error) = repository.insert(&entry).await {
+        tracing::error!(
+            conversation_id = %entry.conversation_id,
+            event_kind = %entry.event_kind,
+            "ai log insert failed: {}",
+            error
+        );
+    }
+}
+
 fn history_message(
     conversation_id: &str,
     role: &str,
@@ -262,6 +281,30 @@ async fn persist_voice_event(
                 ),
             )
             .await;
+            let model = get_omni_config(state)
+                .map(|c| c.model)
+                .unwrap_or_else(|_| "qwen-omni".to_string());
+            persist_ai_log(
+                state,
+                NewAiLogEntry {
+                    id: None,
+                    conversation_id: session_state.conversation_id.clone(),
+                    event_kind: "prompt".to_string(),
+                    model,
+                    status: "success".to_string(),
+                    prompt_text: Some(text.clone()),
+                    tool_name: None,
+                    tool_call_id: None,
+                    tool_arguments_json: None,
+                    tool_result_json: None,
+                    metrics_json: "{}".to_string(),
+                    duration_ms: None,
+                    raw_event_json: "{}".to_string(),
+                    error_message: None,
+                    created_at: None,
+                },
+            )
+            .await;
         }
         OmniServerEvent::ActionResult { skill, .. } => {
             let event_json = serde_json::to_value(event).ok().and_then(redacted_json);
@@ -288,9 +331,33 @@ async fn persist_assistant_text(state: &AppState, session_state: &OmniSessionSta
             &session_state.conversation_id,
             "assistant",
             "assistant_text",
-            text,
+            text.clone(),
             None,
         ),
+    )
+    .await;
+    let model = get_omni_config(state)
+        .map(|c| c.model)
+        .unwrap_or_else(|_| "qwen-omni".to_string());
+    persist_ai_log(
+        state,
+        NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "assistant".to_string(),
+            model,
+            status: "success".to_string(),
+            prompt_text: Some(text),
+            tool_name: None,
+            tool_call_id: None,
+            tool_arguments_json: None,
+            tool_result_json: None,
+            metrics_json: "{}".to_string(),
+            duration_ms: None,
+            raw_event_json: "{}".to_string(),
+            error_message: None,
+            created_at: None,
+        },
     )
     .await;
 }
@@ -299,6 +366,7 @@ async fn persist_tool_call(
     state: &AppState,
     session_state: &OmniSessionState,
     skill: &str,
+    call_id: &str,
     params: &serde_json::Value,
 ) {
     let event_json = redacted_json(serde_json::json!({
@@ -316,15 +384,68 @@ async fn persist_tool_call(
         ),
     )
     .await;
+    let model = get_omni_config(state)
+        .map(|c| c.model)
+        .unwrap_or_else(|_| "qwen-omni".to_string());
+    let args_json = serde_json::to_string(params).ok();
+    persist_ai_log(
+        state,
+        NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "tool_call".to_string(),
+            model,
+            status: "pending".to_string(),
+            prompt_text: None,
+            tool_name: Some(skill.to_string()),
+            tool_call_id: Some(call_id.to_string()),
+            tool_arguments_json: args_json,
+            tool_result_json: None,
+            metrics_json: "{}".to_string(),
+            duration_ms: None,
+            raw_event_json: "{}".to_string(),
+            error_message: None,
+            created_at: None,
+        },
+    )
+    .await;
 }
 
 async fn persist_tool_result(
     state: &AppState,
     session_state: &OmniSessionState,
     skill: &str,
+    call_id: Option<&str>,
     success: bool,
     error: Option<String>,
+    duration_ms: Option<i64>,
+    result_json: Option<String>,
 ) {
+    let model = get_omni_config(state)
+        .map(|c| c.model)
+        .unwrap_or_else(|_| "qwen-omni".to_string());
+    let status = if success { "success" } else { "error" };
+    persist_ai_log(
+        state,
+        NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "tool_result".to_string(),
+            model,
+            status: status.to_string(),
+            prompt_text: None,
+            tool_name: Some(skill.to_string()),
+            tool_call_id: call_id.map(|s| s.to_string()),
+            tool_arguments_json: None,
+            tool_result_json: result_json,
+            metrics_json: "{}".to_string(),
+            duration_ms,
+            raw_event_json: "{}".to_string(),
+            error_message: error.clone(),
+            created_at: None,
+        },
+    )
+    .await;
     let event = OmniServerEvent::ActionResult {
         skill: skill.to_string(),
         success,
@@ -687,10 +808,27 @@ async fn handle_client_message(
             }
 
             // Execute the skill
+            let start = std::time::Instant::now();
             let result = execute_voice_action(&skill, &clean_params, state, true).await;
+            let duration_ms = Some(start.elapsed().as_millis() as i64);
             let success = result.is_ok();
             let error = result.as_ref().err().cloned();
-            persist_tool_result(state, session_state, &skill, success, error.clone()).await;
+            let result_json = if success {
+                serde_json::to_string(&serde_json::json!({"success": true})).ok()
+            } else {
+                None
+            };
+            persist_tool_result(
+                state,
+                session_state,
+                &skill,
+                Some(&call_id),
+                success,
+                error.clone(),
+                duration_ms,
+                result_json,
+            )
+            .await;
 
             // Send tool result to Qwen
             let tool_result = serde_json::json!({
@@ -733,8 +871,11 @@ async fn handle_client_message(
                 state,
                 session_state,
                 &skill,
+                Some(&call_id),
                 false,
                 Some("action_cancelled".to_string()),
+                None,
+                None,
             )
             .await;
             // Just send cancellation result to Qwen
@@ -892,7 +1033,7 @@ async fn handle_qwen_message(
                 let params = apply_session_context_defaults(&skill, params, session_state).await;
 
                 let dangerous = is_dangerous(&skill, &params);
-                persist_tool_call(state, session_state, &skill, &params).await;
+                persist_tool_call(state, session_state, &skill, call_id, &params).await;
 
                 if dangerous {
                     // Store skill name in params for later retrieval during confirmation
@@ -920,10 +1061,27 @@ async fn handle_qwen_message(
                     }))
                 } else {
                     // Execute immediately
+                    let start = std::time::Instant::now();
                     let result = execute_voice_action(&skill, &params, state, false).await;
+                    let duration_ms = Some(start.elapsed().as_millis() as i64);
                     let success = result.is_ok();
                     let error = result.as_ref().err().cloned();
-                    persist_tool_result(state, session_state, &skill, success, error.clone()).await;
+                    let result_json = if success {
+                        serde_json::to_string(&serde_json::json!({"success": true})).ok()
+                    } else {
+                        None
+                    };
+                    persist_tool_result(
+                        state,
+                        session_state,
+                        &skill,
+                        Some(call_id),
+                        success,
+                        error.clone(),
+                        duration_ms,
+                        result_json,
+                    )
+                    .await;
 
                     // Send tool result
                     let tool_result = serde_json::json!({
@@ -966,8 +1124,41 @@ async fn handle_qwen_message(
         }
 
         // Session events - no forwarding needed
-        "session.created" | "session.updated" | "response.done" | "response.audio.done" => {
+        "session.created" | "session.updated" | "response.audio.done" => {
             tracing::debug!("Qwen event: {}", event_type);
+            Ok(None)
+        }
+
+        "response.done" => {
+            tracing::debug!("Qwen event: {}", event_type);
+            let usage = value.pointer("/response/usage");
+            if let Some(usage) = usage {
+                let metrics_json = serde_json::to_string(usage).unwrap_or_else(|_| "{}".to_string());
+                let model = get_omni_config(state)
+                    .map(|c| c.model)
+                    .unwrap_or_else(|_| "qwen-omni".to_string());
+                persist_ai_log(
+                    state,
+                    NewAiLogEntry {
+                        id: None,
+                        conversation_id: session_state.conversation_id.clone(),
+                        event_kind: "metrics".to_string(),
+                        model,
+                        status: "success".to_string(),
+                        prompt_text: None,
+                        tool_name: None,
+                        tool_call_id: None,
+                        tool_arguments_json: None,
+                        tool_result_json: None,
+                        metrics_json,
+                        duration_ms: None,
+                        raw_event_json: "{}".to_string(),
+                        error_message: None,
+                        created_at: None,
+                    },
+                )
+                .await;
+            }
             Ok(None)
         }
 
@@ -2700,5 +2891,105 @@ esac
         let text = serde_json::to_string(&error).unwrap();
         assert!(text.contains("error"));
         assert!(text.contains("test_error"));
+    }
+
+    /// Test AI log persistence for tool_result events.
+    #[tokio::test]
+    async fn ai_log_persists_tool_result_with_storage() {
+        use crate::storage::db;
+
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("create pool");
+        db::run_migrations(&pool).await.expect("run migrations");
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+
+        let mut config = Config::default();
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = Some("test-key".to_string());
+
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+
+        let store = Config::load(&config_path).expect("load config");
+        let mut state = AppState::new(store, assets_dir, LoggingHandle::empty());
+        state.storage = Some(pool.clone());
+
+        let session_state = OmniSessionState::new();
+        let model = get_omni_config(&state).expect("get omni config").model;
+
+        let entry = NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "tool_result".to_string(),
+            model,
+            status: "success".to_string(),
+            prompt_text: None,
+            tool_name: Some("list_sessions".to_string()),
+            tool_call_id: Some("call-123".to_string()),
+            tool_arguments_json: None,
+            tool_result_json: Some("{\"sessions\":[]}".to_string()),
+            metrics_json: "{}".to_string(),
+            duration_ms: Some(150),
+            raw_event_json: "{}".to_string(),
+            error_message: None,
+            created_at: None,
+        };
+
+        let repo = AiLogRepository::new(pool);
+        repo.insert(&entry).await.expect("insert ai log");
+
+        let logs = repo.list(10, None).await.expect("list logs");
+        assert_eq!(logs.data.len(), 1);
+        assert_eq!(logs.data[0].event_kind, "tool_result");
+        assert_eq!(logs.data[0].tool_name, Some("list_sessions".to_string()));
+        assert_eq!(logs.data[0].duration_ms, Some(150));
+    }
+
+    /// Test AI log failure does not break voice flow when storage is None.
+    #[tokio::test]
+    async fn ai_log_without_storage_continues_gracefully() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.jsonc");
+        let assets_dir = dir.path().join("assets");
+        fs::create_dir_all(&assets_dir).expect("create assets dir");
+        fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+
+        let mut config = Config::default();
+        config.omni.enabled = true;
+        config.omni.dashscope_api_key = Some("test-key".to_string());
+
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&config).expect("serialize config"),
+        )
+        .expect("write config");
+
+        let store = Config::load(&config_path).expect("load config");
+        let state = AppState::new(store, assets_dir, LoggingHandle::empty());
+
+        let session_state = OmniSessionState::new();
+
+        persist_tool_result(
+            &state,
+            &session_state,
+            "list_sessions",
+            None,
+            true,
+            None,
+            None,
+            None,
+        )
+        .await;
     }
 }

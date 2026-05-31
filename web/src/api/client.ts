@@ -898,3 +898,52 @@ export async function clearOmniHistory(): Promise<void> {
 		method: "DELETE",
 	});
 }
+
+// --- AI Logs ---
+
+export interface AiLogEntry {
+	id: string;
+	conversationId: string;
+	eventKind: string;
+	model: string;
+	status: string;
+	promptText?: string | null;
+	toolName?: string | null;
+	toolCallId?: string | null;
+	toolArgumentsJson?: string | null;
+	toolResultJson?: string | null;
+	metricsJson?: string | null;
+	durationMs: number;
+	rawEventJson?: string | null;
+	errorMessage?: string | null;
+	createdAt: string;
+}
+
+export interface AiLogListResponse {
+	data: AiLogEntry[];
+	nextCursor: string | null;
+}
+
+export interface AiLogsQuery {
+	limit?: number;
+	before?: string;
+}
+
+export async function listAiLogs(query: AiLogsQuery = {}): Promise<AiLogListResponse> {
+	const params = new URLSearchParams();
+	if (query.limit !== undefined) {
+		params.set("limit", String(query.limit));
+	}
+	if (query.before) {
+		params.set("before", query.before);
+	}
+	const qs = params.toString();
+	const path = qs ? `/api/ai/logs?${qs}` : "/api/ai/logs";
+	return (await apiFetch(path)) as AiLogListResponse;
+}
+
+export async function clearAiLogs(): Promise<void> {
+	await apiFetch("/api/ai/logs", {
+		method: "DELETE",
+	});
+}
