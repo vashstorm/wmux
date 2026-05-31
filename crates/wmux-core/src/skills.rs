@@ -308,6 +308,184 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                 "required": ["confirmation_id"]
             }),
         ),
+        builtin_skill(
+            "get_current_focus",
+            "Get Current Focus",
+            OmniSkillRiskLevel::Safe,
+            "Read the currently focused connection, session, window, and pane from the UI state.",
+            json!({
+                "type": "object",
+                "properties": {}
+            }),
+        ),
+        builtin_skill(
+            "read_pane_output",
+            "Read Pane Output",
+            OmniSkillRiskLevel::Safe,
+            "Read the last N lines of visible output from a tmux pane.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID." },
+                    "lines": { "type": "integer", "default": 50, "description": "Number of lines to capture (max 500)." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index"]
+            }),
+        ),
+        builtin_skill(
+            "get_config",
+            "Get Config",
+            OmniSkillRiskLevel::Safe,
+            "Read the current server configuration (auth token fields are redacted).",
+            json!({
+                "type": "object",
+                "properties": {}
+            }),
+        ),
+        builtin_skill(
+            "check_health",
+            "Check Health",
+            OmniSkillRiskLevel::Safe,
+            "Check backend server health and tmux connection availability.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name to check. Omit to check server health only." }
+                }
+            }),
+        ),
+        builtin_skill(
+            "create_window",
+            "Create Window",
+            OmniSkillRiskLevel::Write,
+            "Create a new tmux window inside an existing session.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name to create the window in." },
+                    "window_name": { "type": "string", "description": "Name for the new window." }
+                },
+                "required": ["target_name", "session_name", "window_name"]
+            }),
+        ),
+        builtin_skill(
+            "rename_window",
+            "Rename Window",
+            OmniSkillRiskLevel::Write,
+            "Rename an existing tmux window.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name containing the window." },
+                    "window_name": { "type": "string", "description": "Current window name or index." },
+                    "new_name": { "type": "string", "description": "New name for the window." }
+                },
+                "required": ["target_name", "session_name", "window_name", "new_name"]
+            }),
+        ),
+        builtin_skill(
+            "split_pane",
+            "Split Pane",
+            OmniSkillRiskLevel::Write,
+            "Split a tmux pane horizontally or vertically to create a new pane.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID to split." },
+                    "horizontal": { "type": "boolean", "default": false, "description": "If true, split side-by-side. If false, split top/bottom." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index"]
+            }),
+        ),
+        builtin_skill(
+            "focus_pane",
+            "Focus Pane",
+            OmniSkillRiskLevel::Safe,
+            "Switch the UI focus to a specific session, window, and pane without sending any input.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID to focus." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index"]
+            }),
+        ),
+        builtin_skill(
+            "run_project",
+            "Run Project",
+            OmniSkillRiskLevel::Dangerous,
+            "Change to a project directory and run its start command in a pane. Requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID to run the project in." },
+                    "project_path": { "type": "string", "description": "Absolute path to the project directory." },
+                    "start_command": { "type": "string", "description": "Command to run, e.g. 'npm run dev', 'cargo run', 'make run'." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index", "project_path", "start_command"]
+            }),
+        ),
+        builtin_skill(
+            "delete_window",
+            "Delete Window",
+            OmniSkillRiskLevel::Dangerous,
+            "Delete a tmux window and all its panes. This is destructive and requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name containing the window." },
+                    "window_name": { "type": "string", "description": "Window name or index to delete." }
+                },
+                "required": ["target_name", "session_name", "window_name"]
+            }),
+        ),
+        builtin_skill(
+            "kill_pane",
+            "Kill Pane",
+            OmniSkillRiskLevel::Dangerous,
+            "Kill a specific tmux pane, terminating any running process. This is destructive and requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID to kill." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index"]
+            }),
+        ),
+        builtin_skill(
+            "clear_pane",
+            "Clear Pane",
+            OmniSkillRiskLevel::Write,
+            "Clear the visible content and scroll history of a tmux pane.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name." },
+                    "window_name": { "type": "string", "description": "Window name or index." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID to clear." }
+                },
+                "required": ["target_name", "session_name", "window_name", "pane_index"]
+            }),
+        ),
     ]
 }
 

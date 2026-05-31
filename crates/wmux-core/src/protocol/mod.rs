@@ -144,6 +144,30 @@ pub enum OmniSkill {
     ConfirmAction,
     /// Cancel a pending dangerous action.
     CancelAction,
+    /// Read the currently focused connection/session/window/pane from the UI.
+    GetCurrentFocus,
+    /// Read the last N lines of output from a tmux pane.
+    ReadPaneOutput,
+    /// Read the current server configuration (auth fields redacted).
+    GetConfig,
+    /// Check backend health and tmux connection availability.
+    CheckHealth,
+    /// Create a new tmux window inside a session.
+    CreateWindow,
+    /// Rename an existing tmux window.
+    RenameWindow,
+    /// Split a tmux pane horizontally or vertically.
+    SplitPane,
+    /// Switch the UI focus to a specific pane.
+    FocusPane,
+    /// Change to a project directory and run its start command (dangerous).
+    RunProject,
+    /// Delete a tmux window and all its panes (dangerous).
+    DeleteWindow,
+    /// Kill a specific tmux pane, terminating any running process (dangerous).
+    KillPane,
+    /// Clear the visible content and scroll history of a pane.
+    ClearPane,
 }
 
 /// Target specification for voice actions.
@@ -747,7 +771,7 @@ mod tests {
     #[test]
     fn generate_qwen_tools_returns_nine_tools() {
         let tools = generate_qwen_tools(&[]);
-        assert_eq!(tools.len(), 9, "should have 9 voice skills");
+        assert_eq!(tools.len(), 21, "should have 21 voice skills");
 
         // Verify each tool has required structure
         for tool in &tools {

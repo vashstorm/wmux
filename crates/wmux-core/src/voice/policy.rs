@@ -183,7 +183,10 @@ pub fn classify_risk_level(skill: &str, params: &serde_json::Value) -> ActionRis
 /// - `invoke_backend_route` with write methods (POST, PUT, DELETE, PATCH)
 pub fn is_dangerous(skill: &str, params: &serde_json::Value) -> bool {
     // Destructive operations
-    if matches!(skill, "delete_session" | "delete_window" | "delete_pane") {
+    if matches!(
+        skill,
+        "delete_session" | "delete_window" | "delete_pane" | "kill_pane" | "run_project"
+    ) {
         return true;
     }
 
@@ -240,7 +243,12 @@ pub fn is_dangerous(skill: &str, params: &serde_json::Value) -> bool {
 fn is_write_operation(skill: &str) -> bool {
     matches!(
         skill,
-        "create_session" | "rename_session" | "create_window" | "split_pane"
+        "create_session"
+            | "rename_session"
+            | "create_window"
+            | "rename_window"
+            | "split_pane"
+            | "clear_pane"
     )
 }
 

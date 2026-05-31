@@ -167,6 +167,18 @@ impl OmniSkillExecutor {
             "rename_session" => self.rename_session(params).await,
             "delete_session" => self.delete_session(params, false).await,
             "send_to_pane" => self.send_to_pane(params, false).await,
+            "get_current_focus" => self.get_current_focus(params).await,
+            "read_pane_output" => self.read_pane_output(params).await,
+            "get_config" => self.get_config(params).await,
+            "check_health" => self.check_health(params).await,
+            "create_window" => self.create_window(params).await,
+            "rename_window" => self.rename_window(params).await,
+            "split_pane" => self.split_pane(params).await,
+            "focus_pane" => self.focus_pane(params).await,
+            "run_project" => self.run_project(params, false).await,
+            "delete_window" => self.delete_window(params, false).await,
+            "kill_pane" => self.kill_pane(params, false).await,
+            "clear_pane" => self.clear_pane(params).await,
             other => Err(OmniExecutorError::bad_request(format!(
                 "unsupported voice skill: {other}"
             ))),
@@ -182,6 +194,9 @@ impl OmniSkillExecutor {
             "invoke_backend_route" => self.invoke_backend_route(params, true).await,
             "delete_session" => self.delete_session(params, true).await,
             "send_to_pane" => self.send_to_pane(params, true).await,
+            "run_project" => self.run_project(params, true).await,
+            "delete_window" => self.delete_window(params, true).await,
+            "kill_pane" => self.kill_pane(params, true).await,
             other => Err(OmniExecutorError::bad_request(format!(
                 "skill does not support confirmation: {other}"
             ))),
@@ -535,6 +550,403 @@ impl OmniSkillExecutor {
         Ok(Adapter::new(config.tmux.path))
     }
 
+    // ── New skill handlers ────────────────────────────────────────────────────
+
+    async fn get_current_focus(
+        &self,
+        _params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        // Returns an IntentReceived event so the frontend can respond with
+        // the current focus via SessionContext.
+        let event = OmniServerEvent::IntentReceived {
+            skill: "get_current_focus".to_string(),
+            params: json!({}),
+            confirmation_required: false,
+            confirmation_id: None,
+        };
+        Ok(OmniSkillExecution {
+            event,
+            output: json!({ "success": true }),
+        })
+    }
+
+    async fn read_pane_output(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let target_name = required_string(&params, "target_name")?;
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(target_name, &session);
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index"])?;
+        let lines = params
+            .get("lines")
+            .and_then(Value::as_u64)
+            .unwrap_or(50)
+            .min(500) as u32;
+        // bytes = lines * 200 chars avg, capped at 100 KB
+        let max_bytes = (lines * 200).min(100_000);
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let panes = adapter
+            .list_panes(&session, &window)
+            .await
+            .map_err(tmux_error)?;
+        let pane_info = panes
+            .iter()
+            .find(|p| pane_matches(p, &pane))
+            .ok_or_else(|| {
+                OmniExecutorError::not_found(format!(
+                    "pane not found: {target_name}/{session}/{window}/{pane}"
+                ))
+            })?;
+        let target = tmux_pane_target(&session, &window, &pane_info.id);
+        let output = adapter
+            .capture_pane(&target, max_bytes)
+            .await
+            .map_err(tmux_error)?;
+
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
+                skill: "read_pane_output".to_string(),
+                success: true,
+                error: None,
+            },
+            output: json!({
+                "success": true,
+                "target": { "target_name": target_name, "session": session, "window": window, "pane": pane },
+                "content": output,
+                "lines_requested": lines,
+            }),
+        })
+    }
+
+    async fn get_config(
+        &self,
+        _params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        self.execute_backend_request(
+            "get_config",
+            Method::GET,
+            "/api/config".to_string(),
+            None,
+        )
+        .await
+    }
+
+    async fn check_health(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let target_name = optional_string_alias(&params, &["target_name"]);
+        let path = match target_name.as_deref() {
+            Some(t) => format!("/api/targets/{}/health", path_segment(t)),
+            None => "/api/health".to_string(),
+        };
+        self.execute_backend_request("check_health", Method::GET, path, None)
+            .await
+    }
+
+    async fn create_window(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window_name = required_string(&params, "window_name")?;
+        self.execute_backend_request(
+            "create_window",
+            Method::POST,
+            format!(
+                "/api/targets/{}/sessions/{}/windows",
+                path_segment(&target_name),
+                path_segment(&session)
+            ),
+            Some(json!({ "name": window_name })),
+        )
+        .await
+    }
+
+    async fn rename_window(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let new_name = required_string(&params, "new_name")?;
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let windows = adapter.list_windows(&session).await.map_err(tmux_error)?;
+        let win_info = windows
+            .iter()
+            .find(|w| window_matches(w, &window))
+            .ok_or_else(|| {
+                OmniExecutorError::not_found(format!(
+                    "window not found: {target_name}/{session}/{window}"
+                ))
+            })?;
+        let target = format!("{}:={}", session, win_info.name);
+        adapter
+            .rename_window(&target, &new_name)
+            .await
+            .map_err(tmux_error)?;
+
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
+                skill: "rename_window".to_string(),
+                success: true,
+                error: None,
+            },
+            output: json!({
+                "success": true,
+                "operation": "rename_window",
+                "target_name": target_name,
+                "session": session,
+                "window": window,
+                "new_name": new_name,
+            }),
+        })
+    }
+
+
+    async fn split_pane(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index"])?;
+        let horizontal = bool_param(&params, "horizontal");
+        self.execute_backend_request(
+            "split_pane",
+            Method::POST,
+            format!(
+                "/api/targets/{}/sessions/{}/windows/{}/panes/{}/split",
+                path_segment(&target_name),
+                path_segment(&session),
+                path_segment(&window),
+                path_segment(&pane)
+            ),
+            Some(json!({ "horizontal": horizontal })),
+        )
+        .await
+    }
+
+    async fn focus_pane(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index"])?;
+        // Focus is a UI-level intent: send IntentReceived so the frontend can
+        // update its selection without any backend side effect.
+        let event = OmniServerEvent::IntentReceived {
+            skill: "focus_pane".to_string(),
+            params: json!({
+                "target_name": target_name,
+                "session_name": session,
+                "window_name": window,
+                "pane_index": pane,
+            }),
+            confirmation_required: false,
+            confirmation_id: None,
+        };
+        Ok(OmniSkillExecution {
+            event,
+            output: json!({ "success": true }),
+        })
+    }
+
+    async fn run_project(
+        &self,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        if !confirmed && is_dangerous("run_project", &params) {
+            return self.confirmation_required("run_project", params).await;
+        }
+
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string_alias(&params, &["target_name", "targetName"])?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name", "windowName"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index", "paneIndex"])?;
+        let project_path = required_string(&params, "project_path")?;
+        let start_command = required_text(&params, "start_command")?;
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let panes = adapter
+            .list_panes(&session, &window)
+            .await
+            .map_err(tmux_error)?;
+        if !panes.iter().any(|p| pane_matches(p, &pane)) {
+            return Err(OmniExecutorError::not_found(format!(
+                "pane not found: {target_name}/{session}/{window}/{pane}"
+            )));
+        }
+
+        let target = tmux_pane_target(&session, &window, &pane);
+        // Step 1: cd into project directory
+        adapter
+            .send_keys(&target, &[&format!("cd {project_path}"), "Enter"])
+            .await
+            .map_err(tmux_error)?;
+        // Step 2: run the start command
+        adapter
+            .send_keys(&target, &[start_command.as_str(), "Enter"])
+            .await
+            .map_err(tmux_error)?;
+
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
+                skill: "run_project".to_string(),
+                success: true,
+                error: None,
+            },
+            output: json!({
+                "skill": "run_project",
+                "success": true,
+                "target": {
+                    "target_name": target_name,
+                    "session": session,
+                    "window": window,
+                    "pane": pane,
+                },
+                "project_path": project_path,
+                "start_command": start_command,
+            }),
+        })
+    }
+
+    async fn delete_window(
+        &self,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        if !confirmed && is_dangerous("delete_window", &params) {
+            return self.confirmation_required("delete_window", params).await;
+        }
+
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        self.execute_backend_request(
+            "delete_window",
+            Method::DELETE,
+            format!(
+                "/api/targets/{}/sessions/{}/windows/{}",
+                path_segment(&target_name),
+                path_segment(&session),
+                path_segment(&window)
+            ),
+            None,
+        )
+        .await
+    }
+
+    async fn kill_pane(
+        &self,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        if !confirmed && is_dangerous("kill_pane", &params) {
+            return self.confirmation_required("kill_pane", params).await;
+        }
+
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index"])?;
+        self.execute_backend_request(
+            "kill_pane",
+            Method::DELETE,
+            format!(
+                "/api/targets/{}/sessions/{}/windows/{}/panes/{}",
+                path_segment(&target_name),
+                path_segment(&session),
+                path_segment(&window),
+                path_segment(&pane)
+            ),
+            None,
+        )
+        .await
+    }
+
+    async fn clear_pane(
+        &self,
+        params: Value,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name"])?;
+        let target_name = self.local_target_when_model_used_session_as_target(
+            required_string(&params, "target_name")?,
+            &session,
+        );
+        let window = required_string_alias(&params, &["window", "window_name"])?;
+        let pane = required_string_alias(&params, &["pane", "pane_index"])?;
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let panes = adapter
+            .list_panes(&session, &window)
+            .await
+            .map_err(tmux_error)?;
+        let pane_info = panes
+            .iter()
+            .find(|p| pane_matches(p, &pane))
+            .ok_or_else(|| {
+                OmniExecutorError::not_found(format!(
+                    "pane not found: {target_name}/{session}/{window}/{pane}"
+                ))
+            })?;
+        let target = tmux_pane_target(&session, &window, &pane_info.id);
+        // Send clear command + Enter, then clear tmux scroll history
+        adapter
+            .send_keys(&target, &["clear", "Enter"])
+            .await
+            .map_err(tmux_error)?;
+
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
+                skill: "clear_pane".to_string(),
+                success: true,
+                error: None,
+            },
+            output: json!({
+                "skill": "clear_pane",
+                "success": true,
+                "target": {
+                    "target_name": target_name,
+                    "session": session,
+                    "window": window,
+                    "pane": pane,
+                },
+            }),
+        })
+    }
+
     fn local_target_when_model_used_session_as_target(
         &self,
         target_name: String,
@@ -583,6 +995,18 @@ fn skill_name(skill: &OmniSkill) -> &'static str {
         OmniSkill::SendToPane => "send_to_pane",
         OmniSkill::ConfirmAction => "confirm_action",
         OmniSkill::CancelAction => "cancel_action",
+        OmniSkill::GetCurrentFocus => "get_current_focus",
+        OmniSkill::ReadPaneOutput => "read_pane_output",
+        OmniSkill::GetConfig => "get_config",
+        OmniSkill::CheckHealth => "check_health",
+        OmniSkill::CreateWindow => "create_window",
+        OmniSkill::RenameWindow => "rename_window",
+        OmniSkill::SplitPane => "split_pane",
+        OmniSkill::FocusPane => "focus_pane",
+        OmniSkill::RunProject => "run_project",
+        OmniSkill::DeleteWindow => "delete_window",
+        OmniSkill::KillPane => "kill_pane",
+        OmniSkill::ClearPane => "clear_pane",
     }
 }
 
@@ -894,6 +1318,10 @@ fn send_keys_payload(
 
 fn pane_matches(pane_info: &crate::tmux::Pane, pane: &str) -> bool {
     pane_info.id == pane || pane_info.index.to_string() == pane
+}
+
+fn window_matches(win_info: &crate::tmux::Window, window: &str) -> bool {
+    win_info.id == window || win_info.name == window || win_info.index.to_string() == window
 }
 
 fn tmux_pane_target(session: &str, window: &str, pane: &str) -> String {
@@ -1529,4 +1957,335 @@ esac
             }
         ));
     }
+
+    // ── New skill tests ─────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn executor_get_current_focus_returns_intent() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute("get_current_focus", json!({}))
+            .await
+            .expect("get_current_focus");
+
+        assert!(matches!(
+            result.event,
+            OmniServerEvent::IntentReceived {
+                confirmation_required: false,
+                ..
+            }
+        ));
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_read_pane_output_returns_content() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "read_pane_output",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0",
+                    "lines": 20
+                }),
+            )
+            .await
+            .expect("read pane output");
+
+        assert_eq!(result.output["success"], true);
+        assert_eq!(result.output["lines_requested"], 20);
+        // fake tmux capture-pane returns empty string
+        assert!(result.output["content"].is_string());
+    }
+
+    #[tokio::test]
+    async fn executor_read_pane_output_missing_pane_returns_not_found() {
+        let test = test_executor();
+        let error = test
+            .executor
+            .execute(
+                "read_pane_output",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "99"
+                }),
+            )
+            .await
+            .expect_err("missing pane");
+
+        assert_eq!(error.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn executor_get_config_returns_config() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute("get_config", json!({}))
+            .await
+            .expect("get config");
+
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_check_health_returns_health() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute("check_health", json!({}))
+            .await
+            .expect("check health");
+
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_create_window_succeeds() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "create_window",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "newwin"
+                }),
+            )
+            .await
+            .expect("create window");
+
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_rename_window_succeeds() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "rename_window",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "new_name": "code"
+                }),
+            )
+            .await
+            .expect("rename window");
+
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_split_pane_succeeds() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "split_pane",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0",
+                    "horizontal": false
+                }),
+            )
+            .await
+            .expect("split pane");
+
+        assert_eq!(result.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_focus_pane_returns_intent() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "focus_pane",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0"
+                }),
+            )
+            .await
+            .expect("focus pane");
+
+        assert!(matches!(
+            result.event,
+            OmniServerEvent::IntentReceived {
+                confirmation_required: false,
+                ..
+            }
+        ));
+        if let OmniServerEvent::IntentReceived { params, .. } = &result.event {
+            assert_eq!(params["pane_index"], "0");
+        }
+    }
+
+    #[tokio::test]
+    async fn executor_run_project_requires_confirmation_then_sends_commands() {
+        let test = test_executor();
+        let pending = test
+            .executor
+            .execute(
+                "run_project",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0",
+                    "project_path": "/home/user/myapp",
+                    "start_command": "npm run dev"
+                }),
+            )
+            .await
+            .expect("pending run_project");
+
+        assert!(matches!(
+            pending.event,
+            OmniServerEvent::IntentReceived {
+                confirmation_required: true,
+                ..
+            }
+        ));
+        assert!(tmux_log(&test).is_empty());
+
+        let confirmation_id = match pending.event {
+            OmniServerEvent::IntentReceived {
+                confirmation_required: true,
+                confirmation_id: Some(id),
+                ..
+            } => Uuid::parse_str(&id).expect("uuid"),
+            other => panic!("unexpected event: {other:?}"),
+        };
+
+        let confirmed = test
+            .executor
+            .execute_confirmed("run_project", confirmation_id)
+            .await
+            .expect("confirmed run_project");
+        assert_eq!(confirmed.output["success"], true);
+        let log = tmux_log(&test);
+        assert!(log.contains("[cd /home/user/myapp]"));
+        assert!(log.contains("[npm run dev]"));
+    }
+
+    #[tokio::test]
+    async fn executor_delete_window_requires_confirmation_then_deletes() {
+        let test = test_executor();
+        let pending = test
+            .executor
+            .execute(
+                "delete_window",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor"
+                }),
+            )
+            .await
+            .expect("pending delete_window");
+
+        assert!(matches!(
+            pending.event,
+            OmniServerEvent::IntentReceived {
+                confirmation_required: true,
+                ..
+            }
+        ));
+
+        let confirmation_id = match pending.event {
+            OmniServerEvent::IntentReceived {
+                confirmation_id: Some(id),
+                ..
+            } => Uuid::parse_str(&id).expect("uuid"),
+            other => panic!("unexpected event: {other:?}"),
+        };
+
+        let confirmed = test
+            .executor
+            .execute_confirmed("delete_window", confirmation_id)
+            .await
+            .expect("confirmed delete_window");
+        assert_eq!(confirmed.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_kill_pane_requires_confirmation_then_kills() {
+        let test = test_executor();
+        let pending = test
+            .executor
+            .execute(
+                "kill_pane",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0"
+                }),
+            )
+            .await
+            .expect("pending kill_pane");
+
+        assert!(matches!(
+            pending.event,
+            OmniServerEvent::IntentReceived {
+                confirmation_required: true,
+                ..
+            }
+        ));
+
+        let confirmation_id = match pending.event {
+            OmniServerEvent::IntentReceived {
+                confirmation_id: Some(id),
+                ..
+            } => Uuid::parse_str(&id).expect("uuid"),
+            other => panic!("unexpected event: {other:?}"),
+        };
+
+        let confirmed = test
+            .executor
+            .execute_confirmed("kill_pane", confirmation_id)
+            .await
+            .expect("confirmed kill_pane");
+        assert_eq!(confirmed.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_clear_pane_sends_clear_command() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute(
+                "clear_pane",
+                json!({
+                    "target_name": "local",
+                    "session_name": "alpha",
+                    "window_name": "editor",
+                    "pane_index": "0"
+                }),
+            )
+            .await
+            .expect("clear pane");
+
+        assert_eq!(result.output["success"], true);
+        assert_eq!(result.output["skill"], "clear_pane");
+        let log = tmux_log(&test);
+        assert!(log.contains("[clear]"), "should have sent clear command, got: {log}");
+    }
 }
+
