@@ -249,8 +249,17 @@ test.describe("voice skills", () => {
 		await navigateToggle.click();
 		await expect(navigateToggle).not.toBeChecked();
 
-		const descriptionInput = page.getByTestId("omni-skill-navigate_frontend-description");
+		// Open the skill editor modal for navigate_frontend
+		await page.getByTestId("omni-skill-navigate_frontend-edit").click();
+		await expect(page.getByTestId("skill-editor-dialog")).toBeVisible();
+
+		// Edit the description in the modal input field
+		const descriptionInput = page.getByTestId("skill-editor-description-input");
 		await descriptionInput.fill("Navigate to frontend pages with custom routes");
+
+		// Save the skill edits inside the modal
+		await page.getByTestId("skill-editor-save-btn").click();
+		await expect(page.getByTestId("skill-editor-dialog")).not.toBeVisible();
 
 		await page.getByRole("button", { name: /Save/i }).click();
 		await expect(page.getByTestId("settings-panel")).not.toBeVisible({ timeout: 5000 });
@@ -261,7 +270,15 @@ test.describe("voice skills", () => {
 		await expect(page.getByTestId("settings-panel")).toBeVisible();
 		await page.getByTestId("settings-tab-omni-skills").click();
 		await expect(page.getByTestId("omni-skill-navigate_frontend-enabled")).not.toBeChecked();
-		await expect(page.getByTestId("omni-skill-navigate_frontend-description")).toHaveValue("Navigate to frontend pages with custom routes");
+
+		// Open the skill editor modal again to verify the saved value
+		await page.getByTestId("omni-skill-navigate_frontend-edit").click();
+		await expect(page.getByTestId("skill-editor-dialog")).toBeVisible();
+		await expect(page.getByTestId("skill-editor-description-input")).toHaveValue("Navigate to frontend pages with custom routes");
+
+		// Close the skill editor modal
+		await page.getByRole("button", { name: "Cancel" }).click();
+		await expect(page.getByTestId("skill-editor-dialog")).not.toBeVisible();
 
 		await page.getByTestId("omni-skill-navigate_frontend-enabled").click();
 		await expect(page.getByTestId("omni-skill-navigate_frontend-enabled")).toBeChecked();

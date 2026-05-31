@@ -1402,6 +1402,7 @@ mod tests {
         let id2 = created2["id"].as_str().unwrap().to_string();
 
         let resp = app_no_provider
+            .clone()
             .oneshot(request(
                 "POST",
                 &format!("/api/projects/{}/generate-ai-html", id2),
@@ -1412,5 +1413,24 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let body = json_body(resp).await;
         assert_eq!(body["error"]["code"], "bad_request");
+
+        let stats_resp = app_no_provider
+            .oneshot(request("GET", "/api/ai/stats?limit=10", None))
+            .await
+            .expect("stats response");
+        assert_eq!(stats_resp.status(), StatusCode::OK);
+        let stats_body = json_body(stats_resp).await;
+        assert_eq!(stats_body["data"][0]["projectId"], id2);
+        assert_eq!(stats_body["data"][0]["targetName"], "project");
+        assert_eq!(stats_body["data"][0]["sessionName"], "test-no-provider");
+        assert_eq!(stats_body["data"][0]["status"], "error");
+        assert_eq!(
+            stats_body["data"][0]["responseJson"]
+                .as_str()
+                .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                .and_then(|value| value["operation"].as_str().map(ToOwned::to_owned))
+                .as_deref(),
+            Some("generate_ai_html")
+        );
     }
 }

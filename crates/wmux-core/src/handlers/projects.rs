@@ -3,13 +3,15 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use serde_json::json;
+use std::time::Instant;
 
 use crate::http::{ApiError, ApiResult};
-use crate::project_ai::generate_sanitized_html;
+use crate::project_ai::{generate_sanitized_html, get_active_provider};
 use crate::project_runtime::{launch_or_sync_project, snapshot_from_tmux};
 use crate::state::AppState;
-use crate::storage::ProjectRepository;
-use crate::storage::models::{NewProject, Project, ProjectLayout, UpdateProject};
+use crate::storage::models::{NewAiUsageEvent, NewProject, Project, ProjectLayout, UpdateProject};
+use crate::storage::{AiUsageRepository, ProjectRepository};
 use crate::tmux::Adapter;
 
 #[derive(Serialize)]
@@ -314,13 +316,26 @@ pub async fn generate_ai_html(
         .store
         .snapshot()
         .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
+    let provider_for_log = get_active_provider(&config.intelligence).ok();
+    let started_at = Instant::now();
 
     match generate_sanitized_html(&config, &project).await {
         Ok(ai_html) => {
+            let duration_ms = started_at.elapsed().as_millis() as i64;
             let updated = repo
                 .update_ai_result(&id, &ai_html, "completed", "")
                 .await
                 .map_err(map_project_error)?;
+            record_project_ai_usage_event(
+                &pool,
+                &project,
+                provider_for_log.as_ref(),
+                "success",
+                duration_ms,
+                Some(ai_html.len()),
+                None,
+            )
+            .await;
 
             tracing::info!(
                 project_id = %updated.id,
@@ -331,9 +346,20 @@ pub async fn generate_ai_html(
             Ok(Json(updated))
         }
         Err(err) => {
+            let duration_ms = started_at.elapsed().as_millis() as i64;
             let api_err: ApiError = err.into();
             let error_msg = api_err.message().to_string();
             let _ = repo.update_ai_result(&id, "", "error", &error_msg).await;
+            record_project_ai_usage_event(
+                &pool,
+                &project,
+                provider_for_log.as_ref(),
+                "error",
+                duration_ms,
+                None,
+                Some(error_msg.as_str()),
+            )
+            .await;
 
             tracing::error!(
                 project_id = %id,
@@ -343,5 +369,68 @@ pub async fn generate_ai_html(
 
             Err(api_err)
         }
+    }
+}
+
+async fn record_project_ai_usage_event(
+    pool: &sqlx::SqlitePool,
+    project: &Project,
+    provider: Option<&crate::config::IntelligenceProviderConfig>,
+    status: &str,
+    duration_ms: i64,
+    ai_html_len: Option<usize>,
+    error_message: Option<&str>,
+) {
+    let provider_name = provider
+        .map(|provider| {
+            if provider.provider.trim().is_empty() {
+                provider.name.clone()
+            } else {
+                provider.provider.clone()
+            }
+        })
+        .unwrap_or_default();
+    let model = provider
+        .map(|provider| provider.model.clone())
+        .unwrap_or_default();
+    let session_name = if project.session_name.trim().is_empty() {
+        project.name.clone()
+    } else {
+        project.session_name.clone()
+    };
+    let summary = if status == "success" {
+        "Project AI HTML generated"
+    } else {
+        "Project AI HTML generation failed"
+    };
+    let response_json = json!({
+        "operation": "generate_ai_html",
+        "summary": summary,
+        "projectId": project.id,
+        "projectName": project.name,
+        "aiHtmlBytes": ai_html_len,
+    })
+    .to_string();
+
+    let repo = AiUsageRepository::new(pool.clone());
+    let event = NewAiUsageEvent {
+        project_id: Some(project.id.clone()),
+        provider: provider_name,
+        model,
+        target_name: "project".to_string(),
+        session_name,
+        status: status.to_string(),
+        duration_ms,
+        prompt_tokens: None,
+        completion_tokens: None,
+        total_tokens: None,
+        estimated_cost: None,
+        error_message: error_message.map(ToString::to_string),
+        window_number: None,
+        response_json: Some(response_json),
+    };
+
+    if let Err(err) = repo.insert(&event).await {
+        tracing::error!(project_id = %project.id, raw_error = %err, "failed to record project AI usage event");
     }
 }

@@ -87,26 +87,19 @@ struct ChatMessageResponse {
 /// Gets the active provider configuration from intelligence config.
 ///
 /// Returns the provider config if it exists and has all required fields
-/// (base_url, model, api_key), otherwise returns an error.
+/// (model, api_key). If base_url is omitted, the OpenAI-compatible default is used.
 pub fn get_active_provider(
     config: &IntelligenceConfig,
 ) -> Result<IntelligenceProviderConfig, AiError> {
-    // Find the active provider by name
     let active_name = config.active_provider.trim();
-    if active_name.is_empty() {
-        return Err(AiError::ProviderNotConfigured);
-    }
-
     let provider = config
         .providers
         .iter()
-        .find(|p| p.name == active_name)
+        .find(|p| !active_name.is_empty() && p.name == active_name)
+        .or_else(|| config.providers.first())
         .ok_or(AiError::ProviderNotConfigured)?;
 
     // Validate required fields
-    if provider.base_url.trim().is_empty() {
-        return Err(AiError::ProviderNotConfigured);
-    }
     if provider.model.trim().is_empty() {
         return Err(AiError::ProviderNotConfigured);
     }
@@ -114,7 +107,28 @@ pub fn get_active_provider(
         return Err(AiError::ProviderNotConfigured);
     }
 
-    Ok(provider.clone())
+    let mut provider = provider.clone();
+    if provider.base_url.trim().is_empty() {
+        provider.base_url = default_base_url(provider.provider.as_str()).to_string();
+    }
+
+    Ok(provider)
+}
+
+fn default_base_url(provider: &str) -> &'static str {
+    match provider.trim().to_ascii_lowercase().as_str() {
+        "openai" => "https://api.openai.com/v1",
+        _ => "https://api.openai.com/v1",
+    }
+}
+
+fn chat_completions_url(base_url: &str) -> String {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    if trimmed.ends_with("/chat/completions") {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}/chat/completions")
+    }
 }
 
 /// Builds a bounded prompt from project metadata.
@@ -162,17 +176,18 @@ pub fn build_prompt(project: &Project) -> String {
 
 /// Sanitizes HTML using ammonia with a strict whitelist.
 ///
-/// Allowed tags: p, br, strong, em, code, pre, ul, ol, li, h2, h3, section,
-/// article, div, span, table, thead, tbody, tr, th, td, a
+/// Allowed tags: p, br, strong, em, code, pre, ul, ol, li, h1, h2, h3, h4, h5, h6,
+/// hr, section, article, div, span, table, thead, tbody, tr, th, td, a
 ///
 /// Allowed attributes:
 /// - href on `a` (only http/https/mailto schemes)
-/// - class with prefix `wmux-ai-` on any element
+/// - class and style globally on any element (to support rich MUI v9 styling)
 pub fn sanitize_html(html: &str) -> String {
-    // Define allowed tags
+    // Define allowed tags (expanded with h1, h4, h5, h6, and hr for premium typography and layout structural styling)
     let allowed_tags: HashSet<&str> = [
-        "p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "h2", "h3", "section",
-        "article", "div", "span", "table", "thead", "tbody", "tr", "th", "td", "a",
+        "p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "h1", "h2", "h3", "h4", "h5",
+        "h6", "hr", "section", "article", "div", "span", "table", "thead", "tbody", "tr", "th",
+        "td", "a",
     ]
     .iter()
     .cloned()
@@ -187,10 +202,14 @@ pub fn sanitize_html(html: &str) -> String {
     // Allow href only on 'a' tag
     tag_attributes.insert("a", ["href"].iter().cloned().collect());
 
+    // Allow class and style attributes globally on all allowed tags
+    let generic_attributes: HashSet<&str> = ["class", "style"].iter().cloned().collect();
+
     // Build the sanitizer
     let sanitized = Builder::new()
         .tags(allowed_tags)
         .tag_attributes(tag_attributes)
+        .generic_attributes(generic_attributes)
         .url_schemes(allowed_schemes)
         .link_rel(Some("noopener noreferrer"))
         .clean(html);
@@ -234,8 +253,50 @@ pub async fn generate_sanitized_html(
     // Build the prompt (no pane output)
     let user_content = build_prompt(project);
 
-    // System prompt for the AI
-    let system_content = "You are a project management assistant. Generate a concise HTML summary of the project. Use only safe HTML tags like p, h2, h3, ul, ol, li, strong, em, code, pre, table elements, and a for links. Keep the summary under 500 words.";
+    // System prompt for the AI (optimized for premium MUI 9 styling and a gorgeous, rich structure)
+    let system_content = r#"You are an elite, modern project management assistant. Your task is to generate a visually stunning, highly professional, and extremely readable HTML summary of the project.
+The frontend integrates Material-UI (MUI) Version 9, and the HTML container will automatically apply MUI's design tokens and styles if you use standard MUI v9 class names.
+
+Structure your response using only safe HTML tags. Use standard MUI v9 class names and inline styles to create a premium dashboard layout:
+
+1. CARDS & CONTAINERS:
+   Use `div` elements with `MuiPaper-root MuiPaper-outlined MuiPaper-rounded` to wrap major sections in clean, bordered panels.
+   Example:
+   <div class="MuiPaper-root MuiPaper-outlined MuiPaper-rounded" style="padding: 16px; margin-bottom: 16px; background-color: var(--color-glass-surface); border-color: var(--color-panel-border);">
+      ...content...
+   </div>
+
+2. TYPOGRAPHY:
+   Use standard MUI typography classes for visual hierarchy:
+   - Section Titles: <h2 class="MuiTypography-root MuiTypography-h5" style="margin-top: 0; margin-bottom: 10px; font-weight: bold; color: var(--color-text);">Title</h2>
+   - Subsections: <h3 class="MuiTypography-root MuiTypography-h6" style="margin-top: 14px; margin-bottom: 6px; color: var(--color-text);">Subtitle</h3>
+   - Details Title: <h4 class="MuiTypography-root MuiTypography-subtitle1" style="margin-top: 10px; margin-bottom: 4px; color: var(--color-text-muted);">Header</h4>
+   - Standard Body Text: <p class="MuiTypography-root MuiTypography-body1" style="margin-bottom: 10px; line-height: 1.6; color: var(--color-text-muted);">Body content...</p>
+   - Code Snippets: <code style="font-family: monospace; background-color: rgba(0,0,0,0.05); padding: 2px 4px; border-radius: 4px;">code</code>
+
+3. CHIPS & BADGES:
+   Use `span` to build beautiful outline chips for tags, technologies, and status indicators:
+   - MUI Chip: <span class="MuiChip-root MuiChip-outlined MuiChip-sizeSmall" style="margin: 2px; border-color: var(--color-panel-border);"><span class="MuiChip-label" style="font-size: 11px; padding: 0 8px;">Chip Text</span></span>
+
+4. DIVIDERS & SEPARATORS:
+   Use `<hr class="MuiDivider-root" style="margin: 16px 0; border: 0; border-top: 1px solid var(--color-panel-border);" />` for separation.
+
+5. LISTS:
+   Use `ul` and `li` with clean spacing:
+   - List: <ul class="MuiList-root" style="padding-left: 18px; margin-bottom: 10px;">
+   - List Item: <li class="MuiListItem-root MuiTypography-root MuiTypography-body2" style="margin-bottom: 4px; color: var(--color-text-muted);">List Item Text</li>
+
+6. DATA TABLES:
+   Use `table` elements to format tabular details or progress stats cleanly:
+   - Table: <table class="MuiTable-root" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+   - Table Head Cell: <th class="MuiTableCell-root MuiTableCell-head" style="font-weight: bold; border-bottom: 2px solid var(--color-panel-border); padding: 8px; text-align: left; font-size: 12px; color: var(--color-text);">Header</th>
+   - Table Body Cell: <td class="MuiTableCell-root MuiTableCell-body" style="border-bottom: 1px solid var(--color-panel-border); padding: 8px; font-size: 13px; color: var(--color-text-muted);">Data</td>
+
+DESIGN RULES:
+- Avoid plain, unstyled HTML. Structure the content beautifully with padding, custom container cards, and chips.
+- Focus on presenting a summary of the project's state, layout composition, active areas, and progress.
+- Keep the summary clear, premium, and under 500 words.
+- Do NOT wrap your output in markdown formatting (like ```html ... ```). Return ONLY the raw HTML string, starting immediately with your opening tags."#;
 
     // Build the request
     let request = ChatRequest {
@@ -261,8 +322,7 @@ pub async fn generate_sanitized_html(
         .map_err(|e| AiError::HttpError(e.to_string()))?;
 
     // Build the API URL
-    let base_url = provider.base_url.trim_end_matches('/');
-    let api_url = format!("{}/chat/completions", base_url);
+    let api_url = chat_completions_url(provider.base_url.as_str());
 
     // Make the API call
     let response = client
@@ -302,4 +362,46 @@ pub async fn generate_sanitized_html(
     let sanitized = sanitize_html(truncated);
 
     Ok(sanitized)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn provider(name: &str, base_url: &str) -> IntelligenceProviderConfig {
+        IntelligenceProviderConfig {
+            name: name.to_string(),
+            provider: "openai".to_string(),
+            model: "gpt-test".to_string(),
+            api_key: "sk-test".to_string(),
+            base_url: base_url.to_string(),
+        }
+    }
+
+    #[test]
+    fn active_provider_uses_first_provider_when_active_name_is_empty() {
+        let config = IntelligenceConfig {
+            enabled: true,
+            active_provider: String::new(),
+            providers: vec![provider("default", "")],
+            ..Default::default()
+        };
+
+        let selected = get_active_provider(&config).expect("provider");
+
+        assert_eq!(selected.name, "default");
+        assert_eq!(selected.base_url, "https://api.openai.com/v1");
+    }
+
+    #[test]
+    fn chat_completions_url_accepts_base_or_full_endpoint() {
+        assert_eq!(
+            chat_completions_url("https://api.example.test/v1"),
+            "https://api.example.test/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_url("https://api.example.test/v1/chat/completions"),
+            "https://api.example.test/v1/chat/completions"
+        );
+    }
 }

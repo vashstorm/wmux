@@ -1,7 +1,7 @@
 // @ts-nocheck
 import playwrightTest from "./web/node_modules/@playwright/test/index.js";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +30,7 @@ if (shouldInitialize) {
 		// Ignore missing session cleanup.
 	}
 
-		execFileSync("tmux", [
+	execFileSync("tmux", [
 		"new-session",
 		"-d",
 		"-s",
@@ -40,6 +40,13 @@ if (shouldInitialize) {
 		"printf 'WMUX_READY\\n'; exec $SHELL -i",
 	]);
 	execFileSync("tmux", ["set-option", "-t", sessionName, "destroy-unattached", "off"]);
+
+	// Copy skills next to the temporary config file so the server can load them
+	try {
+		cpSync(join(repoRoot, "skills"), join(tempDir, "skills"), { recursive: true });
+	} catch (err) {
+		console.error("Failed to copy skills directory:", err);
+	}
 
 	writeFileSync(
 		configPath,
@@ -62,6 +69,18 @@ if (shouldInitialize) {
 				},
 				logs: {
 					level: "info",
+				},
+				omni: {
+					enabled: true,
+					dashscopeApiKey: "playwright-mock-key",
+					microphoneDisabled: false,
+					voice: "Cindy",
+					model: "qwen3.5-omni-flash-realtime",
+					endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/realtime",
+					continuousListening: true,
+					storeRawAudio: false,
+					vadEnabled: true,
+					vadThreshold: 0.5,
 				},
 			},
 			null,

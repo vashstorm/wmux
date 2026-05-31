@@ -142,6 +142,11 @@ test.describe("settings panel", () => {
 
 		await page.reload();
 
+		// Wait for scale/styling initialization to be asynchronously loaded and applied to the DOM root
+		await page.waitForFunction(() =>
+			document.documentElement.style.getPropertyValue("--font-size-base") !== ""
+		);
+
 		const persistedFontSize = await page.evaluate(() =>
 			document.documentElement.style.getPropertyValue("--font-size-base")
 		);

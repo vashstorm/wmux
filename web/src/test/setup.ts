@@ -1,4 +1,13 @@
 import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
+
+vi.mock("@mui/material", async (importOriginal) => {
+	const original = await importOriginal<typeof import("@mui/material")>();
+	return {
+		...original,
+		Tooltip: ({ children }: any) => children,
+	};
+});
 
 const AUTH_TOKEN_KEY = "wmux-auth-token";
 const TEST_AUTH_TOKEN = "test-auth-token";

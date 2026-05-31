@@ -86,9 +86,11 @@ function toConfigConnectionPayload(conn: ConnectionConfig): RawConnectionConfig 
 	};
 }
 
-function normalizeAppConfig(config: AppConfig): AppConfig {
+function normalizeAppConfig(config: any): AppConfig {
+	const omni = config.omni ?? config.voice;
 	return {
 		...config,
+		omni,
 		path: config.path ?? ".",
 		connections: (config.connections as RawConnectionConfig[] | undefined ?? [])
 			.map(normalizeConnectionConfig)
