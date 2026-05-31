@@ -7,6 +7,7 @@ import { AiEventDetail } from "./AiEventDetail.js";
 import { ProjectDashboard } from "./ProjectDashboard.js";
 import { listPanes, listWindows, type AiUsageEvent } from "../api/client.js";
 import { getErrorMessage } from "../api/errors.js";
+import { isProjectAiHtmlEvent, parseAiUsageResponse } from "./aiUsagePresentation.js";
 
 const ACTIVE_WINDOW_SYNC_INTERVAL_MS = 1000;
 
@@ -26,6 +27,15 @@ interface EventIntelligence {
 }
 
 function getAiEventDetails(event: AiUsageEvent): EventIntelligence {
+	const usageResponse = parseAiUsageResponse(event.responseJson);
+	if (isProjectAiHtmlEvent(event, usageResponse)) {
+		return {
+			app: "Project HTML",
+			status: event.status,
+			summary: usageResponse.summary ?? "Project AI HTML generated",
+		};
+	}
+
 	const res: EventIntelligence = { app: "", status: "", summary: "" };
 	if (!event.responseJson) return res;
 	try {

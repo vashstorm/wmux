@@ -177,6 +177,42 @@ describe("ProjectDashboard", () => {
 		expect(screen.getByText("2 windows")).toBeInTheDocument();
 	});
 
+	test("displays generated AI HTML with status, size, and updated time", () => {
+		render(
+			<TestWrapper>
+				{enableProject(makeProject({
+					aiHtml: "<section><h2>Generated Summary</h2><p>Project is healthy.</p></section>",
+					aiStatus: "completed",
+					updatedAt: "2025-01-02T03:04:05Z",
+				}))}
+				<ProjectDashboard />
+			</TestWrapper>,
+		);
+
+		expect(screen.getByTestId("project-ai-html")).toBeInTheDocument();
+		expect(screen.getByTestId("project-ai-html-content")).toHaveTextContent("Generated Summary");
+		expect(screen.getByTestId("project-ai-meta")).toHaveTextContent("completed");
+		expect(screen.getByTestId("project-ai-meta")).toHaveTextContent("B");
+		expect(screen.getByTestId("project-ai-meta")).toHaveTextContent("Updated");
+		expect(screen.getByText("AI Output")).toBeInTheDocument();
+	});
+
+	test("shows AI generation error in the main content panel", () => {
+		render(
+			<TestWrapper>
+				{enableProject(makeProject({
+					aiStatus: "error",
+					aiError: "Provider timeout",
+				}))}
+				<ProjectDashboard />
+			</TestWrapper>,
+		);
+
+		expect(screen.getByText("Generation failed")).toBeInTheDocument();
+		expect(screen.getByTestId("project-ai-error")).toHaveTextContent("Provider timeout");
+		expect(screen.getByTestId("project-ai-status")).toHaveTextContent("error");
+	});
+
 	test("displays status chip with correct color", () => {
 		const { container } = render(
 			<TestWrapper>

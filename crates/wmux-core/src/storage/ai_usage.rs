@@ -63,24 +63,47 @@ impl AiUsageRepository {
         &self,
         limit: i64,
         project_id: Option<&str>,
+        status: Option<&str>,
     ) -> Result<Vec<AiUsageEvent>, sqlx::Error> {
         let clamped_limit = limit.min(200).max(1);
 
-        if let Some(pid) = project_id {
-            sqlx::query_as::<_, AiUsageEvent>(
-                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
-            )
-            .bind(pid)
-            .bind(clamped_limit)
-            .fetch_all(&self.pool)
-            .await
-        } else {
-            sqlx::query_as::<_, AiUsageEvent>(
-                "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events ORDER BY created_at DESC LIMIT ?"
-            )
-            .bind(clamped_limit)
-            .fetch_all(&self.pool)
-            .await
+        match (project_id, status) {
+            (Some(pid), Some(status)) => {
+                sqlx::query_as::<_, AiUsageEvent>(
+                    "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE project_id = ? AND status = ? ORDER BY created_at DESC LIMIT ?"
+                )
+                .bind(pid)
+                .bind(status)
+                .bind(clamped_limit)
+                .fetch_all(&self.pool)
+                .await
+            }
+            (Some(pid), None) => {
+                sqlx::query_as::<_, AiUsageEvent>(
+                    "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
+                )
+                .bind(pid)
+                .bind(clamped_limit)
+                .fetch_all(&self.pool)
+                .await
+            }
+            (None, Some(status)) => {
+                sqlx::query_as::<_, AiUsageEvent>(
+                    "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events WHERE status = ? ORDER BY created_at DESC LIMIT ?"
+                )
+                .bind(status)
+                .bind(clamped_limit)
+                .fetch_all(&self.pool)
+                .await
+            }
+            (None, None) => {
+                sqlx::query_as::<_, AiUsageEvent>(
+                    "SELECT id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at FROM ai_usage_events ORDER BY created_at DESC LIMIT ?"
+                )
+                .bind(clamped_limit)
+                .fetch_all(&self.pool)
+                .await
+            }
         }
     }
 

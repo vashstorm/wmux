@@ -1,6 +1,8 @@
-import { Box, Typography, IconButton, Chip, Divider } from "@mui/material";
+import { Alert, Box, Typography, IconButton, Chip, Divider } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { AiUsageEvent } from "../api/client.js";
+import { SafeHtml } from "./SafeHtml.js";
+import { formatBytes, formatDuration, getAiUsageKindLabel, isProjectAiHtmlEvent, parseAiUsageResponse } from "./aiUsagePresentation.js";
 
 interface AiEventDetailProps {
 	event: AiUsageEvent;
@@ -47,51 +49,18 @@ function formatTimestamp(iso: string): string {
 	}
 }
 
-function formatDuration(ms: number): string {
-	if (ms < 1000) return `${ms}ms`;
-	if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-	return `${(ms / 60000).toFixed(1)}m`;
-}
-
 function formatTokens(tokens: number | null | undefined): string {
 	if (tokens == null) return "—";
 	return tokens.toLocaleString();
 }
 
-function formatJson(jsonString: string | null | undefined): { formatted: string | null; content: unknown } {
-	if (!jsonString) return { formatted: null, content: null };
-	try {
-		const parsed = JSON.parse(jsonString);
-		// Extract content: try top-level first, then OpenAI ChatCompletion format (choices[0].message.content)
-		const content = parsed.content
-			?? parsed.choices?.[0]?.message?.content
-			?? null;
-		return {
-			formatted: JSON.stringify(parsed, null, 2),
-			content,
-		};
-	} catch {
-		return { formatted: jsonString, content: null };
-	}
-}
-
-function formatContentAsJson(content: unknown): string | null {
-	if (content == null) return null;
-	if (typeof content === "string") {
-		try {
-			const parsed = JSON.parse(content);
-			return JSON.stringify(parsed, null, 2);
-		} catch {
-			// Not valid JSON — display as a JSON string literal
-			return JSON.stringify(content);
-		}
-	}
-	return JSON.stringify(content, null, 2);
-}
-
 export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 	const isSuccess = event.status === "success";
 	const isError = event.status === "error";
+	const parsedResponse = parseAiUsageResponse(event.responseJson);
+	const isProjectHtml = isProjectAiHtmlEvent(event, parsedResponse);
+	const kindLabel = getAiUsageKindLabel(event, parsedResponse);
+	const shouldShowAiResponse = !isProjectHtml || parsedResponse.parseError || parsedResponse.contentParseError;
 
 	return (
 		<Box
@@ -122,8 +91,15 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 							letterSpacing: "0",
 						}}
 					>
-						Event Detail
+						{isProjectHtml ? "Project HTML Detail" : "Event Detail"}
 					</Typography>
+					<Chip
+						label={kindLabel}
+						size="small"
+						color={isProjectHtml ? "secondary" : "default"}
+						variant="outlined"
+						sx={{ fontSize: DETAIL_FONT_SIZE.label, height: 24 }}
+					/>
 					<Chip
 						label={event.status}
 						size="small"
@@ -178,10 +154,67 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 					</>
 				)}
 
-				{(() => {
-					const { formatted, content } = formatJson(event.responseJson);
-					const contentJson = formatContentAsJson(content);
-					if (!formatted) return null;
+				{isProjectHtml && (
+					<>
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
+							Project HTML
+						</Typography>
+						<Box data-testid="ai-html-log-summary" sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
+							<DetailRow label="Operation" value={parsedResponse.summary ?? "Project AI HTML generated"} />
+							<DetailRow label="Project" value={parsedResponse.projectName ?? event.sessionName ?? "—"} />
+							<DetailRow label="Project ID" value={parsedResponse.projectId ?? event.projectId ?? "—"} mono />
+							<DetailRow label="HTML Size" value={formatBytes(parsedResponse.aiHtmlBytes)} />
+						</Box>
+
+						<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
+							HTML Preview
+						</Typography>
+						<Box
+							data-testid="ai-html-log-preview"
+							sx={{
+								mt: 0.5,
+								mb: 2,
+								bgcolor: "background.default",
+								borderRadius: "var(--radius-sm)",
+								border: "1px solid",
+								borderColor: "divider",
+								overflow: "hidden",
+							}}
+						>
+							<Box
+								sx={{
+									px: 1.5,
+									py: 1,
+									borderBottom: "1px solid",
+									borderColor: "divider",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									gap: 1,
+								}}
+							>
+								<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "var(--font-weight-semibold)" }}>
+									Rendered sanitized HTML
+								</Typography>
+								<Typography variant="caption" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.label, flexShrink: 0 }}>
+									{formatBytes(parsedResponse.aiHtmlBytes)}
+								</Typography>
+							</Box>
+							<Box sx={{ p: 2, maxHeight: 420, overflow: "auto" }}>
+								{parsedResponse.aiHtml ? (
+									<SafeHtml html={parsedResponse.aiHtml} />
+								) : (
+									<Alert severity="info" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
+										This log was recorded before HTML previews were stored. Regenerate the project HTML to see the rendered preview here.
+									</Alert>
+								)}
+							</Box>
+						</Box>
+					</>
+				)}
+
+				{shouldShowAiResponse && (() => {
+					if (!parsedResponse.formatted) return null;
 					return (
 						<>
 							<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
@@ -189,17 +222,17 @@ export function AiEventDetail({ event, onClose }: AiEventDetailProps) {
 							</Typography>
 							<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 								<Typography variant="body2" component="pre" sx={{ fontSize: DETAIL_FONT_SIZE.code, fontFamily: "var(--font-mono)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
-									{formatted}
+									{parsedResponse.formatted}
 								</Typography>
 							</Box>
-							{contentJson != null && (
+							{parsedResponse.contentJson != null && (
 								<>
 									<Typography variant="caption" sx={{ color: "text.disabled", fontSize: DETAIL_FONT_SIZE.section, textTransform: "uppercase", letterSpacing: "0", fontWeight: "var(--font-weight-semibold)" }}>
 										Content
 									</Typography>
 									<Box sx={{ mt: 0.5, mb: 2, p: 1.5, bgcolor: "background.default", borderRadius: "var(--radius-sm)", border: "1px solid", borderColor: "divider" }}>
 										<Typography variant="body2" component="pre" sx={{ fontSize: DETAIL_FONT_SIZE.code, fontFamily: "var(--font-mono)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
-											{contentJson}
+											{parsedResponse.contentJson}
 										</Typography>
 									</Box>
 								</>

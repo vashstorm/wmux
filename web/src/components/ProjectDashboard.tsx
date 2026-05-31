@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Box, Typography, Button, Chip, CircularProgress, Paper, Divider, Stack } from "@mui/material";
+import { Alert, Box, Typography, Button, Chip, CircularProgress, Paper, Divider, Stack } from "@mui/material";
 import SyncIcon from "@mui/icons-material/Sync";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { useAppState } from "../state/store.js";
@@ -40,6 +40,7 @@ function statusColor(status: string): "success" | "error" | "warning" | "default
 	switch (status) {
 	case "running":
 	case "active":
+	case "completed":
 		return "success";
 	case "error":
 	case "failed":
@@ -50,6 +51,12 @@ function statusColor(status: string): "success" | "error" | "warning" | "default
 	default:
 		return "default";
 	}
+}
+
+function aiStatusLabel(status: string, hasHtml: boolean, isGenerating: boolean): string {
+	if (isGenerating) return "generating";
+	if (status.trim() && status !== "idle") return status;
+	return hasHtml ? "completed" : "idle";
 }
 
 function formatTimestamp(iso: string | null): string {
@@ -79,6 +86,16 @@ function tryParseJson<T>(jsonString: string | null): T | null {
 		}
 	}
 	return null;
+}
+
+function byteLength(value: string): number {
+	return new TextEncoder().encode(value).length;
+}
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function ProjectDashboard() {
@@ -148,6 +165,25 @@ export function ProjectDashboard() {
 	const progressValue = progressData && typeof progressData === "object" && "percent" in progressData
 		? (progressData as { percent?: number }).percent
 		: null;
+	const aiHtml = selectedProject.aiHtml ?? "";
+	const aiStatus = selectedProject.aiStatus ?? "";
+	const hasAiHtml = aiHtml.trim().length > 0;
+	const isGeneratingAiHtml = actionLoading === "ai-generate" || aiStatus === "generating";
+	const currentAiStatus = aiStatusLabel(aiStatus, hasAiHtml, isGeneratingAiHtml);
+	const aiHtmlSize = hasAiHtml ? formatBytes(byteLength(aiHtml)) : null;
+	const aiUpdatedAt = hasAiHtml || aiStatus === "error"
+		? formatTimestamp(selectedProject.updatedAt)
+		: "—";
+	const aiStatusChip = (
+		<Chip
+			label={currentAiStatus}
+			size="small"
+			color={statusColor(currentAiStatus)}
+			variant="outlined"
+			data-testid="project-ai-status"
+			sx={{ fontSize: DETAIL_FONT_SIZE.label, height: 24 }}
+		/>
+	);
 
 	return (
 		<Box
@@ -213,21 +249,55 @@ export function ProjectDashboard() {
 						flexDirection: "column",
 					}}
 				>
-					<Typography
-						variant="caption"
+					<Stack
+						direction={{ xs: "column", sm: "row" }}
 						sx={{
-							color: "text.disabled",
-							fontSize: DETAIL_FONT_SIZE.section,
-							textTransform: "uppercase",
-							letterSpacing: "0",
-							fontWeight: "var(--font-weight-semibold)",
+							alignItems: { xs: "flex-start", sm: "center" },
+							justifyContent: "space-between",
+							gap: 1,
 							mb: 1,
 						}}
 					>
-						AI Generated Content
-					</Typography>
+						<Typography
+							variant="caption"
+							sx={{
+								color: "text.disabled",
+								fontSize: DETAIL_FONT_SIZE.section,
+								textTransform: "uppercase",
+								letterSpacing: "0",
+								fontWeight: "var(--font-weight-semibold)",
+							}}
+						>
+							AI Generated Content
+						</Typography>
+						<Stack
+							direction="row"
+							spacing={0.75}
+							sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 0.75 }}
+							data-testid="project-ai-meta"
+						>
+							{aiStatusChip}
+							{aiHtmlSize && (
+								<Chip
+									label={aiHtmlSize}
+									size="small"
+									variant="outlined"
+									sx={{ fontSize: DETAIL_FONT_SIZE.label, height: 24 }}
+								/>
+							)}
+							<Typography variant="caption" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.label }}>
+								Updated {aiUpdatedAt}
+							</Typography>
+						</Stack>
+					</Stack>
 
-					{selectedProject.aiStatus === "generating" ? (
+					{actionError && (
+						<Alert severity="error" sx={{ mb: 1.5 }} data-testid="project-action-error">
+							{actionError}
+						</Alert>
+					)}
+
+					{isGeneratingAiHtml ? (
 						<Paper
 							variant="outlined"
 							className="project-dashboard-card"
@@ -235,71 +305,112 @@ export function ProjectDashboard() {
 								flex: 1,
 								display: "flex",
 								flexDirection: "column",
-								alignItems: "center",
-								justifyContent: "center",
-								p: 4,
 								bgcolor: "background.default",
 								borderColor: "divider",
 								borderRadius: "var(--radius-lg)",
 								minHeight: 280,
+								overflow: "hidden",
 							}}
 						>
-							<CircularProgress size={24} sx={{ mb: 1.5 }} />
-							<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
-								Generating AI content...
-							</Typography>
-						</Paper>
-					) : selectedProject.aiStatus === "error" ? (
-						<Paper
-							variant="outlined"
-							className="project-dashboard-card"
-							sx={{
-								flex: 1,
-								p: 3,
-								bgcolor: "error.main",
-								color: "error.contrastText",
-								borderColor: "error.dark",
-								borderRadius: "var(--radius-lg)",
-								minHeight: 280,
-							}}
-						>
-							<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "bold", mb: 1 }}>
-								AI Generation Error
-							</Typography>
-							<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
-								{selectedProject.aiError || "AI generation failed"}
-							</Typography>
-						</Paper>
-					) : !selectedProject.aiHtml ? (
-						<Paper
-							variant="outlined"
-							className="project-dashboard-card"
-							sx={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								alignItems: "center",
-								justifyContent: "center",
-								p: 4,
-								bgcolor: "background.default",
-								borderColor: "divider",
-								borderRadius: "var(--radius-lg)",
-								minHeight: 280,
-							}}
-						>
-							<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body, textAlign: "center", mb: 2 }}>
-								No AI-generated content yet. Click &ldquo;Generate AI HTML&rdquo; to start.
-							</Typography>
-							<Button
-								size="small"
-								variant="outlined"
-								className="project-dashboard-btn project-dashboard-btn-secondary"
-								startIcon={actionLoading === "ai-generate" ? <CircularProgress size={16} color="inherit" /> : <AutoFixHighIcon fontSize="small" />}
-								disabled={actionLoading !== null}
-								onClick={handleAiGenerate}
+							<Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid", borderColor: "divider" }}>
+								<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "var(--font-weight-semibold)" }}>
+									Generating HTML summary
+								</Typography>
+							</Box>
+							<Box
+								sx={{
+									flex: 1,
+									display: "flex",
+									flexDirection: "column",
+									alignItems: "center",
+									justifyContent: "center",
+									p: 4,
+								}}
 							>
-								Generate AI HTML
-							</Button>
+								<CircularProgress size={24} sx={{ mb: 1.5 }} />
+								<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body }}>
+									Generating AI content...
+								</Typography>
+							</Box>
+						</Paper>
+					) : aiStatus === "error" ? (
+						<Paper
+							variant="outlined"
+							className="project-dashboard-card"
+							sx={{
+								flex: 1,
+								bgcolor: "background.default",
+								borderColor: "error.main",
+								borderRadius: "var(--radius-lg)",
+								minHeight: 280,
+								overflow: "hidden",
+							}}
+						>
+							<Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid", borderColor: "divider" }}>
+								<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "var(--font-weight-semibold)" }}>
+									Generation failed
+								</Typography>
+							</Box>
+							<Box sx={{ p: 2.5 }}>
+								<Alert severity="error" sx={{ mb: 2 }} data-testid="project-ai-error">
+									{selectedProject.aiError || "AI generation failed"}
+								</Alert>
+								<Button
+									size="small"
+									variant="outlined"
+									className="project-dashboard-btn project-dashboard-btn-secondary"
+									startIcon={<AutoFixHighIcon fontSize="small" />}
+									disabled={actionLoading !== null}
+									onClick={handleAiGenerate}
+								>
+									Generate AI HTML
+								</Button>
+							</Box>
+						</Paper>
+					) : !hasAiHtml ? (
+						<Paper
+							variant="outlined"
+							className="project-dashboard-card"
+							sx={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								bgcolor: "background.default",
+								borderColor: "divider",
+								borderRadius: "var(--radius-lg)",
+								minHeight: 280,
+								overflow: "hidden",
+							}}
+						>
+							<Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid", borderColor: "divider" }}>
+								<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "var(--font-weight-semibold)" }}>
+									No generated HTML yet
+								</Typography>
+							</Box>
+							<Box
+								sx={{
+									flex: 1,
+									display: "flex",
+									flexDirection: "column",
+									alignItems: "center",
+									justifyContent: "center",
+									p: 4,
+								}}
+							>
+								<Typography variant="body2" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.body, textAlign: "center", mb: 2 }}>
+									No AI-generated content yet. Click &ldquo;Generate AI HTML&rdquo; to start.
+								</Typography>
+								<Button
+									size="small"
+									variant="outlined"
+									className="project-dashboard-btn project-dashboard-btn-secondary"
+									startIcon={actionLoading === "ai-generate" ? <CircularProgress size={16} color="inherit" /> : <AutoFixHighIcon fontSize="small" />}
+									disabled={actionLoading !== null}
+									onClick={handleAiGenerate}
+								>
+									Generate AI HTML
+								</Button>
+							</Box>
 						</Paper>
 					) : (
 						<Paper
@@ -308,14 +419,43 @@ export function ProjectDashboard() {
 							variant="outlined"
 							sx={{
 								flex: 1,
-								p: 3,
 								bgcolor: "background.default",
 								borderColor: "divider",
-								overflow: "auto",
 								borderRadius: "var(--radius-lg)",
+								overflow: "hidden",
+								display: "flex",
+								flexDirection: "column",
 							}}
 						>
-							<SafeHtml html={selectedProject.aiHtml} />
+							<Box
+								sx={{
+									px: 2,
+									py: 1.25,
+									borderBottom: "1px solid",
+									borderColor: "divider",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									gap: 1.5,
+								}}
+							>
+								<Typography variant="body2" sx={{ fontSize: DETAIL_FONT_SIZE.body, fontWeight: "var(--font-weight-semibold)" }}>
+									Generated HTML summary
+								</Typography>
+								<Typography variant="caption" color="text.secondary" sx={{ fontSize: DETAIL_FONT_SIZE.label, flexShrink: 0 }}>
+									{aiHtmlSize}
+								</Typography>
+							</Box>
+							<Box
+								data-testid="project-ai-html-content"
+								sx={{
+									flex: 1,
+									overflow: "auto",
+									p: { xs: 2, md: 3 },
+								}}
+							>
+								<SafeHtml html={aiHtml} />
+							</Box>
 						</Paper>
 					)}
 				</Box>
@@ -385,11 +525,35 @@ export function ProjectDashboard() {
 								Generate AI HTML
 							</Button>
 						</Stack>
-						{actionError && (
-							<Typography color="error" variant="caption" sx={{ display: "block", mt: 0.5 }}>
-								{actionError}
-							</Typography>
-						)}
+					</Box>
+
+					<Box>
+						<Typography
+							variant="caption"
+							sx={{
+								color: "text.disabled",
+								fontSize: DETAIL_FONT_SIZE.section,
+								textTransform: "uppercase",
+								letterSpacing: "0",
+								fontWeight: "var(--font-weight-semibold)",
+							}}
+						>
+							AI Output
+						</Typography>
+						<Paper
+							variant="outlined"
+							className="project-dashboard-card"
+							sx={{
+								mt: 0.5,
+								p: 1.5,
+								bgcolor: "background.default",
+								borderColor: "divider",
+							}}
+						>
+							<DetailRow label="Status" value={currentAiStatus} />
+							<DetailRow label="HTML size" value={aiHtmlSize ?? "—"} />
+							<DetailRow label="Updated" value={aiUpdatedAt} />
+						</Paper>
 					</Box>
 
 					{/* Metadata Cards */}

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Typography, IconButton, List, ListItem, Stack, Switch, FormControlLabel, Tooltip } from "@mui/material";
+import { Box, Typography, IconButton, List, ListItem, Stack, Switch, FormControlLabel, Tooltip, Chip } from "@mui/material";
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { cleanupAiStats, listAiStats } from "../../api/client.js";
 import type { AiUsageEvent, AiUsageSummary } from "../../api/client.js";
 import { ApiError } from "../../api/errors.js";
 import { useAppState } from "../../state/store.js";
+import { getAiUsageKindLabel, getAiUsageSubtitle, getAiUsageTitle, parseAiUsageResponse } from "../aiUsagePresentation.js";
 
 const DEFAULT_REFRESH_INTERVAL_MS = 30000;
 const STATS_FONT_SIZE = {
@@ -14,20 +15,13 @@ const STATS_FONT_SIZE = {
 	meta: "var(--font-size-xs)",
 };
 
-function getAiSummary(responseJson: string | null | undefined): string | undefined {
-	if (!responseJson) return undefined;
-	try {
-		const parsed = JSON.parse(responseJson);
-		return parsed.summary;
-	} catch {
-		return undefined;
-	}
-}
+type StatusFilter = "error" | null;
 
 export function StatsView() {
 	const { selectedAiEvent, setSelectedAiEvent, showConfirm } = useAppState();
 	const [events, setEvents] = useState<AiUsageEvent[]>([]);
 	const [summary, setSummary] = useState<AiUsageSummary | null>(null);
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>(null);
 	const [loading, setLoading] = useState(false);
 	const [cleaning, setCleaning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -40,7 +34,10 @@ export function StatsView() {
 		setLoading(true);
 		setError(null);
 		try {
-			const response = await listAiStats({ limit: 50 });
+			const response = await listAiStats({
+				limit: statusFilter ? 200 : 50,
+				status: statusFilter ?? undefined,
+			});
 			setEvents(response.data);
 			setSummary(response.summary);
 			setLastRefreshedAt(new Date());
@@ -51,7 +48,7 @@ export function StatsView() {
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [statusFilter]);
 
 	const resetInterval = useCallback(() => {
 		if (intervalRef.current) {
@@ -84,6 +81,12 @@ export function StatsView() {
 		void loadStats();
 		resetInterval();
 	}, [loadStats, resetInterval]);
+
+	const handleToggleErrorFilter = useCallback(() => {
+		setCleanupMessage(null);
+		setSelectedAiEvent(null);
+		setStatusFilter((current) => current === "error" ? null : "error");
+	}, [setSelectedAiEvent]);
 
 	const performCleanup = useCallback(async () => {
 		setCleaning(true);
@@ -201,22 +204,38 @@ export function StatsView() {
 							</Typography>
 							<Typography sx={{ fontSize: "var(--font-size-xs)", color: "text.secondary", mt: 0.25 }}>Success</Typography>
 						</Box>
-						<Box sx={{
-							p: 2,
-							borderRadius: "var(--radius-md)",
-							bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.06)" : "rgba(239, 68, 68, 0.04)",
-							border: "1px solid",
-							borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.15)",
-							textAlign: "center",
-							boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.25)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
-							backdropFilter: "blur(8px)",
-							transition: "all var(--transition-base)",
-							"&:hover": {
-								borderColor: "error.main",
-								boxShadow: "var(--glow-danger)",
-								transform: "translateY(-1px)",
-							}
-						}}>
+						<Box
+							component="button"
+							type="button"
+							onClick={handleToggleErrorFilter}
+							data-testid="stats-filter-errors"
+							aria-pressed={statusFilter === "error"}
+							aria-label={statusFilter === "error" ? "Show all Tmux analysis logs" : "Show error Tmux analysis logs"}
+							sx={{
+								p: 2,
+								borderRadius: "var(--radius-md)",
+								bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.06)" : "rgba(239, 68, 68, 0.04)",
+								border: "1px solid",
+								borderColor: statusFilter === "error" ? "error.main" : (theme) => theme.palette.mode === "dark" ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.15)",
+								textAlign: "center",
+								width: "100%",
+								font: "inherit",
+								appearance: "none",
+								cursor: "pointer",
+								boxShadow: (theme) => theme.palette.mode === "dark" ? "0 4px 20px rgba(0, 0, 0, 0.25)" : "0 4px 20px rgba(0, 0, 0, 0.05)",
+								backdropFilter: "blur(8px)",
+								transition: "all var(--transition-base)",
+								outline: "none",
+								"&:hover": {
+									borderColor: "error.main",
+									boxShadow: "var(--glow-danger)",
+									transform: "translateY(-1px)",
+								},
+								"&:focus-visible": {
+									borderColor: "error.main",
+									boxShadow: "0 0 0 3px rgba(239, 68, 68, 0.22)",
+								},
+							}}>
 							<Typography sx={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: "error.main", lineHeight: 1 }}>
 								{summary.totalError}
 							</Typography>
@@ -229,102 +248,134 @@ export function StatsView() {
 			{loading && events.length === 0 ? (
 				<Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 2 }}>Loading...</Typography>
 			) : error && events.length === 0 ? null : events.length === 0 ? (
-				<Typography variant="body2" color="text.secondary" data-testid="stats-empty" sx={{ textAlign: "center", py: 2 }}>No Tmux analysis events yet</Typography>
+				<Typography variant="body2" color="text.secondary" data-testid="stats-empty" sx={{ textAlign: "center", py: 2 }}>
+					{statusFilter === "error" ? "No error logs found" : "No Tmux analysis events yet"}
+				</Typography>
 			) : (
 				<List disablePadding dense>
-					{events.map((event) => (
-						<ListItem
-							key={event.id}
-							onClick={() => setSelectedAiEvent(event)}
-							data-testid={`stats-event-${event.id}`}
-							sx={{
-								px: 1,
-								py: 1,
-								my: 0.5,
-								borderRadius: "var(--radius-sm)",
-								cursor: "pointer",
-								bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
-								"&:hover": { bgcolor: "action.hover" },
-								transition: "background-color 0.15s",
-								overflow: "hidden",
-							}}
-						>
-							<Stack direction="row" spacing={1.5} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
-								{/* Glowing status dot */}
-								<Box
-									sx={{
-										width: 8,
-										height: 8,
-										borderRadius: "50%",
-										flexShrink: 0,
-										backgroundColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
-										boxShadow: event.status === "success" 
-											? "0 0 8px var(--color-success)" 
-											: event.status === "error" 
-												? "0 0 8px var(--color-danger)" 
-												: "none",
-										position: "relative",
-										"&::after": {
-											content: '""',
-											position: "absolute",
-											top: -2,
-											left: -2,
-											right: -2,
-											bottom: -2,
-											borderRadius: "50%",
-											border: "1px solid",
-											borderColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "transparent",
-											opacity: 0.4,
-											animation: event.status === "success" || event.status === "error" ? "pulse 2s infinite ease-in-out" : "none",
-										}
-									}}
-								/>
-								<Stack
-									direction="row"
-									sx={{
-										flex: 1,
-										minWidth: 0,
-										alignItems: "center",
-										justifyContent: "space-between",
-										py: 0.25,
-										pr: 1,
-									}}
-								>
-									<Typography
-										variant="body2"
+					{events.map((event) => {
+						const parsed = parseAiUsageResponse(event.responseJson);
+						const kindLabel = getAiUsageKindLabel(event, parsed);
+						const title = getAiUsageTitle(event, parsed);
+						const subtitle = getAiUsageSubtitle(event, parsed);
+						return (
+							<ListItem
+								key={event.id}
+								onClick={() => setSelectedAiEvent(event)}
+								data-testid={`stats-event-${event.id}`}
+								sx={{
+									px: 1,
+									py: 1,
+									my: 0.5,
+									borderRadius: "var(--radius-sm)",
+									cursor: "pointer",
+									bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
+									"&:hover": { bgcolor: "action.hover" },
+									transition: "background-color 0.15s",
+									overflow: "hidden",
+								}}
+							>
+								<Stack direction="row" spacing={1.5} sx={{ alignItems: "center", width: "100%", minWidth: 0 }}>
+									<Box
 										sx={{
-											fontSize: STATS_FONT_SIZE.body,
-											fontWeight: "var(--font-weight-medium)",
-											whiteSpace: "nowrap",
-											overflow: "hidden",
-											textOverflow: "ellipsis",
+											width: 8,
+											height: 8,
+											borderRadius: "50%",
+											flexShrink: 0,
+											backgroundColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "text.disabled",
+											boxShadow: event.status === "success"
+												? "0 0 8px var(--color-success)"
+												: event.status === "error"
+													? "0 0 8px var(--color-danger)"
+													: "none",
+											position: "relative",
+											"&::after": {
+												content: '""',
+												position: "absolute",
+												top: -2,
+												left: -2,
+												right: -2,
+												bottom: -2,
+												borderRadius: "50%",
+												border: "1px solid",
+												borderColor: event.status === "success" ? "success.main" : event.status === "error" ? "error.main" : "transparent",
+												opacity: 0.4,
+												animation: event.status === "success" || event.status === "error" ? "pulse 2s infinite ease-in-out" : "none",
+											}
 										}}
-										title={`${event.sessionName} ${getAiSummary(event.responseJson) ?? ""}`}
+									/>
+									<Stack
+										direction="row"
+										sx={{
+											flex: 1,
+											minWidth: 0,
+											alignItems: "center",
+											justifyContent: "space-between",
+											py: 0.25,
+											pr: 1,
+											gap: 1,
+										}}
 									>
-										{event.sessionName}
-									</Typography>
-									{event.windowNumber != null && (
-										<Typography
-											variant="caption"
-											color="text.secondary"
-											sx={{
-												fontSize: STATS_FONT_SIZE.meta,
-												fontWeight: "var(--font-weight-medium)",
-												bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
-												px: 0.75,
-												py: 0.1,
-												borderRadius: "var(--radius-sm)",
-												flexShrink: 0,
-												ml: 1,
-											}}
-										>
-											W{event.windowNumber}
-										</Typography>
-									)}
+										<Box sx={{ minWidth: 0, flex: 1 }}>
+											<Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+												<Typography
+													variant="body2"
+													sx={{
+														fontSize: STATS_FONT_SIZE.body,
+														fontWeight: "var(--font-weight-medium)",
+														whiteSpace: "nowrap",
+														overflow: "hidden",
+														textOverflow: "ellipsis",
+													}}
+													title={`${kindLabel}: ${title} ${subtitle}`}
+												>
+													{title}
+												</Typography>
+											</Stack>
+											<Typography
+												variant="caption"
+												color="text.secondary"
+												sx={{
+													display: "block",
+													fontSize: STATS_FONT_SIZE.meta,
+													whiteSpace: "nowrap",
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+												}}
+											>
+												{subtitle}
+											</Typography>
+										</Box>
+										<Stack direction="row" spacing={0.5} sx={{ flexShrink: 0, alignItems: "center" }}>
+											<Chip
+												label={kindLabel}
+												size="small"
+												color={kindLabel === "Project HTML" ? "secondary" : "default"}
+												variant="outlined"
+												sx={{ height: 20, fontSize: STATS_FONT_SIZE.meta }}
+											/>
+											{event.windowNumber != null && (
+												<Typography
+													variant="caption"
+													color="text.secondary"
+													sx={{
+														fontSize: STATS_FONT_SIZE.meta,
+														fontWeight: "var(--font-weight-medium)",
+														bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.04)",
+														px: 0.75,
+														py: 0.1,
+														borderRadius: "var(--radius-sm)",
+													}}
+												>
+													W{event.windowNumber}
+												</Typography>
+											)}
+										</Stack>
+									</Stack>
 								</Stack>
-							</Stack>
-						</ListItem>
-					))}
+							</ListItem>
+						);
+					})}
 				</List>
 			)}
 		</Box>

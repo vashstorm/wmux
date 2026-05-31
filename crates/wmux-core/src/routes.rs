@@ -6,8 +6,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::handlers::{
-    ai_logs, ai_stats, config, connections, health, logs, projects, sessions, skills, terminal, voice,
-    voice_history,
+    ai_logs, ai_stats, config, connections, health, logs, projects, sessions, skills, terminal,
+    voice, voice_history,
 };
 use crate::http::api_not_found;
 use crate::state::AppState;
@@ -989,6 +989,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ai_stats_route_filters_data_by_status() {
+        let (app, _dir, pool) = test_app_with_memory_storage().await;
+
+        for (id, status, created_at) in [
+            ("error-new", "error", "2026-05-31T10:02:00Z"),
+            ("success", "success", "2026-05-31T10:01:00Z"),
+            ("error-old", "error", "2026-05-31T10:00:00Z"),
+        ] {
+            sqlx::query(
+                "INSERT INTO ai_usage_events (id, project_id, provider, model, target_name, session_name, status, duration_ms, prompt_tokens, completion_tokens, total_tokens, estimated_cost, error_message, window_number, response_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(id)
+            .bind(None::<String>)
+            .bind("test")
+            .bind("model")
+            .bind("local")
+            .bind("session-a")
+            .bind(status)
+            .bind(0)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<i64>)
+            .bind(None::<f64>)
+            .bind(None::<String>)
+            .bind(Some(1_i64))
+            .bind(None::<String>)
+            .bind(created_at)
+            .execute(&pool)
+            .await
+            .expect("insert event");
+        }
+
+        let resp = app
+            .oneshot(request("GET", "/api/ai/stats?limit=10&status=error", None))
+            .await
+            .expect("response");
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = json_body(resp).await;
+        let ids: Vec<&str> = body["data"]
+            .as_array()
+            .expect("data array")
+            .iter()
+            .filter_map(|event| event["id"].as_str())
+            .collect();
+
+        assert_eq!(ids, vec!["error-new", "error-old"]);
+        assert_eq!(body["summary"]["totalEvents"], 3);
+        assert_eq!(body["summary"]["totalError"], 2);
+    }
+
+    #[tokio::test]
     async fn ai_stats_cleanup_route_deletes_older_than_5_min() {
         let (app, dir) = test_app_with_storage().await;
         let db_path = dir.path().join("runtime/data/wmux.db");
@@ -1212,7 +1263,11 @@ mod tests {
 
         let cursor = body["nextCursor"].as_str().expect("cursor string");
         let next_page = app
-            .oneshot(request("GET", &format!("/api/ai/logs?limit=50&before={cursor}"), None))
+            .oneshot(request(
+                "GET",
+                &format!("/api/ai/logs?limit=50&before={cursor}"),
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(next_page.status(), StatusCode::OK);
@@ -1226,7 +1281,11 @@ mod tests {
         let (app, _dir, _pool) = test_app_with_memory_storage().await;
 
         let response = app
-            .oneshot(request("GET", "/api/ai/logs?before=invalid-timestamp", None))
+            .oneshot(request(
+                "GET",
+                "/api/ai/logs?before=invalid-timestamp",
+                None,
+            ))
             .await
             .expect("response");
 

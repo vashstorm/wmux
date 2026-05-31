@@ -333,6 +333,7 @@ pub async fn generate_ai_html(
                 "success",
                 duration_ms,
                 Some(ai_html.len()),
+                Some(ai_html.as_str()),
                 None,
             )
             .await;
@@ -357,6 +358,7 @@ pub async fn generate_ai_html(
                 "error",
                 duration_ms,
                 None,
+                None,
                 Some(error_msg.as_str()),
             )
             .await;
@@ -379,6 +381,7 @@ async fn record_project_ai_usage_event(
     status: &str,
     duration_ms: i64,
     ai_html_len: Option<usize>,
+    ai_html: Option<&str>,
     error_message: Option<&str>,
 ) {
     let provider_name = provider
@@ -409,6 +412,7 @@ async fn record_project_ai_usage_event(
         "projectId": project.id,
         "projectName": project.name,
         "aiHtmlBytes": ai_html_len,
+        "aiHtml": ai_html,
     })
     .to_string();
 

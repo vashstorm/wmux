@@ -849,6 +849,7 @@ export async function generateProjectAiHtml(id: string): Promise<Project> {
 export interface AiStatsQuery {
 	limit?: number;
 	projectId?: string;
+	status?: string;
 }
 
 export async function listAiStats(query: AiStatsQuery = {}): Promise<AiStatsResponse> {
@@ -858,6 +859,9 @@ export async function listAiStats(query: AiStatsQuery = {}): Promise<AiStatsResp
 	}
 	if (query.projectId) {
 		params.set("projectId", query.projectId);
+	}
+	if (query.status) {
+		params.set("status", query.status);
 	}
 	const qs = params.toString();
 	const path = qs ? `/api/ai/stats?${qs}` : "/api/ai/stats";

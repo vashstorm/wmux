@@ -18,13 +18,18 @@ impl AiLogRepository {
         Self { pool }
     }
 
-    pub async fn insert(
-        &self,
-        entry: &NewAiLogEntry,
-    ) -> Result<AiLogEntry, AiLogRepoError> {
-        let id = entry.id.as_ref().filter(|s| !s.trim().is_empty()).cloned()
+    pub async fn insert(&self, entry: &NewAiLogEntry) -> Result<AiLogEntry, AiLogRepoError> {
+        let id = entry
+            .id
+            .as_ref()
+            .filter(|s| !s.trim().is_empty())
+            .cloned()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
-        let created_at = entry.created_at.as_ref().filter(|s| !s.trim().is_empty()).cloned()
+        let created_at = entry
+            .created_at
+            .as_ref()
+            .filter(|s| !s.trim().is_empty())
+            .cloned()
             .unwrap_or_else(|| now_utc());
 
         sqlx::query(
@@ -188,7 +193,10 @@ mod tests {
         let result_max = repo.list(1000, None).await.expect("list max clamp");
         assert_eq!(result_max.data.len(), 200);
         assert!(result_max.next_cursor.is_some());
-        assert_eq!(result_max.next_cursor.unwrap(), result_max.data.last().unwrap().created_at);
+        assert_eq!(
+            result_max.next_cursor.unwrap(),
+            result_max.data.last().unwrap().created_at
+        );
     }
 
     #[tokio::test]
@@ -203,13 +211,17 @@ mod tests {
                 .expect("insert log");
         }
 
-        let result = repo.list(10, Some("2026-05-28T10:10:00Z"))
+        let result = repo
+            .list(10, Some("2026-05-28T10:10:00Z"))
             .await
             .expect("list before cursor");
 
         assert_eq!(result.data.len(), 10);
         assert_eq!(result.data[0].created_at, "2026-05-28T10:09:00Z");
-        assert_eq!(result.data.last().unwrap().created_at, "2026-05-28T10:00:00Z");
+        assert_eq!(
+            result.data.last().unwrap().created_at,
+            "2026-05-28T10:00:00Z"
+        );
     }
 
     #[tokio::test]
@@ -278,8 +290,14 @@ mod tests {
 
         let inserted = repo.insert(&entry).await.expect("insert json entry");
 
-        assert_eq!(inserted.tool_arguments_json, Some("{\"command\":\"ls\"}".to_string()));
-        assert_eq!(inserted.tool_result_json, Some("{\"output\":\"file1 file2\"}".to_string()));
+        assert_eq!(
+            inserted.tool_arguments_json,
+            Some("{\"command\":\"ls\"}".to_string())
+        );
+        assert_eq!(
+            inserted.tool_result_json,
+            Some("{\"output\":\"file1 file2\"}".to_string())
+        );
         assert_eq!(inserted.metrics_json, "{\"tokens\":150}");
         assert_eq!(inserted.raw_event_json, "{\"raw\":\"data\"}");
 

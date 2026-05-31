@@ -25,9 +25,9 @@ use wmux_core::config::OmniConfig;
 use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, OmniTarget, generate_qwen_tools};
 use wmux_core::state::RuntimeSkills;
 use wmux_core::storage::{
+    AiLogRepository,
     models::{NewAiLogEntry, OmniConversationMessage},
     voice_history::OmniHistoryRepository,
-    AiLogRepository,
 };
 
 use crate::state::AppState;
@@ -1133,7 +1133,8 @@ async fn handle_qwen_message(
             tracing::debug!("Qwen event: {}", event_type);
             let usage = value.pointer("/response/usage");
             if let Some(usage) = usage {
-                let metrics_json = serde_json::to_string(usage).unwrap_or_else(|_| "{}".to_string());
+                let metrics_json =
+                    serde_json::to_string(usage).unwrap_or_else(|_| "{}".to_string());
                 let model = get_omni_config(state)
                     .map(|c| c.model)
                     .unwrap_or_else(|_| "qwen-omni".to_string());

@@ -13,6 +13,7 @@ pub struct StatsQuery {
     #[serde(default = "default_limit")]
     pub limit: i64,
     pub project_id: Option<String>,
+    pub status: Option<String>,
 }
 
 fn default_limit() -> i64 {
@@ -41,7 +42,7 @@ pub async fn get_stats(
 
     let limit = query.limit.min(200).max(1);
     let data = repo
-        .list(limit, query.project_id.as_deref())
+        .list(limit, query.project_id.as_deref(), query.status.as_deref())
         .await
         .map_err(|err| {
             tracing::error!(raw_error = %err, "database error listing AI stats");
