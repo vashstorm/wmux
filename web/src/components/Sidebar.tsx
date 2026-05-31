@@ -145,13 +145,45 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 	}, [loadConnectionsList]);
 
 	useEffect(() => {
-		void refreshErrorLogBadge();
-		const intervalId = window.setInterval(() => {
+		if (document.visibilityState === "visible") {
 			void refreshErrorLogBadge();
-		}, 10000);
+		}
+		const intervalIdRef = { current: 0 };
+
+		const startInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+			}
+			const id = window.setInterval(() => {
+				if (document.visibilityState === "visible") {
+					void refreshErrorLogBadge();
+				}
+			}, 10000);
+			intervalIdRef.current = id;
+		};
+
+		const stopInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+				intervalIdRef.current = 0;
+			}
+		};
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "hidden") {
+				stopInterval();
+			} else if (document.visibilityState === "visible") {
+				void refreshErrorLogBadge();
+				startInterval();
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		startInterval();
 
 		return () => {
-			window.clearInterval(intervalId);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			stopInterval();
 		};
 	}, [refreshErrorLogBadge]);
 
@@ -166,7 +198,9 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 			setSelectedPane(null);
 		}
 
-		loadSessionsForTarget(selectedTargetName);
+		if (document.visibilityState === "visible") {
+			loadSessionsForTarget(selectedTargetName);
+		}
 	}, [selectedTargetName, loadSessionsForTarget, setSelectedPane]);
 
 	useEffect(() => {
@@ -174,7 +208,10 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 
 		let cancelled = false;
 		let inFlight = false;
+		const intervalIdRef = { current: 0 };
+
 		const syncSessions = async () => {
+			if (document.visibilityState === "hidden") return;
 			if (cancelled || inFlight) return;
 			inFlight = true;
 			try {
@@ -184,13 +221,40 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 			}
 		};
 
-		const intervalId = window.setInterval(() => {
-			void syncSessions();
-		}, SESSION_SYNC_INTERVAL_MS);
+		const startInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+			}
+			const id = window.setInterval(() => {
+				void syncSessions();
+			}, SESSION_SYNC_INTERVAL_MS);
+			intervalIdRef.current = id;
+		};
+
+		const stopInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+				intervalIdRef.current = 0;
+			}
+		};
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "hidden") {
+				stopInterval();
+			} else if (document.visibilityState === "visible") {
+				void syncSessions();
+				startInterval();
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		void syncSessions();
+		startInterval();
 
 		return () => {
 			cancelled = true;
-			window.clearInterval(intervalId);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			stopInterval();
 		};
 	}, [selectedTargetName, loadSessionsForTarget]);
 

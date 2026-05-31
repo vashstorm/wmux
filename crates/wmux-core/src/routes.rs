@@ -13,6 +13,40 @@ use crate::http::api_not_found;
 use crate::state::AppState;
 
 pub fn router(state: AppState) -> Router {
+    let session_routes = Router::new()
+        .route(
+            "/sessions",
+            get(sessions::list_sessions).post(sessions::create_session),
+        )
+        .route(
+            "/sessions/{session}",
+            delete(sessions::delete_session).patch(sessions::rename_session),
+        )
+        .route(
+            "/sessions/{session}/analyze",
+            post(sessions::analyze_session),
+        )
+        .route(
+            "/sessions/{session}/windows",
+            get(sessions::list_windows).post(sessions::create_window),
+        )
+        .route(
+            "/sessions/{session}/windows/{window}",
+            delete(sessions::delete_window),
+        )
+        .route(
+            "/sessions/{session}/windows/{window}/panes",
+            get(sessions::list_panes),
+        )
+        .route(
+            "/sessions/{session}/windows/{window}/panes/{pane}/split",
+            post(sessions::split_pane),
+        )
+        .route(
+            "/sessions/{session}/windows/{window}/panes/{pane}",
+            delete(sessions::delete_pane),
+        );
+
     let protected_api = Router::new()
         .route(
             "/connections",
@@ -26,70 +60,8 @@ pub fn router(state: AppState) -> Router {
                 .delete(connections::delete),
         )
         .route("/connections/{id}/health", get(connections::health))
-        .route(
-            "/targets/{target}/sessions",
-            get(sessions::list_sessions).post(sessions::create_session),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}",
-            delete(sessions::delete_session).patch(sessions::rename_session),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/analyze",
-            post(sessions::analyze_session),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/windows",
-            get(sessions::list_windows).post(sessions::create_window),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/windows/{window}",
-            delete(sessions::delete_window),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/windows/{window}/panes",
-            get(sessions::list_panes),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/windows/{window}/panes/{pane}/split",
-            post(sessions::split_pane),
-        )
-        .route(
-            "/targets/{target}/sessions/{session}/windows/{window}/panes/{pane}",
-            delete(sessions::delete_pane),
-        )
-        .route(
-            "/connections/{id}/sessions",
-            get(sessions::list_sessions).post(sessions::create_session),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}",
-            delete(sessions::delete_session).patch(sessions::rename_session),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/analyze",
-            post(sessions::analyze_session),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/windows",
-            get(sessions::list_windows).post(sessions::create_window),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/windows/{window}",
-            delete(sessions::delete_window),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/windows/{window}/panes",
-            get(sessions::list_panes),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/windows/{window}/panes/{pane}/split",
-            post(sessions::split_pane),
-        )
-        .route(
-            "/connections/{id}/sessions/{session}/windows/{window}/panes/{pane}",
-            delete(sessions::delete_pane),
-        )
+        .nest("/targets/{target}", session_routes.clone())
+        .nest("/connections/{id}", session_routes)
         .route("/config", get(config::get).put(config::update))
         .route("/skills", get(skills::list).post(skills::create))
         .route(
@@ -189,8 +161,17 @@ mod tests {
     use tower::ServiceExt;
     use wmux_core::config::Config;
     use wmux_core::logging::LoggingHandle;
+    use crate::test_utils::TestAppFixture;
 
     const TOKEN: &str = "test-token";
+
+    /// Create test app using TestAppFixture (shared test utility).
+    fn test_app_from_fixture(config: Value) -> (Router, TestAppFixture) {
+        let fixture = TestAppFixture::with_config_value(config);
+        let store = Config::load(&fixture.config_path).expect("load config");
+        let state = AppState::new(store, fixture.assets_dir.clone(), LoggingHandle::empty());
+        (router(state), fixture)
+    }
 
     fn test_app(config: Value) -> (Router, tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -424,7 +405,7 @@ mod tests {
 
     #[tokio::test]
     async fn config_get_sanitizes_secret_fields() {
-        let (app, _dir, _config_path) = test_app(base_config());
+        let (app, _fixture) = test_app_from_fixture(base_config());
 
         let response = app
             .oneshot(request("GET", "/api/config", None))
@@ -467,7 +448,7 @@ mod tests {
 
     #[tokio::test]
     async fn config_update_preserves_key_when_blank() {
-        let (app, _dir, _config_path) = test_app(base_config());
+        let (app, _fixture) = test_app_from_fixture(base_config());
 
         // PUT config with blank apiKey - should preserve existing key
         let payload = json!({
@@ -711,6 +692,71 @@ mod tests {
         let analyze_body = json_body(analyze_response).await;
         assert_eq!(analyze_body["error"]["code"], "not_found");
         assert!(!analyze_body.to_string().contains("connectionId"));
+    }
+
+    #[tokio::test]
+    async fn connections_and_targets_session_routes_are_aliases() {
+        let (app, _dir, _config_path) = test_app(base_config());
+
+        let create_conn_response = app
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/connections",
+                Some(json!({ "type": "local" })),
+            ))
+            .await
+            .expect("response");
+        assert_eq!(create_conn_response.status(), StatusCode::CREATED);
+        let conn = json_body(create_conn_response).await;
+        let target_name = conn["targetName"].as_str().expect("target name").to_string();
+
+        let targets_list = app
+            .clone()
+            .oneshot(request("GET", &format!("/api/targets/{target_name}/sessions"), None))
+            .await
+            .expect("response");
+        assert_eq!(targets_list.status(), StatusCode::OK);
+        let targets_response = json_body(targets_list).await;
+
+        let connections_list = app
+            .clone()
+            .oneshot(request("GET", &format!("/api/connections/{target_name}/sessions"), None))
+            .await
+            .expect("response");
+        assert_eq!(connections_list.status(), StatusCode::OK);
+        let connections_response = json_body(connections_list).await;
+
+        assert_eq!(
+            targets_response["data"].as_array().expect("targets sessions").len(),
+            connections_response["data"].as_array().expect("connections sessions").len(),
+            "Both route families should return same number of sessions"
+        );
+        assert_eq!(targets_response["targetName"], connections_response["targetName"]);
+        assert_eq!(targets_response["mode"], connections_response["mode"]);
+
+        let targets_windows = app
+            .clone()
+            .oneshot(
+                request("GET", &format!("/api/targets/{target_name}/sessions/nonexistent/windows"), None),
+            )
+            .await
+            .expect("response");
+        let targets_windows_response = json_body(targets_windows).await;
+
+        let connections_windows = app
+            .oneshot(
+                request("GET", &format!("/api/connections/{target_name}/sessions/nonexistent/windows"), None),
+            )
+            .await
+            .expect("response");
+        let connections_windows_response = json_body(connections_windows).await;
+
+        assert_eq!(
+            targets_windows_response["error"]["code"],
+            connections_windows_response["error"]["code"],
+            "Both route families should return same error for nonexistent session"
+        );
     }
 
     #[tokio::test]

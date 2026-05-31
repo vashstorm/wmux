@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import { Box } from "@mui/material";
 import WifiOffIcon from "@mui/icons-material/WifiOff";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
+import type { Terminal as XTermType } from "@xterm/xterm";
+import type { FitAddon as FitAddonType } from "@xterm/addon-fit";
 import { getErrorMessage } from "../api/errors.js";
 import { getAuthToken } from "../api/runtime.js";
 import { TerminalWebSocket } from "../api/websocket.js";
@@ -35,7 +33,7 @@ function resolveDisplaySize(fittedSize: TerminalSize | null, sourceSize: Termina
 	return fittedSize;
 }
 
-function redrawTerminal(terminal: XTerm) {
+function redrawTerminal(terminal: XTermType) {
 	terminal.clearTextureAtlas();
 	terminal.refresh(0, Math.max(0, terminal.rows - 1));
 }
@@ -45,8 +43,8 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const { targetName, session, window: windowId, pane } = selectedPane;
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const terminalRef = useRef<XTerm | null>(null);
-	const fitAddonRef = useRef<FitAddon | null>(null);
+	const terminalRef = useRef<XTermType | null>(null);
+	const fitAddonRef = useRef<FitAddonType | null>(null);
 	const wsRef = useRef<TerminalWebSocket | null>(null);
 	const resizeObserverRef = useRef<ResizeObserver | null>(null);
 	const resizeFrameRef = useRef<number | null>(null);
@@ -55,6 +53,7 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	const sourceSizeRef = useRef<TerminalSize | null>(sourceSize ?? null);
 	const [disconnected, setDisconnected] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+	const [xtermLoading, setXtermLoading] = useState(true);
 	const terminalThemeId = windowTheme ?? uiSettings.windowTheme ?? uiSettings.theme ?? document.documentElement.dataset.theme;
 	const terminalTheme = getTerminalTheme(terminalThemeId);
 	const terminalStyle = {
@@ -198,82 +197,103 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 	useEffect(() => {
 		if (!containerRef.current) return;
 
-		const terminal = new XTerm({
-			allowProposedApi: true,
-			cursorBlink: true,
-			customGlyphs: false,
-			scrollback: 0,
-			fontFamily:
-				"'CaskaydiaCove Nerd Font', 'Geist Mono', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
-			fontSize: getTerminalFontPx(uiSettings.uiScaleStep),
-			fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
-			fontWeightBold: "bold",
-			theme: terminalTheme,
-		});
+		let cancelled = false;
 
-		const fitAddon = new FitAddon();
-		terminal.loadAddon(fitAddon);
-		terminal.loadAddon(new Unicode11Addon());
-		terminal.unicode.activeVersion = "11";
-		terminal.loadAddon(new WebLinksAddon());
+		void (async () => {
+			try {
+				const [{ Terminal: XTerm }, { FitAddon }, { Unicode11Addon }, { WebLinksAddon }] = await Promise.all([
+					import("@xterm/xterm"),
+					import("@xterm/addon-fit"),
+					import("@xterm/addon-unicode11"),
+					import("@xterm/addon-web-links"),
+				]);
 
-		terminal.open(containerRef.current);
-		terminalRef.current = terminal;
-		fitAddonRef.current = fitAddon;
-		const initialSize = fitAndSyncSize();
+				if (cancelled) return;
 
-		terminal.focus();
+				const terminal = new XTerm({
+					allowProposedApi: true,
+					cursorBlink: true,
+					customGlyphs: false,
+					scrollback: 0,
+					fontFamily:
+						"'CaskaydiaCove Nerd Font', 'Geist Mono', 'Berkeley Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono CJK SC', 'Source Han Mono SC', 'Sarasa Mono SC', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'PingFang SC', 'Hiragino Sans GB', monospace",
+					fontSize: getTerminalFontPx(uiSettings.uiScaleStep),
+					fontWeight: uiSettings.terminalFontWeight as import("@xterm/xterm").FontWeight,
+					fontWeightBold: "bold",
+					theme: terminalTheme,
+				});
 
-		terminal.onData((data) => {
-			wsRef.current?.send({ type: "input", data });
-		});
+				const fitAddon = new FitAddon();
+				terminal.loadAddon(fitAddon);
+				terminal.loadAddon(new Unicode11Addon());
+				terminal.unicode.activeVersion = "11";
+				terminal.loadAddon(new WebLinksAddon());
 
-		terminal.onResize(({ cols, rows }) => {
-			const nextSize = normalizeTerminalSize(cols, rows);
-			if (!nextSize) return;
-			const previousSize = lastSentSizeRef.current;
-			if (
-				previousSize &&
-				previousSize.cols === nextSize.cols &&
-				previousSize.rows === nextSize.rows
-			) {
-				return;
-			}
-			lastSentSizeRef.current = nextSize;
-			wsRef.current?.send({ type: "resize", cols, rows });
-		});
+				terminal.open(containerRef.current!);
+				terminalRef.current = terminal;
+				fitAddonRef.current = fitAddon;
+				setXtermLoading(false);
+				const initialSize = fitAndSyncSize();
 
-		const resizeObserver = new ResizeObserver(() => {
-			scheduleDeferredFit();
-		});
+				terminal.focus();
 
-		if (wrapperRef.current) {
-			resizeObserver.observe(wrapperRef.current);
-		}
-		if (containerRef.current) {
-			resizeObserver.observe(containerRef.current);
-		}
+				terminal.onData((data) => {
+					wsRef.current?.send({ type: "input", data });
+				});
 
-		resizeObserverRef.current = resizeObserver;
+				terminal.onResize(({ cols, rows }) => {
+					const nextSize = normalizeTerminalSize(cols, rows);
+					if (!nextSize) return;
+					const previousSize = lastSentSizeRef.current;
+					if (
+						previousSize &&
+						previousSize.cols === nextSize.cols &&
+						previousSize.rows === nextSize.rows
+					) {
+						return;
+					}
+					lastSentSizeRef.current = nextSize;
+					wsRef.current?.send({ type: "resize", cols, rows });
+				});
 
-		connectWebSocket(initialSize);
+				const resizeObserver = new ResizeObserver(() => {
+					scheduleDeferredFit();
+				});
 
-		scheduleDeferredFit();
-		window.addEventListener("resize", scheduleDeferredFit);
+				if (wrapperRef.current) {
+					resizeObserver.observe(wrapperRef.current);
+				}
+				if (containerRef.current) {
+					resizeObserver.observe(containerRef.current);
+				}
 
-		const fontSet = document.fonts;
-		if (fontSet) {
-			void fontSet.ready.then(() => {
+				resizeObserverRef.current = resizeObserver;
+
+				connectWebSocket(initialSize);
+
 				scheduleDeferredFit();
-			});
-		}
+				window.addEventListener("resize", scheduleDeferredFit);
+
+				const fontSet = document.fonts;
+				if (fontSet) {
+					void fontSet.ready.then(() => {
+						scheduleDeferredFit();
+					});
+				}
+			} catch (err) {
+				if (!cancelled) {
+					setErrorMessage("Failed to load terminal library");
+				}
+			}
+		})();
 
 		return () => {
-			resizeObserver.disconnect();
+			cancelled = true;
+			resizeObserverRef.current?.disconnect();
 			window.removeEventListener("resize", scheduleDeferredFit);
 			clearDeferredFits();
 			resizeObserverRef.current = null;
-			terminal.dispose();
+			terminalRef.current?.dispose();
 			terminalRef.current = null;
 			fitAddonRef.current = null;
 			lastSentSizeRef.current = null;
@@ -302,6 +322,11 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
 			data-testid="terminal-wrapper"
 			sx={{ position: "relative", display: "flex", flex: 1, width: "100%", height: "100%", overflow: "hidden" }}
 		>
+			{xtermLoading && (
+				<div className="terminal-loading" role="status" aria-live="polite">
+					Loading terminal…
+				</div>
+			)}
 			<div
 				ref={containerRef}
 				className="terminal-container"

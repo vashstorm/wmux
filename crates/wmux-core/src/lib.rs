@@ -24,3 +24,6 @@ pub fn version() -> &'static str {
         None => env!("CARGO_PKG_VERSION"),
     }
 }
+
+#[cfg(test)]
+mod test_utils;

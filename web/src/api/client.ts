@@ -1,7 +1,7 @@
 import { ApiError, type ApiErrorResponse } from "./errors.js";
 import { getAuthToken, getBaseUrl } from "./runtime.js";
 
-async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T | null> {
 	const url = `${getBaseUrl()}${path}`;
 	const headers = new Headers(options.headers);
 
@@ -34,7 +34,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<unknow
 		return null;
 	}
 
-	return response.json();
+	return response.json() as Promise<T>;
 }
 
 export interface ConnectionConfig {
@@ -86,13 +86,14 @@ function toConfigConnectionPayload(conn: ConnectionConfig): RawConnectionConfig 
 	};
 }
 
-function normalizeAppConfig(config: any): AppConfig {
-	const omni = config.omni ?? config.voice;
+function normalizeAppConfig(config: RawAppConfig): AppConfig {
+	const { voice, ...rest } = config;
+	const omni = config.omni ?? voice;
 	return {
-		...config,
+		...rest,
 		omni,
 		path: config.path ?? ".",
-		connections: (config.connections as RawConnectionConfig[] | undefined ?? [])
+		connections: (config.connections ?? [])
 			.map(normalizeConnectionConfig)
 			.filter((connection) => connection.targetName.length > 0),
 	};
@@ -104,6 +105,11 @@ function toConfigPayload(config: AppConfig): Omit<AppConfig, "connections"> & { 
 		connections: (config.connections ?? []).map(toConfigConnectionPayload),
 	};
 }
+
+// Raw config format from API (may have legacy field names)
+type RawAppConfig = AppConfig & {
+	voice?: OmniConfig; // legacy alias for omni
+};
 
 export interface ConnectionsListResponse {
 	data: ConnectionConfig[];
@@ -359,65 +365,65 @@ export interface AiStatsCleanupResponse {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-	return (await apiFetch("/api/health")) as HealthResponse;
+	return (await apiFetch<HealthResponse>("/api/health"))!;
 }
 
 export async function listSkills(): Promise<OmniSkillDef[]> {
-	const response = (await apiFetch("/api/skills")) as SkillsListResponse;
+	const response = (await apiFetch<SkillsListResponse>("/api/skills"))!;
 	return response.data ?? [];
 }
 
 export async function getSkill(id: string): Promise<OmniSkillDef> {
-	return (await apiFetch(`/api/skills/${encodeURIComponent(id)}`)) as OmniSkillDef;
+	return (await apiFetch<OmniSkillDef>(`/api/skills/${encodeURIComponent(id)}`))!;
 }
 
 export async function createSkill(skill: OmniSkillDef): Promise<OmniSkillDef> {
-	return (await apiFetch("/api/skills", {
+	return (await apiFetch<OmniSkillDef>("/api/skills", {
 		method: "POST",
 		body: JSON.stringify(skill),
-	})) as OmniSkillDef;
+	}))!;
 }
 
 export async function updateSkill(id: string, skill: OmniSkillDef): Promise<OmniSkillDef> {
-	return (await apiFetch(`/api/skills/${encodeURIComponent(id)}`, {
+	return (await apiFetch<OmniSkillDef>(`/api/skills/${encodeURIComponent(id)}`, {
 		method: "PUT",
 		body: JSON.stringify(skill),
-	})) as OmniSkillDef;
+	}))!;
 }
 
 export async function deleteSkill(id: string): Promise<void> {
-	await apiFetch(`/api/skills/${encodeURIComponent(id)}`, {
+	await apiFetch<void>(`/api/skills/${encodeURIComponent(id)}`, {
 		method: "DELETE",
 	});
 }
 
 export async function listConnections(): Promise<ConnectionConfig[]> {
-	const response = (await apiFetch("/api/connections")) as ConnectionsListResponse;
+	const response = (await apiFetch<ConnectionsListResponse>("/api/connections"))!;
 	return (response.data ?? [])
 		.map(normalizeConnectionConfig)
 		.filter((connection) => connection.targetName.length > 0);
 }
 
 export async function createConnection(data: Omit<ConnectionConfig, "targetName">): Promise<ConnectionConfig> {
-	return normalizeConnectionConfig((await apiFetch("/api/connections", {
+	return normalizeConnectionConfig((await apiFetch<RawConnectionConfig>("/api/connections", {
 		method: "POST",
 		body: JSON.stringify(data),
-	})) as RawConnectionConfig);
+	}))!);
 }
 
 export async function getConnection(targetName: string): Promise<ConnectionConfig> {
-	return normalizeConnectionConfig((await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`)) as RawConnectionConfig);
+	return normalizeConnectionConfig((await apiFetch<RawConnectionConfig>(`/api/connections/${encodeURIComponent(targetName)}`))!);
 }
 
 export async function updateConnection(targetName: string, data: ConnectionConfig): Promise<ConnectionConfig> {
-	return normalizeConnectionConfig((await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
+	return normalizeConnectionConfig((await apiFetch<RawConnectionConfig>(`/api/connections/${encodeURIComponent(targetName)}`, {
 		method: "PUT",
 		body: JSON.stringify(data),
-	})) as RawConnectionConfig);
+	}))!);
 }
 
 export async function deleteConnection(targetName: string): Promise<void> {
-	await apiFetch(`/api/connections/${encodeURIComponent(targetName)}`, {
+	await apiFetch<void>(`/api/connections/${encodeURIComponent(targetName)}`, {
 		method: "DELETE",
 	});
 }
@@ -566,16 +572,20 @@ function normalizePaneInfo(pane: RawPaneInfo): PaneInfo {
 	};
 }
 
+type WindowsListRawResponse = Omit<WindowsListResponse, "data"> & { data?: RawWindowInfo[] };
+
 export async function listWindows(targetName: string, sessionName: string): Promise<WindowsListResponse> {
-	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows`)) as Omit<WindowsListResponse, "data"> & { data?: RawWindowInfo[] };
+	const response = (await apiFetch<WindowsListRawResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows`))!;
 	return {
 		...response,
 		data: (response.data ?? []).map(normalizeWindowInfo),
 	};
 }
 
+type PanesListRawResponse = Omit<PanesListResponse, "data"> & { data?: RawPaneInfo[] };
+
 export async function listPanes(targetName: string, sessionName: string, windowId: string): Promise<PanesListResponse> {
-	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`)) as Omit<PanesListResponse, "data"> & { data?: RawPaneInfo[] };
+	const response = (await apiFetch<PanesListRawResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(sessionName)}/windows/${encodeURIComponent(windowId)}/panes`))!;
 	return {
 		...response,
 		data: (response.data ?? []).map(normalizePaneInfo),
@@ -600,44 +610,48 @@ type NormalizedSession = {
 	intelligenceAppCounts?: Record<string, number>;
 };
 
+type RawSessionItem = {
+	ID?: string;
+	Name?: string;
+	Attached?: boolean;
+	WindowCount?: number;
+	id?: string;
+	name?: string;
+	attached?: boolean;
+	windowCount?: number;
+	AttentionState?: "none" | "attention" | "explicit";
+	attentionState?: "none" | "attention" | "explicit";
+	AttentionCount?: number;
+	attentionCount?: number;
+	IntelligenceApp?: string;
+	intelligenceApp?: string;
+	IntelligenceStatus?: string;
+	intelligenceStatus?: string;
+	IntelligenceSummary?: string;
+	intelligenceSummary?: string;
+	IntelligenceSource?: string;
+	intelligenceSource?: string;
+	IntelligenceConfidence?: number;
+	intelligenceConfidence?: number;
+	IntelligenceStale?: boolean;
+	intelligenceStale?: boolean;
+	IntelligenceUpdatedAt?: string;
+	intelligenceUpdatedAt?: string;
+	IntelligenceError?: string;
+	intelligenceError?: string;
+	IntelligenceAppCounts?: Record<string, number>;
+	intelligenceAppCounts?: Record<string, number>;
+};
+
+type SessionsListRawResponse = {
+	targetName: string;
+	mode: string;
+	adapterPath?: string;
+	data: RawSessionItem[];
+};
+
 export async function listSessions(targetName: string): Promise<SessionsListResponse> {
-	const response = (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions`)) as {
-		targetName: string;
-		mode: string;
-		adapterPath?: string;
-		data: Array<{
-			ID?: string;
-			Name?: string;
-			Attached?: boolean;
-			WindowCount?: number;
-			id?: string;
-			name?: string;
-			attached?: boolean;
-			windowCount?: number;
-			AttentionState?: "none" | "attention" | "explicit";
-			attentionState?: "none" | "attention" | "explicit";
-			AttentionCount?: number;
-			attentionCount?: number;
-			IntelligenceApp?: string;
-			intelligenceApp?: string;
-			IntelligenceStatus?: string;
-			intelligenceStatus?: string;
-			IntelligenceSummary?: string;
-			intelligenceSummary?: string;
-			IntelligenceSource?: string;
-			intelligenceSource?: string;
-			IntelligenceConfidence?: number;
-			intelligenceConfidence?: number;
-			IntelligenceStale?: boolean;
-			intelligenceStale?: boolean;
-			IntelligenceUpdatedAt?: string;
-			intelligenceUpdatedAt?: string;
-			IntelligenceError?: string;
-			intelligenceError?: string;
-			IntelligenceAppCounts?: Record<string, number>;
-			intelligenceAppCounts?: Record<string, number>;
-		}>;
-	};
+	const response = (await apiFetch<SessionsListRawResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions`))!;
 	return {
 		...response,
 		data: (response.data ?? [])
@@ -668,36 +682,36 @@ export async function listSessions(targetName: string): Promise<SessionsListResp
 }
 
 export async function createSession(targetName: string, name: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions`, {
 		method: "POST",
 		body: JSON.stringify({ name }),
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function killSession(targetName: string, session: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
 		method: "DELETE",
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function renameSession(targetName: string, session: string, newName: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}`, {
 		method: "PATCH",
 		body: JSON.stringify({ name: newName }),
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function createWindow(targetName: string, session: string, name: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows`, {
 		method: "POST",
 		body: JSON.stringify({ name }),
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function killWindow(targetName: string, session: string, window: string): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}`, {
 		method: "DELETE",
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function splitPane(
@@ -707,10 +721,10 @@ export async function splitPane(
 	pane: string,
 	horizontal: boolean,
 ): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}/split`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}/split`, {
 		method: "POST",
 		body: JSON.stringify({ horizontal }),
-	})) as OperationResponse;
+	}))!;
 }
 
 export async function killPane(
@@ -719,9 +733,9 @@ export async function killPane(
 	window: string,
 	pane: string,
 ): Promise<OperationResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}`, {
+	return (await apiFetch<OperationResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/windows/${encodeURIComponent(window)}/panes/${encodeURIComponent(pane)}`, {
 		method: "DELETE",
-	})) as OperationResponse;
+	}))!;
 }
 
 export interface ConnectionHealth {
@@ -737,23 +751,23 @@ export interface ConnectionHealthListResponse {
 }
 
 export async function listConnectionHealth(): Promise<ConnectionHealth[]> {
-	const response = (await apiFetch("/api/connections/health")) as ConnectionHealthListResponse;
+	const response = (await apiFetch<ConnectionHealthListResponse>("/api/connections/health"))!;
 	return response.data ?? [];
 }
 
 export async function getConnectionHealth(targetName: string): Promise<ConnectionHealth> {
-	return (await apiFetch(`/api/connections/${encodeURIComponent(targetName)}/health`)) as ConnectionHealth;
+	return (await apiFetch<ConnectionHealth>(`/api/connections/${encodeURIComponent(targetName)}/health`))!;
 }
 
 export async function getConfig(): Promise<AppConfig> {
-	return normalizeAppConfig((await apiFetch("/api/config")) as AppConfig);
+	return normalizeAppConfig((await apiFetch<AppConfig>("/api/config"))!);
 }
 
 export async function updateConfig(data: AppConfig): Promise<AppConfig> {
-	return normalizeAppConfig((await apiFetch("/api/config", {
+	return normalizeAppConfig((await apiFetch<AppConfig>("/api/config", {
 		method: "PUT",
 		body: JSON.stringify(toConfigPayload(data)),
-	})) as AppConfig);
+	}))!);
 }
 
 export interface SessionIntelligence {
@@ -778,18 +792,18 @@ export interface AnalyzeSessionResponse {
 }
 
 export async function analyzeSession(targetName: string, session: string): Promise<AnalyzeSessionResponse> {
-	return (await apiFetch(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/analyze`, {
+	return (await apiFetch<AnalyzeSessionResponse>(`/api/targets/${encodeURIComponent(targetName)}/sessions/${encodeURIComponent(session)}/analyze`, {
 		method: "POST",
 		body: JSON.stringify({}),
-	})) as AnalyzeSessionResponse;
+	}))!;
 }
 
 export async function fetchErrorLogs(): Promise<ErrorLogsResponse> {
-	return (await apiFetch("/api/logs/errors")) as ErrorLogsResponse;
+	return (await apiFetch<ErrorLogsResponse>("/api/logs/errors"))!;
 }
 
 export async function clearErrorLogs(): Promise<void> {
-	await apiFetch("/api/logs/errors", {
+	await apiFetch<void>("/api/logs/errors", {
 		method: "DELETE",
 	});
 }
@@ -797,51 +811,51 @@ export async function clearErrorLogs(): Promise<void> {
 // --- Projects client functions ---
 
 export async function listProjects(): Promise<Project[]> {
-	const response = (await apiFetch("/api/projects")) as ProjectListResponse;
+	const response = (await apiFetch<ProjectListResponse>("/api/projects"))!;
 	return response.data ?? [];
 }
 
 export async function createProject(data: NewProject): Promise<Project> {
-	return (await apiFetch("/api/projects", {
+	return (await apiFetch<Project>("/api/projects", {
 		method: "POST",
 		body: JSON.stringify(data),
-	})) as Project;
+	}))!;
 }
 
 export async function getProject(id: string): Promise<Project> {
-	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}`)) as Project;
+	return (await apiFetch<Project>(`/api/projects/${encodeURIComponent(id)}`))!;
 }
 
 export async function updateProject(id: string, data: UpdateProject): Promise<Project> {
-	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}`, {
+	return (await apiFetch<Project>(`/api/projects/${encodeURIComponent(id)}`, {
 		method: "PUT",
 		body: JSON.stringify(data),
-	})) as Project;
+	}))!;
 }
 
 export async function deleteProject(id: string, killSession = false): Promise<void> {
 	const qs = killSession ? "?kill_session=true" : "";
-	await apiFetch(`/api/projects/${encodeURIComponent(id)}${qs}`, {
+	await apiFetch<void>(`/api/projects/${encodeURIComponent(id)}${qs}`, {
 		method: "DELETE",
 	});
 }
 
 export async function launchProject(id: string): Promise<ProjectActionResponse> {
-	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/launch`, {
+	return (await apiFetch<ProjectActionResponse>(`/api/projects/${encodeURIComponent(id)}/launch`, {
 		method: "POST",
-	})) as ProjectActionResponse;
+	}))!;
 }
 
 export async function syncProjectFromTmux(id: string): Promise<ProjectActionResponse> {
-	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/sync-from-tmux`, {
+	return (await apiFetch<ProjectActionResponse>(`/api/projects/${encodeURIComponent(id)}/sync-from-tmux`, {
 		method: "POST",
-	})) as ProjectActionResponse;
+	}))!;
 }
 
 export async function generateProjectAiHtml(id: string): Promise<Project> {
-	return (await apiFetch(`/api/projects/${encodeURIComponent(id)}/generate-ai-html`, {
+	return (await apiFetch<Project>(`/api/projects/${encodeURIComponent(id)}/generate-ai-html`, {
 		method: "POST",
-	})) as Project;
+	}))!;
 }
 
 // --- AI Stats client functions ---
@@ -865,7 +879,7 @@ export async function listAiStats(query: AiStatsQuery = {}): Promise<AiStatsResp
 	}
 	const qs = params.toString();
 	const path = qs ? `/api/ai/stats?${qs}` : "/api/ai/stats";
-	return (await apiFetch(path)) as AiStatsResponse;
+	return (await apiFetch<AiStatsResponse>(path))!;
 }
 
 export async function cleanupAiStats(query: Pick<AiStatsQuery, "projectId"> = {}): Promise<AiStatsCleanupResponse> {
@@ -875,7 +889,7 @@ export async function cleanupAiStats(query: Pick<AiStatsQuery, "projectId"> = {}
 	}
 	const qs = params.toString();
 	const path = qs ? `/api/ai/stats/cleanup?${qs}` : "/api/ai/stats/cleanup";
-	return (await apiFetch(path, { method: "POST" })) as AiStatsCleanupResponse;
+	return (await apiFetch<AiStatsCleanupResponse>(path, { method: "POST" }))!;
 }
 
 // --- Voice History client functions ---
@@ -895,7 +909,7 @@ export async function getOmniHistory(query: OmniHistoryQuery): Promise<OmniConve
 	if (query.before) {
 		params.set("before", query.before);
 	}
-	const response = (await apiFetch(`/api/voice/history?${params.toString()}`)) as OmniHistoryListResponse;
+	const response = (await apiFetch<OmniHistoryListResponse>(`/api/voice/history?${params.toString()}`))!;
 	return response.data ?? [];
 }
 
@@ -945,11 +959,11 @@ export async function listAiLogs(query: AiLogsQuery = {}): Promise<AiLogListResp
 	}
 	const qs = params.toString();
 	const path = qs ? `/api/ai/logs?${qs}` : "/api/ai/logs";
-	return (await apiFetch(path)) as AiLogListResponse;
+	return (await apiFetch<AiLogListResponse>(path))!;
 }
 
 export async function clearAiLogs(): Promise<void> {
-	await apiFetch("/api/ai/logs", {
+	await apiFetch<void>("/api/ai/logs", {
 		method: "DELETE",
 	});
 }

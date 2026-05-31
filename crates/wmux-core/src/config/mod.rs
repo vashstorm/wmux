@@ -10,6 +10,9 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod parser;
+pub(crate) use parser::strip_jsonc_comments;
+
 const DEFAULT_CONFIG_FILE_NAME: &str = "config.jsonc";
 const DEFAULT_KNOWN_HOSTS_PATH: &str = "~/.ssh/known_hosts";
 const DEFAULT_BASE_PATH: &str = ".";
@@ -593,67 +596,6 @@ pub fn parse_config(data: &str) -> Result<Config> {
     let mut config: Config = serde_json::from_str(&clean)?;
     config.normalize();
     Ok(config)
-}
-
-pub fn strip_jsonc_comments(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    let mut chars = input.chars().peekable();
-    let mut in_string = false;
-    let mut escaped = false;
-
-    while let Some(ch) = chars.next() {
-        if in_string {
-            out.push(ch);
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == '"' {
-                in_string = false;
-            }
-            continue;
-        }
-
-        if ch == '"' {
-            in_string = true;
-            out.push(ch);
-            continue;
-        }
-
-        if ch == '/' {
-            match chars.peek().copied() {
-                Some('/') => {
-                    let _ = chars.next();
-                    for next in chars.by_ref() {
-                        if next == '\n' {
-                            out.push('\n');
-                            break;
-                        }
-                    }
-                    continue;
-                }
-                Some('*') => {
-                    let _ = chars.next();
-                    let mut prev = '\0';
-                    for next in chars.by_ref() {
-                        if next == '\n' {
-                            out.push('\n');
-                        }
-                        if prev == '*' && next == '/' {
-                            break;
-                        }
-                        prev = next;
-                    }
-                    continue;
-                }
-                _ => {}
-            }
-        }
-
-        out.push(ch);
-    }
-
-    out
 }
 
 pub fn expand_user_path(path: &str) -> Result<String> {

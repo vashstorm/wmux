@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Dialog, DialogTitle, DialogContent, Button, TextField, Select, FormControl, InputLabel, Typography, Box, IconButton, Switch, FormControlLabel, Slider, Chip, CircularProgress, List, ListItemButton, Stack, Tooltip, SvgIcon } from "@mui/material";
 import { Add as AddIcon, Analytics as AnalyticsIcon, Close as CloseIcon, Delete as DeleteIcon, Edit as EditIcon, Extension as ExtensionIcon, Lan as LanIcon, Memory as MemoryIcon, SettingsOutlined as SettingsOutlinedIcon, SmartToy as SmartToyIcon, Star as StarIcon, TextFields as TextFieldsIcon, Remove as RemoveIcon, RestartAlt as RestartAltIcon } from "@mui/icons-material";
 import { getConfig, type AppConfig, type IntelligenceProviderConfig, type ConnectionConfig, type ConnectionHealth, type OmniSkillDef, updateConfig, deleteConnection, listConnectionHealth, connectionDisplayName, listSkills, createSkill, updateSkill, deleteSkill } from "../api/client.js";
+import { VoiceSettingsTab } from "./settings/VoiceSettingsTab.js";
 import { ApiError, getErrorMessage } from "../api/errors.js";
 import { useAppState } from "../state/store.js";
 import { applyUIScaleStep, clampUIScaleStep, normalizeTerminalFontWeight, VALID_TERMINAL_FONT_WEIGHTS, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, getUIFontBasePx, getTerminalFontPx, MIN_UI_SCALE_STEP, MAX_UI_SCALE_STEP } from "../ui/fontSize.js";
@@ -1621,40 +1622,11 @@ export function SettingsPanel() {
 													/>
 												</Box>
 
-										<Box>
-											<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Settings</Typography>
-											<Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-												<TextField
-													id="voice-voice"
-													label="Voice / Timbre"
-													type="text"
-													value={formState.omniVoice}
-													onChange={(event) => updateField("omniVoice", event.target.value)}
-													placeholder="Chelsie"
-													fullWidth
-													slotProps={{
-														htmlInput: {
-															"data-testid": "omni-voice-input",
-														},
-													}}
-												/>
-												<FormControlLabel
-													control={
-														<Switch
-															id="omni-microphone-disabled"
-															checked={formState.omniMicrophoneDisabled}
-															onChange={(event) => updateField("omniMicrophoneDisabled", event.target.checked)}
-															slotProps={{
-																input: {
-																	"data-testid": "omni-microphone-disabled-toggle",
-																} as React.InputHTMLAttributes<HTMLInputElement>,
-															}}
-														/>
-													}
-													label="Disable Microphone"
-												/>
-</Box>
-										</Box>
+<VoiceSettingsTab
+											omniVoice={formState.omniVoice}
+											omniMicrophoneDisabled={formState.omniMicrophoneDisabled}
+											updateField={updateField}
+										/>
 									</Box>
 								)}
 

@@ -730,3 +730,181 @@ describe("MainPanel", () => {
 		expect(screen.getByTestId("project-ai-generate-button")).toBeInTheDocument();
 	});
 });
+
+describe("visibility gating for active window sync", () => {
+	const setSelectedPane = vi.fn();
+	const setWindows = vi.fn();
+	const setPanes = vi.fn();
+	const setError = vi.fn();
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		setSelectedPane.mockClear();
+		setWindows.mockClear();
+		setPanes.mockClear();
+		setError.mockClear();
+		vi.mocked(listWindows).mockReset();
+		vi.mocked(listPanes).mockReset();
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+	});
+
+	afterEach(() => {
+		cleanup();
+		vi.useRealTimers();
+		vi.clearAllMocks();
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+	});
+
+	test("skips active window sync when document is hidden", async () => {
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [windowOne],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(2000);
+		});
+
+		expect(listWindows).not.toHaveBeenCalled();
+		expect(listPanes).not.toHaveBeenCalled();
+	});
+
+	test("resumes active window sync on visibility restore", async () => {
+		vi.mocked(listWindows).mockResolvedValue({
+			targetName: "conn-1",
+			session: "dev",
+			mode: "local",
+			data: [activeWindowTwo],
+		});
+		vi.mocked(listPanes).mockResolvedValue({
+			targetName: "conn-1",
+			session: "dev",
+			window: "@1",
+			mode: "local",
+			data: [activePaneThree],
+		});
+
+		vi.mocked(useAppState).mockReturnValue({
+			selectedPane,
+			selectedAiEvent: null,
+			selectedProject: null,
+			sessions: {
+				"conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "Waiting for input" }],
+			},
+			windows: {
+				"conn-1:dev": {
+					windows: [windowOne],
+					loadedPanes: {
+						"@1": [{
+							id: "%1",
+							title: "bash",
+							index: 0,
+							active: true,
+							width: 80,
+							height: 24,
+							left: 0,
+							top: 0,
+						}],
+					},
+					panesLoaded: true,
+				},
+			},
+			setSelectedPane,
+			setSelectedAiEvent: vi.fn(),
+			setWindows,
+			setPanes,
+			setError,
+			uiSettings: {
+				theme: "dark",
+				windowTheme: "dark",
+				fontSize: 16,
+				terminalFontSize: 14,
+				terminalFontWeight: "normal",
+			},
+		} as unknown as ReturnType<typeof useAppState>);
+
+		render(<MainPanel />);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1000);
+		});
+
+		expect(listWindows).toHaveBeenCalledTimes(1);
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(2000);
+		});
+
+		expect(listWindows).toHaveBeenCalledTimes(1);
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+
+		expect(listWindows).toHaveBeenCalledTimes(2);
+	});
+});

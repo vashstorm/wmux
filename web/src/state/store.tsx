@@ -223,6 +223,7 @@ export interface AppState {
 	showNewConnectionForm: boolean;
 	showSettingsPanel: boolean;
 	showErrorLogsPanel: boolean;
+	showAiAssistant: boolean;
 	errorLogCount: number;
 	configConflict: ConfigConflictState | null;
 	confirmDialog: ConfirmDialogState | null;
@@ -265,6 +266,7 @@ interface AppContextValue extends AppState {
 	setShowNewConnectionForm: (show: boolean) => void;
 	setShowSettingsPanel: (show: boolean) => void;
 	setShowErrorLogsPanel: (show: boolean) => void;
+	setShowAiAssistant: (show: boolean) => void;
 	setErrorLogCount: (count: number) => void;
 	setConfigConflict: (conflict: ConfigConflictState | null) => void;
 	setConfirmDialog: (dialog: ConfirmDialogState | null) => void;
@@ -300,6 +302,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const [showNewConnectionForm, setShowNewConnectionForm] = useState(false);
 	const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 	const [showErrorLogsPanel, setShowErrorLogsPanel] = useState(false);
+	const [showAiAssistant, setShowAiAssistantState] = useState(false);
 	const [errorLogCount, setErrorLogCount] = useState(0);
 	const [configConflict, setConfigConflict] = useState<ConfigConflictState | null>(null);
 	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -413,6 +416,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setOmniHistoryState(history);
 	}, []);
 
+	const setShowAiAssistant = useCallback((show: boolean) => {
+		setShowAiAssistantState(show);
+	}, []);
+
 	const setSelectedPane = useCallback((pane: SelectedPane | null) => {
 		setSelectedPaneState(pane);
 		if (pane !== null) {
@@ -447,6 +454,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		showNewConnectionForm,
 		showSettingsPanel,
 		showErrorLogsPanel,
+		showAiAssistant,
 		errorLogCount,
 		configConflict,
 		confirmDialog,
@@ -466,6 +474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		setShowNewConnectionForm,
 		setShowSettingsPanel,
 		setShowErrorLogsPanel,
+		setShowAiAssistant,
 		setErrorLogCount,
 		setConfigConflict,
 		setConfirmDialog,

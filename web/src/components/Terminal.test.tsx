@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { Terminal } from "./Terminal.js";
@@ -139,29 +139,36 @@ describe("Terminal", () => {
 		expect(screen.getByTestId("terminal")).toBeInTheDocument();
 	});
 
-	test("creates WebSocket connection when auth token exists in sessionStorage", () => {
+	test("creates WebSocket connection when auth token exists in sessionStorage", async () => {
 		sessionStorage.setItem("wmux-auth-token", "test-token");
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		await waitFor(() => {
+			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		});
 		expect(mockConnect).toHaveBeenCalledTimes(1);
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.token).toBe("test-token");
 	});
 
-	test("creates WebSocket connection even when auth token is missing from sessionStorage", () => {
+	test("creates WebSocket connection even when auth token is missing from sessionStorage", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		await waitFor(() => {
+			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		});
 		expect(mockConnect).toHaveBeenCalledTimes(1);
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.token).toBe("");
 		expect(screen.queryByText("Authentication token not found")).not.toBeInTheDocument();
 	});
 
-	test("passes correct pane parameters to WebSocket", () => {
+	test("passes correct pane parameters to WebSocket", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
+		await waitFor(() => {
+			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
+		});
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(callArgs.targetName).toBe("conn-1");
 		expect(callArgs.session).toBe("dev");
@@ -169,9 +176,12 @@ describe("Terminal", () => {
 		expect(callArgs.pane).toBe("%1");
 	});
 
-	test("passes fitted dimensions to WebSocket for the initial PTY size", () => {
+	test("passes fitted dimensions to WebSocket for the initial PTY size", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
+		await waitFor(() => {
+			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
+		});
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(mockProposeDimensions).toHaveBeenCalled();
 		expect(mockFit).not.toHaveBeenCalled();
@@ -179,24 +189,33 @@ describe("Terminal", () => {
 		expect(callArgs.rows).toBe(40);
 	});
 
-	test("uses fitted dimensions when tmux pane is wider than the viewport", () => {
+	test("uses fitted dimensions when tmux pane is wider than the viewport", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
 
+		await waitFor(() => {
+			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
+		});
 		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
 		expect(mockXTermResize).toHaveBeenCalledWith(120, 40);
 		expect(callArgs.cols).toBe(120);
 		expect(callArgs.rows).toBe(40);
 	});
 
-	test("redraws terminal after fitting the viewport", () => {
+	test("redraws terminal after fitting the viewport", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(mockXTermClearTextureAtlas).toHaveBeenCalled();
+		await waitFor(() => {
+			expect(mockXTermClearTextureAtlas).toHaveBeenCalled();
+		});
 		expect(mockXTermRefresh).toHaveBeenCalledWith(0, 23);
 	});
 
-	test("does not recreate WebSocket when pane identifiers are unchanged", () => {
+	test("does not recreate WebSocket when pane identifiers are unchanged", async () => {
 		const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
+		});
 
 		rerender(<Terminal selectedPane={{ ...mockSelectedPane }} />);
 
@@ -204,27 +223,35 @@ describe("Terminal", () => {
 		expect(mockClose).not.toHaveBeenCalled();
 	});
 
-	test("does not resend duplicate terminal resize dimensions", () => {
+	test("does not resend duplicate terminal resize dimensions", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(capturedOnResize).not.toBeNull();
+		await waitFor(() => {
+			expect(capturedOnResize).not.toBeNull();
+		});
 		capturedOnResize!({ cols: 120, rows: 40 });
 
 		expect(mockWsSend).not.toHaveBeenCalled();
 	});
 
-	test("sends terminal resize when dimensions change", () => {
+	test("sends terminal resize when dimensions change", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(capturedOnResize).not.toBeNull();
+		await waitFor(() => {
+			expect(capturedOnResize).not.toBeNull();
+		});
 		capturedOnResize!({ cols: 119, rows: 39 });
 
 		expect(mockWsSend).toHaveBeenCalledTimes(1);
 		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 39 });
 	});
 
-test("uses Unicode 11 width tables for CJK terminal output", () => {
+test("uses Unicode 11 width tables for CJK terminal output", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		const xtermInstance = vi.mocked(XTerm).mock.results[0]!.value;
@@ -237,8 +264,12 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		expect(xtermInstance.unicode.activeVersion).toBe("11");
 	});
 
-	test("uses the mapped palette for non-default window themes", () => {
+	test("uses the mapped palette for non-default window themes", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.theme).toMatchObject({
@@ -248,9 +279,13 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		});
 	});
 
-	test("uses ui windowTheme for the terminal palette when no prop is provided", () => {
+	test("uses ui windowTheme for the terminal palette when no prop is provided", async () => {
 		mockUISettings = { ...mockUISettings, theme: "light", windowTheme: "dark" };
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.theme).toMatchObject({
@@ -268,50 +303,73 @@ test("uses Unicode 11 width tables for CJK terminal output", () => {
 		expect(screen.getByTestId("terminal-wrapper").style.backgroundColor).toBe("rgb(245, 247, 251)");
 	});
 
-	test("writes output data to xterm when receiving output message", () => {
+	test("writes output data to xterm when receiving output message", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
 
-		expect(capturedOnMessage).not.toBeNull();
+		await waitFor(() => {
+			expect(capturedOnMessage).not.toBeNull();
+		});
+
 		capturedOnMessage!({ type: "output", data: "hello world" });
 
 		expect(mockXTermWrite).toHaveBeenCalledTimes(1);
 		expect(mockXTermWrite).toHaveBeenCalledWith("hello world");
 	});
 
-	test("does not write connection status messages into the terminal buffer", () => {
+	test("does not write connection status messages into the terminal buffer", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(capturedOnMessage).not.toBeNull();
+		});
 
 		capturedOnMessage!({ type: "status", status: "connected" });
 
 		expect(mockXTermWriteln).not.toHaveBeenCalled();
 	});
 
-	test("derives terminal fontSize from uiScaleStep step 0 → 17px", () => {
+	test("derives terminal fontSize from uiScaleStep step 0 → 17px", async () => {
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.fontSize).toBe(17);
 	});
 
-	test("derives terminal fontSize from uiScaleStep step 4 → 20px", () => {
+	test("derives terminal fontSize from uiScaleStep step 4 → 20px", async () => {
 		mockUISettings.uiScaleStep = 4;
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.fontSize).toBe(20);
 	});
 
-	test("derives terminal fontSize from uiScaleStep step -4 → 14px", () => {
+	test("derives terminal fontSize from uiScaleStep step -4 → 14px", async () => {
 		mockUISettings.uiScaleStep = -4;
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.fontSize).toBe(14);
 	});
 
-	test("applies terminalFontWeight to xterm options", () => {
+	test("applies terminalFontWeight to xterm options", async () => {
 		mockUISettings.terminalFontWeight = "bold";
 		render(<Terminal selectedPane={mockSelectedPane} />);
+
+		await waitFor(() => {
+			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
+		});
 
 		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
 		expect(xtermOptions.fontWeight).toBe("bold");

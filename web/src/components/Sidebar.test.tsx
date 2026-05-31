@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { Sidebar } from "./Sidebar.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { AppProvider, useAppState } from "../state/store.js";
@@ -675,6 +675,7 @@ describe("Projects view", () => {
 		render(<TestWrapper><Sidebar /><SelectedPaneChecker /></TestWrapper>);
 		fireEvent.click(screen.getByTestId("open-projects-button"));
 		await waitFor(() => expect(screen.getByTestId("project-item-p1")).toBeInTheDocument());
+		await waitFor(() => expect(mockListConnections).toHaveBeenCalled());
 
 		fireEvent.click(screen.getByTestId("project-open-session-p1"));
 
@@ -828,5 +829,139 @@ describe("Session Card Icons and Association Confirmation", () => {
 			});
 			expect(screen.getByTestId("projects-view")).toBeInTheDocument();
 		});
+	});
+});
+
+describe("visibility gating for sidebar polling", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.clearAllMocks();
+		mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }]);
+		mockListConnectionHealth.mockResolvedValue([]);
+		mockListSessions.mockResolvedValue({
+			targetName: "conn1",
+			mode: "local",
+			data: [{ name: "session1" }],
+		});
+		mockFetchErrorLogs.mockResolvedValue({ enabled: true, path: "/tmp/wmux-error.log", lines: [], truncated: false, maxLines: 1000 });
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.clearAllMocks();
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+	});
+
+	test("skips session sync polling when document is hidden", async () => {
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5000);
+		});
+
+		expect(mockListSessions).toHaveBeenCalledTimes(0);
+	});
+
+	test("skips error log badge polling when document is hidden", async () => {
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(15000);
+		});
+
+		expect(mockFetchErrorLogs).toHaveBeenCalledTimes(0);
+	});
+
+	test("resumes session sync polling on visibility restore", async () => {
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(3000);
+		});
+
+		const initialCallCount = mockListSessions.mock.calls.length;
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(3000);
+		});
+
+		expect(mockListSessions.mock.calls.length).toBe(initialCallCount);
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+
+		expect(mockListSessions.mock.calls.length).toBeGreaterThan(initialCallCount);
+	});
+
+	test("resumes error log badge polling on visibility restore", async () => {
+		render(<TestWrapper><Sidebar /></TestWrapper>);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(11000);
+		});
+
+		const initialCallCount = mockFetchErrorLogs.mock.calls.length;
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "hidden",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(15000);
+		});
+
+		expect(mockFetchErrorLogs.mock.calls.length).toBe(initialCallCount);
+
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			writable: true,
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+
+		expect(mockFetchErrorLogs.mock.calls.length).toBeGreaterThan(initialCallCount);
 	});
 });

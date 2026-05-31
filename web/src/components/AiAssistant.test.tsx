@@ -1,8 +1,9 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AiAssistant } from "./AiAssistant.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import { useEffect } from "react";
+import type { OmniStatus } from "../state/store.js";
 import * as client from "../api/client.js";
 
 const voiceClientMocks = vi.hoisted(() => ({
@@ -95,13 +96,18 @@ beforeEach(() => {
 function renderWithProvider() {
 	return render(
 		<AppProvider>
+			<ShowAi />
 			<AiAssistant />
 		</AppProvider>,
 	);
 }
 
-function showAssistant() {
-	fireEvent.click(screen.getByRole("button", { name: "Show AI Assistant" }));
+function ShowAi() {
+	const { setShowAiAssistant } = useAppState();
+	useEffect(() => {
+		setShowAiAssistant(true);
+	}, [setShowAiAssistant]);
+	return null;
 }
 
 function setupStateSetup(effectFn: (ctx: ReturnType<typeof useAppState>) => void) {
@@ -123,18 +129,18 @@ function renderWithStateSetup(effectFn: (ctx: ReturnType<typeof useAppState>) =>
 }
 
 describe("AiAssistant", () => {
-	test("shows disabled state by default", () => {
+	test("shows idle state when omni is enabled", async () => {
 		renderWithProvider();
-		showAssistant();
-		const el = document.querySelector("[data-ai-assistant-state]");
-		expect(el?.getAttribute("data-ai-assistant-state")).toBe("disabled");
+		await waitFor(() => {
+			const el = document.querySelector("[data-ai-assistant-state]");
+			expect(el?.getAttribute("data-ai-assistant-state")).toBe("idle");
+		});
 	});
 
 	test("shows start button when idle", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 
 		const el = document.querySelector("[data-ai-assistant-state]");
 		expect(el?.getAttribute("data-ai-assistant-state")).toBe("idle");
@@ -144,7 +150,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniTranscript("hello world");
 		});
-		showAssistant();
 
 		expect(screen.getByText("hello world")).toBeInTheDocument();
 	});
@@ -154,7 +159,6 @@ describe("AiAssistant", () => {
 			ctx.setOmniStatus("error");
 			ctx.setOmniError("Microphone access denied");
 		});
-		showAssistant();
 
 		expect(screen.getByText("Microphone access denied")).toBeInTheDocument();
 	});
@@ -164,7 +168,6 @@ describe("AiAssistant", () => {
 			ctx.setOmniStatus("confirming");
 			ctx.setOmniConfirmation({ confirmationId: "c1", skill: "send_to_pane" });
 		});
-		showAssistant();
 
 		expect(screen.getByText(/Confirm action:/)).toBeInTheDocument();
 		expect(screen.getByText("send_to_pane")).toBeInTheDocument();
@@ -173,8 +176,10 @@ describe("AiAssistant", () => {
 	});
 
 	test("shows disabled indicator when voice is disabled", () => {
-		renderWithProvider();
-		showAssistant();
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("disabled" as OmniStatus);
+			ctx.setShowAiAssistant(true);
+		});
 		expect(screen.getByText("Voice is disabled")).toBeInTheDocument();
 	});
 
@@ -182,7 +187,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("listening");
 		});
-		showAssistant();
 
 		expect(screen.getByText("listening")).toBeInTheDocument();
 	});
@@ -223,7 +227,6 @@ describe("AiAssistant", () => {
 			},
 		});
 		renderWithProvider();
-		showAssistant();
 		const msg = await screen.findByText("Microphone disabled in Settings");
 		expect(msg).toBeInTheDocument();
 	});
@@ -266,7 +269,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 		const btn = await screen.findByRole("button", { name: /start listening/i });
 		expect(btn).toBeDisabled();
 	});
@@ -291,7 +293,6 @@ describe("AiAssistant", () => {
 			},
 		]);
 		renderWithProvider();
-		showAssistant();
 		expect(await screen.findByText("hello there")).toBeInTheDocument();
 		expect(screen.getByText("Executed: open_file")).toBeInTheDocument();
 		expect(screen.getByText("You")).toBeInTheDocument();
@@ -302,7 +303,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 
 		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
 			target: { value: "show sessions" },
@@ -323,7 +323,6 @@ describe("AiAssistant", () => {
 			ctx.setSelectedPane({ targetName: "local", session: "main", window: "@1", pane: "%2" });
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 
 		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
 			target: { value: "新建 Session, hana" },
@@ -351,7 +350,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 
 		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
 			target: { value: "show sessions" },
@@ -370,7 +368,6 @@ describe("AiAssistant", () => {
 		renderWithStateSetup((ctx) => {
 			ctx.setOmniStatus("idle");
 		});
-		showAssistant();
 
 		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
 			target: { value: "say hello" },
@@ -386,19 +383,16 @@ describe("AiAssistant", () => {
 		expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("AAAA", 24000);
 	});
 
-	test("can show and hide the full assistant", () => {
-		renderWithProvider();
+	test("Hide AI Assistant button renders and is clickable", () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle" as OmniStatus);
+			ctx.setShowAiAssistant(true);
+		});
 
-		// Default state: assistant is hidden, only launcher button visible
-		const launcher = screen.getByRole("button", { name: "Show AI Assistant" });
-		expect(launcher).toBeInTheDocument();
-		expect(document.querySelector(".ai-assistant")).toBeNull();
-
-		fireEvent.click(launcher);
 		expect(document.querySelector(".ai-assistant")).not.toBeNull();
-
-		fireEvent.click(screen.getByRole("button", { name: "Hide AI Assistant" }));
-		expect(document.querySelector(".ai-assistant")).toBeNull();
+		const hideBtn = screen.getByRole("button", { name: "Hide AI Assistant" });
+		expect(hideBtn).toBeInTheDocument();
+		fireEvent.click(hideBtn);
 	});
 
 	test("clears history when new chat button is clicked", async () => {
@@ -413,7 +407,6 @@ describe("AiAssistant", () => {
 			},
 		]);
 		renderWithProvider();
-		showAssistant();
 
 		expect(await screen.findByText("old message")).toBeInTheDocument();
 

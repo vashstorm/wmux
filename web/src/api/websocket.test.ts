@@ -130,9 +130,14 @@ describe("TerminalWebSocket", () => {
 		const socket = createSocket({ onError });
 		socket.connect();
 
+		mockWs.readyState = WebSocket.CONNECTING;
 		const event = new Event("error");
 		mockWs.onerror?.(event);
-		expect(onError).toHaveBeenCalledWith(event);
+
+		expect(onError).toHaveBeenCalledTimes(1);
+		const arg = onError.mock.calls[0]![0];
+		expect(arg.event).toBe(event);
+		expect(arg.readyState).toBe(WebSocket.CONNECTING);
 	});
 
 	test("queues messages before connection is open", () => {
@@ -178,38 +183,59 @@ describe("TerminalWebSocket", () => {
 	});
 
 	test("attempts reconnect with exponential backoff", () => {
+		const originalRandom = Math.random;
+		Object.defineProperty(globalThis.Math, "random", { value: () => 0 });
+
 		const socket = createSocket();
 		socket.connect();
+		expect(WebSocket).toHaveBeenCalledTimes(1);
 
 		mockWs.readyState = WebSocket.OPEN;
 		mockWs.onopen?.();
-
 		mockWs.onclose?.();
-		expect(WebSocket).toHaveBeenCalledTimes(1);
 
-		vi.advanceTimersByTime(1000);
+		vi.advanceTimersByTime(501);
 		expect(WebSocket).toHaveBeenCalledTimes(2);
 
+		mockWs.readyState = WebSocket.OPEN;
+		mockWs.onopen?.();
 		mockWs.onclose?.();
-		vi.advanceTimersByTime(2000);
+
+		vi.advanceTimersByTime(1001);
 		expect(WebSocket).toHaveBeenCalledTimes(3);
+
+		mockWs.readyState = WebSocket.OPEN;
+		mockWs.onopen?.();
+		mockWs.onclose?.();
+
+		vi.advanceTimersByTime(2001);
+		expect(WebSocket).toHaveBeenCalledTimes(4);
+
+		Object.defineProperty(globalThis.Math, "random", { value: originalRandom });
 	});
 
 	test("stops reconnecting after max attempts", () => {
+		const originalRandom = Math.random;
+		Object.defineProperty(globalThis.Math, "random", { value: () => 0 });
+
 		const socket = createSocket();
 		socket.connect();
+		expect(WebSocket).toHaveBeenCalledTimes(1);
 
 		mockWs.readyState = WebSocket.OPEN;
 		mockWs.onopen?.();
 
-		for (let i = 0; i < 4; i++) {
+		for (let i = 0; i < 5; i++) {
 			mockWs.onclose?.();
-			vi.advanceTimersByTime(1000 * (i + 1));
+			vi.advanceTimersByTime(60000);
 		}
 
 		mockWs.onclose?.();
-		vi.advanceTimersByTime(10000);
-		expect(WebSocket).toHaveBeenCalledTimes(4);
+		vi.advanceTimersByTime(60000);
+
+		expect(WebSocket).toHaveBeenCalledTimes(6);
+
+		Object.defineProperty(globalThis.Math, "random", { value: originalRandom });
 	});
 
 	test("close prevents reconnect", () => {
@@ -282,5 +308,71 @@ describe("TerminalWebSocket", () => {
 
 		mockWs.onclose?.();
 		expect(socket.isConnected()).toBe(false);
+	});
+
+	test("queue drains exactly once after reconnect", () => {
+		const onOpen = vi.fn();
+		const socket = createSocket({ onOpen });
+		socket.connect();
+
+		socket.send({ type: "input", data: "queued" });
+
+		mockWs.readyState = WebSocket.OPEN;
+		mockWs.onopen?.();
+		socket.send({ type: "input", data: "trigger" });
+
+		expect(mockWs.send).toHaveBeenCalledTimes(2);
+		expect(onOpen).toHaveBeenCalledTimes(1);
+
+		mockWs.onclose?.();
+
+		mockWs.readyState = WebSocket.CONNECTING;
+		mockWs = {
+			readyState: WebSocket.CONNECTING,
+			send: vi.fn(),
+			close: vi.fn(),
+			onopen: null,
+			onmessage: null,
+			onclose: null,
+			onerror: null,
+		};
+		vi.mocked(WebSocket).mockImplementation(() => mockWs as unknown as WebSocket);
+
+		socket.connect();
+
+		mockWs.readyState = WebSocket.OPEN;
+		mockWs.onopen?.();
+
+		expect(mockWs.send).not.toHaveBeenCalled();
+		expect(onOpen).toHaveBeenCalledTimes(2);
+	});
+
+	test("no reconnect after explicit disconnect", () => {
+		const socket = createSocket();
+		socket.connect();
+
+		mockWs.readyState = WebSocket.OPEN;
+		mockWs.onopen?.();
+
+		socket.disconnect();
+
+		mockWs.onclose?.();
+		vi.advanceTimersByTime(10000);
+		expect(WebSocket).toHaveBeenCalledTimes(1);
+	});
+
+	test("onerror callback includes useful error info", () => {
+		const onError = vi.fn();
+		const socket = createSocket({ onError });
+		socket.connect();
+
+		mockWs.readyState = WebSocket.CONNECTING;
+		const event = new Event("error");
+		mockWs.onerror?.(event);
+
+		expect(onError).toHaveBeenCalledTimes(1);
+		const arg = onError.mock.calls[0]![0];
+		expect(arg.event).toBe(event);
+		expect(arg.readyState).toBe(WebSocket.CONNECTING);
 	});
 });

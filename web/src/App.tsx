@@ -1,5 +1,6 @@
 import "./styles/global.css";
 import "./styles/layout.css";
+import "./styles/overlays.css";
 import "./styles/components.css";
 import "./styles/fonts.css";
 
@@ -22,6 +23,7 @@ import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
 import { AiAssistant } from "./components/AiAssistant.js";
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js";
 import { normalizeThemeId } from "./ui/themes.js";
+import AssistantIcon from "@mui/icons-material/Assistant";
 
 function UISettingsInit() {
 	const { setUISettings } = useAppState();
@@ -66,7 +68,7 @@ function MuiThemeShell({ children }: { children: React.ReactNode }) {
 }
 
 function ThemeToggle() {
-	const { uiSettings, setUISettings } = useAppState();
+	const { uiSettings, setUISettings, setError } = useAppState();
 	const isDark = uiSettings.theme === "dark";
 	const updatingRef = useRef(false);
 
@@ -79,8 +81,8 @@ function ThemeToggle() {
 			const config = await getConfig();
 			config.ui.theme = newTheme;
 			await updateConfig(config);
-		} catch (err) {
-			console.error("Failed to persist theme:", err);
+		} catch {
+			setError({ code: "persist_failed", message: "Failed to persist theme" });
 		} finally {
 			updatingRef.current = false;
 		}
@@ -142,7 +144,7 @@ function LightTerminalIcon() {
 }
 
 function TerminalThemeToggle() {
-	const { uiSettings, setUISettings } = useAppState();
+	const { uiSettings, setUISettings, setError } = useAppState();
 	const isDark = uiSettings.windowTheme === "dark";
 	const updatingRef = useRef(false);
 
@@ -155,8 +157,8 @@ function TerminalThemeToggle() {
 			const config = await getConfig();
 			config.ui.windowTheme = newTheme;
 			await updateConfig(config);
-		} catch (err) {
-			console.error("Failed to persist terminal theme:", err);
+		} catch {
+			setError({ code: "persist_failed", message: "Failed to persist terminal theme" });
 		} finally {
 			updatingRef.current = false;
 		}
@@ -184,6 +186,29 @@ function WorkspaceNavigationSync() {
 	return null;
 }
 
+export function PanelVisibility() {
+	const { showSettingsPanel, showErrorLogsPanel, showNewConnectionForm, editingConnection, showAiAssistant, setShowAiAssistant, omniStatus } = useAppState();
+
+	return (
+		<>
+			{(showNewConnectionForm || editingConnection) && <NewConnectionForm />}
+			{showSettingsPanel && <SettingsPanel />}
+			{showErrorLogsPanel && <ErrorLogsPanel />}
+			{omniStatus !== "disabled" && showAiAssistant && <AiAssistant />}
+			{omniStatus !== "disabled" && !showAiAssistant && (
+				<button
+					type="button"
+					className="voice-launcher"
+					aria-label="Show AI Assistant"
+					onClick={() => setShowAiAssistant(true)}
+				>
+					<AssistantIcon fontSize="small" />
+				</button>
+			)}
+		</>
+	);
+}
+
 export function App() {
 	return (
 		<AppProvider>
@@ -199,10 +224,7 @@ export function App() {
 						<MainPanel />
 					<ErrorBanner />
 					<ConfirmDialog />
-					<NewConnectionForm />
-					<SettingsPanel />
-					<ErrorLogsPanel />
-					<AiAssistant />
+					<PanelVisibility />
 				</div>
 			</MuiThemeShell>
 		</AppProvider>

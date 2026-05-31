@@ -6,7 +6,6 @@ import StopIcon from "@mui/icons-material/Stop";
 import ReplayIcon from "@mui/icons-material/Replay";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
-import AssistantIcon from "@mui/icons-material/Assistant";
 import SendIcon from "@mui/icons-material/Send";
 import { getAuthToken, getRuntimeFlags } from "../api/runtime.js";
 import { OmniWebSocket } from "../api/voiceClient.js";
@@ -69,6 +68,7 @@ export function AiAssistant() {
 		setOmniConfirmation,
 		setOmniError,
 		setShowSettingsPanel,
+		setShowAiAssistant,
 		connections,
 		selectedTargetName,
 		selectedPane,
@@ -86,7 +86,6 @@ export function AiAssistant() {
 	const [history, setHistory] = useState<OmniConversationMessage[]>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
-	const [isHidden, setIsHidden] = useState(true);
 
 	const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
 		const targetName = selectedPane?.targetName ?? selectedTargetName;
@@ -446,19 +445,6 @@ export function AiAssistant() {
 	const visibleHistory = history.slice(-10);
 	const showEmptyState = !historyLoading && visibleHistory.length === 0 && !omniTranscript && !omniError && !omniPendingConfirmation;
 
-	if (isHidden) {
-		return (
-			<button
-				type="button"
-				className="voice-launcher"
-				aria-label="Show AI Assistant"
-				onClick={() => setIsHidden(false)}
-			>
-				<AssistantIcon fontSize="small" />
-			</button>
-		);
-	}
-
 	return (
 		<div className="ai-assistant" data-ai-assistant-state={omniStatus}>
 			<div className="voice-header">
@@ -480,7 +466,7 @@ export function AiAssistant() {
 					type="button"
 					className="voice-btn voice-btn--ghost"
 					aria-label="Hide AI Assistant"
-					onClick={() => setIsHidden(true)}
+					onClick={() => setShowAiAssistant(false)}
 				>
 					<CloseIcon fontSize="small" />
 				</button>

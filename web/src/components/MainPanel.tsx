@@ -155,8 +155,10 @@ export function MainPanel() {
 
 		let cancelled = false;
 		let inFlight = false;
+		const intervalIdRef = { current: 0 };
 
 		const syncActiveWindow = async () => {
+			if (document.visibilityState === "hidden") return;
 			if (cancelled || inFlight) return;
 
 			inFlight = true;
@@ -191,13 +193,40 @@ export function MainPanel() {
 			}
 		};
 
-		const intervalId = window.setInterval(() => {
-			void syncActiveWindow();
-		}, ACTIVE_WINDOW_SYNC_INTERVAL_MS);
+		const startInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+			}
+			const id = window.setInterval(() => {
+				void syncActiveWindow();
+			}, ACTIVE_WINDOW_SYNC_INTERVAL_MS);
+			intervalIdRef.current = id;
+		};
+
+		const stopInterval = () => {
+			if (intervalIdRef.current !== 0) {
+				window.clearInterval(intervalIdRef.current);
+				intervalIdRef.current = 0;
+			}
+		};
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === "hidden") {
+				stopInterval();
+			} else if (document.visibilityState === "visible") {
+				void syncActiveWindow();
+				startInterval();
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+
+		startInterval();
 
 		return () => {
 			cancelled = true;
-			window.clearInterval(intervalId);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			stopInterval();
 		};
 	}, [selectedPane, setPanes, setWindows]);
 
@@ -206,6 +235,7 @@ export function MainPanel() {
 
 		let cancelled = false;
 		const loadInitialPanes = async () => {
+			if (document.visibilityState === "hidden") return;
 			try {
 				const panesResponse = await listPanes(
 					selectedPane.targetName,

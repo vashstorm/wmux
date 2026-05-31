@@ -1,0 +1,45 @@
+@import './tokens.css';
+
+/* ==========================================================================
+   Overlay & Backdrop Shared Styles — Extracted from components.css
+   ========================================================================== */
+
+/* --- Keyframes --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* --- Pattern A: Full-viewport modal overlays with glassmorphic backdrop ---
+   Used by: confirm-dialog-overlay, new-connection-form-overlay,
+            settings-panel-overlay, error-logs-panel-overlay
+   Only z-index differs per variant (set in components.css). */
+:is(.confirm-dialog-overlay,
+    .new-connection-form-overlay,
+    .settings-panel-overlay,
+    .error-logs-panel-overlay) {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(8, 12, 20, 0.4);
+  backdrop-filter: var(--color-glass-blur);
+  -webkit-backdrop-filter: var(--color-glass-blur);
+  animation: fadeIn var(--transition-fast) forwards;
+}
+
+/* --- Pattern B: Terminal disconnected overlay (absolute, within container) --- */
+.terminal-disconnected-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-dropdown);
+  background-color: rgba(13, 17, 23, 0.7);
+  backdrop-filter: blur(6px);
+  transition: all var(--transition-base);
+}
+
+

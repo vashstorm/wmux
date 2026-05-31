@@ -22,7 +22,7 @@ export interface TerminalWebSocketOptions {
 	onMessage: (message: ServerMessage) => void;
 	onOpen?: () => void;
 	onClose?: () => void;
-	onError?: (error: Event) => void;
+	onError?: (error: { event: Event; target: string; readyState: number }) => void;
 }
 
 export class TerminalWebSocket {
@@ -31,9 +31,11 @@ export class TerminalWebSocket {
 	private writeLock = false;
 	private writeQueue: ClientMessage[] = [];
 	private reconnectAttempts = 0;
-	private maxReconnectAttempts = 3;
-	private reconnectDelay = 1000;
+	private maxReconnectAttempts = 5;
+	private baseDelay = 1000;
+	private maxDelay = 30000;
 	private closed = false;
+	private disconnected = false;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(options: TerminalWebSocketOptions) {
@@ -41,7 +43,7 @@ export class TerminalWebSocket {
 	}
 
 	connect(): void {
-		if (this.closed || this.ws) {
+		if (this.closed || this.disconnected || this.ws) {
 			return;
 		}
 
@@ -59,6 +61,9 @@ export class TerminalWebSocket {
 		this.ws = new WebSocket(url);
 
 		this.ws.onopen = () => {
+			if (this.reconnectAttempts > 0) {
+				this.flushQueue();
+			}
 			this.reconnectAttempts = 0;
 			this.options.onOpen?.();
 		};
@@ -73,7 +78,7 @@ export class TerminalWebSocket {
 		};
 
 		this.ws.onclose = () => {
-			const shouldReconnect = !this.closed;
+			const shouldReconnect = !this.closed && !this.disconnected;
 			this.ws = null;
 
 			if (!shouldReconnect) {
@@ -84,15 +89,22 @@ export class TerminalWebSocket {
 
 			if (this.reconnectAttempts < this.maxReconnectAttempts) {
 				this.reconnectAttempts++;
+				const base = Math.min(this.baseDelay * Math.pow(2, this.reconnectAttempts - 1), this.maxDelay);
+				const delay = base * (0.5 + Math.random() * 0.5);
 				this.reconnectTimer = setTimeout(() => {
 					this.reconnectTimer = null;
 					this.connect();
-				}, this.reconnectDelay * this.reconnectAttempts);
+				}, delay);
 			}
 		};
 
 		this.ws.onerror = (event) => {
-			this.options.onError?.(event);
+			const errInfo = {
+				event,
+				target: "ws",
+				readyState: this.ws ? this.ws.readyState : -1,
+			};
+			this.options.onError?.(errInfo);
 		};
 	}
 
@@ -129,6 +141,11 @@ export class TerminalWebSocket {
 		if (this.writeQueue.length > 0) {
 			this.flushQueue();
 		}
+	}
+
+	disconnect(): void {
+		this.disconnected = true;
+		this.close();
 	}
 
 	close(): void {
