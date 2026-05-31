@@ -1,12 +1,11 @@
-import { Typography, Box, TextField, FormControlLabel, Switch } from "@mui/material";
+import { Typography, Box, TextField } from "@mui/material";
 
 interface VoiceSettingsTabProps {
 	omniVoice: string;
-	omniMicrophoneDisabled: boolean;
-	updateField: (key: "omniVoice" | "omniMicrophoneDisabled", value: string | boolean) => void;
+	updateField: (key: "omniVoice", value: string) => void;
 }
 
-export function VoiceSettingsTab({ omniVoice, omniMicrophoneDisabled, updateField }: VoiceSettingsTabProps) {
+export function VoiceSettingsTab({ omniVoice, updateField }: VoiceSettingsTabProps) {
 	return (
 		<Box>
 			<Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Voice Settings</Typography>
@@ -24,17 +23,6 @@ export function VoiceSettingsTab({ omniVoice, omniMicrophoneDisabled, updateFiel
 							"data-testid": "omni-voice-input",
 						},
 					}}
-				/>
-				<FormControlLabel
-					control={
-						<Switch
-							id="omni-microphone-disabled"
-							checked={omniMicrophoneDisabled}
-							onChange={(event) => updateField("omniMicrophoneDisabled", event.target.checked)}
-							data-testid="omni-microphone-disabled-toggle"
-						/>
-					}
-					label="Disable Microphone"
 				/>
 			</Box>
 		</Box>

@@ -26,7 +26,7 @@ import { normalizeThemeId } from "./ui/themes.js";
 import AssistantIcon from "@mui/icons-material/Assistant";
 
 function UISettingsInit() {
-	const { setUISettings } = useAppState();
+	const { setUISettings, setOmniStatus } = useAppState();
 
 	useEffect(() => {
 		void getConfig().then((config) => {
@@ -44,8 +44,12 @@ function UISettingsInit() {
 
 			applyUIScaleStep(uiScaleStep);
 			setUISettings({ theme, windowTheme, uiScaleStep, terminalFontSize, terminalFontWeight });
+
+			// Initialize omni/AI assistant availability so voice-launcher button
+			// can render before AiAssistant mounts (avoids chicken-and-egg).
+			setOmniStatus(config.omni?.enabled ? "idle" : "disabled");
 		}).catch(() => undefined);
-	}, [setUISettings]);
+	}, [setUISettings, setOmniStatus]);
 
 	return null;
 }

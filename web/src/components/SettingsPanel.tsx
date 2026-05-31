@@ -1624,7 +1624,6 @@ export function SettingsPanel() {
 
 <VoiceSettingsTab
 											omniVoice={formState.omniVoice}
-											omniMicrophoneDisabled={formState.omniMicrophoneDisabled}
 											updateField={updateField}
 										/>
 									</Box>

@@ -468,8 +468,8 @@ export function WindowTabs({
 									? (theme) => hasNonDefaultStatus
 										? statusTone.softBorderColor
 										: theme.palette.mode === "dark"
-											? "rgba(107, 130, 245, 0.32)"
-											: "rgba(79, 107, 237, 0.22)"
+											? "rgba(107, 130, 245, 0.5)"
+											: "rgba(79, 107, 237, 0.45)"
 									: "transparent",
 								color: isActive
 									? hasNonDefaultStatus ? statusTone.color : "primary.main"
@@ -483,8 +483,8 @@ export function WindowTabs({
 												theme.palette.mode === "dark" ? "0 4px 16px rgba(0,0,0,0.5)" : "0 2px 8px rgba(0,0,0,0.10)",
 											].join(", ")
 										: theme.palette.mode === "dark"
-											? "0 2px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(107,130,245,0.2)"
-											: "0 2px 8px rgba(0,0,0,0.10), 0 0 0 1px rgba(79,107,237,0.14)"
+											? "0 2px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(107,130,245,0.35)"
+											: "0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px rgba(79,107,237,0.25)"
 									: "none",
 								transition: "all 180ms cubic-bezier(0.34, 1.56, 0.64, 1)",
 								"&:hover": {
@@ -496,8 +496,8 @@ export function WindowTabs({
 									borderColor: hasNonDefaultStatus
 										? statusTone.softBorderColor
 										: (theme) => theme.palette.mode === "dark"
-											? "rgba(107,130,245,0.22)"
-											: "rgba(79,107,237,0.16)",
+											? "rgba(107,130,245,0.38)"
+											: "rgba(79,107,237,0.3)",
 									transform: "translateY(-1px)",
 									color: isActive ? undefined : "text.primary",
 								},
