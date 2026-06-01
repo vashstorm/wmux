@@ -167,6 +167,7 @@ impl OmniSkillExecutor {
             "rename_session" => self.rename_session(params).await,
             "delete_session" => self.delete_session(params, false).await,
             "send_to_pane" => self.send_to_pane(params, false).await,
+            "new_chat" => self.new_chat(params).await,
             "get_current_focus" => self.get_current_focus(params).await,
             "read_pane_output" => self.read_pane_output(params).await,
             "get_config" => self.get_config(params).await,
@@ -304,15 +305,39 @@ impl OmniSkillExecutor {
             )));
         }
 
+        let mut event_params = serde_json::Map::new();
+        event_params.insert("route".to_string(), Value::String(route.clone()));
+        for field in [
+            "target_name",
+            "targetName",
+            "session",
+            "session_name",
+            "sessionName",
+            "window",
+            "window_name",
+            "windowName",
+            "pane",
+            "pane_index",
+            "paneIndex",
+            "project_id",
+            "projectId",
+            "project_name",
+            "projectName",
+        ] {
+            if let Some(value) = params.get(field).cloned() {
+                event_params.insert(field.to_string(), value);
+            }
+        }
+
         let event = OmniServerEvent::IntentReceived {
             skill: "navigate_frontend".to_string(),
-            params: json!({ "route": route }),
+            params: Value::Object(event_params.clone()),
             confirmation_required: false,
             confirmation_id: None,
         };
         Ok(OmniSkillExecution {
             event,
-            output: json!({ "success": true, "route": route }),
+            output: json!({ "success": true, "params": Value::Object(event_params) }),
         })
     }
 
@@ -456,6 +481,22 @@ impl OmniSkillExecutor {
                     "window": window,
                     "pane": pane,
                 }
+            }),
+        })
+    }
+
+    async fn new_chat(&self, _params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let params = json!({});
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::IntentReceived {
+                skill: "new_chat".to_string(),
+                params: params.clone(),
+                confirmation_required: false,
+                confirmation_id: None,
+            },
+            output: json!({
+                "success": true,
+                "action": "new_chat",
             }),
         })
     }
@@ -1080,6 +1121,7 @@ fn skill_name(skill: &OmniSkill) -> &'static str {
         OmniSkill::SendToPane => "send_to_pane",
         OmniSkill::ConfirmAction => "confirm_action",
         OmniSkill::CancelAction => "cancel_action",
+        OmniSkill::NewChat => "new_chat",
         OmniSkill::GetCurrentFocus => "get_current_focus",
         OmniSkill::ReadPaneOutput => "read_pane_output",
         OmniSkill::GetConfig => "get_config",
@@ -2015,6 +2057,29 @@ esac
 
         assert_eq!(error.code, "bad_request");
     }
+
+    #[tokio::test]
+    async fn executor_new_chat_returns_frontend_intent() {
+        let test = test_executor();
+        let result = test
+            .executor
+            .execute("new_chat", json!({}))
+            .await
+            .expect("new_chat");
+
+        assert_eq!(
+            result.event,
+            OmniServerEvent::IntentReceived {
+                skill: "new_chat".to_string(),
+                params: json!({}),
+                confirmation_required: false,
+                confirmation_id: None,
+            }
+        );
+        assert_eq!(result.output["success"], true);
+        assert_eq!(result.output["action"], "new_chat");
+    }
+
     #[tokio::test]
     async fn executor_list_sessions_returns_session_list() {
         let test = test_executor();
@@ -2819,6 +2884,7 @@ esac
                 "send_to_pane",
                 json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0", "text": "hello" }),
             ),
+            ("new_chat", json!({})),
             ("get_current_focus", json!({})),
             (
                 "read_pane_output",

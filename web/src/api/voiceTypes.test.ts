@@ -249,6 +249,7 @@ describe("voiceTypes", () => {
       expect(isValidVoiceSkill("send_to_pane")).toBe(true)
       expect(isValidVoiceSkill("confirm_action")).toBe(true)
       expect(isValidVoiceSkill("cancel_action")).toBe(true)
+      expect(isValidVoiceSkill("new_chat")).toBe(true)
     })
 
     it("rejects non-string types", () => {

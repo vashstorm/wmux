@@ -163,6 +163,7 @@ Wmux ships with predefined voice skills. Skill prompts live under the grouped `s
 | Skill ID | What it does |
 |----------|-------------|
 | `navigate_frontend` | Navigate to different UI views |
+| `new_chat` | Start a new AI Assistant chat |
 | `invoke_backend_route` | Call backend API endpoints |
 | `list_sessions` | List active tmux sessions |
 | `create_session` | Create a new tmux session |

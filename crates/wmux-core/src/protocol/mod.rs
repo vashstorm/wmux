@@ -144,6 +144,8 @@ pub enum OmniSkill {
     ConfirmAction,
     /// Cancel a pending dangerous action.
     CancelAction,
+    /// Start a new AI Assistant chat.
+    NewChat,
     /// Read the currently focused connection/session/window/pane from the UI.
     GetCurrentFocus,
     /// Read the last N lines of output from a tmux pane.
@@ -530,6 +532,10 @@ mod tests {
             serde_json::to_value(OmniSkill::DeleteSession).expect("serialize"),
             serde_json::json!("delete_session")
         );
+        assert_eq!(
+            serde_json::to_value(OmniSkill::NewChat).expect("serialize"),
+            serde_json::json!("new_chat")
+        );
     }
 
     #[test]
@@ -541,6 +547,10 @@ mod tests {
         let skill: OmniSkill =
             serde_json::from_value(serde_json::json!("send_to_pane")).expect("deserialize");
         assert_eq!(skill, OmniSkill::SendToPane);
+
+        let skill: OmniSkill =
+            serde_json::from_value(serde_json::json!("new_chat")).expect("deserialize");
+        assert_eq!(skill, OmniSkill::NewChat);
     }
 
     #[test]

@@ -188,6 +188,30 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                         "type": "string",
                         "enum": VOICE_FRONTEND_ROUTES,
                         "description": "Target frontend route/page."
+                    },
+                    "target_name": {
+                        "type": "string",
+                        "description": "Target connection name when selecting a session, window, or pane. Defaults to current focus when omitted."
+                    },
+                    "session_name": {
+                        "type": "string",
+                        "description": "Session name to select for session/window/pane navigation, or project-associated session for project lookup."
+                    },
+                    "window_name": {
+                        "type": "string",
+                        "description": "Window ID, name, or index to select for window/pane navigation."
+                    },
+                    "pane_index": {
+                        "type": "string",
+                        "description": "Pane ID or index to select for pane navigation."
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID to open when route is projects."
+                    },
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name to open when route is projects."
                     }
                 },
                 "required": ["route"]
@@ -343,6 +367,16 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                     }
                 },
                 "required": ["confirmation_id"]
+            }),
+        ),
+        builtin_skill(
+            "new_chat",
+            "New Chat",
+            OmniSkillRiskLevel::Safe,
+            "Start a new AI Assistant chat by clearing the current assistant conversation view and saved voice history. This does not affect tmux sessions, windows, panes, projects, config, or AI Logs.",
+            json!({
+                "type": "object",
+                "properties": {}
             }),
         ),
         builtin_skill(

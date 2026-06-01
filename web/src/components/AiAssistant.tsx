@@ -39,7 +39,15 @@ import {
   getConfig,
   getOmniHistory,
   clearOmniHistory,
+  getProject,
+  listPanes,
+  listProjects,
+  listSessions,
+  listWindows,
   type OmniConversationMessage,
+  type PaneInfo,
+  type Project,
+  type WindowInfo,
 } from "../api/client.js"
 import "../styles/ai-assistant.css"
 
@@ -225,6 +233,73 @@ function createAudioPipeline(): AudioPipeline {
   return new AudioPipeline(AUDIO_PIPELINE_CONFIG)
 }
 
+type VoiceIntentParams = Record<string, unknown>
+
+function stringParam(params: VoiceIntentParams, fields: string[]): string | null {
+  for (const field of fields) {
+    const value = params[field]
+    if (typeof value === "string" && value.trim()) {
+      return value.trim()
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value)
+    }
+  }
+  return null
+}
+
+function matchesText(value: string, query: string): boolean {
+  return value.toLowerCase() === query.toLowerCase()
+}
+
+function findWindow(windows: WindowInfo[], query: string | null): WindowInfo | undefined {
+  if (!query) return windows.find((windowInfo) => windowInfo.Active) ?? windows[0]
+  return (
+    windows.find(
+      (windowInfo) =>
+        windowInfo.ID === query ||
+        matchesText(windowInfo.Name, query) ||
+        String(windowInfo.Index) === query,
+    ) ??
+    windows.find((windowInfo) => windowInfo.Active) ??
+    windows[0]
+  )
+}
+
+function findPane(panes: PaneInfo[], query: string | null): PaneInfo | undefined {
+  if (!query) return panes.find((paneInfo) => paneInfo.Active) ?? panes[0]
+  return (
+    panes.find((paneInfo) => paneInfo.ID === query || String(paneInfo.Index) === query) ??
+    panes.find((paneInfo) => paneInfo.Active) ??
+    panes[0]
+  )
+}
+
+function findProject(projects: Project[], params: VoiceIntentParams): Project | undefined {
+  const projectId = stringParam(params, ["project_id", "projectId"])
+  if (projectId) {
+    return projects.find((project) => project.id === projectId)
+  }
+
+  const projectName = stringParam(params, ["project_name", "projectName", "name"])
+  if (projectName) {
+    return projects.find((project) => matchesText(project.name, projectName))
+  }
+
+  const sessionName = stringParam(params, ["session", "session_name", "sessionName"])
+  if (sessionName) {
+    return projects.find(
+      (project) => project.sessionName === sessionName || matchesText(project.name, sessionName),
+    )
+  }
+
+  return undefined
+}
+
+function emitSidebarNavigation(route: string): void {
+  window.dispatchEvent(new CustomEvent("wmux:navigate-sidebar", { detail: { route } }))
+}
+
 export function AiAssistant() {
   const {
     omniStatus,
@@ -236,11 +311,20 @@ export function AiAssistant() {
     setOmniTranscript,
     setOmniConfirmation,
     setOmniError,
+    setError,
     setShowSettingsPanel,
+    setShowNewConnectionForm,
+    setShowErrorLogsPanel,
     setShowAiAssistant,
     connections,
     selectedTargetName,
     selectedPane,
+    setSelectedTargetName,
+    setSessions,
+    setWindows,
+    setPanes,
+    setSelectedPane,
+    setSelectedProject,
   } = useAppState()
 
   const audioLevel = useRef(0)
@@ -444,6 +528,178 @@ export function AiAssistant() {
     })
   }, [])
 
+  const openWorkspaceTarget = useCallback(
+    async (params: VoiceIntentParams) => {
+      const targetName =
+        stringParam(params, ["target_name", "targetName"]) ??
+        selectedPane?.targetName ??
+        selectedTargetName
+      const sessionName = stringParam(params, ["session", "session_name", "sessionName"])
+
+      if (!targetName || !sessionName) {
+        setError({
+          code: "voice_navigation_failed",
+          message: "Target and session are required to open a workspace item",
+        })
+        return
+      }
+
+      const windowQuery = stringParam(params, ["window", "window_name", "windowName"])
+      const paneQuery = stringParam(params, ["pane", "pane_index", "paneIndex"])
+
+      try {
+        setSelectedTargetName(targetName)
+
+        const sessionsResponse = await listSessions(targetName)
+        setSessions(targetName, sessionsResponse.data ?? [])
+
+        const windowsResponse = await listWindows(targetName, sessionName)
+        const windows = windowsResponse.data ?? []
+        setWindows(targetName, sessionName, windows)
+
+        const selectedWindow = findWindow(windows, windowQuery)
+        if (!selectedWindow) {
+          setSelectedPane({ targetName, session: sessionName })
+          return
+        }
+
+        const panesResponse = await listPanes(targetName, sessionName, selectedWindow.ID)
+        const panes = panesResponse.data ?? []
+        setPanes(targetName, sessionName, selectedWindow.ID, panes)
+
+        const selectedPaneInfo = findPane(panes, paneQuery)
+        setSelectedPane({
+          targetName,
+          session: sessionName,
+          window: selectedWindow.ID,
+          pane: selectedPaneInfo?.ID,
+        })
+      } catch (error) {
+        setError({
+          code: "voice_navigation_failed",
+          message: error instanceof Error ? error.message : "Failed to open workspace item",
+        })
+      }
+    },
+    [
+      selectedPane,
+      selectedTargetName,
+      setError,
+      setPanes,
+      setSelectedPane,
+      setSelectedTargetName,
+      setSessions,
+      setWindows,
+    ],
+  )
+
+  const openProjectTarget = useCallback(
+    async (params: VoiceIntentParams) => {
+      const projectId = stringParam(params, ["project_id", "projectId"])
+
+      try {
+        const project = projectId
+          ? await getProject(projectId)
+          : findProject(await listProjects(), params)
+        if (project) {
+          setSelectedProject(project)
+        } else if (
+          stringParam(params, [
+            "project_name",
+            "projectName",
+            "name",
+            "session",
+            "session_name",
+            "sessionName",
+          ]) !== null
+        ) {
+          setError({
+            code: "voice_navigation_failed",
+            message: "Project not found",
+          })
+        }
+      } catch (error) {
+        setError({
+          code: "voice_navigation_failed",
+          message: error instanceof Error ? error.message : "Failed to open project",
+        })
+      }
+    },
+    [setError, setSelectedProject],
+  )
+
+  const handleFrontendIntent = useCallback(
+    (skill: string, params: VoiceIntentParams) => {
+      if (skill === "new_chat") {
+        void handleNewChat()
+        return
+      }
+
+      if (skill === "get_current_focus") {
+        if (wsRef.current?.isConnected()) {
+          sendSessionContext(wsRef.current)
+        }
+        return
+      }
+
+      if (skill === "focus_pane") {
+        emitSidebarNavigation("session")
+        void openWorkspaceTarget(params)
+        return
+      }
+
+      if (skill !== "navigate_frontend") return
+
+      const route = stringParam(params, ["route"]) ?? ""
+      if (route === "settings") {
+        setShowSettingsPanel(true)
+        window.history.pushState(null, "", `${window.location.pathname}?view=settings`)
+        return
+      }
+
+      if (route === "connections") {
+        setShowNewConnectionForm(true)
+        return
+      }
+
+      if (route === "home") {
+        setShowSettingsPanel(false)
+        setShowErrorLogsPanel(false)
+        setSelectedProject(null)
+        setSelectedPane(null)
+        window.history.replaceState(null, "", window.location.pathname)
+        return
+      }
+
+      if (route === "projects" || route === "project") {
+        emitSidebarNavigation("projects")
+        void openProjectTarget(params)
+        return
+      }
+
+      if (route === "session" || route === "window" || route === "pane") {
+        emitSidebarNavigation("session")
+        if (stringParam(params, ["session", "session_name", "sessionName"])) {
+          void openWorkspaceTarget(params)
+        }
+        return
+      }
+
+      emitSidebarNavigation(route)
+    },
+    [
+      handleNewChat,
+      openProjectTarget,
+      openWorkspaceTarget,
+      sendSessionContext,
+      setSelectedPane,
+      setSelectedProject,
+      setShowErrorLogsPanel,
+      setShowNewConnectionForm,
+      setShowSettingsPanel,
+    ],
+  )
+
   const handleServerMessage = useCallback(
     (event: OmniServerEvent) => {
       if (isVoiceConnectedEvent(event)) {
@@ -478,15 +734,7 @@ export function AiAssistant() {
       }
 
       if (isVoiceIntentReceivedEvent(event)) {
-        if (event.skill === "navigate_frontend") {
-          const route = typeof event.params.route === "string" ? event.params.route : ""
-          if (route === "settings") {
-            setShowSettingsPanel(true)
-            window.history.pushState(null, "", `${window.location.pathname}?view=settings`)
-          } else {
-            window.dispatchEvent(new CustomEvent("wmux:navigate-sidebar", { detail: { route } }))
-          }
-        }
+        handleFrontendIntent(event.skill, event.params)
         if (event.confirmationRequired && event.confirmationId) {
           setOmniConfirmation({
             confirmationId: event.confirmationId,
@@ -583,7 +831,7 @@ export function AiAssistant() {
       setOmniConfirmation,
       setOmniError,
       setOmniStatus,
-      setShowSettingsPanel,
+      handleFrontendIntent,
     ],
   )
 

@@ -26,6 +26,11 @@ vi.mock("../api/client.js", () => ({
   getConfig: vi.fn(),
   getOmniHistory: vi.fn(),
   clearOmniHistory: vi.fn().mockResolvedValue(undefined),
+  getProject: vi.fn(),
+  listPanes: vi.fn(),
+  listProjects: vi.fn(),
+  listSessions: vi.fn(),
+  listWindows: vi.fn(),
 }))
 
 vi.mock("../api/voiceClient.js", () => ({
@@ -69,6 +74,7 @@ beforeEach(() => {
   audioPipelineMocks.startCapture.mockClear()
   audioPipelineMocks.stopCapture.mockClear()
   audioPipelineMocks.stopPlayback.mockClear()
+  vi.mocked(client.clearOmniHistory).mockClear()
   vi.mocked(client.getConfig).mockResolvedValue({
     schemaVersion: 1,
     path: ".",
@@ -104,6 +110,65 @@ beforeEach(() => {
     },
   })
   vi.mocked(client.getOmniHistory).mockResolvedValue([])
+  vi.mocked(client.getProject).mockResolvedValue({
+    id: "proj-1",
+    name: "Project One",
+    path: "/tmp/project-one",
+    description: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    sessionName: "project-one",
+    status: "idle",
+    workdir: "",
+    layoutJson: "",
+    detailsJson: "",
+    progressJson: "",
+    aiHtml: "",
+    aiStatus: "",
+    aiError: "",
+    lastSyncedAt: null,
+    schemaVersion: 1,
+  })
+  vi.mocked(client.listProjects).mockResolvedValue([])
+  vi.mocked(client.listSessions).mockResolvedValue({
+    targetName: "local",
+    mode: "local",
+    data: [{ name: "dev" }],
+  })
+  vi.mocked(client.listWindows).mockResolvedValue({
+    targetName: "local",
+    session: "dev",
+    mode: "local",
+    data: [
+      {
+        ID: "@1",
+        Name: "editor",
+        Index: 0,
+        Active: true,
+        PaneCount: 1,
+        ActivePaneID: "%1",
+        ActivePaneTitle: "bash",
+      },
+    ],
+  })
+  vi.mocked(client.listPanes).mockResolvedValue({
+    targetName: "local",
+    session: "dev",
+    window: "@1",
+    mode: "local",
+    data: [
+      {
+        ID: "%1",
+        Title: "bash",
+        Index: 0,
+        Active: true,
+        Width: 80,
+        Height: 24,
+        Left: 0,
+        Top: 0,
+      },
+    ],
+  })
 })
 
 function renderWithProvider() {
@@ -138,6 +203,31 @@ function renderWithStateSetup(effectFn: (ctx: ReturnType<typeof useAppState>) =>
   return render(
     <AppProvider>
       <Setup />
+      <AiAssistant />
+    </AppProvider>,
+  )
+}
+
+function StateProbe() {
+  const { selectedPane, selectedProject } = useAppState()
+  return (
+    <>
+      <div data-testid="selected-pane">
+        {selectedPane
+          ? `${selectedPane.targetName}/${selectedPane.session}/${selectedPane.window ?? ""}/${selectedPane.pane ?? ""}`
+          : "none"}
+      </div>
+      <div data-testid="selected-project">{selectedProject?.id ?? "none"}</div>
+    </>
+  )
+}
+
+function renderWithStateSetupAndProbe(effectFn: (ctx: ReturnType<typeof useAppState>) => void) {
+  const Setup = setupStateSetup(effectFn)
+  return render(
+    <AppProvider>
+      <Setup />
+      <StateProbe />
       <AiAssistant />
     </AppProvider>,
   )
@@ -526,6 +616,133 @@ describe("AiAssistant", () => {
       type: "text_message",
       text: "新建 Session, hana",
     })
+  })
+
+  test("navigates to a specific session from navigate_frontend intent", async () => {
+    renderWithStateSetupAndProbe((ctx) => {
+      ctx.setConnections([{ id: "local", targetName: "local", type: "local" }])
+      ctx.setSelectedTargetName("local")
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "open dev session" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "intent_received",
+        skill: "navigate_frontend",
+        params: { route: "session", target_name: "local", session_name: "dev" },
+        confirmationRequired: false,
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-pane")).toHaveTextContent("local/dev/@1/%1")
+    })
+    expect(client.listWindows).toHaveBeenCalledWith("local", "dev")
+    expect(client.listPanes).toHaveBeenCalledWith("local", "dev", "@1")
+  })
+
+  test("opens a specific project from navigate_frontend intent", async () => {
+    renderWithStateSetupAndProbe((ctx) => {
+      ctx.setConnections([{ id: "local", targetName: "local", type: "local" }])
+      ctx.setSelectedTargetName("local")
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "open project one" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "intent_received",
+        skill: "navigate_frontend",
+        params: { route: "projects", project_id: "proj-1" },
+        confirmationRequired: false,
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-project")).toHaveTextContent("proj-1")
+    })
+    expect(client.getProject).toHaveBeenCalledWith("proj-1")
+  })
+
+  test("sends context when get_current_focus intent arrives", () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setConnections([{ id: "local", targetName: "local", type: "local" }])
+      ctx.setSelectedTargetName("local")
+      ctx.setSelectedPane({ targetName: "local", session: "main", window: "@1", pane: "%2" })
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "where am I" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+    voiceClientMocks.send.mockClear()
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "intent_received",
+        skill: "get_current_focus",
+        params: {},
+        confirmationRequired: false,
+      })
+    })
+
+    expect(voiceClientMocks.send).toHaveBeenCalledWith({
+      type: "session_context",
+      target: {
+        targetName: "local",
+        session: "main",
+        window: "@1",
+        pane: "%2",
+      },
+      connectionType: "local",
+    })
+  })
+
+  test("starts a new chat from new_chat intent", async () => {
+    vi.mocked(client.getOmniHistory).mockResolvedValueOnce([
+      {
+        id: "msg-1",
+        conversationId: "default",
+        role: "user",
+        kind: "transcript",
+        text: "old message",
+        createdAt: "2026-05-28T10:00:00Z",
+      },
+    ])
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    expect(await screen.findByText("old message")).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "new chat" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "intent_received",
+        skill: "new_chat",
+        params: {},
+        confirmationRequired: false,
+      })
+    })
+
+    expect(client.clearOmniHistory).toHaveBeenCalledOnce()
+    await screen.findByText("Ask AI with your voice")
+    expect(screen.queryByText("old message")).not.toBeInTheDocument()
+    expect(screen.queryByText("new chat")).not.toBeInTheDocument()
   })
 
   test("sends typed text messages when wmux auth token is empty on localhost", () => {
