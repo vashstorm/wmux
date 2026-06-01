@@ -1,10 +1,10 @@
-import { TextField, InputAdornment, Box } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
-import { alpha } from "@mui/material/styles";
+import { TextField, InputAdornment, Box } from "@mui/material"
+import SearchIcon from "@mui/icons-material/Search"
+import { alpha } from "@mui/material/styles"
 
 interface SessionSearchProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string
+  onChange: (value: string) => void
 }
 
 export function SessionSearch({ value, onChange }: SessionSearchProps) {
@@ -69,5 +69,5 @@ export function SessionSearch({ value, onChange }: SessionSearchProps) {
         }}
       />
     </Box>
-  );
+  )
 }

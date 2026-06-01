@@ -1389,6 +1389,8 @@ fn test_generate_qwen_tools() {
             "required": ["target_name", "session_name"]
         }),
         full_prompt: String::new(),
+        source_file: None,
+        source_order: None,
     }];
     let tools = generate_qwen_tools(&skill_defs);
     assert_eq!(tools.len(), 1);

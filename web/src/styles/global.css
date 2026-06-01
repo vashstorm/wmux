@@ -1,129 +1,132 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap');
-@import './tokens.css';
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap");
+@import "./tokens.css";
 
 /* --- Box-sizing reset --- */
 *,
 *::before,
 *::after {
-	box-sizing: border-box;
-	margin: 0;
-	padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html {
-	font-size: var(--font-size-base);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	text-rendering: optimizeLegibility;
-	scroll-behavior: smooth;
+  font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
 }
 
 body {
-	font-family: var(--font-stack);
-	line-height: var(--line-height-normal);
-	letter-spacing: var(--letter-spacing-normal);
-	min-height: 100vh;
-	overflow: hidden;
-	background-color: var(--color-background);
-	color: var(--color-text);
+  font-family: var(--font-stack);
+  line-height: var(--line-height-normal);
+  letter-spacing: var(--letter-spacing-normal);
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: var(--color-background);
+  color: var(--color-text);
 }
 
 #root {
-	width: 100vw;
-	height: 100vh;
-	overflow: hidden;
-	position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
 }
 
 /* --- Typography utilities --- */
-h1, h2, h3, h4, h5, h6 {
-	font-weight: var(--font-weight-bold);
-	line-height: var(--line-height-tight);
-	letter-spacing: var(--letter-spacing-tight);
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 /* --- Focus styles --- */
 :focus-visible {
-	outline: 2px solid var(--color-accent);
-	outline-offset: 2px;
-	transition: outline-color var(--transition-fast);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  transition: outline-color var(--transition-fast);
 }
 
 /* --- Scrollbar styling --- */
 ::-webkit-scrollbar {
-	width: 5px;
-	height: 5px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-	background: transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-	border-radius: var(--radius-full);
-	background: rgba(148, 163, 184, 0.25);
-	border: 1px solid transparent;
-	background-clip: padding-box;
-	transition: background var(--transition-fast);
+  border-radius: var(--radius-full);
+  background: rgba(148, 163, 184, 0.25);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background var(--transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: rgba(148, 163, 184, 0.45);
+  background: rgba(148, 163, 184, 0.45);
 }
 
 /* --- Button reset --- */
 button {
-	font-family: inherit;
-	font-size: inherit;
-	cursor: pointer;
-	border: none;
-	background: none;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
 }
 
 /* --- Input reset --- */
 input {
-	font-family: inherit;
-	font-size: inherit;
-	background: none;
-	border: none;
-	outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  border: none;
+  outline: none;
 }
 
 /* --- Textarea reset --- */
 textarea {
-	font-family: inherit;
-	font-size: inherit;
-	background: none;
-	border: none;
-	outline: none;
-	resize: none;
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  border: none;
+  outline: none;
+  resize: none;
 }
 
 /* --- Select reset --- */
 select {
-	font-family: inherit;
-	font-size: inherit;
-	background: none;
-	border: none;
-	outline: none;
-	cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
 }
 
 /* --- Anchor reset --- */
 a {
-	text-decoration: underline;
-	text-decoration-thickness: 1px;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
 }
 
 /* --- Reduced motion --- */
 @media (prefers-reduced-motion: reduce) {
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.01ms !important;
-		animation-iteration-count: 1 !important;
-		transition-duration: 0.01ms !important;
-	}
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-
-

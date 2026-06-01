@@ -1,377 +1,388 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { Terminal as XTerm } from "@xterm/xterm";
-import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { Terminal } from "./Terminal.js";
-import { TerminalWebSocket } from "../api/websocket.js";
-import type { SelectedPane } from "../state/store.js";
+import { describe, test, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, waitFor } from "@testing-library/react"
+import { Terminal as XTerm } from "@xterm/xterm"
+import { Unicode11Addon } from "@xterm/addon-unicode11"
+import { Terminal } from "./Terminal.js"
+import { TerminalWebSocket } from "../api/websocket.js"
+import type { SelectedPane } from "../state/store.js"
 
-const mockXTermWrite = vi.fn();
-const mockXTermWriteln = vi.fn();
-const mockXTermOpen = vi.fn();
-const mockXTermLoadAddon = vi.fn();
-const mockXTermDispose = vi.fn();
-const mockXTermOnData = vi.fn();
-const mockXTermOnResize = vi.fn();
-const mockXTermFocus = vi.fn();
-const mockXTermResize = vi.fn();
-const mockXTermRefresh = vi.fn();
-const mockXTermClearTextureAtlas = vi.fn();
-const mockFit = vi.fn();
-const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }));
-const mockWsSend = vi.fn();
-const mockSetError = vi.fn();
-let capturedOnResize: ((size: { cols: number; rows: number }) => void) | null = null;
+const mockXTermWrite = vi.fn()
+const mockXTermWriteln = vi.fn()
+const mockXTermOpen = vi.fn()
+const mockXTermLoadAddon = vi.fn()
+const mockXTermDispose = vi.fn()
+const mockXTermOnData = vi.fn()
+const mockXTermOnResize = vi.fn()
+const mockXTermFocus = vi.fn()
+const mockXTermResize = vi.fn()
+const mockXTermRefresh = vi.fn()
+const mockXTermClearTextureAtlas = vi.fn()
+const mockFit = vi.fn()
+const mockProposeDimensions = vi.fn(() => ({ cols: 120, rows: 40 }))
+const mockWsSend = vi.fn()
+const mockSetError = vi.fn()
+let capturedOnResize: ((size: { cols: number; rows: number }) => void) | null = null
 
 vi.mock("@xterm/xterm", () => ({
-	Terminal: vi.fn().mockImplementation((options) => ({
-		cols: 80,
-		rows: 24,
-		unicode: {
-			activeVersion: "6",
-		},
-		options: { fontSize: options?.fontSize },
-		open: mockXTermOpen,
-		write: mockXTermWrite,
-		writeln: mockXTermWriteln,
-		loadAddon: mockXTermLoadAddon,
-		dispose: mockXTermDispose,
-		onData: mockXTermOnData,
-		onResize: vi.fn((callback: (size: { cols: number; rows: number }) => void) => {
-			capturedOnResize = callback;
-			mockXTermOnResize(callback);
-		}),
-		focus: mockXTermFocus,
-		resize: mockXTermResize,
-		refresh: mockXTermRefresh,
-		clearTextureAtlas: mockXTermClearTextureAtlas,
-	})),
-}));
+  Terminal: vi.fn().mockImplementation((options) => ({
+    cols: 80,
+    rows: 24,
+    unicode: {
+      activeVersion: "6",
+    },
+    options: { fontSize: options?.fontSize },
+    open: mockXTermOpen,
+    write: mockXTermWrite,
+    writeln: mockXTermWriteln,
+    loadAddon: mockXTermLoadAddon,
+    dispose: mockXTermDispose,
+    onData: mockXTermOnData,
+    onResize: vi.fn((callback: (size: { cols: number; rows: number }) => void) => {
+      capturedOnResize = callback
+      mockXTermOnResize(callback)
+    }),
+    focus: mockXTermFocus,
+    resize: mockXTermResize,
+    refresh: mockXTermRefresh,
+    clearTextureAtlas: mockXTermClearTextureAtlas,
+  })),
+}))
 
 vi.mock("@xterm/addon-fit", () => ({
-	FitAddon: vi.fn().mockImplementation(() => ({
-		fit: mockFit,
-		proposeDimensions: mockProposeDimensions,
-	})),
-}));
+  FitAddon: vi.fn().mockImplementation(() => ({
+    fit: mockFit,
+    proposeDimensions: mockProposeDimensions,
+  })),
+}))
 
 vi.mock("@xterm/addon-unicode11", () => ({
-	Unicode11Addon: vi.fn().mockImplementation(() => ({
-		activate: vi.fn(),
-	})),
-}));
+  Unicode11Addon: vi.fn().mockImplementation(() => ({
+    activate: vi.fn(),
+  })),
+}))
 
 vi.mock("@xterm/addon-web-links", () => ({
-	WebLinksAddon: vi.fn().mockImplementation(() => ({
-		activate: vi.fn(),
-	})),
-}));
+  WebLinksAddon: vi.fn().mockImplementation(() => ({
+    activate: vi.fn(),
+  })),
+}))
 
-const mockConnect = vi.fn();
-const mockClose = vi.fn();
-let capturedOnMessage: ((message: { type: string; data?: string; status?: string; error?: { code: string; message: string } }) => void) | null = null;
+const mockConnect = vi.fn()
+const mockClose = vi.fn()
+let capturedOnMessage:
+  | ((message: {
+      type: string
+      data?: string
+      status?: string
+      error?: { code: string; message: string }
+    }) => void)
+  | null = null
 
 vi.mock("../api/websocket.js", () => ({
-	TerminalWebSocket: vi.fn().mockImplementation((options) => {
-		capturedOnMessage = options.onMessage;
-		return {
-			connect: mockConnect,
-			send: mockWsSend,
-			close: mockClose,
-			isConnected: vi.fn(() => false),
-		};
-	}),
-}));
+  TerminalWebSocket: vi.fn().mockImplementation((options) => {
+    capturedOnMessage = options.onMessage
+    return {
+      connect: mockConnect,
+      send: mockWsSend,
+      close: mockClose,
+      isConnected: vi.fn(() => false),
+    }
+  }),
+}))
 
 let mockUISettings = {
-	theme: "dark",
-	windowTheme: "dark",
-	uiScaleStep: 0,
-	terminalFontWeight: "normal",
-};
+  theme: "dark",
+  windowTheme: "dark",
+  uiScaleStep: 0,
+  terminalFontWeight: "normal",
+}
 
 vi.mock("../state/store.js", () => ({
-	useAppState: vi.fn(() => ({
-		setError: mockSetError,
-		uiSettings: mockUISettings,
-	})),
-}));
+  useAppState: vi.fn(() => ({
+    setError: mockSetError,
+    uiSettings: mockUISettings,
+  })),
+}))
 
 const mockSelectedPane: SelectedPane = {
-	targetName: "conn-1",
-	session: "dev",
-	window: "@1",
-	pane: "%1",
-};
+  targetName: "conn-1",
+  session: "dev",
+  window: "@1",
+  pane: "%1",
+}
 
 describe("Terminal", () => {
-	beforeEach(() => {
-		sessionStorage.clear();
-		mockUISettings = {
-			theme: "dark",
-			windowTheme: "dark",
-			uiScaleStep: 0,
-			terminalFontWeight: "normal",
-		};
-		mockConnect.mockClear();
-		mockClose.mockClear();
-		mockXTermWrite.mockClear();
-		mockXTermWriteln.mockClear();
-		mockXTermFocus.mockClear();
-		mockXTermResize.mockClear();
-		mockXTermRefresh.mockClear();
-		mockXTermClearTextureAtlas.mockClear();
-		mockFit.mockClear();
-		mockProposeDimensions.mockClear();
-		mockWsSend.mockClear();
-		mockSetError.mockClear();
-		capturedOnResize = null;
-		capturedOnMessage = null;
-		vi.mocked(TerminalWebSocket).mockClear();
-	});
+  beforeEach(() => {
+    sessionStorage.clear()
+    mockUISettings = {
+      theme: "dark",
+      windowTheme: "dark",
+      uiScaleStep: 0,
+      terminalFontWeight: "normal",
+    }
+    mockConnect.mockClear()
+    mockClose.mockClear()
+    mockXTermWrite.mockClear()
+    mockXTermWriteln.mockClear()
+    mockXTermFocus.mockClear()
+    mockXTermResize.mockClear()
+    mockXTermRefresh.mockClear()
+    mockXTermClearTextureAtlas.mockClear()
+    mockFit.mockClear()
+    mockProposeDimensions.mockClear()
+    mockWsSend.mockClear()
+    mockSetError.mockClear()
+    capturedOnResize = null
+    capturedOnMessage = null
+    vi.mocked(TerminalWebSocket).mockClear()
+  })
 
-	afterEach(() => {
-		vi.clearAllMocks();
-	});
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
 
-	test("renders terminal container", () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
-		expect(screen.getByTestId("terminal")).toBeInTheDocument();
-	});
+  test("renders terminal container", () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
+    expect(screen.getByTestId("terminal")).toBeInTheDocument()
+  })
 
-	test("creates WebSocket connection when auth token exists in sessionStorage", async () => {
-		sessionStorage.setItem("wmux-auth-token", "test-token");
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("creates WebSocket connection when auth token exists in sessionStorage", async () => {
+    sessionStorage.setItem("wmux-auth-token", "test-token")
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
-		});
-		expect(mockConnect).toHaveBeenCalledTimes(1);
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(callArgs.token).toBe("test-token");
-	});
+    await waitFor(() => {
+      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+    })
+    expect(mockConnect).toHaveBeenCalledTimes(1)
+    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    expect(callArgs.token).toBe("test-token")
+  })
 
-	test("creates WebSocket connection even when auth token is missing from sessionStorage", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("creates WebSocket connection even when auth token is missing from sessionStorage", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
-		});
-		expect(mockConnect).toHaveBeenCalledTimes(1);
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(callArgs.token).toBe("");
-		expect(screen.queryByText("Authentication token not found")).not.toBeInTheDocument();
-	});
+    await waitFor(() => {
+      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+    })
+    expect(mockConnect).toHaveBeenCalledTimes(1)
+    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    expect(callArgs.token).toBe("")
+    expect(screen.queryByText("Authentication token not found")).not.toBeInTheDocument()
+  })
 
-	test("passes correct pane parameters to WebSocket", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("passes correct pane parameters to WebSocket", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
-		});
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(callArgs.targetName).toBe("conn-1");
-		expect(callArgs.session).toBe("dev");
-		expect(callArgs.window).toBe("@1");
-		expect(callArgs.pane).toBe("%1");
-	});
+    await waitFor(() => {
+      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+    })
+    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    expect(callArgs.targetName).toBe("conn-1")
+    expect(callArgs.session).toBe("dev")
+    expect(callArgs.window).toBe("@1")
+    expect(callArgs.pane).toBe("%1")
+  })
 
-	test("passes fitted dimensions to WebSocket for the initial PTY size", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("passes fitted dimensions to WebSocket for the initial PTY size", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
-		});
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockProposeDimensions).toHaveBeenCalled();
-		expect(mockFit).not.toHaveBeenCalled();
-		expect(callArgs.cols).toBe(120);
-		expect(callArgs.rows).toBe(40);
-	});
+    await waitFor(() => {
+      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+    })
+    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    expect(mockProposeDimensions).toHaveBeenCalled()
+    expect(mockFit).not.toHaveBeenCalled()
+    expect(callArgs.cols).toBe(120)
+    expect(callArgs.rows).toBe(40)
+  })
 
-	test("uses fitted dimensions when tmux pane is wider than the viewport", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />);
+  test("uses fitted dimensions when tmux pane is wider than the viewport", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0);
-		});
-		const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0];
-		expect(mockXTermResize).toHaveBeenCalledWith(120, 40);
-		expect(callArgs.cols).toBe(120);
-		expect(callArgs.rows).toBe(40);
-	});
+    await waitFor(() => {
+      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+    })
+    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    expect(mockXTermResize).toHaveBeenCalledWith(120, 40)
+    expect(callArgs.cols).toBe(120)
+    expect(callArgs.rows).toBe(40)
+  })
 
-	test("redraws terminal after fitting the viewport", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("redraws terminal after fitting the viewport", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(mockXTermClearTextureAtlas).toHaveBeenCalled();
-		});
-		expect(mockXTermRefresh).toHaveBeenCalledWith(0, 23);
-	});
+    await waitFor(() => {
+      expect(mockXTermClearTextureAtlas).toHaveBeenCalled()
+    })
+    expect(mockXTermRefresh).toHaveBeenCalledWith(0, 23)
+  })
 
-	test("does not recreate WebSocket when pane identifiers are unchanged", async () => {
-		const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />);
+  test("does not recreate WebSocket when pane identifiers are unchanged", async () => {
+    const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
-		});
+    await waitFor(() => {
+      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+    })
 
-		rerender(<Terminal selectedPane={{ ...mockSelectedPane }} />);
+    rerender(<Terminal selectedPane={{ ...mockSelectedPane }} />)
 
-		expect(TerminalWebSocket).toHaveBeenCalledTimes(1);
-		expect(mockClose).not.toHaveBeenCalled();
-	});
+    expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+    expect(mockClose).not.toHaveBeenCalled()
+  })
 
-	test("does not resend duplicate terminal resize dimensions", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("does not resend duplicate terminal resize dimensions", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(capturedOnResize).not.toBeNull();
-		});
-		capturedOnResize!({ cols: 120, rows: 40 });
+    await waitFor(() => {
+      expect(capturedOnResize).not.toBeNull()
+    })
+    capturedOnResize!({ cols: 120, rows: 40 })
 
-		expect(mockWsSend).not.toHaveBeenCalled();
-	});
+    expect(mockWsSend).not.toHaveBeenCalled()
+  })
 
-	test("sends terminal resize when dimensions change", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("sends terminal resize when dimensions change", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(capturedOnResize).not.toBeNull();
-		});
-		capturedOnResize!({ cols: 119, rows: 39 });
+    await waitFor(() => {
+      expect(capturedOnResize).not.toBeNull()
+    })
+    capturedOnResize!({ cols: 119, rows: 39 })
 
-		expect(mockWsSend).toHaveBeenCalledTimes(1);
-		expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 39 });
-	});
+    expect(mockWsSend).toHaveBeenCalledTimes(1)
+    expect(mockWsSend).toHaveBeenCalledWith({ type: "resize", cols: 119, rows: 39 })
+  })
 
-test("uses Unicode 11 width tables for CJK terminal output", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("uses Unicode 11 width tables for CJK terminal output", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		const xtermInstance = vi.mocked(XTerm).mock.results[0]!.value;
-		const unicodeAddon = vi.mocked(Unicode11Addon).mock.results[0]!.value;
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    const xtermInstance = vi.mocked(XTerm).mock.results[0]!.value
+    const unicodeAddon = vi.mocked(Unicode11Addon).mock.results[0]!.value
 
-		expect(xtermOptions.allowProposedApi).toBe(true);
-		expect(xtermOptions.scrollback).toBe(0);
-		expect(Unicode11Addon).toHaveBeenCalledTimes(1);
-		expect(mockXTermLoadAddon).toHaveBeenCalledWith(unicodeAddon);
-		expect(xtermInstance.unicode.activeVersion).toBe("11");
-	});
+    expect(xtermOptions.allowProposedApi).toBe(true)
+    expect(xtermOptions.scrollback).toBe(0)
+    expect(Unicode11Addon).toHaveBeenCalledTimes(1)
+    expect(mockXTermLoadAddon).toHaveBeenCalledWith(unicodeAddon)
+    expect(xtermInstance.unicode.activeVersion).toBe("11")
+  })
 
-	test("uses the mapped palette for non-default window themes", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />);
+  test("uses the mapped palette for non-default window themes", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.theme).toMatchObject({
-			background: "#f5f7fb",
-			cursor: "#4f6bed",
-			blue: "#4f6bed",
-		});
-	});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.theme).toMatchObject({
+      background: "#f5f7fb",
+      cursor: "#4f6bed",
+      blue: "#4f6bed",
+    })
+  })
 
-	test("uses ui windowTheme for the terminal palette when no prop is provided", async () => {
-		mockUISettings = { ...mockUISettings, theme: "light", windowTheme: "dark" };
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("uses ui windowTheme for the terminal palette when no prop is provided", async () => {
+    mockUISettings = { ...mockUISettings, theme: "light", windowTheme: "dark" }
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.theme).toMatchObject({
-			background: "#0a0e1a",
-			cursor: "#f59e0b",
-			blue: "#8b5cf6",
-		});
-		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#0a0e1a");
-	});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.theme).toMatchObject({
+      background: "#0a0e1a",
+      cursor: "#f59e0b",
+      blue: "#8b5cf6",
+    })
+    expect(
+      screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background"),
+    ).toBe("#0a0e1a")
+  })
 
-	test("applies the terminal theme background to the wrapper", () => {
-		render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />);
+  test("applies the terminal theme background to the wrapper", () => {
+    render(<Terminal selectedPane={mockSelectedPane} windowTheme="light" />)
 
-		expect(screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background")).toBe("#f5f7fb");
-		expect(screen.getByTestId("terminal-wrapper").style.backgroundColor).toBe("rgb(245, 247, 251)");
-	});
+    expect(
+      screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background"),
+    ).toBe("#f5f7fb")
+    expect(screen.getByTestId("terminal-wrapper").style.backgroundColor).toBe("rgb(245, 247, 251)")
+  })
 
-	test("writes output data to xterm when receiving output message", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("writes output data to xterm when receiving output message", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(capturedOnMessage).not.toBeNull();
-		});
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull()
+    })
 
-		capturedOnMessage!({ type: "output", data: "hello world" });
+    capturedOnMessage!({ type: "output", data: "hello world" })
 
-		expect(mockXTermWrite).toHaveBeenCalledTimes(1);
-		expect(mockXTermWrite).toHaveBeenCalledWith("hello world");
-	});
+    expect(mockXTermWrite).toHaveBeenCalledTimes(1)
+    expect(mockXTermWrite).toHaveBeenCalledWith("hello world")
+  })
 
-	test("does not write connection status messages into the terminal buffer", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("does not write connection status messages into the terminal buffer", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(capturedOnMessage).not.toBeNull();
-		});
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull()
+    })
 
-		capturedOnMessage!({ type: "status", status: "connected" });
+    capturedOnMessage!({ type: "status", status: "connected" })
 
-		expect(mockXTermWriteln).not.toHaveBeenCalled();
-	});
+    expect(mockXTermWriteln).not.toHaveBeenCalled()
+  })
 
-	test("derives terminal fontSize from uiScaleStep step 0 → 17px", async () => {
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("derives terminal fontSize from uiScaleStep step 0 → 17px", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontSize).toBe(17);
-	});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.fontSize).toBe(17)
+  })
 
-	test("derives terminal fontSize from uiScaleStep step 4 → 20px", async () => {
-		mockUISettings.uiScaleStep = 4;
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("derives terminal fontSize from uiScaleStep step 4 → 20px", async () => {
+    mockUISettings.uiScaleStep = 4
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontSize).toBe(20);
-	});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.fontSize).toBe(20)
+  })
 
-	test("derives terminal fontSize from uiScaleStep step -4 → 14px", async () => {
-		mockUISettings.uiScaleStep = -4;
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("derives terminal fontSize from uiScaleStep step -4 → 14px", async () => {
+    mockUISettings.uiScaleStep = -4
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontSize).toBe(14);
-	});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.fontSize).toBe(14)
+  })
 
-	test("applies terminalFontWeight to xterm options", async () => {
-		mockUISettings.terminalFontWeight = "bold";
-		render(<Terminal selectedPane={mockSelectedPane} />);
+  test("applies terminalFontWeight to xterm options", async () => {
+    mockUISettings.terminalFontWeight = "bold"
+    render(<Terminal selectedPane={mockSelectedPane} />)
 
-		await waitFor(() => {
-			expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0);
-		});
+    await waitFor(() => {
+      expect(vi.mocked(XTerm).mock.calls.length).toBeGreaterThan(0)
+    })
 
-		const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!;
-		expect(xtermOptions.fontWeight).toBe("bold");
-	});
-});
+    const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
+    expect(xtermOptions.fontWeight).toBe("bold")
+  })
+})

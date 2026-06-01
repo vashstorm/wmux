@@ -1,346 +1,273 @@
-import { describe, test, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { WindowTabs } from "./WindowTabs.js";
-import type { WindowSummary } from "../state/store.js";
+import { describe, test, expect, vi } from "vitest"
+import { render, screen, fireEvent } from "@testing-library/react"
+import { WindowTabs } from "./WindowTabs.js"
+import type { WindowSummary } from "../state/store.js"
 
 const mockWindows: WindowSummary[] = [
-	{
-		id: "@1",
-		name: "editor",
-		index: 0,
-		active: true,
-		paneCount: 2,
-		activePaneID: "%1",
-		activePaneTitle: "bash",
-	},
-	{
-		id: "@2",
-		name: "server",
-		index: 1,
-		active: false,
-		paneCount: 1,
-		activePaneID: "%3",
-		activePaneTitle: "node",
-	},
-];
+  {
+    id: "@1",
+    name: "editor",
+    index: 0,
+    active: true,
+    paneCount: 2,
+    activePaneID: "%1",
+    activePaneTitle: "bash",
+  },
+  {
+    id: "@2",
+    name: "server",
+    index: 1,
+    active: false,
+    paneCount: 1,
+    activePaneID: "%3",
+    activePaneTitle: "node",
+  },
+]
 
 describe("WindowTabs", () => {
-	test("renders tabs with correct labels", () => {
-		render(
-			<WindowTabs
-				windows={mockWindows}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+  test("renders tabs with correct labels", () => {
+    render(<WindowTabs windows={mockWindows} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		const tabs = screen.getAllByTestId(/^window-tab$/);
-		expect(tabs).toHaveLength(1);
+    const tabs = screen.getAllByTestId(/^window-tab$/)
+    expect(tabs).toHaveLength(1)
 
-		expect(screen.getByText("0")).toBeInTheDocument();
-		expect(screen.getByText("editor")).toBeInTheDocument();
-		expect(screen.getByText("server")).toBeInTheDocument();
-		expect(screen.queryByText("bash")).not.toBeInTheDocument();
-		expect(screen.queryByText("node")).not.toBeInTheDocument();
-		expect(screen.queryByText(/·/)).not.toBeInTheDocument();
-	});
+    expect(screen.getByText("0")).toBeInTheDocument()
+    expect(screen.getByText("editor")).toBeInTheDocument()
+    expect(screen.getByText("server")).toBeInTheDocument()
+    expect(screen.queryByText("bash")).not.toBeInTheDocument()
+    expect(screen.queryByText("node")).not.toBeInTheDocument()
+    expect(screen.queryByText(/·/)).not.toBeInTheDocument()
+  })
 
-	test("does not render pane count badges after the app name", () => {
-		render(
-			<WindowTabs
-				windows={mockWindows}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+  test("does not render pane count badges after the app name", () => {
+    render(<WindowTabs windows={mockWindows} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		expect(document.querySelector(".window-tab-badge")).toBeNull();
-	});
+    expect(document.querySelector(".window-tab-badge")).toBeNull()
+  })
 
-	test("highlights active tab", () => {
-		render(
-			<WindowTabs
-				windows={mockWindows}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+  test("highlights active tab", () => {
+    render(<WindowTabs windows={mockWindows} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		const activeTab = screen.getByTestId("window-tab-active");
-		expect(activeTab).toHaveClass("is-active");
-		expect(activeTab).toHaveTextContent("editor");
-	});
+    const activeTab = screen.getByTestId("window-tab-active")
+    expect(activeTab).toHaveClass("is-active")
+    expect(activeTab).toHaveTextContent("editor")
+  })
 
-	test("does not render active pane title in the tab label", () => {
-		render(
-			<WindowTabs
-				windows={mockWindows}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+  test("does not render active pane title in the tab label", () => {
+    render(<WindowTabs windows={mockWindows} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		expect(screen.queryByText("bash")).not.toBeInTheDocument();
-		expect(screen.queryByText("node")).not.toBeInTheDocument();
-	});
+    expect(screen.queryByText("bash")).not.toBeInTheDocument()
+    expect(screen.queryByText("node")).not.toBeInTheDocument()
+  })
 
-	test("clicking a tab fires onSelectWindow with window ID and active pane ID", () => {
-		const handleSelect = vi.fn();
-		render(
-			<WindowTabs
-				windows={mockWindows}
-				selectedWindowId="@1"
-				onSelectWindow={handleSelect}
-			/>,
-		);
+  test("clicking a tab fires onSelectWindow with window ID and active pane ID", () => {
+    const handleSelect = vi.fn()
+    render(<WindowTabs windows={mockWindows} selectedWindowId="@1" onSelectWindow={handleSelect} />)
 
-		const inactiveTab = screen.getByTestId("window-tab");
-		fireEvent.click(inactiveTab);
+    const inactiveTab = screen.getByTestId("window-tab")
+    fireEvent.click(inactiveTab)
 
-		expect(handleSelect).toHaveBeenCalledTimes(1);
-		expect(handleSelect).toHaveBeenCalledWith("@2", "%3");
-	});
+    expect(handleSelect).toHaveBeenCalledTimes(1)
+    expect(handleSelect).toHaveBeenCalledWith("@2", "%3")
+  })
 
-	test("returns null when windows array is empty", () => {
-		const { container } = render(
-			<WindowTabs
-				windows={[]}
-				selectedWindowId={null}
-				onSelectWindow={() => {}}
-			/>,
-		);
+  test("returns null when windows array is empty", () => {
+    const { container } = render(
+      <WindowTabs windows={[]} selectedWindowId={null} onSelectWindow={() => {}} />,
+    )
 
-		expect(container.firstChild).toBeNull();
-	});
+    expect(container.firstChild).toBeNull()
+  })
 
-	test("uses the computed app label for the tab title attribute", () => {
-		const windowsWithLongTitle: WindowSummary[] = [
-			{
-				id: "@1",
-				name: "editor",
-				index: 0,
-				active: true,
-				paneCount: 1,
-				activePaneID: "%1",
-				activePaneTitle: "very-long-title-that-might-overflow",
-				intelligenceApp: "claude",
-			},
-		];
+  test("uses the computed app label for the tab title attribute", () => {
+    const windowsWithLongTitle: WindowSummary[] = [
+      {
+        id: "@1",
+        name: "editor",
+        index: 0,
+        active: true,
+        paneCount: 1,
+        activePaneID: "%1",
+        activePaneTitle: "very-long-title-that-might-overflow",
+        intelligenceApp: "claude",
+      },
+    ]
 
-		render(
-			<WindowTabs
-				windows={windowsWithLongTitle}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(
+      <WindowTabs windows={windowsWithLongTitle} selectedWindowId="@1" onSelectWindow={() => {}} />,
+    )
 
-		expect(screen.getByTestId("window-tab-active")).toHaveAttribute("title", "claude");
-	});
+    expect(screen.getByTestId("window-tab-active")).toHaveAttribute("title", "claude")
+  })
 
-	test("renders app icons for common terminal apps", () => {
-		const windowsWithApps: WindowSummary[] = [
-			{
-				id: "@1",
-				name: "editor",
-				index: 0,
-				active: true,
-				paneCount: 1,
-				activePaneID: "%1",
-				activePaneTitle: "bash",
-				intelligenceApp: "claude",
-			},
-			{
-				id: "@2",
-				name: "tools",
-				index: 1,
-				active: false,
-				paneCount: 1,
-				activePaneID: "%2",
-				activePaneTitle: "OpenCode",
-			},
-			{
-				id: "@3",
-				name: "codex",
-				index: 2,
-				active: false,
-				paneCount: 1,
-				activePaneID: "%3",
-				activePaneTitle: "codex",
-			},
-			{
-				id: "@4",
-				name: "shell",
-				index: 3,
-				active: false,
-				paneCount: 1,
-				activePaneID: "%4",
-				activePaneTitle: "zsh",
-			},
-			{
-				id: "@5",
-				name: "python",
-				index: 4,
-				active: false,
-				paneCount: 1,
-				activePaneID: "%5",
-				activePaneTitle: "python3",
-			},
-		];
+  test("renders app icons for common terminal apps", () => {
+    const windowsWithApps: WindowSummary[] = [
+      {
+        id: "@1",
+        name: "editor",
+        index: 0,
+        active: true,
+        paneCount: 1,
+        activePaneID: "%1",
+        activePaneTitle: "bash",
+        intelligenceApp: "claude",
+      },
+      {
+        id: "@2",
+        name: "tools",
+        index: 1,
+        active: false,
+        paneCount: 1,
+        activePaneID: "%2",
+        activePaneTitle: "OpenCode",
+      },
+      {
+        id: "@3",
+        name: "codex",
+        index: 2,
+        active: false,
+        paneCount: 1,
+        activePaneID: "%3",
+        activePaneTitle: "codex",
+      },
+      {
+        id: "@4",
+        name: "shell",
+        index: 3,
+        active: false,
+        paneCount: 1,
+        activePaneID: "%4",
+        activePaneTitle: "zsh",
+      },
+      {
+        id: "@5",
+        name: "python",
+        index: 4,
+        active: false,
+        paneCount: 1,
+        activePaneID: "%5",
+        activePaneTitle: "python3",
+      },
+    ]
 
-		render(
-			<WindowTabs
-				windows={windowsWithApps}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(<WindowTabs windows={windowsWithApps} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		expect(screen.getByTestId("window-tab-app-icon-@1")).toHaveAccessibleName("Claude");
-		expect(screen.getByTestId("window-tab-app-icon-@2")).toHaveAccessibleName("OpenCode");
-		expect(screen.getByTestId("window-tab-app-icon-@3")).toHaveAccessibleName("Codex");
-		expect(screen.getByTestId("window-tab-app-icon-@4")).toHaveAccessibleName("zsh");
-		expect(screen.getByTestId("window-tab-app-icon-@5")).toHaveAccessibleName("Python");
-	});
+    expect(screen.getByTestId("window-tab-app-icon-@1")).toHaveAccessibleName("Claude")
+    expect(screen.getByTestId("window-tab-app-icon-@2")).toHaveAccessibleName("OpenCode")
+    expect(screen.getByTestId("window-tab-app-icon-@3")).toHaveAccessibleName("Codex")
+    expect(screen.getByTestId("window-tab-app-icon-@4")).toHaveAccessibleName("zsh")
+    expect(screen.getByTestId("window-tab-app-icon-@5")).toHaveAccessibleName("Python")
+  })
 
-	test("keeps per-window labels when there is no window-level app data", () => {
-		const windowsWithRawName: WindowSummary[] = [
-			{
-				id: "@1",
-				name: "ocx[omo]:wmux/main",
-				index: 0,
-				active: true,
-				paneCount: 1,
-				activePaneID: "%1",
-				activePaneTitle: "OpenCode",
-			},
-			{
-				id: "@2",
-				name: "make",
-				index: 1,
-				active: false,
-				paneCount: 1,
-				activePaneID: "%2",
-				activePaneTitle: "zsh",
-			},
-		];
+  test("keeps per-window labels when there is no window-level app data", () => {
+    const windowsWithRawName: WindowSummary[] = [
+      {
+        id: "@1",
+        name: "ocx[omo]:wmux/main",
+        index: 0,
+        active: true,
+        paneCount: 1,
+        activePaneID: "%1",
+        activePaneTitle: "OpenCode",
+      },
+      {
+        id: "@2",
+        name: "make",
+        index: 1,
+        active: false,
+        paneCount: 1,
+        activePaneID: "%2",
+        activePaneTitle: "zsh",
+      },
+    ]
 
-		render(
-			<WindowTabs
-				windows={windowsWithRawName}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(
+      <WindowTabs windows={windowsWithRawName} selectedWindowId="@1" onSelectWindow={() => {}} />,
+    )
 
-		expect(screen.getByText("ocx[omo]:wmux/main")).toBeInTheDocument();
-		expect(screen.getByText("zsh")).toBeInTheDocument();
-	});
-
-});
+    expect(screen.getByText("ocx[omo]:wmux/main")).toBeInTheDocument()
+    expect(screen.getByText("zsh")).toBeInTheDocument()
+  })
+})
 
 describe("attention rendering", () => {
-	test("window with attention state gets is-attention class", () => {
-		const win: WindowSummary = {
-			id: "@1",
-			name: "editor",
-			index: 0,
-			active: true,
-			paneCount: 2,
-			activePaneID: "%1",
-			activePaneTitle: "bash",
-			attentionState: "attention",
-			attentionCount: 1,
-		};
+  test("window with attention state gets is-attention class", () => {
+    const win: WindowSummary = {
+      id: "@1",
+      name: "editor",
+      index: 0,
+      active: true,
+      paneCount: 2,
+      activePaneID: "%1",
+      activePaneTitle: "bash",
+      attentionState: "attention",
+      attentionCount: 1,
+    }
 
-		render(
-			<WindowTabs
-				windows={[win]}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(<WindowTabs windows={[win]} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		const tab = screen.getByTestId("window-tab-active");
-		expect(tab).toHaveClass("is-attention");
-		expect(tab).toHaveClass("status-attention");
-		expect(tab).not.toHaveClass("is-attention-explicit");
-	});
+    const tab = screen.getByTestId("window-tab-active")
+    expect(tab).toHaveClass("is-attention")
+    expect(tab).toHaveClass("status-attention")
+    expect(tab).not.toHaveClass("is-attention-explicit")
+  })
 
-	test("window with attention state and count shows attention badge", () => {
-		const win: WindowSummary = {
-			id: "@1",
-			name: "editor",
-			index: 0,
-			active: true,
-			paneCount: 2,
-			activePaneID: "%1",
-			activePaneTitle: "bash",
-			attentionState: "attention",
-			attentionCount: 1,
-		};
+  test("window with attention state and count shows attention badge", () => {
+    const win: WindowSummary = {
+      id: "@1",
+      name: "editor",
+      index: 0,
+      active: true,
+      paneCount: 2,
+      activePaneID: "%1",
+      activePaneTitle: "bash",
+      attentionState: "attention",
+      attentionCount: 1,
+    }
 
-		render(
-			<WindowTabs
-				windows={[win]}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(<WindowTabs windows={[win]} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		const badge = document.querySelector(".attention-badge");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("1");
-	});
+    const badge = document.querySelector(".attention-badge")
+    expect(badge).toBeInTheDocument()
+    expect(badge?.textContent).toBe("1")
+  })
 
-	test("window with explicit state gets is-attention-explicit class", () => {
-		const win: WindowSummary = {
-			id: "@1",
-			name: "editor",
-			index: 0,
-			active: true,
-			paneCount: 2,
-			activePaneID: "%1",
-			activePaneTitle: "bash",
-			attentionState: "explicit",
-			attentionCount: 2,
-		};
+  test("window with explicit state gets is-attention-explicit class", () => {
+    const win: WindowSummary = {
+      id: "@1",
+      name: "editor",
+      index: 0,
+      active: true,
+      paneCount: 2,
+      activePaneID: "%1",
+      activePaneTitle: "bash",
+      attentionState: "explicit",
+      attentionCount: 2,
+    }
 
-		render(
-			<WindowTabs
-				windows={[win]}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(<WindowTabs windows={[win]} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		const tab = screen.getByTestId("window-tab-active");
-		expect(tab).toHaveClass("is-attention-explicit");
-		expect(tab).toHaveClass("status-explicit");
-		const badge = document.querySelector(".attention-badge");
-		expect(badge).toBeInTheDocument();
-		expect(badge?.textContent).toBe("2");
-	});
+    const tab = screen.getByTestId("window-tab-active")
+    expect(tab).toHaveClass("is-attention-explicit")
+    expect(tab).toHaveClass("status-explicit")
+    const badge = document.querySelector(".attention-badge")
+    expect(badge).toBeInTheDocument()
+    expect(badge?.textContent).toBe("2")
+  })
 
-	test("window with no attention state shows no attention badge", () => {
-		const win: WindowSummary = {
-			id: "@1",
-			name: "editor",
-			index: 0,
-			active: true,
-			paneCount: 2,
-			activePaneID: "%1",
-			activePaneTitle: "bash",
-		};
+  test("window with no attention state shows no attention badge", () => {
+    const win: WindowSummary = {
+      id: "@1",
+      name: "editor",
+      index: 0,
+      active: true,
+      paneCount: 2,
+      activePaneID: "%1",
+      activePaneTitle: "bash",
+    }
 
-		render(
-			<WindowTabs
-				windows={[win]}
-				selectedWindowId="@1"
-				onSelectWindow={() => {}}
-			/>,
-		);
+    render(<WindowTabs windows={[win]} selectedWindowId="@1" onSelectWindow={() => {}} />)
 
-		expect(document.querySelector(".attention-badge")).toBeNull();
-	});
-});
+    expect(document.querySelector(".attention-badge")).toBeNull()
+  })
+})

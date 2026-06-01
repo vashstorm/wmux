@@ -1,14 +1,14 @@
-import type { SelectedPane } from "../state/store.js";
+import type { SelectedPane } from "../state/store.js"
 
 /**
  * URL representation of workspace location.
  * Used for URL search params serialization.
  */
 export interface WorkspaceLocation {
-	connection: string;
-	session: string;
-	window?: string;
-	pane?: string;
+  connection: string
+  session: string
+  window?: string
+  pane?: string
 }
 
 /**
@@ -18,20 +18,18 @@ export interface WorkspaceLocation {
  * - pane without window is INVALID
  * - empty connection or session is INVALID
  */
-export function isStructurallyValidWorkspaceLocation(
-	location: WorkspaceLocation,
-): boolean {
-	// connection and session must be non-empty
-	if (!location.connection || !location.session) {
-		return false;
-	}
+export function isStructurallyValidWorkspaceLocation(location: WorkspaceLocation): boolean {
+  // connection and session must be non-empty
+  if (!location.connection || !location.session) {
+    return false
+  }
 
-	// pane without window is invalid
-	if (location.pane !== undefined && location.window === undefined) {
-		return false;
-	}
+  // pane without window is invalid
+  if (location.pane !== undefined && location.window === undefined) {
+    return false
+  }
 
-	return true;
+  return true
 }
 
 /**
@@ -42,47 +40,47 @@ export function isStructurallyValidWorkspaceLocation(
  * - pane is present without window
  */
 export function parseWorkspaceUrl(search: string): WorkspaceLocation | null {
-	// Handle empty or "?" only
-	if (!search || search === "?") {
-		return null;
-	}
+  // Handle empty or "?" only
+  if (!search || search === "?") {
+    return null
+  }
 
-	// Strip leading "?" if present
-	const searchStr = search.startsWith("?") ? search.slice(1) : search;
+  // Strip leading "?" if present
+  const searchStr = search.startsWith("?") ? search.slice(1) : search
 
-	// Parse with URLSearchParams
-	const params = new URLSearchParams(searchStr);
+  // Parse with URLSearchParams
+  const params = new URLSearchParams(searchStr)
 
-	const connection = params.get("connection");
-	const session = params.get("session");
-	const window = params.get("window");
-	const pane = params.get("pane");
+  const connection = params.get("connection")
+  const session = params.get("session")
+  const window = params.get("window")
+  const pane = params.get("pane")
 
-	// connection and session must be present
-	if (!connection || !session) {
-		return null;
-	}
+  // connection and session must be present
+  if (!connection || !session) {
+    return null
+  }
 
-	const location: WorkspaceLocation = {
-		connection,
-		session,
-	};
+  const location: WorkspaceLocation = {
+    connection,
+    session,
+  }
 
-	// Add optional fields only if they exist
-	if (window !== null) {
-		location.window = window;
-	}
+  // Add optional fields only if they exist
+  if (window !== null) {
+    location.window = window
+  }
 
-	if (pane !== null) {
-		location.pane = pane;
-	}
+  if (pane !== null) {
+    location.pane = pane
+  }
 
-	// Validate structure
-	if (!isStructurallyValidWorkspaceLocation(location)) {
-		return null;
-	}
+  // Validate structure
+  if (!isStructurallyValidWorkspaceLocation(location)) {
+    return null
+  }
 
-	return location;
+  return location
 }
 
 /**
@@ -91,31 +89,29 @@ export function parseWorkspaceUrl(search: string): WorkspaceLocation | null {
  * - location is null
  * - connection or session is missing/empty
  */
-export function formatWorkspaceUrl(
-	location: WorkspaceLocation | null,
-): string {
-	if (!location) {
-		return "";
-	}
+export function formatWorkspaceUrl(location: WorkspaceLocation | null): string {
+  if (!location) {
+    return ""
+  }
 
-	// Validate structure
-	if (!isStructurallyValidWorkspaceLocation(location)) {
-		return "";
-	}
+  // Validate structure
+  if (!isStructurallyValidWorkspaceLocation(location)) {
+    return ""
+  }
 
-	const params = new URLSearchParams();
-	params.set("connection", location.connection);
-	params.set("session", location.session);
+  const params = new URLSearchParams()
+  params.set("connection", location.connection)
+  params.set("session", location.session)
 
-	if (location.window !== undefined) {
-		params.set("window", location.window);
-	}
+  if (location.window !== undefined) {
+    params.set("window", location.window)
+  }
 
-	if (location.pane !== undefined) {
-		params.set("pane", location.pane);
-	}
+  if (location.pane !== undefined) {
+    params.set("pane", location.pane)
+  }
 
-	return `?${params.toString()}`;
+  return `?${params.toString()}`
 }
 
 /**
@@ -123,12 +119,12 @@ export function formatWorkspaceUrl(
  * Maps connection -> targetName.
  */
 export function toSelectedPane(location: WorkspaceLocation): SelectedPane {
-	return {
-		targetName: location.connection,
-		session: location.session,
-		window: location.window,
-		pane: location.pane,
-	};
+  return {
+    targetName: location.connection,
+    session: location.session,
+    window: location.window,
+    pane: location.pane,
+  }
 }
 
 /**
@@ -136,19 +132,17 @@ export function toSelectedPane(location: WorkspaceLocation): SelectedPane {
  * Maps targetName -> connection.
  * Returns null for null input.
  */
-export function fromSelectedPane(
-	pane: SelectedPane | null,
-): WorkspaceLocation | null {
-	if (!pane) {
-		return null;
-	}
+export function fromSelectedPane(pane: SelectedPane | null): WorkspaceLocation | null {
+  if (!pane) {
+    return null
+  }
 
-	return {
-		connection: pane.targetName,
-		session: pane.session,
-		window: pane.window,
-		pane: pane.pane,
-	};
+  return {
+    connection: pane.targetName,
+    session: pane.session,
+    window: pane.window,
+    pane: pane.pane,
+  }
 }
 
 /**
@@ -164,40 +158,40 @@ export function fromSelectedPane(
  * - identical location (no-op)
  */
 export function getWorkspaceHistoryAction(
-	previous: SelectedPane | null,
-	next: SelectedPane | null,
+  previous: SelectedPane | null,
+  next: SelectedPane | null,
 ): "push" | "replace" {
-	// Both null -> replace (no-op)
-	if (!previous && !next) {
-		return "replace";
-	}
+  // Both null -> replace (no-op)
+  if (!previous && !next) {
+    return "replace"
+  }
 
-	// Any -> null -> replace (clearing selection)
-	if (!next) {
-		return "replace";
-	}
+  // Any -> null -> replace (clearing selection)
+  if (!next) {
+    return "replace"
+  }
 
-	// null -> non-null -> push
-	if (!previous) {
-		return "push";
-	}
+  // null -> non-null -> push
+  if (!previous) {
+    return "push"
+  }
 
-	// Session change -> push
-	if (previous.session !== next.session) {
-		return "push";
-	}
+  // Session change -> push
+  if (previous.session !== next.session) {
+    return "push"
+  }
 
-	// Connection change -> push (different target)
-	if (previous.targetName !== next.targetName) {
-		return "push";
-	}
+  // Connection change -> push (different target)
+  if (previous.targetName !== next.targetName) {
+    return "push"
+  }
 
-	// Same session, different window -> push
-	if (previous.window !== next.window) {
-		return "push";
-	}
+  // Same session, different window -> push
+  if (previous.window !== next.window) {
+    return "push"
+  }
 
-	// Same session + same window, pane change -> replace
-	// Also handles: same pane (no-op) -> replace
-	return "replace";
+  // Same session + same window, pane change -> replace
+  // Also handles: same pane (no-op) -> replace
+  return "replace"
 }

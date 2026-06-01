@@ -1,311 +1,382 @@
-import "./styles/global.css";
-import "./styles/layout.css";
-import "./styles/overlays.css";
-import "./styles/components.css";
-import "./styles/fonts.css";
+import "./styles/global.css"
+import "./styles/layout.css"
+import "./styles/overlays.css"
+import "./styles/components.css"
+import "./styles/fonts.css"
 
-import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
-import { ThemeProvider, CssBaseline, IconButton, Tooltip } from "@mui/material";
-import LightModeIcon from "@mui/icons-material/LightMode";
-import DarkModeIcon from "@mui/icons-material/DarkMode";
-import { AppProvider, useAppState } from "./state/store.js";
-import { getConfig, updateConfig } from "./api/client.js";
-import { applyUIScaleStep, fontSizeToScaleStep, DEFAULT_UI_SCALE_STEP, DEFAULT_TERMINAL_FONT_SIZE } from "./ui/fontSize.js";
-import { useModeTheme } from "./ui/muiTheme.js";
-import { MainPanel } from "./components/MainPanel.js";
-import { Sidebar } from "./components/Sidebar.js";
-import { ErrorBanner } from "./components/ErrorBanner.js";
-import { ConfirmDialog } from "./components/ConfirmDialog.js";
-import { NewConnectionForm } from "./components/NewConnectionForm.js";
-import { SettingsPanel } from "./components/SettingsPanel.js";
-import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js";
-import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js";
-import { AiAssistant } from "./components/AiAssistant.js";
-import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js";
-import { normalizeThemeId } from "./ui/themes.js";
-import AssistantIcon from "@mui/icons-material/Assistant";
-import { loadLauncherPos, saveLauncherPos, clampAssistantPos, type AssistantPos } from "./components/AiAssistant.js";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react"
+import { ThemeProvider, CssBaseline, IconButton, Tooltip } from "@mui/material"
+import LightModeIcon from "@mui/icons-material/LightMode"
+import DarkModeIcon from "@mui/icons-material/DarkMode"
+import { AppProvider, useAppState } from "./state/store.js"
+import { getConfig, updateConfig } from "./api/client.js"
+import {
+  applyUIScaleStep,
+  fontSizeToScaleStep,
+  DEFAULT_UI_SCALE_STEP,
+  DEFAULT_TERMINAL_FONT_SIZE,
+} from "./ui/fontSize.js"
+import { useModeTheme } from "./ui/muiTheme.js"
+import { MainPanel } from "./components/MainPanel.js"
+import { Sidebar } from "./components/Sidebar.js"
+import { ErrorBanner } from "./components/ErrorBanner.js"
+import { ConfirmDialog } from "./components/ConfirmDialog.js"
+import { NewConnectionForm } from "./components/NewConnectionForm.js"
+import { SettingsPanel } from "./components/SettingsPanel.js"
+import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js"
+import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js"
+import { AiAssistant } from "./components/AiAssistant.js"
+import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js"
+import { normalizeThemeId } from "./ui/themes.js"
+import AssistantIcon from "@mui/icons-material/Assistant"
+import {
+  loadLauncherPos,
+  saveLauncherPos,
+  clampAssistantPos,
+  type AssistantPos,
+} from "./components/AiAssistant.js"
 
 function UISettingsInit() {
-	const { setUISettings, setOmniStatus } = useAppState();
+  const { setUISettings, setOmniStatus } = useAppState()
 
-	useEffect(() => {
-		void getConfig().then((config) => {
-			const theme = normalizeThemeId(config.ui.theme);
-			const windowTheme = normalizeThemeId(config.ui.windowTheme, theme);
+  useEffect(() => {
+    void getConfig()
+      .then((config) => {
+        const theme = normalizeThemeId(config.ui.theme)
+        const windowTheme = normalizeThemeId(config.ui.windowTheme, theme)
 
-			const uiScaleStep = config.ui.uiScaleStep !== undefined
-				? config.ui.uiScaleStep
-				: config.ui.fontSize !== undefined
-					? fontSizeToScaleStep(config.ui.fontSize)
-					: DEFAULT_UI_SCALE_STEP;
+        const uiScaleStep =
+          config.ui.uiScaleStep !== undefined
+            ? config.ui.uiScaleStep
+            : config.ui.fontSize !== undefined
+              ? fontSizeToScaleStep(config.ui.fontSize)
+              : DEFAULT_UI_SCALE_STEP
 
-			const terminalFontSize = config.ui.terminalFontSize || DEFAULT_TERMINAL_FONT_SIZE;
-			const terminalFontWeight = config.ui.terminalFontWeight || "normal";
+        const terminalFontSize = config.ui.terminalFontSize || DEFAULT_TERMINAL_FONT_SIZE
+        const terminalFontWeight = config.ui.terminalFontWeight || "normal"
 
-			applyUIScaleStep(uiScaleStep);
-			setUISettings({ theme, windowTheme, uiScaleStep, terminalFontSize, terminalFontWeight });
+        applyUIScaleStep(uiScaleStep)
+        setUISettings({ theme, windowTheme, uiScaleStep, terminalFontSize, terminalFontWeight })
 
-			// Initialize omni/AI assistant availability so voice-launcher button
-			// can render before AiAssistant mounts (avoids chicken-and-egg).
-			setOmniStatus(config.omni?.enabled ? "idle" : "disabled");
-		}).catch(() => undefined);
-	}, [setUISettings, setOmniStatus]);
+        // Initialize omni/AI assistant availability so voice-launcher button
+        // can render before AiAssistant mounts (avoids chicken-and-egg).
+        setOmniStatus(config.omni?.enabled ? "idle" : "disabled")
+      })
+      .catch(() => undefined)
+  }, [setUISettings, setOmniStatus])
 
-	return null;
+  return null
 }
 
 function MuiThemeShell({ children }: { children: React.ReactNode }) {
-	const { uiSettings } = useAppState();
-	const theme = useModeTheme(uiSettings.theme);
+  const { uiSettings } = useAppState()
+  const theme = useModeTheme(uiSettings.theme)
 
-	return (
-		<ThemeProvider theme={theme}>
-			<CssBaseline />
-			<div
-				data-mui-color-scheme={uiSettings.theme === "dark" ? "dark" : "light"}
-				style={{ display: "contents" }}
-			>
-				{children}
-			</div>
-		</ThemeProvider>
-	);
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <div
+        data-mui-color-scheme={uiSettings.theme === "dark" ? "dark" : "light"}
+        style={{ display: "contents" }}
+      >
+        {children}
+      </div>
+    </ThemeProvider>
+  )
 }
 
 function ThemeToggle() {
-	const { uiSettings, setUISettings, setError } = useAppState();
-	const isDark = uiSettings.theme === "dark";
-	const updatingRef = useRef(false);
+  const { uiSettings, setUISettings, setError } = useAppState()
+  const isDark = uiSettings.theme === "dark"
+  const updatingRef = useRef(false)
 
-	const handleToggle = async () => {
-		if (updatingRef.current) return;
-		const newTheme = isDark ? "light" : "dark";
-		setUISettings({ ...uiSettings, theme: newTheme });
-		updatingRef.current = true;
-		try {
-			const config = await getConfig();
-			config.ui.theme = newTheme;
-			await updateConfig(config);
-		} catch {
-			setError({ code: "persist_failed", message: "Failed to persist theme" });
-		} finally {
-			updatingRef.current = false;
-		}
-	};
+  const handleToggle = async () => {
+    if (updatingRef.current) return
+    const newTheme = isDark ? "light" : "dark"
+    setUISettings({ ...uiSettings, theme: newTheme })
+    updatingRef.current = true
+    try {
+      const config = await getConfig()
+      config.ui.theme = newTheme
+      await updateConfig(config)
+    } catch {
+      setError({ code: "persist_failed", message: "Failed to persist theme" })
+    } finally {
+      updatingRef.current = false
+    }
+  }
 
-	const toggleLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
+  const toggleLabel = isDark ? "Switch to light mode" : "Switch to dark mode"
 
-	return (
-		<Tooltip title={toggleLabel} arrow placement="top">
-			<IconButton
-				data-testid="theme-toggle"
-				aria-label={toggleLabel}
-				onClick={handleToggle}
-				size="small"
-				sx={{ width: 30, height: 30 }}
-			>
-				{isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-			</IconButton>
-		</Tooltip>
-	);
+  return (
+    <Tooltip title={toggleLabel} arrow placement="top">
+      <IconButton
+        data-testid="theme-toggle"
+        aria-label={toggleLabel}
+        onClick={handleToggle}
+        size="small"
+        sx={{ width: 30, height: 30 }}
+      >
+        {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+      </IconButton>
+    </Tooltip>
+  )
 }
 
 function DarkTerminalIcon() {
-	return (
-		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
-			{/* Dark terminal window */}
-			<rect x="2" y="4" width="20" height="16" rx="3" fill="#0f172a" stroke="#6366f1" strokeWidth="1.5" />
-			{/* Header line */}
-			<path d="M2 9h20" stroke="#1e293b" strokeWidth="1.5" />
-			{/* Dot indicators in header */}
-			<circle cx="5" cy="6.5" r="1" fill="#ef4444" />
-			<circle cx="8" cy="6.5" r="1" fill="#eab308" />
-			<circle cx="11" cy="6.5" r="1" fill="#22c55e" />
-			{/* Prompt `>` */}
-			<path d="M6 12.5l2.5 1.5L6 15.5" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-			{/* Cursor `_` */}
-			<path d="M10 15.5h3" stroke="#a5b4fc" strokeWidth="1.5" strokeLinecap="round" />
-		</svg>
-	);
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+      {/* Dark terminal window */}
+      <rect
+        x="2"
+        y="4"
+        width="20"
+        height="16"
+        rx="3"
+        fill="#0f172a"
+        stroke="#6366f1"
+        strokeWidth="1.5"
+      />
+      {/* Header line */}
+      <path d="M2 9h20" stroke="#1e293b" strokeWidth="1.5" />
+      {/* Dot indicators in header */}
+      <circle cx="5" cy="6.5" r="1" fill="#ef4444" />
+      <circle cx="8" cy="6.5" r="1" fill="#eab308" />
+      <circle cx="11" cy="6.5" r="1" fill="#22c55e" />
+      {/* Prompt `>` */}
+      <path
+        d="M6 12.5l2.5 1.5L6 15.5"
+        stroke="#38bdf8"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Cursor `_` */}
+      <path d="M10 15.5h3" stroke="#a5b4fc" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 function LightTerminalIcon() {
-	return (
-		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
-			{/* Light terminal window */}
-			<rect x="2" y="4" width="20" height="16" rx="3" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
-			{/* Header line */}
-			<path d="M2 9h20" stroke="#e2e8f0" strokeWidth="1.5" />
-			{/* Dot indicators in header */}
-			<circle cx="5" cy="6.5" r="1" fill="#cbd5e1" />
-			<circle cx="8" cy="6.5" r="1" fill="#cbd5e1" />
-			<circle cx="11" cy="6.5" r="1" fill="#cbd5e1" />
-			{/* Prompt `>` */}
-			<path d="M6 12.5l2.5 1.5L6 15.5" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-			{/* Cursor `_` */}
-			<path d="M10 15.5h3" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" />
-		</svg>
-	);
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+      {/* Light terminal window */}
+      <rect
+        x="2"
+        y="4"
+        width="20"
+        height="16"
+        rx="3"
+        fill="#f8fafc"
+        stroke="#cbd5e1"
+        strokeWidth="1.5"
+      />
+      {/* Header line */}
+      <path d="M2 9h20" stroke="#e2e8f0" strokeWidth="1.5" />
+      {/* Dot indicators in header */}
+      <circle cx="5" cy="6.5" r="1" fill="#cbd5e1" />
+      <circle cx="8" cy="6.5" r="1" fill="#cbd5e1" />
+      <circle cx="11" cy="6.5" r="1" fill="#cbd5e1" />
+      {/* Prompt `>` */}
+      <path
+        d="M6 12.5l2.5 1.5L6 15.5"
+        stroke="#475569"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Cursor `_` */}
+      <path d="M10 15.5h3" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 function TerminalThemeToggle() {
-	const { uiSettings, setUISettings, setError } = useAppState();
-	const isDark = uiSettings.windowTheme === "dark";
-	const updatingRef = useRef(false);
+  const { uiSettings, setUISettings, setError } = useAppState()
+  const isDark = uiSettings.windowTheme === "dark"
+  const updatingRef = useRef(false)
 
-	const handleToggle = async () => {
-		if (updatingRef.current) return;
-		const newTheme = isDark ? "light" : "dark";
-		setUISettings({ ...uiSettings, windowTheme: newTheme });
-		updatingRef.current = true;
-		try {
-			const config = await getConfig();
-			config.ui.windowTheme = newTheme;
-			await updateConfig(config);
-		} catch {
-			setError({ code: "persist_failed", message: "Failed to persist terminal theme" });
-		} finally {
-			updatingRef.current = false;
-		}
-	};
+  const handleToggle = async () => {
+    if (updatingRef.current) return
+    const newTheme = isDark ? "light" : "dark"
+    setUISettings({ ...uiSettings, windowTheme: newTheme })
+    updatingRef.current = true
+    try {
+      const config = await getConfig()
+      config.ui.windowTheme = newTheme
+      await updateConfig(config)
+    } catch {
+      setError({ code: "persist_failed", message: "Failed to persist terminal theme" })
+    } finally {
+      updatingRef.current = false
+    }
+  }
 
-	const toggleLabel = isDark ? "Switch terminal to light" : "Switch terminal to dark";
+  const toggleLabel = isDark ? "Switch terminal to light" : "Switch terminal to dark"
 
-	return (
-		<Tooltip title={toggleLabel} arrow placement="top">
-			<IconButton
-				data-testid="terminal-theme-toggle"
-				aria-label={toggleLabel}
-				onClick={handleToggle}
-				size="small"
-				sx={{ width: 30, height: 30 }}
-			>
-				{isDark ? <DarkTerminalIcon /> : <LightTerminalIcon />}
-			</IconButton>
-		</Tooltip>
-	);
+  return (
+    <Tooltip title={toggleLabel} arrow placement="top">
+      <IconButton
+        data-testid="terminal-theme-toggle"
+        aria-label={toggleLabel}
+        onClick={handleToggle}
+        size="small"
+        sx={{ width: 30, height: 30 }}
+      >
+        {isDark ? <DarkTerminalIcon /> : <LightTerminalIcon />}
+      </IconButton>
+    </Tooltip>
+  )
 }
 
 function WorkspaceNavigationSync() {
-	useWorkspaceNavigation();
-	return null;
+  useWorkspaceNavigation()
+  return null
 }
 
-const LAUNCHER_SIZE = { width: 42, height: 42 };
+const LAUNCHER_SIZE = { width: 42, height: 42 }
 
 function AiLauncher({ onOpen }: { onOpen: () => void }) {
-	const [pos, setPos] = useState<AssistantPos>(() => loadLauncherPos());
-	const dragRef = useRef<{ pointerId: number | "mouse"; originX: number; originY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
+  const [pos, setPos] = useState<AssistantPos>(() => loadLauncherPos())
+  const dragRef = useRef<{
+    pointerId: number | "mouse"
+    originX: number
+    originY: number
+    baseX: number
+    baseY: number
+    moved: boolean
+  } | null>(null)
 
-	const startDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
-		dragRef.current = { pointerId, originX: clientX, originY: clientY, baseX: pos.x, baseY: pos.y, moved: false };
-		document.body.style.userSelect = "none";
-	}, [pos]);
+  const startDrag = useCallback(
+    (clientX: number, clientY: number, pointerId: number | "mouse") => {
+      dragRef.current = {
+        pointerId,
+        originX: clientX,
+        originY: clientY,
+        baseX: pos.x,
+        baseY: pos.y,
+        moved: false,
+      }
+      document.body.style.userSelect = "none"
+    },
+    [pos],
+  )
 
-	const updateDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
-		const d = dragRef.current;
-		if (!d || d.pointerId !== pointerId) return;
-		const dx = clientX - d.originX;
-		const dy = clientY - d.originY;
-		if (!d.moved && Math.hypot(dx, dy) > 4) d.moved = true;
-		if (!d.moved) return;
-		setPos(clampAssistantPos({ x: d.baseX + dx, y: d.baseY + dy }, LAUNCHER_SIZE));
-	}, []);
+  const updateDrag = useCallback(
+    (clientX: number, clientY: number, pointerId: number | "mouse") => {
+      const d = dragRef.current
+      if (!d || d.pointerId !== pointerId) return
+      const dx = clientX - d.originX
+      const dy = clientY - d.originY
+      if (!d.moved && Math.hypot(dx, dy) > 4) d.moved = true
+      if (!d.moved) return
+      setPos(clampAssistantPos({ x: d.baseX + dx, y: d.baseY + dy }, LAUNCHER_SIZE))
+    },
+    [],
+  )
 
-	const finishDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
-		const d = dragRef.current;
-		if (!d || d.pointerId !== pointerId) return;
-		const wasDrag = d.moved;
-		dragRef.current = null;
-		document.body.style.userSelect = "";
-		document.body.style.cursor = "";
-		setPos((current) => {
-			saveLauncherPos(current);
-			return current;
-		});
-		if (!wasDrag) onOpen();
-	}, [onOpen]);
+  const finishDrag = useCallback(
+    (clientX: number, clientY: number, pointerId: number | "mouse") => {
+      const d = dragRef.current
+      if (!d || d.pointerId !== pointerId) return
+      const wasDrag = d.moved
+      dragRef.current = null
+      document.body.style.userSelect = ""
+      document.body.style.cursor = ""
+      setPos((current) => {
+        saveLauncherPos(current)
+        return current
+      })
+      if (!wasDrag) onOpen()
+    },
+    [onOpen],
+  )
 
-	useEffect(() => {
-		const onPointerMove = (e: PointerEvent) => updateDrag(e.clientX, e.clientY, e.pointerId);
-		const onPointerUp = (e: PointerEvent) => finishDrag(e.clientX, e.clientY, e.pointerId);
-		const onMouseMove = (e: MouseEvent) => updateDrag(e.clientX, e.clientY, "mouse");
-		const onMouseUp = (e: MouseEvent) => finishDrag(e.clientX, e.clientY, "mouse");
-		window.addEventListener("pointermove", onPointerMove);
-		window.addEventListener("pointerup", onPointerUp);
-		window.addEventListener("pointercancel", onPointerUp);
-		window.addEventListener("mousemove", onMouseMove);
-		window.addEventListener("mouseup", onMouseUp);
-		const onResize = () => setPos((current) => clampAssistantPos(current, LAUNCHER_SIZE));
-		window.addEventListener("resize", onResize);
-		return () => {
-			window.removeEventListener("pointermove", onPointerMove);
-			window.removeEventListener("pointerup", onPointerUp);
-			window.removeEventListener("pointercancel", onPointerUp);
-			window.removeEventListener("mousemove", onMouseMove);
-			window.removeEventListener("mouseup", onMouseUp);
-			window.removeEventListener("resize", onResize);
-			document.body.style.userSelect = "";
-		};
-	}, [updateDrag, finishDrag]);
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => updateDrag(e.clientX, e.clientY, e.pointerId)
+    const onPointerUp = (e: PointerEvent) => finishDrag(e.clientX, e.clientY, e.pointerId)
+    const onMouseMove = (e: MouseEvent) => updateDrag(e.clientX, e.clientY, "mouse")
+    const onMouseUp = (e: MouseEvent) => finishDrag(e.clientX, e.clientY, "mouse")
+    window.addEventListener("pointermove", onPointerMove)
+    window.addEventListener("pointerup", onPointerUp)
+    window.addEventListener("pointercancel", onPointerUp)
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
+    const onResize = () => setPos((current) => clampAssistantPos(current, LAUNCHER_SIZE))
+    window.addEventListener("resize", onResize)
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerUp)
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+      window.removeEventListener("resize", onResize)
+      document.body.style.userSelect = ""
+    }
+  }, [updateDrag, finishDrag])
 
-	return (
-		<button
-			type="button"
-			className="voice-launcher"
-			aria-label="Show AI Assistant"
-			style={{ "--launcher-x": `${pos.x}px`, "--launcher-y": `${pos.y}px` } as CSSProperties}
-			onPointerDown={(e) => {
-				if (e.button !== 0) return;
-				e.preventDefault();
-				startDrag(e.clientX, e.clientY, e.pointerId);
-				e.currentTarget.setPointerCapture(e.pointerId);
-			}}
-			onMouseDown={(e) => {
-				if (dragRef.current || e.button !== 0) return;
-				e.preventDefault();
-				startDrag(e.clientX, e.clientY, "mouse");
-			}}
-		>
-			<AssistantIcon fontSize="small" />
-		</button>
-	);
+  return (
+    <button
+      type="button"
+      className="voice-launcher"
+      aria-label="Show AI Assistant"
+      style={{ "--launcher-x": `${pos.x}px`, "--launcher-y": `${pos.y}px` } as CSSProperties}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        startDrag(e.clientX, e.clientY, e.pointerId)
+        e.currentTarget.setPointerCapture(e.pointerId)
+      }}
+      onMouseDown={(e) => {
+        if (dragRef.current || e.button !== 0) return
+        e.preventDefault()
+        startDrag(e.clientX, e.clientY, "mouse")
+      }}
+    >
+      <AssistantIcon fontSize="small" />
+    </button>
+  )
 }
 
 export function PanelVisibility() {
-	const { showSettingsPanel, showErrorLogsPanel, showNewConnectionForm, editingConnection, showAiAssistant, setShowAiAssistant, omniStatus } = useAppState();
+  const {
+    showSettingsPanel,
+    showErrorLogsPanel,
+    showNewConnectionForm,
+    editingConnection,
+    showAiAssistant,
+    setShowAiAssistant,
+    omniStatus,
+  } = useAppState()
 
-	return (
-		<>
-			{(showNewConnectionForm || editingConnection) && <NewConnectionForm />}
-			{showSettingsPanel && <SettingsPanel />}
-			{showErrorLogsPanel && <ErrorLogsPanel />}
-			{omniStatus !== "disabled" && showAiAssistant && <AiAssistant />}
-			{omniStatus !== "disabled" && !showAiAssistant && (
-				<AiLauncher onOpen={() => setShowAiAssistant(true)} />
-			)}
-		</>
-	);
+  return (
+    <>
+      {(showNewConnectionForm || editingConnection) && <NewConnectionForm />}
+      {showSettingsPanel && <SettingsPanel />}
+      {showErrorLogsPanel && <ErrorLogsPanel />}
+      {omniStatus !== "disabled" && showAiAssistant && <AiAssistant />}
+      {omniStatus !== "disabled" && !showAiAssistant && (
+        <AiLauncher onOpen={() => setShowAiAssistant(true)} />
+      )}
+    </>
+  )
 }
 
 export function App() {
-	return (
-		<AppProvider>
-			<UISettingsInit />
-			<WorkspaceNavigationSync />
-			<MuiThemeShell>
-					<div className="app-shell" data-testid="app-shell">
-						<ConfigConflictBanner />
-						<Sidebar
-							themeToggle={<ThemeToggle />}
-							terminalThemeToggle={<TerminalThemeToggle />}
-						/>
-						<MainPanel />
-					<ErrorBanner />
-					<ConfirmDialog />
-					<PanelVisibility />
-				</div>
-			</MuiThemeShell>
-		</AppProvider>
-	);
+  return (
+    <AppProvider>
+      <UISettingsInit />
+      <WorkspaceNavigationSync />
+      <MuiThemeShell>
+        <div className="app-shell" data-testid="app-shell">
+          <ConfigConflictBanner />
+          <Sidebar themeToggle={<ThemeToggle />} terminalThemeToggle={<TerminalThemeToggle />} />
+          <MainPanel />
+          <ErrorBanner />
+          <ConfirmDialog />
+          <PanelVisibility />
+        </div>
+      </MuiThemeShell>
+    </AppProvider>
+  )
 }

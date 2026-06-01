@@ -1,11 +1,11 @@
-import { TextField, Button, Stack, Box } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { TextField, Button, Stack, Box } from "@mui/material"
+import { alpha } from "@mui/material/styles"
 
 interface NewSessionFormProps {
-  value: string;
-  onChange: (value: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onCancel: () => void;
+  value: string
+  onChange: (value: string) => void
+  onSubmit: (e: React.FormEvent) => void
+  onCancel: () => void
 }
 
 export function NewSessionForm({ value, onChange, onSubmit, onCancel }: NewSessionFormProps) {
@@ -87,5 +87,5 @@ export function NewSessionForm({ value, onChange, onSubmit, onCancel }: NewSessi
         </Button>
       </Stack>
     </Box>
-  );
+  )
 }

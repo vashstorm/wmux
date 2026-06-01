@@ -152,6 +152,7 @@ fn cors_layer() -> CorsLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::TestAppFixture;
     use axum::body::{Body, to_bytes};
     use axum::http::{Request, StatusCode, header};
     use serde_json::{Value, json};
@@ -161,7 +162,6 @@ mod tests {
     use tower::ServiceExt;
     use wmux_core::config::Config;
     use wmux_core::logging::LoggingHandle;
-    use crate::test_utils::TestAppFixture;
 
     const TOKEN: &str = "test-token";
 
@@ -709,11 +709,18 @@ mod tests {
             .expect("response");
         assert_eq!(create_conn_response.status(), StatusCode::CREATED);
         let conn = json_body(create_conn_response).await;
-        let target_name = conn["targetName"].as_str().expect("target name").to_string();
+        let target_name = conn["targetName"]
+            .as_str()
+            .expect("target name")
+            .to_string();
 
         let targets_list = app
             .clone()
-            .oneshot(request("GET", &format!("/api/targets/{target_name}/sessions"), None))
+            .oneshot(request(
+                "GET",
+                &format!("/api/targets/{target_name}/sessions"),
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(targets_list.status(), StatusCode::OK);
@@ -721,33 +728,50 @@ mod tests {
 
         let connections_list = app
             .clone()
-            .oneshot(request("GET", &format!("/api/connections/{target_name}/sessions"), None))
+            .oneshot(request(
+                "GET",
+                &format!("/api/connections/{target_name}/sessions"),
+                None,
+            ))
             .await
             .expect("response");
         assert_eq!(connections_list.status(), StatusCode::OK);
         let connections_response = json_body(connections_list).await;
 
         assert_eq!(
-            targets_response["data"].as_array().expect("targets sessions").len(),
-            connections_response["data"].as_array().expect("connections sessions").len(),
+            targets_response["data"]
+                .as_array()
+                .expect("targets sessions")
+                .len(),
+            connections_response["data"]
+                .as_array()
+                .expect("connections sessions")
+                .len(),
             "Both route families should return same number of sessions"
         );
-        assert_eq!(targets_response["targetName"], connections_response["targetName"]);
+        assert_eq!(
+            targets_response["targetName"],
+            connections_response["targetName"]
+        );
         assert_eq!(targets_response["mode"], connections_response["mode"]);
 
         let targets_windows = app
             .clone()
-            .oneshot(
-                request("GET", &format!("/api/targets/{target_name}/sessions/nonexistent/windows"), None),
-            )
+            .oneshot(request(
+                "GET",
+                &format!("/api/targets/{target_name}/sessions/nonexistent/windows"),
+                None,
+            ))
             .await
             .expect("response");
         let targets_windows_response = json_body(targets_windows).await;
 
         let connections_windows = app
-            .oneshot(
-                request("GET", &format!("/api/connections/{target_name}/sessions/nonexistent/windows"), None),
-            )
+            .oneshot(request(
+                "GET",
+                &format!("/api/connections/{target_name}/sessions/nonexistent/windows"),
+                None,
+            ))
             .await
             .expect("response");
         let connections_windows_response = json_body(connections_windows).await;

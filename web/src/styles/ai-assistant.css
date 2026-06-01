@@ -20,7 +20,10 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl), var(--color-shadow-glow);
   overflow: hidden;
-  transition: box-shadow var(--transition-base), border-color var(--transition-base), background-color var(--transition-base);
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base),
+    background-color var(--transition-base);
 }
 
 .voice-resize-edge {
@@ -104,7 +107,11 @@
   box-shadow: var(--shadow-md), var(--color-shadow-glow);
   cursor: grab;
   touch-action: none;
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-spring), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-spring),
+    box-shadow var(--transition-fast);
 }
 
 .voice-launcher:active {
@@ -182,8 +189,13 @@
 }
 
 @keyframes voice-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .voice-status-label {
@@ -325,7 +337,9 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background var(--transition-fast), filter var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    filter var(--transition-fast);
 }
 
 .voice-confirm-btn {
@@ -423,7 +437,10 @@
   background: var(--color-panel);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 .voice-btn:hover {

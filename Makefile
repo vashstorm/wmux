@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build dev clean test typecheck e2e tauri-build tauri-e2e tauri-dev app icons
+.PHONY: build dev clean test typecheck format e2e tauri-build tauri-e2e tauri-dev app icons
 
 PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 TAURI_DRIVER ?= tauri-driver
@@ -70,6 +70,10 @@ test:
 
 typecheck:
 	bun run --cwd web typecheck
+
+format:
+	cargo fmt --all
+	bun run --cwd web format
 
 e2e:
 	$(MAKE) build

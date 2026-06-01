@@ -73,50 +73,35 @@ mod tests {
     fn strip_single_line_comments() {
         let input = "{\n  // comment\n  \"key\": \"value\"\n}";
         let output = strip_jsonc_comments(input);
-        assert_eq!(
-            output,
-            "{\n  \n  \"key\": \"value\"\n}"
-        );
+        assert_eq!(output, "{\n  \n  \"key\": \"value\"\n}");
     }
 
     #[test]
     fn strip_multi_line_comments() {
         let input = "{\n  /* multi\n  line */\n  \"key\": \"value\"\n}";
         let output = strip_jsonc_comments(input);
-        assert_eq!(
-            output,
-            "{\n  \n\n  \"key\": \"value\"\n}"
-        );
+        assert_eq!(output, "{\n  \n\n  \"key\": \"value\"\n}");
     }
 
     #[test]
     fn preserve_strings_with_slashes() {
         let input = "{\"url\": \"https://example.com\" // comment\n}";
         let output = strip_jsonc_comments(input);
-        assert_eq!(
-            output,
-            "{\"url\": \"https://example.com\" \n}"
-        );
+        assert_eq!(output, "{\"url\": \"https://example.com\" \n}");
     }
 
     #[test]
     fn preserve_strings_with_escaped_quotes() {
         let input = "{\"text\": \"say \\\"hello\\\"\" // comment\n}";
         let output = strip_jsonc_comments(input);
-        assert_eq!(
-            output,
-            "{\"text\": \"say \\\"hello\\\"\" \n}"
-        );
+        assert_eq!(output, "{\"text\": \"say \\\"hello\\\"\" \n}");
     }
 
     #[test]
     fn handle_nested_comment_markers_in_strings() {
         let input = "{\"pattern\": \"/* not a comment */\" // real comment\n}";
         let output = strip_jsonc_comments(input);
-        assert_eq!(
-            output,
-            "{\"pattern\": \"/* not a comment */\" \n}"
-        );
+        assert_eq!(output, "{\"pattern\": \"/* not a comment */\" \n}");
     }
 
     #[test]
