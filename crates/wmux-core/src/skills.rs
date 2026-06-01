@@ -1,8 +1,9 @@
 //! Skill definition loader and persistence for Omni voice skills.
 //!
 //! Loads skill definitions from markdown files in a `skills/` directory.
-//! Each `.md` file contains YAML frontmatter with metadata and markdown body
-//! for the description.
+//! Each `.md` file may contain one or more YAML-frontmatter markdown blocks.
+//! Single-skill files can omit `id` and derive it from the file stem. Grouped
+//! files must include `id` in each block.
 
 use std::path::{Path, PathBuf};
 
@@ -44,12 +45,20 @@ pub struct OmniSkillDef {
     /// Original markdown file text.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub full_prompt: String,
+    /// Relative markdown file path this skill was loaded from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_file: Option<String>,
+    /// Zero-based order of the skill block inside `source_file`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_order: Option<usize>,
 }
 
 /// Raw frontmatter parsed from a markdown skill file.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct SkillFrontmatter {
+    #[serde(default)]
+    id: Option<String>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default = "default_enabled")]
@@ -61,7 +70,15 @@ struct SkillFrontmatter {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 struct SkillFrontmatterOut {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
     enabled: bool,
+}
+
+struct SkillMarkdownBlock<'a> {
+    frontmatter_yaml: &'a str,
+    body: &'a str,
+    raw: &'a str,
 }
 
 /// Load all skill definitions from the given directory.
@@ -83,7 +100,10 @@ pub fn load_skills_from_dir(dir: impl AsRef<Path>) -> Vec<OmniSkillDef> {
 
     for path in paths {
         match load_skill_file(&path) {
-            Ok(skill) => skills.push(skill),
+            Ok(mut loaded) => {
+                apply_source_file(&mut loaded, dir, &path);
+                skills.extend(loaded);
+            }
             Err(e) => {
                 tracing::warn!("failed to load skill file {}: {}", path.display(), e);
             }
@@ -98,7 +118,12 @@ pub fn get_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<Omn
     validate_skill_id(id)?;
     let path =
         existing_skill_path(dir.as_ref(), id)?.unwrap_or_else(|| skill_path(dir.as_ref(), id));
-    load_skill_file(&path)
+    let mut skills = load_skill_file(&path)?;
+    apply_source_file(&mut skills, dir.as_ref(), &path);
+    skills
+        .into_iter()
+        .find(|skill| skill.id == id)
+        .ok_or_else(|| anyhow::anyhow!("skill not found: {id}"))
 }
 
 pub fn save_skill_to_dir(
@@ -109,19 +134,42 @@ pub fn save_skill_to_dir(
     std::fs::create_dir_all(dir.as_ref())?;
     let path = existing_skill_path(dir.as_ref(), &skill.id)?
         .unwrap_or_else(|| skill_path(dir.as_ref(), &skill.id));
-    let frontmatter = SkillFrontmatterOut {
-        enabled: skill.enabled,
-    };
-    let yaml = serde_yaml::to_string(&frontmatter)?;
-    let content = format!("---\n{}---\n\n{}\n", yaml, skill.description.trim());
-    std::fs::write(&path, content)?;
-    load_skill_file(&path)
+
+    if path.exists() {
+        let mut skills = load_skill_file(&path)?;
+        let include_id = should_write_group_ids(&path, &skills);
+        if let Some(existing) = skills.iter_mut().find(|item| item.id == skill.id) {
+            *existing = skill.clone();
+        } else {
+            skills.push(skill.clone());
+            skills.sort_by(|a, b| a.id.cmp(&b.id));
+        }
+        std::fs::write(&path, render_skill_file(&skills, include_id)?)?;
+    } else {
+        std::fs::write(
+            &path,
+            render_skill_file(std::slice::from_ref(skill), false)?,
+        )?;
+    }
+
+    let mut skills = load_skill_file(&path)?;
+    apply_source_file(&mut skills, dir.as_ref(), &path);
+    skills
+        .into_iter()
+        .find(|item| item.id == skill.id)
+        .ok_or_else(|| anyhow::anyhow!("saved skill not found: {}", skill.id))
 }
 
 pub fn delete_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<()> {
     validate_skill_id(id)?;
     if let Some(path) = existing_skill_path(dir.as_ref(), id)? {
-        std::fs::remove_file(path)?;
+        let mut skills = load_skill_file(&path)?;
+        skills.retain(|skill| skill.id != id);
+        if skills.is_empty() {
+            std::fs::remove_file(path)?;
+        } else {
+            std::fs::write(&path, render_skill_file(&skills, true)?)?;
+        }
     }
     Ok(())
 }
@@ -646,9 +694,9 @@ pub fn skill_prompt(skill: &OmniSkillDef) -> &str {
     }
 }
 
-/// Parse a single markdown skill file.
+/// Parse a markdown skill file.
 ///
-/// Expects the format:
+/// Single-skill files can omit `id` and derive it from the filename:
 /// ```markdown
 /// ---
 /// enabled: true
@@ -658,58 +706,167 @@ pub fn skill_prompt(skill: &OmniSkillDef) -> &str {
 ///
 /// Markdown prompt text...
 /// ```
-fn load_skill_file(path: &Path) -> anyhow::Result<OmniSkillDef> {
-    let content = std::fs::read_to_string(path)?;
-
-    // Split frontmatter from body
-    let (frontmatter_yaml, body) = parse_frontmatter(&content)?;
-
-    let frontmatter: SkillFrontmatter = serde_yaml::from_str(frontmatter_yaml)?;
-
-    let file_id = path
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .ok_or_else(|| anyhow::anyhow!("skill file has no valid stem: {}", path.display()))?
-        .to_string();
-    let id = file_id;
-    validate_skill_id(&id)?;
-    let description = body.trim().to_string();
-    let name = frontmatter.name.unwrap_or_else(|| {
-        display_name_from_markdown(&description).unwrap_or_else(|| titleize_skill_id(&id))
-    });
-    let risk_level = builtin_risk_level(&id).unwrap_or_else(default_risk_level);
-    let parameters = parameters_for_loaded_skill(&id, &description)?;
-
-    Ok(OmniSkillDef {
-        id,
-        name,
-        risk_level,
-        enabled: frontmatter.enabled,
-        prompt_mode: frontmatter.prompt_mode,
-        description,
-        parameters,
-        full_prompt: content.trim().to_string(),
-    })
-}
-
-/// Extract YAML frontmatter and markdown body from text.
 ///
-/// Frontmatter is delimited by `---` on its own line at the very start
-/// of the file and again after the YAML block.
-fn parse_frontmatter(content: &str) -> anyhow::Result<(&str, &str)> {
-    if !content.starts_with("---") {
-        anyhow::bail!("missing frontmatter delimiter at start of file");
+/// Grouped files repeat the same frontmatter/body block and must include
+/// `id` in each block.
+fn load_skill_file(path: &Path) -> anyhow::Result<Vec<OmniSkillDef>> {
+    let content = std::fs::read_to_string(path)?;
+    let blocks = parse_skill_blocks(&content)?;
+    let multiple_blocks = blocks.len() > 1;
+    let mut skills = Vec::with_capacity(blocks.len());
+
+    for (source_order, block) in blocks.into_iter().enumerate() {
+        let frontmatter: SkillFrontmatter = serde_yaml::from_str(block.frontmatter_yaml)?;
+
+        let id = match frontmatter.id {
+            Some(id) => id,
+            None if !multiple_blocks => path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .ok_or_else(|| anyhow::anyhow!("skill file has no valid stem: {}", path.display()))?
+                .to_string(),
+            None => anyhow::bail!("grouped skill file block is missing id: {}", path.display()),
+        };
+        validate_skill_id(&id)?;
+
+        let description = block.body.trim().to_string();
+        let name = frontmatter.name.unwrap_or_else(|| {
+            display_name_from_markdown(&description).unwrap_or_else(|| titleize_skill_id(&id))
+        });
+        let risk_level = builtin_risk_level(&id).unwrap_or_else(default_risk_level);
+        let parameters = parameters_for_loaded_skill(&id, &description)?;
+
+        skills.push(OmniSkillDef {
+            id,
+            name,
+            risk_level,
+            enabled: frontmatter.enabled,
+            prompt_mode: frontmatter.prompt_mode,
+            description,
+            parameters,
+            full_prompt: block.raw.trim().to_string(),
+            source_file: None,
+            source_order: Some(source_order),
+        });
     }
 
-    let after_first = &content[3..];
-    let Some(end_pos) = after_first.find("\n---") else {
+    Ok(skills)
+}
+
+fn parse_skill_blocks(content: &str) -> anyhow::Result<Vec<SkillMarkdownBlock<'_>>> {
+    let delimiters = frontmatter_delimiters(content);
+    if delimiters.first().map(|(start, _)| *start) != Some(0) {
+        anyhow::bail!("missing frontmatter delimiter at start of file");
+    }
+    if delimiters.len() < 2 {
         anyhow::bail!("missing closing frontmatter delimiter");
-    };
+    }
 
-    let yaml = after_first[..end_pos].trim();
-    let body = &after_first[end_pos + 4..];
+    let mut blocks = Vec::new();
+    let mut index = 0;
+    while index < delimiters.len() {
+        if index + 1 >= delimiters.len() {
+            anyhow::bail!("missing closing frontmatter delimiter");
+        }
 
-    Ok((yaml, body))
+        let (block_start, yaml_start) = delimiters[index];
+        let (yaml_end, body_start) = delimiters[index + 1];
+        let block_end = delimiters
+            .get(index + 2)
+            .map(|(start, _)| *start)
+            .unwrap_or(content.len());
+
+        blocks.push(SkillMarkdownBlock {
+            frontmatter_yaml: content[yaml_start..yaml_end].trim(),
+            body: &content[body_start..block_end],
+            raw: &content[block_start..block_end],
+        });
+        index += 2;
+    }
+
+    Ok(blocks)
+}
+
+fn frontmatter_delimiters(content: &str) -> Vec<(usize, usize)> {
+    let mut delimiters = Vec::new();
+    let mut offset = 0;
+
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if trimmed == "---" {
+            delimiters.push((offset, offset + line.len()));
+        }
+        offset += line.len();
+    }
+
+    delimiters
+}
+
+fn render_skill_file(skills: &[OmniSkillDef], include_id: bool) -> anyhow::Result<String> {
+    let mut content = String::new();
+
+    for (index, skill) in skills.iter().enumerate() {
+        if index > 0 {
+            content.push('\n');
+        }
+
+        let frontmatter = SkillFrontmatterOut {
+            id: include_id.then(|| skill.id.clone()),
+            enabled: skill.enabled,
+        };
+        let yaml = serde_yaml::to_string(&frontmatter)?;
+        content.push_str("---\n");
+        content.push_str(&yaml);
+        content.push_str("---\n\n");
+        content.push_str(skill.description.trim());
+        content.push('\n');
+    }
+
+    Ok(content)
+}
+
+fn apply_source_file(skills: &mut [OmniSkillDef], dir: &Path, path: &Path) {
+    let source_file = path
+        .strip_prefix(dir)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    for skill in skills {
+        skill.source_file = Some(source_file.clone());
+    }
+}
+
+fn should_write_group_ids(path: &Path, skills: &[OmniSkillDef]) -> bool {
+    skills.len() > 1
+        || skills
+            .first()
+            .map(|skill| path.file_stem().and_then(|stem| stem.to_str()) != Some(skill.id.as_str()))
+            .unwrap_or(false)
+}
+
+#[cfg(test)]
+fn load_single_skill_file(path: &Path) -> anyhow::Result<OmniSkillDef> {
+    let mut skills = load_skill_file(path)?;
+    if skills.len() != 1 {
+        anyhow::bail!("expected exactly one skill in {}", path.display());
+    }
+    Ok(skills.remove(0))
+}
+
+/// Parse a single-skill markdown text into frontmatter and body.
+///
+/// Grouped files are parsed through `parse_skill_blocks`; this helper remains
+/// for tests and callers that need legacy single-file behavior.
+#[cfg(test)]
+fn parse_frontmatter(content: &str) -> anyhow::Result<(&str, &str)> {
+    let mut blocks = parse_skill_blocks(content)?;
+    let block = blocks
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("missing frontmatter delimiter at start of file"))?;
+    if !blocks.is_empty() {
+        anyhow::bail!("expected a single frontmatter block");
+    }
+    Ok((block.frontmatter_yaml, block.body))
 }
 
 fn skill_path(dir: &Path, id: &str) -> PathBuf {
@@ -717,9 +874,16 @@ fn skill_path(dir: &Path, id: &str) -> PathBuf {
 }
 
 fn existing_skill_path(dir: &Path, id: &str) -> anyhow::Result<Option<PathBuf>> {
-    Ok(markdown_skill_paths(dir)?
-        .into_iter()
-        .find(|path| path.file_stem().and_then(|stem| stem.to_str()) == Some(id)))
+    for path in markdown_skill_paths(dir)? {
+        match load_skill_file(&path) {
+            Ok(skills) if skills.iter().any(|skill| skill.id == id) => return Ok(Some(path)),
+            Ok(_) => {}
+            Err(e) => {
+                tracing::warn!("failed to load skill file {}: {}", path.display(), e);
+            }
+        }
+    }
+    Ok(None)
 }
 
 fn markdown_skill_paths(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
@@ -788,6 +952,8 @@ fn builtin_skill(
         description: description.to_string(),
         parameters,
         full_prompt: description.to_string(),
+        source_file: None,
+        source_order: None,
     }
 }
 
@@ -912,7 +1078,7 @@ List all tmux sessions.
         )
         .unwrap();
 
-        let skill = load_skill_file(&path).unwrap();
+        let skill = load_single_skill_file(&path).unwrap();
         assert_eq!(skill.id, "list_sessions");
         assert_eq!(skill.name, "List Sessions");
         assert_eq!(skill.risk_level, OmniSkillRiskLevel::Safe);
@@ -959,6 +1125,42 @@ List all tmux sessions.
     }
 
     #[test]
+    fn load_skills_from_dir_reads_grouped_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut file = std::fs::File::create(dir.path().join("sessions.md")).unwrap();
+        write!(
+            file,
+            "{}",
+            r#"---
+id: list_sessions
+enabled: true
+---
+
+# List Sessions
+
+List all tmux sessions.
+
+---
+id: create_session
+enabled: false
+---
+
+# Create Session
+
+Create a new tmux session.
+"#
+        )
+        .unwrap();
+
+        let skills = load_skills_from_dir(dir.path());
+        assert_eq!(skills.len(), 2);
+        assert_eq!(skills[0].id, "create_session");
+        assert!(!skills[0].enabled);
+        assert_eq!(skills[1].id, "list_sessions");
+        assert!(skills[1].enabled);
+    }
+
+    #[test]
     fn save_skill_to_dir_round_trips_parameters() {
         let dir = tempfile::tempdir().unwrap();
         let skill = OmniSkillDef {
@@ -970,10 +1172,13 @@ List all tmux sessions.
             description: "# Custom Skill\n\nUse this custom skill.\n\n## Parameters\n\n```json\n{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}\n```".to_string(),
             parameters: default_parameters(),
             full_prompt: String::new(),
+            source_file: None,
+            source_order: None,
         };
 
         let saved = save_skill_to_dir(dir.path(), &skill).unwrap();
         assert_eq!(saved.id, "custom_skill");
+        assert_eq!(saved.source_file.as_deref(), Some("custom_skill.md"));
         assert_eq!(saved.name, "Custom Skill");
         assert!(!saved.enabled);
         assert_eq!(saved.prompt_mode, OmniSkillPromptMode::Description);
@@ -985,6 +1190,106 @@ List all tmux sessions.
         assert!(!saved_text.contains("\nprompt_mode:"));
         assert!(!saved_text.contains("\nparameters:"));
         assert!(saved_text.contains("## Parameters"));
+    }
+
+    #[test]
+    fn save_skill_to_dir_updates_grouped_file_member() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sessions.md");
+        let mut file = std::fs::File::create(&path).unwrap();
+        write!(
+            file,
+            "{}",
+            r#"---
+id: list_sessions
+enabled: true
+---
+
+# List Sessions
+
+List all tmux sessions.
+
+---
+id: create_session
+enabled: true
+---
+
+# Create Session
+
+Create a new tmux session.
+"#
+        )
+        .unwrap();
+
+        let saved = save_skill_to_dir(
+            dir.path(),
+            &OmniSkillDef {
+                id: "create_session".to_string(),
+                name: "Create Session".to_string(),
+                risk_level: OmniSkillRiskLevel::Write,
+                enabled: false,
+                prompt_mode: OmniSkillPromptMode::Description,
+                description: "# Create Session\n\nCreate a grouped tmux session.".to_string(),
+                parameters: default_parameters(),
+                full_prompt: String::new(),
+                source_file: None,
+                source_order: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(saved.id, "create_session");
+        assert_eq!(saved.source_file.as_deref(), Some("sessions.md"));
+        assert!(!saved.enabled);
+        let skills = load_skills_from_dir(dir.path());
+        assert_eq!(skills.len(), 2);
+        assert!(skills.iter().any(|skill| skill.id == "list_sessions"));
+        assert!(
+            std::fs::read_to_string(path)
+                .unwrap()
+                .contains("Create a grouped tmux session.")
+        );
+    }
+
+    #[test]
+    fn delete_skill_from_dir_removes_grouped_file_member() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sessions.md");
+        let mut file = std::fs::File::create(&path).unwrap();
+        write!(
+            file,
+            "{}",
+            r#"---
+id: list_sessions
+enabled: true
+---
+
+# List Sessions
+
+List all tmux sessions.
+
+---
+id: create_session
+enabled: true
+---
+
+# Create Session
+
+Create a new tmux session.
+"#
+        )
+        .unwrap();
+
+        delete_skill_from_dir(dir.path(), "create_session").unwrap();
+
+        let skills = load_skills_from_dir(dir.path());
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "list_sessions");
+        assert!(
+            std::fs::read_to_string(path)
+                .unwrap()
+                .contains("id: list_sessions")
+        );
     }
 
     #[test]

@@ -1,4 +1,5 @@
 ---
+id: invoke_backend_route
 enabled: true
 ---
 
@@ -48,5 +49,45 @@ Invoke an allowlisted backend REST API route. Write or destructive routes may re
     }
   },
   "required": ["route_id"]
+}
+```
+---
+id: get_config
+enabled: true
+---
+
+# Get Config
+
+Read the current server configuration. Auth token fields are redacted in the response for security.
+
+## Parameters
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+---
+id: check_health
+enabled: true
+---
+
+# Check Health
+
+Check backend server health and tmux connection availability.
+Safe read-only diagnostic. Optionally check a specific connection target.
+
+## Parameters
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target_name": {
+      "type": "string",
+      "description": "Target connection name to check. Omit to check the server health only."
+    }
+  }
 }
 ```
