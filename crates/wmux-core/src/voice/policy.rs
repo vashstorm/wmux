@@ -185,7 +185,14 @@ pub fn is_dangerous(skill: &str, params: &serde_json::Value) -> bool {
     // Destructive operations
     if matches!(
         skill,
-        "delete_session" | "delete_window" | "delete_pane" | "kill_pane" | "run_project"
+        "delete_session"
+            | "delete_window"
+            | "delete_pane"
+            | "kill_pane"
+            | "run_project"
+            | "delete_project"
+            | "cleanup_tmux_analysis"
+            | "clear_ai_logs"
     ) {
         return true;
     }
@@ -249,6 +256,12 @@ fn is_write_operation(skill: &str) -> bool {
             | "rename_window"
             | "split_pane"
             | "clear_pane"
+            | "create_project"
+            | "update_project"
+            | "launch_project"
+            | "sync_project_from_tmux"
+            | "generate_project_ai_html"
+            | "analyze_session"
     )
 }
 

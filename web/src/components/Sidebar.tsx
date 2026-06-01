@@ -73,6 +73,18 @@ export function Sidebar({ themeToggle, terminalThemeToggle }: { themeToggle?: Re
 	const [projects, setProjects] = useState<Project[]>([]);
 	const prevSelectedRef = useRef<string | null>(null);
 
+	useEffect(() => {
+		const handleVoiceNavigation = (event: Event) => {
+			const route = (event as CustomEvent<{ route?: string }>).detail?.route;
+			if (route === "projects" || route === "session" || route === "stats" || route === "ai_logs") {
+				setActiveView(route);
+			}
+		};
+
+		window.addEventListener("wmux:navigate-sidebar", handleVoiceNavigation);
+		return () => window.removeEventListener("wmux:navigate-sidebar", handleVoiceNavigation);
+	}, []);
+
 	const refreshErrorLogBadge = useCallback(async () => {
 		try {
 			const response = await fetchErrorLogs();

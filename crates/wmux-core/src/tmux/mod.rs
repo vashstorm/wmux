@@ -203,6 +203,11 @@ impl<R: CommandRunner> Adapter<R> {
         self.run_args(&args).await.map(|_| ())
     }
 
+    pub async fn clear_history(&self, target: &str) -> Result<()> {
+        let args = build_clear_history_args(target)?;
+        self.run_args(&args).await.map(|_| ())
+    }
+
     pub async fn send_keys(&self, target: &str, keys: &[&str]) -> Result<()> {
         require_value("pane target", target)?;
         if keys.is_empty() {
@@ -395,6 +400,15 @@ fn build_kill_pane_args(target: &str) -> Result<Vec<String>> {
     require_value("pane target", target)?;
     Ok(vec![
         "kill-pane".to_string(),
+        "-t".to_string(),
+        target.to_string(),
+    ])
+}
+
+fn build_clear_history_args(target: &str) -> Result<Vec<String>> {
+    require_value("pane target", target)?;
+    Ok(vec![
+        "clear-history".to_string(),
         "-t".to_string(),
         target.to_string(),
     ])
@@ -997,6 +1011,27 @@ mod tests {
                 "dev".to_string(),
                 "-F".to_string(),
                 SESSION_FORMAT.to_string(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn tmux_clear_history_uses_target_pane() {
+        let runner = MockRunner::with_response(MockResponse::Output {
+            stdout: String::new(),
+            stderr: String::new(),
+            code: 0,
+        });
+        let adapter = Adapter::with_runner("tmux", runner.clone());
+
+        adapter.clear_history("%1").await.expect("clear history");
+
+        assert_eq!(
+            runner.calls()[0].args,
+            vec![
+                "clear-history".to_string(),
+                "-t".to_string(),
+                "%1".to_string(),
             ]
         );
     }

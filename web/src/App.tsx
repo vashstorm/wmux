@@ -4,7 +4,7 @@ import "./styles/overlays.css";
 import "./styles/components.css";
 import "./styles/fonts.css";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react";
 import { ThemeProvider, CssBaseline, IconButton, Tooltip } from "@mui/material";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
@@ -24,6 +24,7 @@ import { AiAssistant } from "./components/AiAssistant.js";
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js";
 import { normalizeThemeId } from "./ui/themes.js";
 import AssistantIcon from "@mui/icons-material/Assistant";
+import { loadLauncherPos, saveLauncherPos, clampAssistantPos, type AssistantPos } from "./components/AiAssistant.js";
 
 function UISettingsInit() {
 	const { setUISettings, setOmniStatus } = useAppState();
@@ -190,6 +191,87 @@ function WorkspaceNavigationSync() {
 	return null;
 }
 
+const LAUNCHER_SIZE = { width: 42, height: 42 };
+
+function AiLauncher({ onOpen }: { onOpen: () => void }) {
+	const [pos, setPos] = useState<AssistantPos>(() => loadLauncherPos());
+	const dragRef = useRef<{ pointerId: number | "mouse"; originX: number; originY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
+
+	const startDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		dragRef.current = { pointerId, originX: clientX, originY: clientY, baseX: pos.x, baseY: pos.y, moved: false };
+		document.body.style.userSelect = "none";
+	}, [pos]);
+
+	const updateDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		const d = dragRef.current;
+		if (!d || d.pointerId !== pointerId) return;
+		const dx = clientX - d.originX;
+		const dy = clientY - d.originY;
+		if (!d.moved && Math.hypot(dx, dy) > 4) d.moved = true;
+		if (!d.moved) return;
+		setPos(clampAssistantPos({ x: d.baseX + dx, y: d.baseY + dy }, LAUNCHER_SIZE));
+	}, []);
+
+	const finishDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		const d = dragRef.current;
+		if (!d || d.pointerId !== pointerId) return;
+		const wasDrag = d.moved;
+		dragRef.current = null;
+		document.body.style.userSelect = "";
+		document.body.style.cursor = "";
+		setPos((current) => {
+			saveLauncherPos(current);
+			return current;
+		});
+		if (!wasDrag) onOpen();
+	}, [onOpen]);
+
+	useEffect(() => {
+		const onPointerMove = (e: PointerEvent) => updateDrag(e.clientX, e.clientY, e.pointerId);
+		const onPointerUp = (e: PointerEvent) => finishDrag(e.clientX, e.clientY, e.pointerId);
+		const onMouseMove = (e: MouseEvent) => updateDrag(e.clientX, e.clientY, "mouse");
+		const onMouseUp = (e: MouseEvent) => finishDrag(e.clientX, e.clientY, "mouse");
+		window.addEventListener("pointermove", onPointerMove);
+		window.addEventListener("pointerup", onPointerUp);
+		window.addEventListener("pointercancel", onPointerUp);
+		window.addEventListener("mousemove", onMouseMove);
+		window.addEventListener("mouseup", onMouseUp);
+		const onResize = () => setPos((current) => clampAssistantPos(current, LAUNCHER_SIZE));
+		window.addEventListener("resize", onResize);
+		return () => {
+			window.removeEventListener("pointermove", onPointerMove);
+			window.removeEventListener("pointerup", onPointerUp);
+			window.removeEventListener("pointercancel", onPointerUp);
+			window.removeEventListener("mousemove", onMouseMove);
+			window.removeEventListener("mouseup", onMouseUp);
+			window.removeEventListener("resize", onResize);
+			document.body.style.userSelect = "";
+		};
+	}, [updateDrag, finishDrag]);
+
+	return (
+		<button
+			type="button"
+			className="voice-launcher"
+			aria-label="Show AI Assistant"
+			style={{ "--launcher-x": `${pos.x}px`, "--launcher-y": `${pos.y}px` } as CSSProperties}
+			onPointerDown={(e) => {
+				if (e.button !== 0) return;
+				e.preventDefault();
+				startDrag(e.clientX, e.clientY, e.pointerId);
+				e.currentTarget.setPointerCapture(e.pointerId);
+			}}
+			onMouseDown={(e) => {
+				if (dragRef.current || e.button !== 0) return;
+				e.preventDefault();
+				startDrag(e.clientX, e.clientY, "mouse");
+			}}
+		>
+			<AssistantIcon fontSize="small" />
+		</button>
+	);
+}
+
 export function PanelVisibility() {
 	const { showSettingsPanel, showErrorLogsPanel, showNewConnectionForm, editingConnection, showAiAssistant, setShowAiAssistant, omniStatus } = useAppState();
 
@@ -200,14 +282,7 @@ export function PanelVisibility() {
 			{showErrorLogsPanel && <ErrorLogsPanel />}
 			{omniStatus !== "disabled" && showAiAssistant && <AiAssistant />}
 			{omniStatus !== "disabled" && !showAiAssistant && (
-				<button
-					type="button"
-					className="voice-launcher"
-					aria-label="Show AI Assistant"
-					onClick={() => setShowAiAssistant(true)}
-				>
-					<AssistantIcon fontSize="small" />
-				</button>
+				<AiLauncher onOpen={() => setShowAiAssistant(true)} />
 			)}
 		</>
 	);

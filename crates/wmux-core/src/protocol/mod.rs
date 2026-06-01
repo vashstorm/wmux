@@ -331,7 +331,7 @@ pub enum OmniServerEvent {
 }
 
 /// Allowed frontend routes for navigate_frontend skill.
-pub const VOICE_FRONTEND_ROUTES: [&str; 7] = [
+pub const VOICE_FRONTEND_ROUTES: [&str; 9] = [
     "home",
     "settings",
     "projects",
@@ -339,21 +339,35 @@ pub const VOICE_FRONTEND_ROUTES: [&str; 7] = [
     "session",
     "window",
     "pane",
+    "stats",
+    "ai_logs",
 ];
 
 /// Allowed backend routes for invoke_backend_route skill.
-pub const VOICE_BACKEND_ROUTES: [&str; 11] = [
+pub const VOICE_BACKEND_ROUTES: [&str; 23] = [
     "connections.list",
     "sessions.list",
     "sessions.create",
     "sessions.rename",
     "sessions.delete",
+    "sessions.analyze",
     "windows.list",
     "windows.create",
     "windows.delete",
     "panes.list",
     "panes.split",
     "panes.delete",
+    "projects.list",
+    "projects.create",
+    "projects.update",
+    "projects.delete",
+    "projects.launch",
+    "projects.sync_from_tmux",
+    "projects.generate_ai_html",
+    "tmux_analysis.list",
+    "tmux_analysis.cleanup",
+    "ai_logs.list",
+    "ai_logs.clear",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -769,9 +783,9 @@ mod tests {
     }
 
     #[test]
-    fn generate_qwen_tools_returns_nine_tools() {
+    fn generate_qwen_tools_returns_builtin_tools() {
         let tools = generate_qwen_tools(&[]);
-        assert_eq!(tools.len(), 21, "should have 21 voice skills");
+        assert_eq!(tools.len(), 33, "should have 33 voice skills");
 
         // Verify each tool has required structure
         for tool in &tools {
@@ -801,12 +815,24 @@ mod tests {
             "sessions.create",
             "sessions.rename",
             "sessions.delete",
+            "sessions.analyze",
             "windows.list",
             "windows.create",
             "windows.delete",
             "panes.list",
             "panes.split",
             "panes.delete",
+            "projects.list",
+            "projects.create",
+            "projects.update",
+            "projects.delete",
+            "projects.launch",
+            "projects.sync_from_tmux",
+            "projects.generate_ai_html",
+            "tmux_analysis.list",
+            "tmux_analysis.cleanup",
+            "ai_logs.list",
+            "ai_logs.clear",
         ];
 
         for route in expected_routes {
@@ -839,6 +865,8 @@ mod tests {
             "session",
             "window",
             "pane",
+            "stats",
+            "ai_logs",
         ];
 
         for route in expected_routes {
@@ -863,8 +891,10 @@ mod tests {
         assert!(props.get("execute").is_some());
         assert!(props.get("append_enter").is_some());
         assert!(props.get("control").is_some());
+        assert!(props.get("control_sequence").is_some());
         assert!(props.get("multiline").is_some());
 
+        assert_eq!(props["pane_index"]["type"], "string");
         // Verify they are boolean with default false
         assert_eq!(props["execute"]["type"], "boolean");
         assert_eq!(props["execute"]["default"], false);

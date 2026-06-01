@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { AiAssistant } from "./AiAssistant.js";
 import { AppProvider, useAppState } from "../state/store.js";
 import { useEffect } from "react";
@@ -185,6 +185,39 @@ describe("AiAssistant", () => {
 		});
 
 		expect(screen.getByText("hello world")).toBeInTheDocument();
+	});
+
+	test("replaces live voice transcript with one finalized user message", async () => {
+		renderWithStateSetup((ctx) => {
+			ctx.setOmniStatus("idle");
+		});
+
+		fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+			target: { value: "connect" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+		act(() => {
+			voiceClientMocks.onMessage?.({
+				type: "transcript_delta",
+				text: "hello world",
+			});
+		});
+
+		expect(screen.getByText("Live")).toBeInTheDocument();
+		expect(screen.getByText("hello world")).toBeInTheDocument();
+
+		act(() => {
+			voiceClientMocks.onMessage?.({
+				type: "transcript_done",
+				text: "hello world",
+			});
+		});
+
+		await waitFor(() => {
+			expect(screen.queryByText("Live")).not.toBeInTheDocument();
+			expect(screen.getAllByText("hello world")).toHaveLength(1);
+		});
 	});
 
 	test("shows error message when omniError is set", () => {

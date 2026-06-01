@@ -21,6 +21,8 @@ export const FRONTEND_ROUTES = {
 	SESSION: "session",
 	WINDOW: "window",
 	PANE: "pane",
+	STATS: "stats",
+	AI_LOGS: "ai_logs",
 } as const;
 
 export type FrontendRoute = (typeof FRONTEND_ROUTES)[keyof typeof FRONTEND_ROUTES];
@@ -32,12 +34,24 @@ export const BACKEND_ROUTES = {
 	SESSIONS_CREATE: "sessions.create",
 	SESSIONS_RENAME: "sessions.rename",
 	SESSIONS_DELETE: "sessions.delete",
+	SESSIONS_ANALYZE: "sessions.analyze",
 	WINDOWS_LIST: "windows.list",
 	WINDOWS_CREATE: "windows.create",
 	WINDOWS_DELETE: "windows.delete",
 	PANES_LIST: "panes.list",
 	PANES_SPLIT: "panes.split",
 	PANES_DELETE: "panes.delete",
+	PROJECTS_LIST: "projects.list",
+	PROJECTS_CREATE: "projects.create",
+	PROJECTS_UPDATE: "projects.update",
+	PROJECTS_DELETE: "projects.delete",
+	PROJECTS_LAUNCH: "projects.launch",
+	PROJECTS_SYNC_FROM_TMUX: "projects.sync_from_tmux",
+	PROJECTS_GENERATE_AI_HTML: "projects.generate_ai_html",
+	TMUX_ANALYSIS_LIST: "tmux_analysis.list",
+	TMUX_ANALYSIS_CLEANUP: "tmux_analysis.cleanup",
+	AI_LOGS_LIST: "ai_logs.list",
+	AI_LOGS_CLEAR: "ai_logs.clear",
 } as const;
 
 export type BackendRoute = (typeof BACKEND_ROUTES)[keyof typeof BACKEND_ROUTES];

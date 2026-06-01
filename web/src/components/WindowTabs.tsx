@@ -470,7 +470,9 @@ export function WindowTabs({
 										: theme.palette.mode === "dark"
 											? "rgba(107, 130, 245, 0.5)"
 											: "rgba(79, 107, 237, 0.45)"
-									: "transparent",
+									: (theme) => theme.palette.mode === "dark"
+										? "rgba(255, 255, 255, 0.15)"
+										: "rgba(15, 23, 42, 0.18)",
 								color: isActive
 									? hasNonDefaultStatus ? statusTone.color : "primary.main"
 									: "text.secondary",

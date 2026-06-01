@@ -1891,6 +1891,7 @@
 	gap: 6px;
 	padding: 0 13px;
 	border-radius: 8px;
+	border: 1px solid rgba(15, 23, 42, 0.14);
 	font-size: var(--font-size-xs);
 	white-space: nowrap;
 	cursor: pointer;
@@ -1899,6 +1900,10 @@
 	overflow: visible;
 	min-height: 34px;
 	animation: tabSlideIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+[data-mui-color-scheme="dark"] .window-tab {
+	border-color: rgba(255, 255, 255, 0.12);
 }
 
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(1) { animation-delay: 0ms; }
@@ -1910,6 +1915,11 @@
 
 .window-tab:hover {
 	outline: none;
+	border-color: rgba(15, 23, 42, 0.25);
+}
+
+[data-mui-color-scheme="dark"] .window-tab:hover {
+	border-color: rgba(255, 255, 255, 0.22);
 }
 
 .window-tab.is-active {

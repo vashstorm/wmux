@@ -158,7 +158,7 @@ Voice configuration is managed through the Settings UI and persisted server-side
 
 ### Built-in Voice Skills
 
-Wmux ships with predefined voice skills. You can enable/disable them and customize their Markdown prompts through **Settings > Voice Control > Skills**:
+Wmux ships with predefined voice skills. Skill prompts live under the grouped `skills/` directory, and you can enable/disable them or customize their Markdown prompts through **Settings > Voice Control > Skills**:
 
 | Skill ID | What it does |
 |----------|-------------|
@@ -169,8 +169,15 @@ Wmux ships with predefined voice skills. You can enable/disable them and customi
 | `rename_session` | Rename an existing session |
 | `delete_session` | Delete a session (requires confirmation) |
 | `send_to_pane` | Send text to a specific pane (requires confirmation) |
+| `read_pane_output` | Read recent pane output |
+| `create_window` / `rename_window` / `delete_window` | Manage tmux windows |
+| `split_pane` / `focus_pane` / `kill_pane` / `clear_pane` | Manage tmux panes |
+| `list_projects` / `create_project` / `update_project` / `delete_project` | Manage saved projects |
+| `launch_project` / `sync_project_from_tmux` / `generate_project_ai_html` | Operate project dashboards and tmux layouts |
+| `analyze_session` / `list_tmux_analysis` / `cleanup_tmux_analysis` | Run and manage Tmux Analysis records |
+| `list_ai_logs` / `clear_ai_logs` | Inspect or clear AI Logs |
 
-Skills that perform destructive actions (delete, send to pane) require explicit confirmation through the UI.
+Skills that perform destructive actions (delete, terminal execution, cleanup, or clear operations) require explicit confirmation through the UI.
 
 ### Privacy and Security
 

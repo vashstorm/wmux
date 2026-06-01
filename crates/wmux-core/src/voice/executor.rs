@@ -176,6 +176,79 @@ impl OmniSkillExecutor {
             "split_pane" => self.split_pane(params).await,
             "focus_pane" => self.focus_pane(params).await,
             "run_project" => self.run_project(params, false).await,
+            "list_projects" => {
+                self.execute_backend_route_skill("list_projects", "projects.list", params, false)
+                    .await
+            }
+            "create_project" => {
+                self.execute_backend_route_skill("create_project", "projects.create", params, false)
+                    .await
+            }
+            "update_project" => {
+                self.execute_backend_route_skill("update_project", "projects.update", params, false)
+                    .await
+            }
+            "delete_project" => {
+                self.execute_backend_route_skill("delete_project", "projects.delete", params, false)
+                    .await
+            }
+            "launch_project" => {
+                self.execute_backend_route_skill("launch_project", "projects.launch", params, false)
+                    .await
+            }
+            "sync_project_from_tmux" => {
+                self.execute_backend_route_skill(
+                    "sync_project_from_tmux",
+                    "projects.sync_from_tmux",
+                    params,
+                    false,
+                )
+                .await
+            }
+            "generate_project_ai_html" => {
+                self.execute_backend_route_skill(
+                    "generate_project_ai_html",
+                    "projects.generate_ai_html",
+                    params,
+                    false,
+                )
+                .await
+            }
+            "analyze_session" => {
+                self.execute_backend_route_skill(
+                    "analyze_session",
+                    "sessions.analyze",
+                    params,
+                    false,
+                )
+                .await
+            }
+            "list_tmux_analysis" => {
+                self.execute_backend_route_skill(
+                    "list_tmux_analysis",
+                    "tmux_analysis.list",
+                    params,
+                    false,
+                )
+                .await
+            }
+            "cleanup_tmux_analysis" => {
+                self.execute_backend_route_skill(
+                    "cleanup_tmux_analysis",
+                    "tmux_analysis.cleanup",
+                    params,
+                    false,
+                )
+                .await
+            }
+            "list_ai_logs" => {
+                self.execute_backend_route_skill("list_ai_logs", "ai_logs.list", params, false)
+                    .await
+            }
+            "clear_ai_logs" => {
+                self.execute_backend_route_skill("clear_ai_logs", "ai_logs.clear", params, false)
+                    .await
+            }
             "delete_window" => self.delete_window(params, false).await,
             "kill_pane" => self.kill_pane(params, false).await,
             "clear_pane" => self.clear_pane(params).await,
@@ -195,6 +268,23 @@ impl OmniSkillExecutor {
             "delete_session" => self.delete_session(params, true).await,
             "send_to_pane" => self.send_to_pane(params, true).await,
             "run_project" => self.run_project(params, true).await,
+            "delete_project" => {
+                self.execute_backend_route_skill("delete_project", "projects.delete", params, true)
+                    .await
+            }
+            "cleanup_tmux_analysis" => {
+                self.execute_backend_route_skill(
+                    "cleanup_tmux_analysis",
+                    "tmux_analysis.cleanup",
+                    params,
+                    true,
+                )
+                .await
+            }
+            "clear_ai_logs" => {
+                self.execute_backend_route_skill("clear_ai_logs", "ai_logs.clear", params, true)
+                    .await
+            }
             "delete_window" => self.delete_window(params, true).await,
             "kill_pane" => self.kill_pane(params, true).await,
             other => Err(OmniExecutorError::bad_request(format!(
@@ -401,6 +491,26 @@ impl OmniSkillExecutor {
             .await
     }
 
+    async fn execute_backend_route_skill(
+        &self,
+        skill: &str,
+        route_id: &str,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let route = backend_route(route_id).ok_or_else(|| {
+            OmniExecutorError::bad_request(format!("backend route not allowed: {route_id}"))
+        })?;
+        let route_params = self.normalize_route_params_for_local_session(route.id, params.clone());
+        if route.is_write && !confirmed && is_dangerous(skill, &route_params) {
+            return self.confirmation_required(skill, params).await;
+        }
+
+        let (path, body) = route_request(&route, &route_params)?;
+        self.execute_backend_request(skill, route.method.clone(), path, body)
+            .await
+    }
+
     async fn confirmation_required(
         &self,
         skill: &str,
@@ -576,7 +686,8 @@ impl OmniSkillExecutor {
     ) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = required_string(&params, "target_name")?;
         let session = required_string_alias(&params, &["session", "session_name"])?;
-        let target_name = self.local_target_when_model_used_session_as_target(target_name, &session);
+        let target_name =
+            self.local_target_when_model_used_session_as_target(target_name, &session);
         let window = required_string_alias(&params, &["window", "window_name"])?;
         let pane = required_string_alias(&params, &["pane", "pane_index"])?;
         let lines = params
@@ -621,23 +732,12 @@ impl OmniSkillExecutor {
         })
     }
 
-    async fn get_config(
-        &self,
-        _params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
-        self.execute_backend_request(
-            "get_config",
-            Method::GET,
-            "/api/config".to_string(),
-            None,
-        )
-        .await
+    async fn get_config(&self, _params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        self.execute_backend_request("get_config", Method::GET, "/api/config".to_string(), None)
+            .await
     }
 
-    async fn check_health(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn check_health(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let target_name = optional_string_alias(&params, &["target_name"]);
         let path = match target_name.as_deref() {
             Some(t) => format!("/api/targets/{}/health", path_segment(t)),
@@ -647,10 +747,7 @@ impl OmniSkillExecutor {
             .await
     }
 
-    async fn create_window(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn create_window(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "session_name"])?;
         let target_name = self.local_target_when_model_used_session_as_target(
             required_string(&params, "target_name")?,
@@ -670,10 +767,7 @@ impl OmniSkillExecutor {
         .await
     }
 
-    async fn rename_window(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn rename_window(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "session_name"])?;
         let target_name = self.local_target_when_model_used_session_as_target(
             required_string(&params, "target_name")?,
@@ -715,11 +809,7 @@ impl OmniSkillExecutor {
         })
     }
 
-
-    async fn split_pane(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn split_pane(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "session_name"])?;
         let target_name = self.local_target_when_model_used_session_as_target(
             required_string(&params, "target_name")?,
@@ -743,10 +833,7 @@ impl OmniSkillExecutor {
         .await
     }
 
-    async fn focus_pane(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn focus_pane(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "session_name"])?;
         let target_name = self.local_target_when_model_used_session_as_target(
             required_string(&params, "target_name")?,
@@ -896,10 +983,7 @@ impl OmniSkillExecutor {
         .await
     }
 
-    async fn clear_pane(
-        &self,
-        params: Value,
-    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+    async fn clear_pane(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
         let session = required_string_alias(&params, &["session", "session_name"])?;
         let target_name = self.local_target_when_model_used_session_as_target(
             required_string(&params, "target_name")?,
@@ -927,6 +1011,7 @@ impl OmniSkillExecutor {
             .send_keys(&target, &["clear", "Enter"])
             .await
             .map_err(tmux_error)?;
+        adapter.clear_history(&target).await.map_err(tmux_error)?;
 
         Ok(OmniSkillExecution {
             event: OmniServerEvent::ActionResult {
@@ -1042,6 +1127,12 @@ fn backend_route(route_id: &str) -> Option<BackendRoute> {
             risk_skill: "invoke_backend_route",
             is_write: true,
         }),
+        "sessions.analyze" => Some(BackendRoute {
+            id: "sessions.analyze",
+            method: Method::POST,
+            risk_skill: "analyze_session",
+            is_write: true,
+        }),
         "windows.list" => Some(BackendRoute {
             id: "windows.list",
             method: Method::GET,
@@ -1076,6 +1167,72 @@ fn backend_route(route_id: &str) -> Option<BackendRoute> {
             id: "panes.delete",
             method: Method::DELETE,
             risk_skill: "invoke_backend_route",
+            is_write: true,
+        }),
+        "projects.list" => Some(BackendRoute {
+            id: "projects.list",
+            method: Method::GET,
+            risk_skill: "list_projects",
+            is_write: false,
+        }),
+        "projects.create" => Some(BackendRoute {
+            id: "projects.create",
+            method: Method::POST,
+            risk_skill: "create_project",
+            is_write: true,
+        }),
+        "projects.update" => Some(BackendRoute {
+            id: "projects.update",
+            method: Method::PUT,
+            risk_skill: "update_project",
+            is_write: true,
+        }),
+        "projects.delete" => Some(BackendRoute {
+            id: "projects.delete",
+            method: Method::DELETE,
+            risk_skill: "delete_project",
+            is_write: true,
+        }),
+        "projects.launch" => Some(BackendRoute {
+            id: "projects.launch",
+            method: Method::POST,
+            risk_skill: "launch_project",
+            is_write: true,
+        }),
+        "projects.sync_from_tmux" => Some(BackendRoute {
+            id: "projects.sync_from_tmux",
+            method: Method::POST,
+            risk_skill: "sync_project_from_tmux",
+            is_write: true,
+        }),
+        "projects.generate_ai_html" => Some(BackendRoute {
+            id: "projects.generate_ai_html",
+            method: Method::POST,
+            risk_skill: "generate_project_ai_html",
+            is_write: true,
+        }),
+        "tmux_analysis.list" => Some(BackendRoute {
+            id: "tmux_analysis.list",
+            method: Method::GET,
+            risk_skill: "list_tmux_analysis",
+            is_write: false,
+        }),
+        "tmux_analysis.cleanup" => Some(BackendRoute {
+            id: "tmux_analysis.cleanup",
+            method: Method::POST,
+            risk_skill: "cleanup_tmux_analysis",
+            is_write: true,
+        }),
+        "ai_logs.list" => Some(BackendRoute {
+            id: "ai_logs.list",
+            method: Method::GET,
+            risk_skill: "list_ai_logs",
+            is_write: false,
+        }),
+        "ai_logs.clear" => Some(BackendRoute {
+            id: "ai_logs.clear",
+            method: Method::DELETE,
+            risk_skill: "clear_ai_logs",
             is_write: true,
         }),
         _ => None,
@@ -1122,6 +1279,18 @@ fn route_request(
             Ok((
                 format!(
                     "/api/targets/{}/sessions/{}",
+                    path_segment(&target_name),
+                    path_segment(&session)
+                ),
+                None,
+            ))
+        }
+        "sessions.analyze" => {
+            let target_name = required_string(params, "target_name")?;
+            let session = required_string_alias(params, &["session", "session_name"])?;
+            Ok((
+                format!(
+                    "/api/targets/{}/sessions/{}/analyze",
                     path_segment(&target_name),
                     path_segment(&session)
                 ),
@@ -1217,11 +1386,147 @@ fn route_request(
                 None,
             ))
         }
+        "projects.list" => Ok(("/api/projects".to_string(), None)),
+        "projects.create" => {
+            let name = required_string(params, "name")?;
+            let mut body = serde_json::Map::new();
+            body.insert("name".to_string(), Value::String(name));
+            insert_optional_string(params, &mut body, "path", "path");
+            insert_optional_string(params, &mut body, "description", "description");
+            insert_optional_string(params, &mut body, "session_name", "sessionName");
+            insert_optional_string(params, &mut body, "workdir", "workdir");
+            insert_optional_string(params, &mut body, "layout_json", "layoutJson");
+            insert_optional_string(params, &mut body, "details_json", "detailsJson");
+            insert_optional_string(params, &mut body, "progress_json", "progressJson");
+            Ok(("/api/projects".to_string(), Some(Value::Object(body))))
+        }
+        "projects.update" => {
+            let project_id = required_string_alias(params, &["project_id", "id"])?;
+            let mut body = serde_json::Map::new();
+            insert_optional_string(params, &mut body, "name", "name");
+            insert_optional_string(params, &mut body, "path", "path");
+            insert_optional_string(params, &mut body, "description", "description");
+            insert_optional_string(params, &mut body, "session_name", "sessionName");
+            insert_optional_string(params, &mut body, "workdir", "workdir");
+            insert_optional_string(params, &mut body, "layout_json", "layoutJson");
+            insert_optional_string(params, &mut body, "details_json", "detailsJson");
+            insert_optional_string(params, &mut body, "progress_json", "progressJson");
+            Ok((
+                format!("/api/projects/{}", path_segment(&project_id)),
+                Some(Value::Object(body)),
+            ))
+        }
+        "projects.delete" => {
+            let project_id = required_string_alias(params, &["project_id", "id"])?;
+            let kill_session = params
+                .get("kill_session")
+                .or_else(|| params.get("killSession"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let query = if kill_session {
+                "?kill_session=true"
+            } else {
+                ""
+            };
+            Ok((
+                format!("/api/projects/{}{}", path_segment(&project_id), query),
+                None,
+            ))
+        }
+        "projects.launch" => {
+            let project_id = required_string_alias(params, &["project_id", "id"])?;
+            Ok((
+                format!("/api/projects/{}/launch", path_segment(&project_id)),
+                None,
+            ))
+        }
+        "projects.sync_from_tmux" => {
+            let project_id = required_string_alias(params, &["project_id", "id"])?;
+            Ok((
+                format!("/api/projects/{}/sync-from-tmux", path_segment(&project_id)),
+                None,
+            ))
+        }
+        "projects.generate_ai_html" => {
+            let project_id = required_string_alias(params, &["project_id", "id"])?;
+            Ok((
+                format!(
+                    "/api/projects/{}/generate-ai-html",
+                    path_segment(&project_id)
+                ),
+                None,
+            ))
+        }
+        "tmux_analysis.list" => {
+            let mut path = "/api/ai/stats".to_string();
+            append_i64_query(params, &mut path, "limit", "limit");
+            append_string_query(params, &mut path, "project_id", "projectId");
+            append_string_query(params, &mut path, "status", "status");
+            Ok((path, None))
+        }
+        "tmux_analysis.cleanup" => {
+            let mut path = "/api/ai/stats/cleanup".to_string();
+            append_string_query(params, &mut path, "project_id", "projectId");
+            Ok((path, None))
+        }
+        "ai_logs.list" => {
+            let mut path = "/api/ai/logs".to_string();
+            append_i64_query(params, &mut path, "limit", "limit");
+            append_string_query(params, &mut path, "before", "before");
+            Ok((path, None))
+        }
+        "ai_logs.clear" => Ok(("/api/ai/logs".to_string(), None)),
         _ => Err(OmniExecutorError::bad_request(format!(
             "backend route not allowed: {}",
             route.id
         ))),
     }
+}
+
+fn insert_optional_string(
+    params: &Value,
+    body: &mut serde_json::Map<String, Value>,
+    input_field: &'static str,
+    output_field: &'static str,
+) {
+    if let Some(value) = optional_string_alias(params, &[input_field, output_field]) {
+        body.insert(output_field.to_string(), Value::String(value));
+    }
+}
+
+fn append_string_query(
+    params: &Value,
+    path: &mut String,
+    input_field: &'static str,
+    output_field: &'static str,
+) {
+    if let Some(value) = optional_string_alias(params, &[input_field, output_field]) {
+        append_query(path, output_field, &value);
+    }
+}
+
+fn append_i64_query(
+    params: &Value,
+    path: &mut String,
+    input_field: &'static str,
+    output_field: &'static str,
+) {
+    if let Some(value) = params.get(input_field).or_else(|| params.get(output_field)) {
+        if let Some(number) = value.as_i64() {
+            append_query(path, output_field, &number.to_string());
+        }
+    }
+}
+
+fn append_query(path: &mut String, key: &str, value: &str) {
+    if path.contains('?') {
+        path.push('&');
+    } else {
+        path.push('?');
+    }
+    path.push_str(key);
+    path.push('=');
+    path.push_str(&path_segment(value));
 }
 
 fn required_string(params: &Value, field: &'static str) -> Result<String, OmniExecutorError> {
@@ -1604,6 +1909,13 @@ case "$cmd" in
     printf '%%1%stty%s0%s1%s80%s24%s0%s0%s0%s0%s0%s0%szsh\n' "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep" "$sep"
     ;;
   send-keys)
+    for arg in "$@"; do
+      printf '[%s]' "$arg" >> "$log"
+    done
+    printf '\n' >> "$log"
+    exit 0
+    ;;
+  clear-history)
     for arg in "$@"; do
       printf '[%s]' "$arg" >> "$log"
     done
@@ -2285,7 +2597,13 @@ esac
         assert_eq!(result.output["success"], true);
         assert_eq!(result.output["skill"], "clear_pane");
         let log = tmux_log(&test);
-        assert!(log.contains("[clear]"), "should have sent clear command, got: {log}");
+        assert!(
+            log.contains("[clear]"),
+            "should have sent clear command, got: {log}"
+        );
+        assert!(
+            log.contains("[clear-history][-t][%1]"),
+            "should have cleared tmux scroll history, got: {log}"
+        );
     }
 }
-

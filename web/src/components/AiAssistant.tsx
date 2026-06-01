@@ -21,11 +21,14 @@ const AUDIO_PIPELINE_CONFIG = {
 	vadThreshold: 0,
 };
 const ASSISTANT_SIZE_STORAGE_KEY = "wmux-ai-assistant-size";
+export const LAUNCHER_POS_STORAGE_KEY = "wmux-launcher-pos";
 const DEFAULT_ASSISTANT_SIZE = { width: 380, height: 520 };
 const MIN_ASSISTANT_SIZE = { width: 320, height: 360 };
+const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 };
 const VIEWPORT_MARGIN_PX = 16;
 
 type AssistantSize = typeof DEFAULT_ASSISTANT_SIZE;
+export type AssistantPos = { x: number; y: number };
 type ResizeStart = {
 	pointerId: number | "mouse";
 	startX: number;
@@ -33,6 +36,13 @@ type ResizeStart = {
 	startWidth: number;
 	startHeight: number;
 	direction: "width" | "height" | "both";
+};
+type DragStart = {
+	pointerId: number | "mouse";
+	originX: number;
+	originY: number;
+	baseX: number;
+	baseY: number;
 };
 
 function clampAssistantSize(size: AssistantSize): AssistantSize {
@@ -44,6 +54,46 @@ function clampAssistantSize(size: AssistantSize): AssistantSize {
 		height: Math.min(maxHeight, Math.max(MIN_ASSISTANT_SIZE.height, Math.round(size.height))),
 	};
 }
+
+export function clampAssistantPos(pos: AssistantPos, size: { width: number; height: number }): AssistantPos {
+	if (typeof window === "undefined") return pos;
+	const maxX = window.innerWidth - size.width - VIEWPORT_MARGIN_PX;
+	const maxY = window.innerHeight - size.height - VIEWPORT_MARGIN_PX;
+	return {
+		x: Math.round(Math.max(VIEWPORT_MARGIN_PX, Math.min(maxX, pos.x))),
+		y: Math.round(Math.max(VIEWPORT_MARGIN_PX, Math.min(maxY, pos.y))),
+	};
+}
+
+function defaultLauncherPos(): AssistantPos {
+	if (typeof window === "undefined") return { x: VIEWPORT_MARGIN_PX, y: VIEWPORT_MARGIN_PX };
+	return {
+		x: window.innerWidth - LAUNCHER_ELEM_SIZE.width - VIEWPORT_MARGIN_PX,
+		y: window.innerHeight - LAUNCHER_ELEM_SIZE.height - VIEWPORT_MARGIN_PX,
+	};
+}
+
+export function loadLauncherPos(): AssistantPos {
+	try {
+		const raw = localStorage.getItem(LAUNCHER_POS_STORAGE_KEY);
+		if (!raw) return defaultLauncherPos();
+		const parsed = JSON.parse(raw) as Partial<AssistantPos>;
+		if (typeof parsed.x !== "number" || typeof parsed.y !== "number") {
+			return defaultLauncherPos();
+		}
+		return clampAssistantPos({ x: parsed.x, y: parsed.y }, LAUNCHER_ELEM_SIZE);
+	} catch {
+		return defaultLauncherPos();
+	}
+}
+
+export function saveLauncherPos(pos: AssistantPos): void {
+	try {
+		localStorage.setItem(LAUNCHER_POS_STORAGE_KEY, JSON.stringify(pos));
+	} catch {
+	}
+}
+
 
 function loadAssistantSize(): AssistantSize {
 	try {
@@ -64,6 +114,23 @@ function saveAssistantSize(size: AssistantSize): void {
 		localStorage.setItem(ASSISTANT_SIZE_STORAGE_KEY, JSON.stringify(size));
 	} catch {
 	}
+}
+
+/** Compute where the dialog should open, anchoring to the launcher and expanding toward the screen center. */
+function dialogPosFromLauncher(launcherPos: AssistantPos, dialogSize: { width: number; height: number }): AssistantPos {
+
+	if (typeof window === "undefined") return { x: VIEWPORT_MARGIN_PX, y: VIEWPORT_MARGIN_PX };
+	const iconCenterX = launcherPos.x + LAUNCHER_ELEM_SIZE.width / 2;
+	const iconCenterY = launcherPos.y + LAUNCHER_ELEM_SIZE.height / 2;
+	// Align the dialog edge that is closest to the nearest screen edge with the icon's same edge.
+	// This makes the dialog expand toward the screen center.
+	const x = iconCenterX > window.innerWidth / 2
+		? launcherPos.x + LAUNCHER_ELEM_SIZE.width - dialogSize.width   // right half → right-align
+		: launcherPos.x;                                                  // left half  → left-align
+	const y = iconCenterY > window.innerHeight / 2
+		? launcherPos.y + LAUNCHER_ELEM_SIZE.height - dialogSize.height  // bottom half → bottom-align
+		: launcherPos.y;                                                  // top half    → top-align
+	return clampAssistantPos({ x, y }, dialogSize);
 }
 
 function formatTime(iso: string): string {
@@ -130,8 +197,10 @@ export function AiAssistant() {
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [inputText, setInputText] = useState("");
 	const [assistantSize, setAssistantSize] = useState(loadAssistantSize);
+	const [assistantPos, setAssistantPos] = useState<AssistantPos>(() => dialogPosFromLauncher(loadLauncherPos(), loadAssistantSize()));
 	const chatRef = useRef<HTMLDivElement | null>(null);
 	const resizeStartRef = useRef<ResizeStart | null>(null);
+	const dragStartRef = useRef<DragStart | null>(null);
 
 	const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
 		const targetName = selectedPane?.targetName ?? selectedTargetName;
@@ -272,7 +341,7 @@ export function AiAssistant() {
 		}
 
 		if (isVoiceTranscriptDoneEvent(event)) {
-			setOmniTranscript(event.text);
+			setOmniTranscript("");
 			setOmniStatus("processing");
 			setHistory((prev) => [
 				...prev,
@@ -289,9 +358,14 @@ export function AiAssistant() {
 		}
 
 		if (isVoiceIntentReceivedEvent(event)) {
-			if (event.skill === "navigate_frontend" && event.params.route === "settings") {
-				setShowSettingsPanel(true);
-				window.history.pushState(null, "", `${window.location.pathname}?view=settings`);
+			if (event.skill === "navigate_frontend") {
+				const route = typeof event.params.route === "string" ? event.params.route : "";
+				if (route === "settings") {
+					setShowSettingsPanel(true);
+					window.history.pushState(null, "", `${window.location.pathname}?view=settings`);
+				} else {
+					window.dispatchEvent(new CustomEvent("wmux:navigate-sidebar", { detail: { route } }));
+				}
 			}
 			if (event.confirmationRequired && event.confirmationId) {
 				setOmniConfirmation({
@@ -555,9 +629,42 @@ export function AiAssistant() {
 		finishAssistantResize(event.pointerId);
 	}, [finishAssistantResize]);
 
+	const startDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		dragStartRef.current = {
+			pointerId,
+			originX: clientX,
+			originY: clientY,
+			baseX: assistantPos.x,
+			baseY: assistantPos.y,
+		};
+		document.body.style.cursor = "grabbing";
+		document.body.style.userSelect = "none";
+	}, [assistantPos]);
+
+	const updateDrag = useCallback((clientX: number, clientY: number, pointerId: number | "mouse") => {
+		const drag = dragStartRef.current;
+		if (!drag || drag.pointerId !== pointerId) return;
+		const dx = clientX - drag.originX;
+		const dy = clientY - drag.originY;
+		setAssistantPos((prev) => {
+			const size = loadAssistantSize();
+			return clampAssistantPos({ x: drag.baseX + dx, y: drag.baseY + dy }, size);
+		});
+	}, []);
+
+	const finishDrag = useCallback((pointerId: number | "mouse") => {
+		const drag = dragStartRef.current;
+		if (!drag || drag.pointerId !== pointerId) return;
+		dragStartRef.current = null;
+		document.body.style.cursor = "";
+		document.body.style.userSelect = "";
+		// Dialog position is session-only; not persisted (reopening always re-anchors to launcher)
+	}, []);
+
 	useEffect(() => {
 		const handleWindowResize = () => {
 			setAssistantSize((current) => clampAssistantSize(current));
+			setAssistantPos((current) => clampAssistantPos(current, loadAssistantSize()));
 		};
 		window.addEventListener("resize", handleWindowResize);
 		return () => window.removeEventListener("resize", handleWindowResize);
@@ -566,15 +673,19 @@ export function AiAssistant() {
 	useEffect(() => {
 		const handlePointerMove = (event: PointerEvent) => {
 			updateAssistantResize(event.clientX, event.clientY, event.pointerId);
+			updateDrag(event.clientX, event.clientY, event.pointerId);
 		};
 		const handlePointerUp = (event: PointerEvent) => {
 			finishAssistantResize(event.pointerId);
+			finishDrag(event.pointerId);
 		};
 		const handleMouseMove = (event: MouseEvent) => {
 			updateAssistantResize(event.clientX, event.clientY, "mouse");
+			updateDrag(event.clientX, event.clientY, "mouse");
 		};
 		const handleMouseUp = () => {
 			finishAssistantResize("mouse");
+			finishDrag("mouse");
 		};
 		window.addEventListener("pointermove", handlePointerMove);
 		window.addEventListener("pointerup", handlePointerUp);
@@ -590,7 +701,7 @@ export function AiAssistant() {
 			document.body.style.cursor = "";
 			document.body.style.userSelect = "";
 		};
-	}, [finishAssistantResize, updateAssistantResize]);
+	}, [finishAssistantResize, updateAssistantResize, updateDrag, finishDrag]);
 
 	const isListening = omniStatus === "listening" || omniStatus === "processing" || omniStatus === "speaking" || omniStatus === "confirming";
 	const isDisabled = omniStatus === "disabled";
@@ -616,6 +727,8 @@ export function AiAssistant() {
 			style={{
 				"--ai-assistant-width": `${assistantSize.width}px`,
 				"--ai-assistant-height": `${assistantSize.height}px`,
+				"--ai-assistant-x": `${assistantPos.x}px`,
+				"--ai-assistant-y": `${assistantPos.y}px`,
 			} as CSSProperties}
 		>
 			{/* Border Drag Handles for Resizing */}
@@ -643,7 +756,24 @@ export function AiAssistant() {
 				onPointerCancel={endResize}
 				onMouseDown={beginMouseResize("both")}
 			/>
-			<div className="voice-header">
+			<div
+				className="voice-header voice-header--draggable"
+				onPointerDown={(e) => {
+					if (e.button !== 0) return;
+					const target = e.target as HTMLElement;
+					if (target.closest("button")) return;
+					e.preventDefault();
+					startDrag(e.clientX, e.clientY, e.pointerId);
+					e.currentTarget.setPointerCapture(e.pointerId);
+				}}
+				onMouseDown={(e) => {
+					if (dragStartRef.current || e.button !== 0) return;
+					const target = e.target as HTMLElement;
+					if (target.closest("button")) return;
+					e.preventDefault();
+					startDrag(e.clientX, e.clientY, "mouse");
+				}}
+			>
 				<div className="voice-title">
 					<span className="voice-status-dot" />
 				</div>

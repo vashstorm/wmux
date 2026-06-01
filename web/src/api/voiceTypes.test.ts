@@ -240,6 +240,8 @@ describe("voiceTypes", () => {
 			expect(isValidFrontendRoute("session")).toBe(true);
 			expect(isValidFrontendRoute("window")).toBe(true);
 			expect(isValidFrontendRoute("pane")).toBe(true);
+			expect(isValidFrontendRoute("stats")).toBe(true);
+			expect(isValidFrontendRoute("ai_logs")).toBe(true);
 		});
 
 		it("rejects unknown frontend routes", () => {
@@ -247,9 +249,9 @@ describe("voiceTypes", () => {
 			expect(isValidFrontendRoute("admin")).toBe(false);
 		});
 
-		it("FRONTEND_ROUTES constant contains all 7 routes", () => {
+		it("FRONTEND_ROUTES constant contains all 9 routes", () => {
 			const routes = Object.values(FRONTEND_ROUTES);
-			expect(routes.length).toBe(7);
+			expect(routes.length).toBe(9);
 		});
 	});
 
@@ -260,12 +262,24 @@ describe("voiceTypes", () => {
 			expect(isValidBackendRoute("sessions.create")).toBe(true);
 			expect(isValidBackendRoute("sessions.rename")).toBe(true);
 			expect(isValidBackendRoute("sessions.delete")).toBe(true);
+			expect(isValidBackendRoute("sessions.analyze")).toBe(true);
 			expect(isValidBackendRoute("windows.list")).toBe(true);
 			expect(isValidBackendRoute("windows.create")).toBe(true);
 			expect(isValidBackendRoute("windows.delete")).toBe(true);
 			expect(isValidBackendRoute("panes.list")).toBe(true);
 			expect(isValidBackendRoute("panes.split")).toBe(true);
 			expect(isValidBackendRoute("panes.delete")).toBe(true);
+			expect(isValidBackendRoute("projects.list")).toBe(true);
+			expect(isValidBackendRoute("projects.create")).toBe(true);
+			expect(isValidBackendRoute("projects.update")).toBe(true);
+			expect(isValidBackendRoute("projects.delete")).toBe(true);
+			expect(isValidBackendRoute("projects.launch")).toBe(true);
+			expect(isValidBackendRoute("projects.sync_from_tmux")).toBe(true);
+			expect(isValidBackendRoute("projects.generate_ai_html")).toBe(true);
+			expect(isValidBackendRoute("tmux_analysis.list")).toBe(true);
+			expect(isValidBackendRoute("tmux_analysis.cleanup")).toBe(true);
+			expect(isValidBackendRoute("ai_logs.list")).toBe(true);
+			expect(isValidBackendRoute("ai_logs.clear")).toBe(true);
 		});
 
 		it("rejects unknown backend routes", () => {
@@ -274,9 +288,9 @@ describe("voiceTypes", () => {
 			expect(isValidBackendRoute("unknown.route")).toBe(false);
 		});
 
-		it("BACKEND_ROUTES constant contains all 11 routes", () => {
+		it("BACKEND_ROUTES constant contains all 23 routes", () => {
 			const routes = Object.values(BACKEND_ROUTES);
-			expect(routes.length).toBe(11);
+			expect(routes.length).toBe(23);
 		});
 	});
 

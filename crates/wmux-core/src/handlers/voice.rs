@@ -1261,7 +1261,21 @@ fn apply_context_to_route_params(
 fn skill_uses_tmux_target(skill: &str) -> bool {
     matches!(
         skill,
-        "list_sessions" | "create_session" | "rename_session" | "delete_session" | "send_to_pane"
+        "list_sessions"
+            | "create_session"
+            | "rename_session"
+            | "delete_session"
+            | "send_to_pane"
+            | "read_pane_output"
+            | "create_window"
+            | "rename_window"
+            | "split_pane"
+            | "focus_pane"
+            | "run_project"
+            | "delete_window"
+            | "kill_pane"
+            | "clear_pane"
+            | "analyze_session"
     )
 }
 

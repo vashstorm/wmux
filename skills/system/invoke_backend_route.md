@@ -4,7 +4,7 @@ enabled: true
 
 # Invoke Backend Route
 
-Invoke a backend REST API route. Only read-only routes are allowed for safety.
+Invoke an allowlisted backend REST API route. Write or destructive routes may require confirmation.
 
 ## Parameters
 
@@ -15,17 +15,29 @@ Invoke a backend REST API route. Only read-only routes are allowed for safety.
     "route_id": {
       "type": "string",
       "enum": [
+        "connections.list",
         "sessions.list",
         "sessions.create",
         "sessions.rename",
         "sessions.delete",
+        "sessions.analyze",
         "windows.list",
         "windows.create",
-        "windows.rename",
         "windows.delete",
         "panes.list",
         "panes.split",
-        "panes.delete"
+        "panes.delete",
+        "projects.list",
+        "projects.create",
+        "projects.update",
+        "projects.delete",
+        "projects.launch",
+        "projects.sync_from_tmux",
+        "projects.generate_ai_html",
+        "tmux_analysis.list",
+        "tmux_analysis.cleanup",
+        "ai_logs.list",
+        "ai_logs.clear"
       ],
       "description": "Backend route to invoke (allowlist enforced)."
     },

@@ -4,8 +4,8 @@
 
 .ai-assistant {
   position: fixed;
-  right: var(--spacing-md);
-  bottom: var(--spacing-md);
+  left: var(--ai-assistant-x, calc(100vw - 380px - var(--spacing-md)));
+  top: var(--ai-assistant-y, calc(100vh - 520px - var(--spacing-md)));
   z-index: var(--z-sticky);
   display: flex;
   flex-direction: column;
@@ -88,8 +88,8 @@
 
 .voice-launcher {
   position: fixed;
-  right: var(--spacing-md);
-  bottom: var(--spacing-md);
+  left: var(--launcher-x, calc(100vw - 42px - var(--spacing-md)));
+  top: var(--launcher-y, calc(100vh - 42px - var(--spacing-md)));
   z-index: var(--z-sticky);
   display: inline-flex;
   align-items: center;
@@ -102,8 +102,13 @@
   background: var(--color-panel);
   color: var(--color-accent);
   box-shadow: var(--shadow-md), var(--color-shadow-glow);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-spring), box-shadow var(--transition-fast);
+}
+
+.voice-launcher:active {
+  cursor: grabbing;
 }
 
 .voice-launcher:hover {
@@ -123,6 +128,14 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--color-panel-border);
   background: var(--color-surface);
+}
+
+.voice-header--draggable {
+  cursor: grab;
+}
+
+.voice-header--draggable:active {
+  cursor: grabbing;
 }
 
 .voice-title {
@@ -483,8 +496,8 @@
 
 @media (max-width: 560px) {
   .ai-assistant {
-    right: var(--spacing-sm);
-    bottom: var(--spacing-sm);
+    left: var(--ai-assistant-x, var(--spacing-sm));
+    top: var(--ai-assistant-y, auto);
     width: min(var(--ai-assistant-width, 380px), calc(100vw - (var(--spacing-sm) * 2)));
     height: min(var(--ai-assistant-height, 520px), calc(100vh - (var(--spacing-md) * 2)));
     min-width: min(320px, calc(100vw - (var(--spacing-sm) * 2)));

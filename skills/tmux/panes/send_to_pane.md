@@ -25,12 +25,12 @@ Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=t
       "description": "Window name or index."
     },
     "pane_index": {
-      "type": "integer",
-      "description": "Pane index within window."
+      "type": "string",
+      "description": "Pane index or tmux pane ID within the window."
     },
     "text": {
       "type": "string",
-      "description": "Text to send to the pane."
+      "description": "Text to send to the pane, or a tmux key name when control is true."
     },
     "execute": {
       "type": "boolean",
@@ -45,7 +45,11 @@ Send text or commands to a tmux pane. WARNING: With execute=true, append_enter=t
     "control": {
       "type": "boolean",
       "default": false,
-      "description": "If true, send as control sequence (dangerous)."
+      "description": "If true, interpret text as a tmux key/control sequence (dangerous)."
+    },
+    "control_sequence": {
+      "type": "string",
+      "description": "Optional tmux key/control sequence to send instead of text (dangerous)."
     },
     "multiline": {
       "type": "boolean",

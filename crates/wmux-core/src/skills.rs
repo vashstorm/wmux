@@ -73,28 +73,15 @@ pub fn load_skills_from_dir(dir: impl AsRef<Path>) -> Vec<OmniSkillDef> {
     let dir = dir.as_ref();
     let mut skills = Vec::new();
 
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
+    let paths = match markdown_skill_paths(dir) {
+        Ok(paths) => paths,
         Err(e) => {
             tracing::warn!("failed to read skills directory {}: {}", dir.display(), e);
             return skills;
         }
     };
 
-    for entry in entries {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(e) => {
-                tracing::warn!("failed to read directory entry: {}", e);
-                continue;
-            }
-        };
-
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("md") {
-            continue;
-        }
-
+    for path in paths {
         match load_skill_file(&path) {
             Ok(skill) => skills.push(skill),
             Err(e) => {
@@ -109,7 +96,8 @@ pub fn load_skills_from_dir(dir: impl AsRef<Path>) -> Vec<OmniSkillDef> {
 
 pub fn get_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<OmniSkillDef> {
     validate_skill_id(id)?;
-    let path = skill_path(dir.as_ref(), id);
+    let path =
+        existing_skill_path(dir.as_ref(), id)?.unwrap_or_else(|| skill_path(dir.as_ref(), id));
     load_skill_file(&path)
 }
 
@@ -119,7 +107,8 @@ pub fn save_skill_to_dir(
 ) -> anyhow::Result<OmniSkillDef> {
     validate_skill_id(&skill.id)?;
     std::fs::create_dir_all(dir.as_ref())?;
-    let path = skill_path(dir.as_ref(), &skill.id);
+    let path = existing_skill_path(dir.as_ref(), &skill.id)?
+        .unwrap_or_else(|| skill_path(dir.as_ref(), &skill.id));
     let frontmatter = SkillFrontmatterOut {
         enabled: skill.enabled,
     };
@@ -131,8 +120,7 @@ pub fn save_skill_to_dir(
 
 pub fn delete_skill_from_dir(dir: impl AsRef<Path>, id: &str) -> anyhow::Result<()> {
     validate_skill_id(id)?;
-    let path = skill_path(dir.as_ref(), id);
-    if path.exists() {
+    if let Some(path) = existing_skill_path(dir.as_ref(), id)? {
         std::fs::remove_file(path)?;
     }
     Ok(())
@@ -264,11 +252,12 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                     },
                     "session_name": { "type": "string", "description": "Session name." },
                     "window_name": { "type": "string", "description": "Window name or index." },
-                    "pane_index": { "type": "integer", "description": "Pane index within window." },
-                    "text": { "type": "string", "description": "Text to send to the pane." },
+                    "pane_index": { "type": "string", "description": "Pane index or tmux pane ID within the window." },
+                    "text": { "type": "string", "description": "Text to send to the pane, or a tmux key name when control is true." },
                     "execute": { "type": "boolean", "default": false, "description": "If true, execute as command (dangerous)." },
                     "append_enter": { "type": "boolean", "default": false, "description": "If true, append Enter key after text (dangerous)." },
-                    "control": { "type": "boolean", "default": false, "description": "If true, send as control sequence (dangerous)." },
+                    "control": { "type": "boolean", "default": false, "description": "If true, interpret text as a tmux key/control sequence (dangerous)." },
+                    "control_sequence": { "type": "string", "description": "Optional tmux key/control sequence to send instead of text (dangerous)." },
                     "multiline": { "type": "boolean", "default": false, "description": "If true, text contains multiple lines (dangerous)." }
                 },
                 "required": ["target_name", "session_name", "window_name", "pane_index", "text"]
@@ -440,6 +429,167 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
             }),
         ),
         builtin_skill(
+            "list_projects",
+            "List Projects",
+            OmniSkillRiskLevel::Safe,
+            "List saved projects and their associated tmux session status.",
+            json!({
+                "type": "object",
+                "properties": {}
+            }),
+        ),
+        builtin_skill(
+            "create_project",
+            "Create Project",
+            OmniSkillRiskLevel::Write,
+            "Create a saved project entry that can be launched or synced with tmux.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string", "description": "Project name." },
+                    "path": { "type": "string", "default": "", "description": "Project path." },
+                    "description": { "type": "string", "default": "", "description": "Project description." },
+                    "session_name": { "type": "string", "description": "Optional tmux session name. Defaults to the project name." },
+                    "workdir": { "type": "string", "description": "Optional working directory." }
+                },
+                "required": ["name"]
+            }),
+        ),
+        builtin_skill(
+            "update_project",
+            "Update Project",
+            OmniSkillRiskLevel::Write,
+            "Update a saved project entry.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Project ID to update." },
+                    "name": { "type": "string", "description": "Updated project name." },
+                    "path": { "type": "string", "description": "Updated project path." },
+                    "description": { "type": "string", "description": "Updated project description." },
+                    "session_name": { "type": "string", "description": "Updated tmux session name." },
+                    "workdir": { "type": "string", "description": "Updated working directory." }
+                },
+                "required": ["project_id"]
+            }),
+        ),
+        builtin_skill(
+            "delete_project",
+            "Delete Project",
+            OmniSkillRiskLevel::Dangerous,
+            "Delete a saved project entry. Optionally terminate the associated tmux session.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Project ID to delete." },
+                    "kill_session": { "type": "boolean", "default": false, "description": "Also terminate the associated tmux session." }
+                },
+                "required": ["project_id"]
+            }),
+        ),
+        builtin_skill(
+            "launch_project",
+            "Launch Project",
+            OmniSkillRiskLevel::Write,
+            "Launch or recreate a project's tmux layout.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Project ID to launch." }
+                },
+                "required": ["project_id"]
+            }),
+        ),
+        builtin_skill(
+            "sync_project_from_tmux",
+            "Sync Project From Tmux",
+            OmniSkillRiskLevel::Write,
+            "Capture the current tmux session layout into a saved project.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Project ID to sync." }
+                },
+                "required": ["project_id"]
+            }),
+        ),
+        builtin_skill(
+            "generate_project_ai_html",
+            "Generate Project AI HTML",
+            OmniSkillRiskLevel::Write,
+            "Generate an AI HTML summary for a project dashboard.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Project ID to analyze." }
+                },
+                "required": ["project_id"]
+            }),
+        ),
+        builtin_skill(
+            "analyze_session",
+            "Analyze Session",
+            OmniSkillRiskLevel::Write,
+            "Run Tmux Analysis for all windows in a session using the active AI provider.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name to analyze." }
+                },
+                "required": ["target_name", "session_name"]
+            }),
+        ),
+        builtin_skill(
+            "list_tmux_analysis",
+            "List Tmux Analysis",
+            OmniSkillRiskLevel::Safe,
+            "List Tmux Analysis usage events and summary metrics.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "limit": { "type": "integer", "default": 50, "description": "Maximum events to return, up to 200." },
+                    "project_id": { "type": "string", "description": "Optional project ID filter." },
+                    "status": { "type": "string", "enum": ["success", "error"], "description": "Optional status filter." }
+                }
+            }),
+        ),
+        builtin_skill(
+            "cleanup_tmux_analysis",
+            "Cleanup Tmux Analysis",
+            OmniSkillRiskLevel::Dangerous,
+            "Delete stale Tmux Analysis records. This is destructive and requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "string", "description": "Optional project ID filter." }
+                }
+            }),
+        ),
+        builtin_skill(
+            "list_ai_logs",
+            "List AI Logs",
+            OmniSkillRiskLevel::Safe,
+            "List AI Logs entries for recent model prompts, tool calls, tool results, and errors.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "limit": { "type": "integer", "default": 50, "description": "Maximum logs to return." },
+                    "before": { "type": "string", "description": "Optional RFC3339 cursor for pagination." }
+                }
+            }),
+        ),
+        builtin_skill(
+            "clear_ai_logs",
+            "Clear AI Logs",
+            OmniSkillRiskLevel::Dangerous,
+            "Clear all AI Logs entries. This is destructive and requires confirmation.",
+            json!({
+                "type": "object",
+                "properties": {}
+            }),
+        ),
+        builtin_skill(
             "delete_window",
             "Delete Window",
             OmniSkillRiskLevel::Dangerous,
@@ -564,6 +714,37 @@ fn parse_frontmatter(content: &str) -> anyhow::Result<(&str, &str)> {
 
 fn skill_path(dir: &Path, id: &str) -> PathBuf {
     dir.join(format!("{id}.md"))
+}
+
+fn existing_skill_path(dir: &Path, id: &str) -> anyhow::Result<Option<PathBuf>> {
+    Ok(markdown_skill_paths(dir)?
+        .into_iter()
+        .find(|path| path.file_stem().and_then(|stem| stem.to_str()) == Some(id)))
+}
+
+fn markdown_skill_paths(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    collect_markdown_skill_paths(dir, &mut paths)?;
+    paths.sort();
+    Ok(paths)
+}
+
+fn collect_markdown_skill_paths(dir: &Path, paths: &mut Vec<PathBuf>) -> anyhow::Result<()> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_markdown_skill_paths(&path, paths)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            paths.push(path);
+        }
+    }
+    Ok(())
 }
 
 fn validate_skill_id(id: &str) -> anyhow::Result<()> {
@@ -762,6 +943,19 @@ List all tmux sessions.
         assert_eq!(skills.len(), 2);
         assert_eq!(skills[0].id, "skill_a");
         assert_eq!(skills[1].id, "skill_b");
+    }
+
+    #[test]
+    fn load_skills_from_dir_reads_grouped_subdirectories() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("tmux")).unwrap();
+
+        let mut file = std::fs::File::create(dir.path().join("tmux").join("skill_c.md")).unwrap();
+        write!(file, "---\nenabled: true\n---\n\n# Skill C\n\nDesc C.\n").unwrap();
+
+        let skills = load_skills_from_dir(dir.path());
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].id, "skill_c");
     }
 
     #[test]
