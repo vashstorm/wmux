@@ -214,6 +214,15 @@ pub struct OmniActionResult {
     pub error: Option<String>,
 }
 
+/// Token usage reported by the realtime model for a completed response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OmniTokenUsage {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
 /// Client-to-server voice WebSocket messages.
 ///
 /// Sent from frontend to backend during voice sessions.
@@ -333,6 +342,8 @@ pub enum OmniServerEvent {
         #[serde(rename = "remainingSeconds")]
         remaining_seconds: u32,
     },
+    /// Token usage reported for the latest completed response.
+    TokenUsage { usage: OmniTokenUsage },
 }
 
 /// Allowed frontend routes for navigate_frontend skill.
@@ -674,6 +685,13 @@ mod tests {
             OmniServerEvent::SessionTimeout {
                 remaining_seconds: 30,
             },
+            OmniServerEvent::TokenUsage {
+                usage: OmniTokenUsage {
+                    input_tokens: 120,
+                    output_tokens: 35,
+                    total_tokens: 155,
+                },
+            },
         ];
 
         for event in events {
@@ -788,6 +806,29 @@ mod tests {
         assert_eq!(value["skill"], "delete_session");
         assert_eq!(value["success"], true);
         assert!(value.get("error").is_none());
+    }
+
+    #[test]
+    fn voice_token_usage_serializes_with_camel_case() {
+        let event = OmniServerEvent::TokenUsage {
+            usage: OmniTokenUsage {
+                input_tokens: 42,
+                output_tokens: 13,
+                total_tokens: 55,
+            },
+        };
+
+        assert_eq!(
+            serde_json::to_value(event).expect("serialize"),
+            serde_json::json!({
+                "type": "token_usage",
+                "usage": {
+                    "inputTokens": 42,
+                    "outputTokens": 13,
+                    "totalTokens": 55
+                }
+            })
+        );
     }
 
     #[test]

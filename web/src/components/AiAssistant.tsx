@@ -29,6 +29,7 @@ import {
   isVoiceConnectedEvent,
   isVoiceAssistantMessageEvent,
   isVoiceAssistantDeltaEvent,
+  isVoiceTokenUsageEvent,
 } from "../api/voiceTypes.js"
 import { useAppState } from "../state/store.js"
 import {
@@ -55,6 +56,15 @@ const VIEWPORT_MARGIN_PX = 16
 
 type AssistantSize = typeof DEFAULT_ASSISTANT_SIZE
 export type AssistantPos = { x: number; y: number }
+type TokenUsage = {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+type TokenUsageStats = {
+  last: TokenUsage | null
+  total: TokenUsage
+}
 type ResizeStart = {
   pointerId: number | "mouse"
   startX: number
@@ -175,6 +185,22 @@ function formatRole(role: string): string {
   return role === "user" ? "You" : "AI"
 }
 
+function emptyTokenUsage(): TokenUsage {
+  return { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+}
+
+function addTokenUsage(total: TokenUsage, next: TokenUsage): TokenUsage {
+  return {
+    inputTokens: total.inputTokens + next.inputTokens,
+    outputTokens: total.outputTokens + next.outputTokens,
+    totalTokens: total.totalTokens + next.totalTokens,
+  }
+}
+
+function formatTokenCount(count: number): string {
+  return new Intl.NumberFormat().format(count)
+}
+
 function omniComposerText(status: string): string {
   switch (status) {
     case "connecting":
@@ -226,6 +252,10 @@ export function AiAssistant() {
   const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable)
   const [history, setHistory] = useState<OmniConversationMessage[]>([])
   const [assistantDraft, setAssistantDraft] = useState("")
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageStats>(() => ({
+    last: null,
+    total: emptyTokenUsage(),
+  }))
   const [historyLoading, setHistoryLoading] = useState(false)
   const [inputText, setInputText] = useState("")
   const [assistantSize, setAssistantSize] = useState(loadAssistantSize)
@@ -319,6 +349,7 @@ export function AiAssistant() {
     assistantDraftRef.current = ""
     setAssistantDraft("")
     setHistory([])
+    setTokenUsage({ last: null, total: emptyTokenUsage() })
   }, [])
 
   const appendAssistantDraft = useCallback((text: string) => {
@@ -513,6 +544,14 @@ export function AiAssistant() {
       if (isVoiceAudioDeltaEvent(event)) {
         setOmniStatus("speaking")
         pipelineRef.current?.enqueuePlayback(event.pcm16Base64, event.sampleRate)
+        return
+      }
+
+      if (isVoiceTokenUsageEvent(event)) {
+        setTokenUsage((prev) => ({
+          last: event.usage,
+          total: addTokenUsage(prev.total, event.usage),
+        }))
         return
       }
 
@@ -955,6 +994,10 @@ export function AiAssistant() {
         </div>
         <div className="voice-status-label">
           <span>{omniStatus}</span>
+        </div>
+        <div className="voice-token-meter" data-testid="ai-token-meter" aria-live="polite">
+          <span>Total {formatTokenCount(tokenUsage.total.totalTokens)}</span>
+          {tokenUsage.last && <span>Last {formatTokenCount(tokenUsage.last.totalTokens)}</span>}
         </div>
         <button
           type="button"

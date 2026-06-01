@@ -263,6 +263,32 @@ describe("AiAssistant", () => {
     expect(screen.getByText("listening")).toBeInTheDocument()
   })
 
+  test("updates token usage totals from voice events", () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    expect(screen.getByTestId("ai-token-meter")).toHaveTextContent("Total 0")
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "count this" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "token_usage",
+        usage: { inputTokens: 120, outputTokens: 35, totalTokens: 155 },
+      })
+      voiceClientMocks.onMessage?.({
+        type: "token_usage",
+        usage: { inputTokens: 1000, outputTokens: 250, totalTokens: 1250 },
+      })
+    })
+
+    expect(screen.getByTestId("ai-token-meter")).toHaveTextContent("Total 1,405")
+    expect(screen.getByTestId("ai-token-meter")).toHaveTextContent("Last 1,250")
+  })
+
   test("shows mic disabled message when microphoneDisabled is true", async () => {
     vi.mocked(client.getConfig).mockResolvedValueOnce({
       schemaVersion: 1,

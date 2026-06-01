@@ -880,6 +880,67 @@ async fn response_audio_transcript_delta_emits_assistant_delta() {
     assert!(rows.is_empty());
 }
 
+#[tokio::test]
+async fn response_done_emits_token_usage_event_and_persists_metrics() {
+    let config = test_voice_config("ws://127.0.0.1:9/realtime".to_string(), true, Some("key"));
+    let (state, _dir, pool) = test_state_with_storage(config).await;
+    let session_state = OmniSessionState::new();
+
+    let event = handle_qwen_message(
+        &json!({
+            "type": "response.done",
+            "response": {
+                "usage": {
+                    "input_tokens": 120,
+                    "output_tokens": 35,
+                    "total_tokens": 155
+                }
+            }
+        })
+        .to_string(),
+        &session_state,
+        &state,
+        &mpsc::channel(1).0,
+    )
+    .await
+    .expect("handle response done");
+
+    assert_eq!(
+        event,
+        Some(OmniServerEvent::TokenUsage {
+            usage: OmniTokenUsage {
+                input_tokens: 120,
+                output_tokens: 35,
+                total_tokens: 155,
+            }
+        })
+    );
+
+    let row: (String,) = sqlx::query_as(
+        "SELECT metrics_json FROM ai_logs WHERE conversation_id = ? AND event_kind = 'metrics'",
+    )
+    .bind(&session_state.conversation_id)
+    .fetch_one(&pool)
+    .await
+    .expect("fetch metrics row");
+    assert!(row.0.contains("input_tokens"));
+}
+
+#[test]
+fn token_usage_from_qwen_accepts_legacy_prompt_completion_names() {
+    assert_eq!(
+        token_usage_from_qwen(&json!({
+            "prompt_tokens": 10,
+            "completion_tokens": 7
+        })),
+        Some(OmniTokenUsage {
+            input_tokens: 10,
+            output_tokens: 7,
+            total_tokens: 17,
+        })
+    );
+}
+
 /// Test voice config validation returns error when voice disabled.
 #[tokio::test]
 async fn test_voice_disabled_validation() {
@@ -1095,9 +1156,11 @@ async fn session_context_message_is_forwarded_without_creating_response() {
     let assets_dir = dir.path().join("assets");
     fs::create_dir_all(&assets_dir).expect("create assets dir");
     fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+    let mut config = Config::default();
+    config.omni.voice = Some("Cherry".to_string());
     fs::write(
         &config_path,
-        serde_json::to_string_pretty(&Config::default()).expect("serialize config"),
+        serde_json::to_string_pretty(&config).expect("serialize config"),
     )
     .expect("write config");
     let store = Config::load(&config_path).expect("load config");
@@ -1134,6 +1197,17 @@ async fn session_context_message_is_forwarded_without_creating_response() {
         Some(
             "Current Wmux context: target_name=local, connection_type=local, session=main, window=@1, pane=%2. Use target_name as the default connection for tmux actions when the user does not name a connection."
         )
+    );
+    assert_eq!(
+        effects.qwen_messages[0]["session"]["voice"].as_str(),
+        Some("Cherry")
+    );
+    assert_eq!(
+        effects.qwen_messages[0]["session"]["tools"]
+            .as_array()
+            .expect("tools array")
+            .len(),
+        33
     );
 }
 

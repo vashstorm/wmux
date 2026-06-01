@@ -147,7 +147,7 @@
 
 .voice-title {
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   align-items: center;
   min-width: 0;
   gap: var(--spacing-xs);
@@ -201,6 +201,7 @@
 .voice-status-label {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   height: 22px;
   padding: 0 var(--spacing-xs);
   border: 1px solid var(--color-panel-border);
@@ -209,6 +210,24 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-2xs);
   text-transform: capitalize;
+}
+
+.voice-token-meter {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-2xs);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.voice-token-meter span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --- Chat Body --- */
@@ -455,33 +474,35 @@
 }
 
 .voice-btn--start {
-  color: var(--color-success);
+  color: var(--color-text-muted);
 }
 
 .voice-btn--start:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.12);
+  border-color: var(--color-panel-border);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 
 .voice-btn--stop {
-  color: var(--color-danger);
-  border-color: rgba(239, 68, 68, 0.25);
-  background: rgba(239, 68, 68, 0.06);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.06);
   animation: mic-pulse-active 2s infinite ease-in-out;
 }
 
 .voice-btn--stop:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(16, 185, 129, 0.16);
 }
 
 @keyframes mic-pulse-active {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
   }
   70% {
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
   }
 }
 

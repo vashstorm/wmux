@@ -22,7 +22,9 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use wmux_core::config::OmniConfig;
-use wmux_core::protocol::{OmniClientMessage, OmniServerEvent, OmniTarget, generate_qwen_tools};
+use wmux_core::protocol::{
+    OmniClientMessage, OmniServerEvent, OmniTarget, OmniTokenUsage, generate_qwen_tools,
+};
 use wmux_core::state::RuntimeSkills;
 use wmux_core::storage::{
     AiLogRepository,
@@ -175,7 +177,7 @@ async fn handle_voice_socket(state: AppState, mut socket: WebSocket) {
     };
 
     // Send session.update to Qwen with tools
-    if send_session_update(&mut upstream, &voice_config, &state.skills)
+    if send_session_update(&mut upstream, &voice_config, &state.skills, None)
         .await
         .is_err()
     {
@@ -262,6 +264,28 @@ fn history_message(
 
 fn redacted_json(value: serde_json::Value) -> Option<String> {
     serde_json::to_string(&redact_secrets(&value)).ok()
+}
+
+fn token_usage_from_qwen(usage: &serde_json::Value) -> Option<OmniTokenUsage> {
+    let input_tokens = usage_u64(usage, &["input_tokens", "prompt_tokens"]).unwrap_or(0);
+    let output_tokens = usage_u64(usage, &["output_tokens", "completion_tokens"]).unwrap_or(0);
+    let total_tokens =
+        usage_u64(usage, &["total_tokens"]).unwrap_or(input_tokens.saturating_add(output_tokens));
+
+    (input_tokens > 0 || output_tokens > 0 || total_tokens > 0).then_some(OmniTokenUsage {
+        input_tokens,
+        output_tokens,
+        total_tokens,
+    })
+}
+
+fn usage_u64(value: &serde_json::Value, fields: &[&str]) -> Option<u64> {
+    fields.iter().find_map(|field| {
+        let token_value = value.get(*field)?;
+        token_value
+            .as_u64()
+            .or_else(|| token_value.as_i64().and_then(|n| u64::try_from(n).ok()))
+    })
 }
 
 async fn persist_voice_event(
@@ -629,8 +653,36 @@ async fn send_session_update(
     upstream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     config: &OmniConfig,
     skills: &RuntimeSkills,
+    instructions: Option<String>,
 ) -> Result<(), String> {
+    let (session, tool_count) = qwen_session_payload(config, skills, instructions);
+    let session_update = serde_json::json!({
+        "type": "session.update",
+        "session": session
+    });
+
+    let message = TungsteniteMessage::Text(
+        serde_json::to_string(&session_update)
+            .map_err(|e| format!("failed to serialize session.update: {}", e))?
+            .into(),
+    );
+
+    upstream
+        .send(message)
+        .await
+        .map_err(|e| format!("failed to send session.update: {}", e))?;
+
+    tracing::debug!("sent session.update to Qwen with {} tools", tool_count);
+    Ok(())
+}
+
+fn qwen_session_payload(
+    config: &OmniConfig,
+    skills: &RuntimeSkills,
+    instructions: Option<String>,
+) -> (serde_json::Value, usize) {
     let tools = generate_qwen_tools(&skills.list());
+    let tool_count = tools.len();
 
     let turn_detection = if config.vad_enabled {
         serde_json::json!({
@@ -653,25 +705,11 @@ async fn send_session_update(
     if let Some(voice) = config.voice.as_deref().filter(|voice| !voice.is_empty()) {
         session["voice"] = serde_json::Value::String(voice.to_string());
     }
+    if let Some(instructions) = instructions.filter(|value| !value.is_empty()) {
+        session["instructions"] = serde_json::Value::String(instructions);
+    }
 
-    let session_update = serde_json::json!({
-        "type": "session.update",
-        "session": session
-    });
-
-    let message = TungsteniteMessage::Text(
-        serde_json::to_string(&session_update)
-            .map_err(|e| format!("failed to serialize session.update: {}", e))?
-            .into(),
-    );
-
-    upstream
-        .send(message)
-        .await
-        .map_err(|e| format!("failed to send session.update: {}", e))?;
-
-    tracing::debug!("sent session.update to Qwen with {} tools", tools.len());
-    Ok(())
+    (session, tool_count)
 }
 
 /// Bridge bidirectional messages between client and Qwen upstream.
@@ -943,11 +981,13 @@ async fn handle_client_message(
             session_state
                 .set_context(target.clone(), connection_type.clone())
                 .await;
+            let voice_config = get_omni_config(state)?;
+            let instructions = context_prompt_text(&target, connection_type.as_deref());
+            let (session, _) =
+                qwen_session_payload(&voice_config, &state.skills, Some(instructions));
             Ok(ClientMessageEffects::qwen(vec![serde_json::json!({
                 "type": "session.update",
-                "session": {
-                    "instructions": context_prompt_text(&target, connection_type.as_deref())
-                }
+                "session": session
             })]))
         }
 
@@ -1350,6 +1390,7 @@ async fn handle_qwen_message(
         "response.done" => {
             tracing::debug!("Qwen event: {}", event_type);
             let usage = value.pointer("/response/usage");
+            let token_usage = usage.and_then(token_usage_from_qwen);
             if let Some(usage) = usage {
                 let metrics_json =
                     serde_json::to_string(usage).unwrap_or_else(|_| "{}".to_string());
@@ -1378,7 +1419,7 @@ async fn handle_qwen_message(
                 )
                 .await;
             }
-            Ok(None)
+            Ok(token_usage.map(|usage| OmniServerEvent::TokenUsage { usage }))
         }
 
         _ => {

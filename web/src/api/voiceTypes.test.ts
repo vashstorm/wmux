@@ -19,6 +19,7 @@ import {
   isVoiceAssistantDeltaEvent,
   isVoiceErrorEvent,
   isVoiceSessionTimeoutEvent,
+  isVoiceTokenUsageEvent,
   isValidVoiceSkill,
   isValidFrontendRoute,
   isValidBackendRoute,
@@ -193,6 +194,17 @@ describe("voiceTypes", () => {
       expect(isOmniServerEvent(event)).toBe(true)
       if (isOmniServerEvent(event)) {
         expect(isVoiceSessionTimeoutEvent(event)).toBe(true)
+      }
+    })
+
+    it("recognizes token_usage event", () => {
+      const event = {
+        type: "token_usage",
+        usage: { inputTokens: 120, outputTokens: 35, totalTokens: 155 },
+      }
+      expect(isOmniServerEvent(event)).toBe(true)
+      if (isOmniServerEvent(event)) {
+        expect(isVoiceTokenUsageEvent(event)).toBe(true)
       }
     })
 
@@ -415,6 +427,7 @@ describe("voiceTypes", () => {
         { type: "assistant_delta", text: "Don" },
         { type: "error", code: "voice_disabled", message: "Voice is disabled" },
         { type: "session_timeout", remainingSeconds: 30 },
+        { type: "token_usage", usage: { inputTokens: 120, outputTokens: 35, totalTokens: 155 } },
       ]
 
       for (const event of events) {
@@ -438,6 +451,8 @@ describe("voiceTypes", () => {
           expect(event.message).toBeDefined()
         } else if (isVoiceSessionTimeoutEvent(event)) {
           expect(event.remainingSeconds).toBeGreaterThan(0)
+        } else if (isVoiceTokenUsageEvent(event)) {
+          expect(event.usage.totalTokens).toBeGreaterThan(0)
         }
       }
     })

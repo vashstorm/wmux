@@ -215,6 +215,19 @@ export interface VoiceSessionTimeoutEvent extends OmniServerEventBase {
   remainingSeconds: number
 }
 
+/** Token usage reported for the latest completed assistant response */
+export interface VoiceTokenUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}
+
+/** Incremental usage event sent after a model response completes */
+export interface VoiceTokenUsageEvent extends OmniServerEventBase {
+  type: "token_usage"
+  usage: VoiceTokenUsage
+}
+
 /** Union type for all server-to-client voice events */
 export type OmniServerEvent =
   | VoiceConnectedEvent
@@ -227,6 +240,7 @@ export type OmniServerEvent =
   | VoiceAssistantDeltaEvent
   | VoiceErrorEvent
   | VoiceSessionTimeoutEvent
+  | VoiceTokenUsageEvent
 
 // ============================================================================
 // Type Guards
@@ -255,6 +269,7 @@ const SERVER_EVENT_TYPES = [
   "assistant_delta",
   "error",
   "session_timeout",
+  "token_usage",
 ] as const
 
 /**
@@ -426,6 +441,13 @@ export function isVoiceSessionTimeoutEvent(
   event: OmniServerEvent,
 ): event is VoiceSessionTimeoutEvent {
   return event.type === "session_timeout"
+}
+
+/**
+ * Type guard for VoiceTokenUsageEvent.
+ */
+export function isVoiceTokenUsageEvent(event: OmniServerEvent): event is VoiceTokenUsageEvent {
+  return event.type === "token_usage"
 }
 
 /**
