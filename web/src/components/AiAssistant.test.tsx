@@ -250,10 +250,9 @@ describe("AiAssistant", () => {
     const el = document.querySelector("[data-ai-assistant-state]")
     expect(el?.getAttribute("data-ai-assistant-state")).toBe("idle")
     const controls = document.querySelector(".ai-assistant-controls")
-    expect(controls?.querySelectorAll("button")).toHaveLength(4)
+    expect(controls?.querySelectorAll("button")).toHaveLength(3)
     expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Mute AI voice" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Stop AI output" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Start listening" })).toBeInTheDocument()
   })
 

@@ -1201,6 +1201,13 @@ export function AiAssistant() {
     omniStatus === "processing" ||
     omniStatus === "speaking" ||
     omniStatus === "confirming"
+  const isRunning =
+    micCapturing ||
+    omniStatus === "connecting" ||
+    omniStatus === "processing" ||
+    omniStatus === "speaking" ||
+    omniStatus === "confirming" ||
+    omniStatus === "listening"
   const isDisabled = omniStatus === "disabled"
   const visibleHistory = history.slice(-10)
   const latestHistoryId = history[history.length - 1]?.id ?? ""
@@ -1436,28 +1443,31 @@ export function AiAssistant() {
           >
             {audioMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
           </button>
-          <button
-            type="button"
-            className="voice-btn voice-btn--halt"
-            aria-label="Stop AI output"
-            onClick={handleStopResponse}
-            disabled={isDisabled || (!wsRef.current && !assistantDraft)}
-          >
-            <StopCircleIcon fontSize="small" />
-          </button>
-          <button
-            type="button"
-            className={`voice-btn ${micCapturing ? "voice-btn--stop" : "voice-btn--start"}`}
-            aria-label={micCapturing ? "Stop listening" : "Start listening"}
-            onClick={handleMicToggle}
-            disabled={!micCapturing && (isDisabled || wsConnecting || micDisabled || !micAvailable)}
-          >
-            {isDisabled || micDisabled || !micAvailable ? (
-              <MicOffIcon fontSize="small" />
-            ) : (
-              <MicIcon fontSize="small" />
-            )}
-          </button>
+          {isRunning ? (
+            <button
+              type="button"
+              className="voice-btn voice-btn--stop"
+              aria-label={micCapturing ? "Stop listening" : "Stop AI output"}
+              onClick={micCapturing ? stopListening : handleStopResponse}
+              disabled={isDisabled}
+            >
+              <StopCircleIcon fontSize="small" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="voice-btn voice-btn--start"
+              aria-label="Start listening"
+              onClick={omniStatus === "error" ? handleReconnect : startListening}
+              disabled={isDisabled || wsConnecting || micDisabled || !micAvailable}
+            >
+              {isDisabled || micDisabled || !micAvailable ? (
+                <MicOffIcon fontSize="small" />
+              ) : (
+                <MicIcon fontSize="small" />
+              )}
+            </button>
+          )}
         </div>
       </form>
     </div>
