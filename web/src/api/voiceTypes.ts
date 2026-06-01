@@ -130,6 +130,11 @@ export interface VoiceStartListeningMessage extends OmniClientMessageBase {
   type: "start_listening"
 }
 
+/** Cancel the current assistant response/output */
+export interface VoiceStopResponseMessage extends OmniClientMessageBase {
+  type: "stop_response"
+}
+
 /** Union type for all client-to-server voice messages */
 export type OmniClientMessage =
   | VoiceAudioFrameMessage
@@ -139,6 +144,7 @@ export type OmniClientMessage =
   | VoiceCancelActionMessage
   | VoiceStopListeningMessage
   | VoiceStartListeningMessage
+  | VoiceStopResponseMessage
 
 // ============================================================================
 // Server-to-Client WebSocket Events
@@ -255,6 +261,7 @@ const CLIENT_MESSAGE_TYPES = [
   "cancel_action",
   "stop_listening",
   "start_listening",
+  "stop_response",
 ] as const
 
 /** Server event type strings */
@@ -359,6 +366,15 @@ export function isVoiceStartListeningMessage(
   msg: OmniClientMessage,
 ): msg is VoiceStartListeningMessage {
   return msg.type === "start_listening"
+}
+
+/**
+ * Type guard for VoiceStopResponseMessage.
+ */
+export function isVoiceStopResponseMessage(
+  msg: OmniClientMessage,
+): msg is VoiceStopResponseMessage {
+  return msg.type === "stop_response"
 }
 
 /**

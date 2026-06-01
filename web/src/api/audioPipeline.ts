@@ -28,7 +28,8 @@ export interface AudioLevelObserver {
 
 export class AudioPipeline {
   private config: Required<AudioPipelineConfig>
-  private audioCtx: AudioContext | null = null
+  private captureAudioCtx: AudioContext | null = null
+  private playbackAudioCtx: AudioContext | null = null
   private mediaStream: MediaStream | null = null
   private sourceNode: MediaStreamAudioSourceNode | null = null
   private scriptNode: ScriptProcessorNode | null = null
@@ -53,8 +54,8 @@ export class AudioPipeline {
   ): Promise<void> {
     if (this.isCapturing) return
 
-    this.audioCtx = this.config.devices.createAudioContext()
-    await this.audioCtx.resume()
+    this.captureAudioCtx = this.config.devices.createAudioContext()
+    await this.captureAudioCtx.resume()
 
     this.mediaStream = await this.config.devices.getUserMedia({
       audio: {
@@ -65,13 +66,13 @@ export class AudioPipeline {
       },
     })
 
-    this.sourceNode = this.audioCtx.createMediaStreamSource(this.mediaStream)
+    this.sourceNode = this.captureAudioCtx.createMediaStreamSource(this.mediaStream)
 
     const bufferSize = 4096
-    this.scriptNode = this.audioCtx.createScriptProcessor(bufferSize, 1, 1)
+    this.scriptNode = this.captureAudioCtx.createScriptProcessor(bufferSize, 1, 1)
 
     this.sourceNode.connect(this.scriptNode)
-    this.scriptNode.connect(this.audioCtx.destination)
+    this.scriptNode.connect(this.captureAudioCtx.destination)
 
     this.scriptNode.onaudioprocess = (event) => {
       const inputBuffer = event.inputBuffer
@@ -113,9 +114,9 @@ export class AudioPipeline {
       this.mediaStream.getTracks().forEach((track) => track.stop())
       this.mediaStream = null
     }
-    if (this.audioCtx) {
-      void this.audioCtx.close()
-      this.audioCtx = null
+    if (this.captureAudioCtx) {
+      void this.captureAudioCtx.close()
+      this.captureAudioCtx = null
     }
   }
 
@@ -137,9 +138,9 @@ export class AudioPipeline {
 
     this.isPlaying = true
 
-    if (!this.audioCtx) {
-      this.audioCtx = this.config.devices.createAudioContext()
-      await this.audioCtx.resume()
+    if (!this.playbackAudioCtx) {
+      this.playbackAudioCtx = this.config.devices.createAudioContext()
+      await this.playbackAudioCtx.resume()
     }
 
     const chunks: Float32Array[] = []
@@ -154,7 +155,7 @@ export class AudioPipeline {
       }
     }
 
-    const buffer = this.audioCtx.createBuffer(1, totalLength, sampleRate)
+    const buffer = this.playbackAudioCtx.createBuffer(1, totalLength, sampleRate)
     const channelData = buffer.getChannelData(0)
     let offset = 0
     for (const chunk of chunks) {
@@ -162,9 +163,9 @@ export class AudioPipeline {
       offset += chunk.length
     }
 
-    const source = this.audioCtx.createBufferSource()
+    const source = this.playbackAudioCtx.createBufferSource()
     source.buffer = buffer
-    source.connect(this.audioCtx.destination)
+    source.connect(this.playbackAudioCtx.destination)
 
     source.onended = () => {
       void this.drainPlaybackQueue(sampleRate)
@@ -183,6 +184,10 @@ export class AudioPipeline {
         void 0
       }
       this.playbackSource = null
+    }
+    if (this.playbackAudioCtx) {
+      void this.playbackAudioCtx.close()
+      this.playbackAudioCtx = null
     }
     this.isPlaying = false
   }
@@ -260,6 +265,6 @@ export class AudioPipeline {
   }
 
   getContext(): AudioContext | null {
-    return this.audioCtx
+    return this.captureAudioCtx ?? this.playbackAudioCtx
   }
 }

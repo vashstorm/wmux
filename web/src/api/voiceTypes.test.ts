@@ -8,6 +8,7 @@ import {
   isVoiceCancelActionMessage,
   isVoiceStopListeningMessage,
   isVoiceStartListeningMessage,
+  isVoiceStopResponseMessage,
   isVoiceSessionContextMessage,
   isVoiceConnectedEvent,
   isVoiceAudioDeltaEvent,
@@ -87,6 +88,14 @@ describe("voiceTypes", () => {
       expect(isOmniClientMessage(msg)).toBe(true)
       if (isOmniClientMessage(msg)) {
         expect(isVoiceStartListeningMessage(msg)).toBe(true)
+      }
+    })
+
+    it("recognizes stop_response message", () => {
+      const msg = { type: "stop_response" }
+      expect(isOmniClientMessage(msg)).toBe(true)
+      if (isOmniClientMessage(msg)) {
+        expect(isVoiceStopResponseMessage(msg)).toBe(true)
       }
     })
 

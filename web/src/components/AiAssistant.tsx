@@ -12,6 +12,9 @@ import {
 } from "react"
 import MicIcon from "@mui/icons-material/Mic"
 import MicOffIcon from "@mui/icons-material/MicOff"
+import StopCircleIcon from "@mui/icons-material/StopCircle"
+import VolumeOffIcon from "@mui/icons-material/VolumeOff"
+import VolumeUpIcon from "@mui/icons-material/VolumeUp"
 import CloseIcon from "@mui/icons-material/Close"
 import AddIcon from "@mui/icons-material/Add"
 import SendIcon from "@mui/icons-material/Send"
@@ -248,6 +251,7 @@ export function AiAssistant() {
   const omniStatusRef = useRef(omniStatus)
   const [wsConnecting, setWsConnecting] = useState(false)
   const [micCapturing, setMicCapturing] = useState(false)
+  const [audioMuted, setAudioMuted] = useState(false)
   const [micDisabled, setMicDisabled] = useState(false)
   const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable)
   const [history, setHistory] = useState<OmniConversationMessage[]>([])
@@ -264,6 +268,8 @@ export function AiAssistant() {
   )
   const chatRef = useRef<HTMLDivElement | null>(null)
   const assistantDraftRef = useRef("")
+  const audioMutedRef = useRef(false)
+  const suppressAssistantOutputRef = useRef(false)
   const resizeStartRef = useRef<ResizeStart | null>(null)
   const dragStartRef = useRef<DragStart | null>(null)
 
@@ -297,6 +303,9 @@ export function AiAssistant() {
   useEffect(() => {
     omniStatusRef.current = omniStatus
   }, [omniStatus])
+  useEffect(() => {
+    audioMutedRef.current = audioMuted
+  }, [audioMuted])
   useEffect(() => {
     let cancelled = false
     const loadMicState = async () => {
@@ -513,6 +522,7 @@ export function AiAssistant() {
       }
 
       if (isVoiceAssistantDeltaEvent(event)) {
+        if (suppressAssistantOutputRef.current) return
         if (event.text) {
           appendAssistantDraft(event.text)
         }
@@ -522,6 +532,7 @@ export function AiAssistant() {
       }
 
       if (isVoiceAssistantMessageEvent(event)) {
+        if (suppressAssistantOutputRef.current) return
         const text = event.text || assistantDraftRef.current
         clearAssistantDraft()
         setOmniStatus("idle")
@@ -542,12 +553,16 @@ export function AiAssistant() {
       }
 
       if (isVoiceAudioDeltaEvent(event)) {
+        if (suppressAssistantOutputRef.current) return
         setOmniStatus("speaking")
-        pipelineRef.current?.enqueuePlayback(event.pcm16Base64, event.sampleRate)
+        if (!audioMutedRef.current) {
+          pipelineRef.current?.enqueuePlayback(event.pcm16Base64, event.sampleRate)
+        }
         return
       }
 
       if (isVoiceTokenUsageEvent(event)) {
+        if (suppressAssistantOutputRef.current) return
         setTokenUsage((prev) => ({
           last: event.usage,
           total: addTokenUsage(prev.total, event.usage),
@@ -584,6 +599,7 @@ export function AiAssistant() {
     setOmniTranscript("")
     clearAssistantDraft()
     setOmniError(null)
+    suppressAssistantOutputRef.current = false
 
     const ws = new OmniWebSocket({
       token,
@@ -642,6 +658,7 @@ export function AiAssistant() {
     }
 
     try {
+      suppressAssistantOutputRef.current = false
       await pipelineRef.current.startCapture(
         (frameBase64, sampleRate) => {
           if (wsRef.current?.isConnected()) {
@@ -683,15 +700,52 @@ export function AiAssistant() {
 
   const stopListening = useCallback(() => {
     pipelineRef.current?.stopCapture()
-    pipelineRef.current?.stopPlayback()
-    wsRef.current?.close()
-    wsRef.current = null
-    wsConnectingRef.current = false
-    setWsConnecting(false)
+    if (wsRef.current?.isConnected()) {
+      wsRef.current.send({ type: "stop_listening" })
+    }
     setMicCapturing(false)
     setAudioBars(new Array(LEVEL_SEGMENTS).fill(false))
-    setOmniStatus("idle")
+    if (omniStatusRef.current === "listening" || omniStatusRef.current === "connecting") {
+      setOmniStatus("idle")
+    }
   }, [setOmniStatus])
+
+  const handleMuteToggle = useCallback(() => {
+    setAudioMuted((current) => {
+      const next = !current
+      audioMutedRef.current = next
+      if (next) {
+        pipelineRef.current?.stopPlayback()
+      }
+      return next
+    })
+  }, [])
+
+  const handleStopResponse = useCallback(() => {
+    suppressAssistantOutputRef.current = true
+    pipelineRef.current?.stopPlayback()
+    clearAssistantDraft()
+    setOmniTranscript("")
+    setOmniConfirmation(null)
+    setOmniError(null)
+    const responseActive =
+      omniStatusRef.current === "processing" ||
+      omniStatusRef.current === "speaking" ||
+      omniStatusRef.current === "confirming" ||
+      Boolean(assistantDraftRef.current)
+    if (responseActive && wsRef.current?.isConnected()) {
+      wsRef.current.send({ type: "stop_response" })
+    }
+    if (omniStatusRef.current !== "disabled") {
+      setOmniStatus("idle")
+    }
+  }, [
+    clearAssistantDraft,
+    setOmniConfirmation,
+    setOmniError,
+    setOmniStatus,
+    setOmniTranscript,
+  ])
 
   const handleConfirm = useCallback(() => {
     if (omniPendingConfirmation && wsRef.current?.isConnected()) {
@@ -752,6 +806,7 @@ export function AiAssistant() {
       setOmniTranscript("")
       clearAssistantDraft()
       setOmniError(null)
+      suppressAssistantOutputRef.current = false
       omniStatusRef.current = "processing"
       setOmniStatus("processing")
       if (existingWs) {
@@ -1122,6 +1177,25 @@ export function AiAssistant() {
             disabled={!inputText.trim() || isDisabled}
           >
             <SendIcon fontSize="small" />
+          </button>
+          <button
+            type="button"
+            className={`voice-btn ${audioMuted ? "voice-btn--muted" : "voice-btn--audio"}`}
+            aria-label={audioMuted ? "Unmute AI voice" : "Mute AI voice"}
+            aria-pressed={audioMuted}
+            onClick={handleMuteToggle}
+            disabled={isDisabled}
+          >
+            {audioMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
+          </button>
+          <button
+            type="button"
+            className="voice-btn voice-btn--halt"
+            aria-label="Stop AI output"
+            onClick={handleStopResponse}
+            disabled={isDisabled || (!wsRef.current && !assistantDraft)}
+          >
+            <StopCircleIcon fontSize="small" />
           </button>
           <button
             type="button"

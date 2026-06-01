@@ -514,6 +514,25 @@
   background: var(--color-accent-subtle);
 }
 
+.voice-btn--audio {
+  color: var(--color-text-muted);
+}
+
+.voice-btn--muted {
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.voice-btn--halt {
+  color: var(--color-danger);
+}
+
+.voice-btn--halt:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 .voice-btn--ghost {
   width: 28px;
   height: 28px;

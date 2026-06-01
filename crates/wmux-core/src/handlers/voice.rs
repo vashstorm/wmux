@@ -1114,6 +1114,15 @@ async fn handle_client_message(
                 "type": "input_audio_buffer.commit"
             })]))
         }
+
+        OmniClientMessage::StopResponse => Ok(ClientMessageEffects::qwen(vec![
+            serde_json::json!({
+                "type": "response.cancel"
+            }),
+            serde_json::json!({
+                "type": "input_audio_buffer.clear"
+            }),
+        ])),
     }
 }
 

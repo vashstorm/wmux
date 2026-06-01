@@ -267,6 +267,8 @@ pub enum OmniClientMessage {
     StopListening,
     /// Start voice recognition/listening.
     StartListening,
+    /// Cancel the current assistant response/output.
+    StopResponse,
 }
 
 /// Server-to-client voice WebSocket events.
@@ -575,6 +577,7 @@ mod tests {
             },
             OmniClientMessage::StopListening,
             OmniClientMessage::StartListening,
+            OmniClientMessage::StopResponse,
         ];
 
         for message in messages {

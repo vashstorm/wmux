@@ -152,7 +152,7 @@ describe("AiAssistant", () => {
     })
   })
 
-  test("shows only send and mic buttons when idle", () => {
+  test("shows assistant output controls when idle", () => {
     renderWithStateSetup((ctx) => {
       ctx.setOmniStatus("idle")
     })
@@ -160,10 +160,11 @@ describe("AiAssistant", () => {
     const el = document.querySelector("[data-ai-assistant-state]")
     expect(el?.getAttribute("data-ai-assistant-state")).toBe("idle")
     const controls = document.querySelector(".ai-assistant-controls")
-    expect(controls?.querySelectorAll("button")).toHaveLength(2)
+    expect(controls?.querySelectorAll("button")).toHaveLength(4)
     expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Mute AI voice" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Stop AI output" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Start listening" })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Mute" })).not.toBeInTheDocument()
   })
 
   test("resizes dialog from the top-left drag handle", () => {
@@ -563,6 +564,107 @@ describe("AiAssistant", () => {
     })
 
     expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("AAAA", 24000)
+  })
+
+  test("mute keeps assistant text but skips voice playback", async () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Mute AI voice" }))
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "say hello" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "assistant_delta",
+        text: "Hello",
+      })
+      voiceClientMocks.onMessage?.({
+        type: "audio_delta",
+        pcm16Base64: "AAAA",
+        sampleRate: 24000,
+      })
+    })
+
+    expect(screen.getByText("Hello")).toBeInTheDocument()
+    expect(audioPipelineMocks.enqueuePlayback).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: "Unmute AI voice" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    )
+  })
+
+  test("stopping mic capture keeps AI output and websocket alive", async () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Start listening" }))
+
+    await waitFor(() => {
+      expect(audioPipelineMocks.startCapture).toHaveBeenCalledOnce()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop listening" }))
+
+    expect(audioPipelineMocks.stopCapture).toHaveBeenCalledOnce()
+    expect(audioPipelineMocks.stopPlayback).not.toHaveBeenCalled()
+    expect(voiceClientMocks.close).not.toHaveBeenCalled()
+    expect(voiceClientMocks.send).toHaveBeenCalledWith({ type: "stop_listening" })
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "audio_delta",
+        pcm16Base64: "BBBB",
+        sampleRate: 24000,
+      })
+    })
+
+    expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("BBBB", 24000)
+  })
+
+  test("stop AI output cancels current response and ignores later deltas", () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "say hello" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "assistant_delta",
+        text: "Hel",
+      })
+    })
+    expect(screen.getByText("Hel")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop AI output" }))
+
+    expect(audioPipelineMocks.stopPlayback).toHaveBeenCalled()
+    expect(voiceClientMocks.send).toHaveBeenCalledWith({ type: "stop_response" })
+    expect(screen.queryByText("Hel")).not.toBeInTheDocument()
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "assistant_delta",
+        text: "lo",
+      })
+      voiceClientMocks.onMessage?.({
+        type: "audio_delta",
+        pcm16Base64: "CCCC",
+        sampleRate: 24000,
+      })
+    })
+
+    expect(screen.queryByText("lo")).not.toBeInTheDocument()
+    expect(audioPipelineMocks.enqueuePlayback).not.toHaveBeenCalled()
   })
 
   test("shows assistant text while voice reply audio is streaming", async () => {

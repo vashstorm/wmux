@@ -1150,6 +1150,42 @@ async fn test_text_message_conversion() {
 }
 
 #[tokio::test]
+async fn stop_response_cancels_current_qwen_response() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("config.jsonc");
+    let assets_dir = dir.path().join("assets");
+    fs::create_dir_all(&assets_dir).expect("create assets dir");
+    fs::write(assets_dir.join("index.html"), "<html></html>").expect("write index");
+    fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&Config::default()).expect("serialize config"),
+    )
+    .expect("write config");
+    let store = Config::load(&config_path).expect("load config");
+    let state = AppState::new(store, assets_dir, LoggingHandle::empty());
+
+    let client_msg = OmniClientMessage::StopResponse;
+    let result = handle_client_message(
+        &serde_json::to_string(&client_msg).expect("serialize stop response"),
+        &OmniSessionState::new(),
+        &state,
+        &mpsc::channel(1).0,
+    )
+    .await
+    .expect("handle stop response");
+
+    assert_eq!(result.qwen_messages.len(), 2);
+    assert_eq!(
+        result.qwen_messages[0].get("type").and_then(|v| v.as_str()),
+        Some("response.cancel")
+    );
+    assert_eq!(
+        result.qwen_messages[1].get("type").and_then(|v| v.as_str()),
+        Some("input_audio_buffer.clear")
+    );
+}
+
+#[tokio::test]
 async fn session_context_message_is_forwarded_without_creating_response() {
     let dir = tempfile::tempdir().expect("tempdir");
     let config_path = dir.path().join("config.jsonc");
@@ -1593,6 +1629,11 @@ fn test_client_message_parsing() {
     let text = serde_json::to_string(&start_msg).unwrap();
     let msg: OmniClientMessage = serde_json::from_str(&text).unwrap();
     assert!(matches!(msg, OmniClientMessage::StartListening));
+
+    let stop_response_msg = serde_json::json!({"type": "stop_response"});
+    let text = serde_json::to_string(&stop_response_msg).unwrap();
+    let msg: OmniClientMessage = serde_json::from_str(&text).unwrap();
+    assert!(matches!(msg, OmniClientMessage::StopResponse));
 }
 
 /// Test server event serialization.
