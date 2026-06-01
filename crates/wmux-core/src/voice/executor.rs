@@ -1797,6 +1797,7 @@ mod tests {
     use crate::config::Config;
     use crate::logging::LoggingHandle;
     use crate::state::AppState;
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::PathBuf;
 
@@ -1849,6 +1850,49 @@ mod tests {
             tmux_log_path,
             _dir: dir,
         }
+    }
+
+    async fn test_executor_with_storage() -> TestExecutor {
+        let mut test = test_executor();
+        let db_path = test._dir.path().join("test.db");
+        let pool = crate::storage::db::create_pool(&db_path)
+            .await
+            .expect("create storage pool");
+        crate::storage::db::run_migrations(&pool)
+            .await
+            .expect("run migrations");
+        test.executor.state.storage = Some(pool);
+        test
+    }
+
+    fn confirmation_id(event: OmniServerEvent) -> Uuid {
+        match event {
+            OmniServerEvent::IntentReceived {
+                confirmation_required: true,
+                confirmation_id: Some(id),
+                ..
+            } => Uuid::parse_str(&id).expect("uuid"),
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
+
+    async fn create_project_fixture(test: &TestExecutor, name: &str) -> String {
+        let result = test
+            .executor
+            .execute(
+                "create_project",
+                json!({
+                    "name": name,
+                    "path": "/tmp/wmux-project",
+                    "description": "Project fixture"
+                }),
+            )
+            .await
+            .expect("create project fixture");
+        result.output["data"]["id"]
+            .as_str()
+            .expect("project id")
+            .to_string()
     }
 
     fn tmux_log(test: &TestExecutor) -> String {
@@ -2605,5 +2649,268 @@ esac
             log.contains("[clear-history][-t][%1]"),
             "should have cleared tmux scroll history, got: {log}"
         );
+    }
+
+    #[tokio::test]
+    async fn executor_project_skills_cover_crud_and_lifecycle_routes() {
+        let test = test_executor_with_storage().await;
+
+        let listed = test
+            .executor
+            .execute("list_projects", json!({}))
+            .await
+            .expect("list projects");
+        assert_eq!(listed.output["data"]["data"].as_array().unwrap().len(), 0);
+
+        let created = test
+            .executor
+            .execute(
+                "create_project",
+                json!({
+                    "name": "voice-project",
+                    "path": "/tmp/wmux-project",
+                    "description": "Created by voice skill"
+                }),
+            )
+            .await
+            .expect("create project");
+        let project_id = created.output["data"]["id"]
+            .as_str()
+            .expect("project id")
+            .to_string();
+        assert_eq!(created.output["data"]["name"], "voice-project");
+
+        let updated = test
+            .executor
+            .execute(
+                "update_project",
+                json!({
+                    "project_id": project_id,
+                    "description": "Updated by voice skill"
+                }),
+            )
+            .await
+            .expect("update project");
+        assert_eq!(
+            updated.output["data"]["description"],
+            "Updated by voice skill"
+        );
+
+        let launched = test
+            .executor
+            .execute("launch_project", json!({ "project_id": project_id }))
+            .await
+            .expect("launch project");
+        assert_eq!(launched.output["data"]["operation"], "sync");
+
+        let synced = test
+            .executor
+            .execute(
+                "sync_project_from_tmux",
+                json!({ "project_id": project_id }),
+            )
+            .await
+            .expect("sync project");
+        assert_eq!(synced.output["data"]["operation"], "sync");
+
+        let ai_error = test
+            .executor
+            .execute(
+                "generate_project_ai_html",
+                json!({ "project_id": project_id }),
+            )
+            .await
+            .expect_err("AI provider is not configured in the test fixture");
+        assert_eq!(ai_error.code, "bad_request");
+
+        let pending = test
+            .executor
+            .execute(
+                "delete_project",
+                json!({ "project_id": project_id, "kill_session": false }),
+            )
+            .await
+            .expect("pending delete project");
+        let confirmed = test
+            .executor
+            .execute_confirmed("delete_project", confirmation_id(pending.event))
+            .await
+            .expect("confirmed delete project");
+        assert_eq!(confirmed.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_analysis_and_log_skills_cover_routes() {
+        let test = test_executor_with_storage().await;
+
+        let analyze_error = test
+            .executor
+            .execute(
+                "analyze_session",
+                json!({ "target_name": "local", "session_name": "alpha" }),
+            )
+            .await
+            .expect_err("AI intelligence is not configured in the test fixture");
+        assert_eq!(analyze_error.code, "bad_request");
+
+        let stats = test
+            .executor
+            .execute("list_tmux_analysis", json!({ "limit": 10 }))
+            .await
+            .expect("list tmux analysis");
+        assert_eq!(stats.output["data"]["summary"]["totalEvents"], 0);
+
+        let cleanup = test
+            .executor
+            .execute("cleanup_tmux_analysis", json!({}))
+            .await
+            .expect("pending cleanup");
+        let cleanup_confirmed = test
+            .executor
+            .execute_confirmed("cleanup_tmux_analysis", confirmation_id(cleanup.event))
+            .await
+            .expect("confirmed cleanup");
+        assert_eq!(cleanup_confirmed.output["data"]["deleted"], 0);
+
+        let logs = test
+            .executor
+            .execute("list_ai_logs", json!({ "limit": 10 }))
+            .await
+            .expect("list AI logs");
+        assert_eq!(logs.output["data"]["data"].as_array().unwrap().len(), 0);
+
+        let clear = test
+            .executor
+            .execute("clear_ai_logs", json!({}))
+            .await
+            .expect("pending clear logs");
+        let clear_confirmed = test
+            .executor
+            .execute_confirmed("clear_ai_logs", confirmation_id(clear.event))
+            .await
+            .expect("confirmed clear logs");
+        assert_eq!(clear_confirmed.output["success"], true);
+    }
+
+    #[tokio::test]
+    async fn executor_dispatches_every_builtin_skill() {
+        let test = test_executor_with_storage().await;
+        let project_id = create_project_fixture(&test, "dispatch-project").await;
+        let cases = [
+            ("navigate_frontend", json!({ "route": "settings" })),
+            (
+                "invoke_backend_route",
+                json!({ "route_id": "connections.list", "params": {} }),
+            ),
+            ("list_sessions", json!({ "target_name": "local" })),
+            (
+                "create_session",
+                json!({ "target_name": "local", "session_name": "created" }),
+            ),
+            (
+                "rename_session",
+                json!({ "target_name": "local", "old_name": "created", "new_name": "renamed" }),
+            ),
+            (
+                "delete_session",
+                json!({ "target_name": "local", "session_name": "alpha" }),
+            ),
+            (
+                "send_to_pane",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0", "text": "hello" }),
+            ),
+            ("get_current_focus", json!({})),
+            (
+                "read_pane_output",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+            ("get_config", json!({})),
+            ("check_health", json!({})),
+            (
+                "create_window",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "newwin" }),
+            ),
+            (
+                "rename_window",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "new_name": "code" }),
+            ),
+            (
+                "split_pane",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+            (
+                "focus_pane",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+            (
+                "run_project",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0", "project_path": "/tmp/wmux-project", "start_command": "make run" }),
+            ),
+            ("list_projects", json!({})),
+            ("create_project", json!({ "name": "dispatch-project-two" })),
+            (
+                "update_project",
+                json!({ "project_id": project_id, "description": "dispatch update" }),
+            ),
+            (
+                "delete_project",
+                json!({ "project_id": project_id, "kill_session": false }),
+            ),
+            ("launch_project", json!({ "project_id": project_id })),
+            (
+                "sync_project_from_tmux",
+                json!({ "project_id": project_id }),
+            ),
+            (
+                "generate_project_ai_html",
+                json!({ "project_id": project_id }),
+            ),
+            (
+                "analyze_session",
+                json!({ "target_name": "local", "session_name": "alpha" }),
+            ),
+            ("list_tmux_analysis", json!({})),
+            ("cleanup_tmux_analysis", json!({})),
+            ("list_ai_logs", json!({})),
+            ("clear_ai_logs", json!({})),
+            (
+                "delete_window",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor" }),
+            ),
+            (
+                "kill_pane",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+            (
+                "clear_pane",
+                json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+        ];
+
+        let dispatch_ids = cases
+            .iter()
+            .map(|(id, _)| (*id).to_string())
+            .chain(
+                ["confirm_action", "cancel_action"]
+                    .into_iter()
+                    .map(str::to_string),
+            )
+            .collect::<BTreeSet<_>>();
+        let builtin_ids = crate::skills::builtin_skill_defs()
+            .into_iter()
+            .map(|skill| skill.id)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(dispatch_ids, builtin_ids);
+
+        for (skill, params) in cases {
+            let result = test.executor.execute(skill, params).await;
+            if let Err(error) = result {
+                assert_ne!(
+                    error.message,
+                    format!("unsupported voice skill: {skill}"),
+                    "{skill} should be dispatched by the executor"
+                );
+            }
+        }
     }
 }

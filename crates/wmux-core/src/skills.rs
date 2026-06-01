@@ -1043,7 +1043,9 @@ fn titleize_skill_id(id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
     use std::io::Write;
+    use std::path::PathBuf;
 
     #[test]
     fn parse_frontmatter_extracts_yaml_and_body() {
@@ -1298,5 +1300,104 @@ Create a new tmux session.
         let parameters = parameters_from_markdown(markdown).unwrap().unwrap();
         assert_eq!(parameters["type"], "object");
         assert_eq!(parameters["required"][0], "query");
+    }
+
+    #[test]
+    fn repository_skill_markdown_covers_every_builtin_skill() {
+        let skills_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../skills")
+            .canonicalize()
+            .expect("repository skills dir");
+        let loaded = load_skills_from_dir(&skills_dir);
+        let builtins = builtin_skill_defs();
+
+        let loaded_ids = loaded
+            .iter()
+            .map(|skill| skill.id.as_str())
+            .collect::<BTreeSet<_>>();
+        let builtin_ids = builtins
+            .iter()
+            .map(|skill| skill.id.as_str())
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            loaded_ids, builtin_ids,
+            "repository markdown skills must stay in sync with built-in skill definitions"
+        );
+
+        let mut seen = BTreeSet::new();
+        for skill in &loaded {
+            assert!(
+                seen.insert(skill.id.as_str()),
+                "duplicate skill id: {}",
+                skill.id
+            );
+            assert!(skill.enabled, "{} should be enabled by default", skill.id);
+            assert!(
+                skill.source_file.is_some(),
+                "{} should remember its source markdown file",
+                skill.id
+            );
+            assert!(
+                skill.description.starts_with(&format!("# {}", skill.name)),
+                "{} should use its display name as the markdown title",
+                skill.id
+            );
+
+            let builtin = builtins
+                .iter()
+                .find(|builtin| builtin.id == skill.id)
+                .expect("matching builtin");
+            assert_eq!(
+                skill.risk_level, builtin.risk_level,
+                "{} risk level should match the built-in definition",
+                skill.id
+            );
+        }
+    }
+
+    #[test]
+    fn repository_skill_markdown_has_valid_parameter_schemas() {
+        let skills_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../skills")
+            .canonicalize()
+            .expect("repository skills dir");
+        let loaded = load_skills_from_dir(&skills_dir);
+
+        for skill in loaded {
+            assert_eq!(
+                skill
+                    .parameters
+                    .get("type")
+                    .and_then(serde_json::Value::as_str),
+                Some("object"),
+                "{} parameters should be an object schema",
+                skill.id
+            );
+
+            if let Some(required) = skill
+                .parameters
+                .get("required")
+                .and_then(serde_json::Value::as_array)
+            {
+                let properties = skill
+                    .parameters
+                    .get("properties")
+                    .and_then(serde_json::Value::as_object)
+                    .unwrap_or_else(|| panic!("{} should define properties", skill.id));
+
+                for field in required {
+                    let field = field.as_str().unwrap_or_else(|| {
+                        panic!("{} required entries should be strings", skill.id)
+                    });
+                    assert!(
+                        properties.contains_key(field),
+                        "{} required field '{}' should have a property schema",
+                        skill.id,
+                        field
+                    );
+                }
+            }
+        }
     }
 }
