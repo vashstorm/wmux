@@ -848,6 +848,38 @@ async fn response_audio_transcript_done_emits_assistant_message() {
     assert_eq!(rows[0].text, "assistant spoke this");
 }
 
+#[tokio::test]
+async fn response_audio_transcript_delta_emits_assistant_delta() {
+    let config = test_voice_config("ws://127.0.0.1:9/realtime".to_string(), true, Some("key"));
+    let (state, _dir, pool) = test_state_with_storage(config).await;
+    let session_state = OmniSessionState::new();
+
+    let event = handle_qwen_message(
+        &json!({ "type": "response.audio_transcript.delta", "delta": "assistant speaking" })
+            .to_string(),
+        &session_state,
+        &state,
+        &mpsc::channel(1).0,
+    )
+    .await
+    .expect("handle qwen audio transcript delta");
+
+    assert_eq!(
+        event,
+        Some(OmniServerEvent::AssistantDelta {
+            text: "assistant speaking".to_string(),
+        })
+    );
+    let rows = sqlx::query_as::<_, OmniConversationMessage>(
+        "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages",
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("fetch history rows");
+
+    assert!(rows.is_empty());
+}
+
 /// Test voice config validation returns error when voice disabled.
 #[tokio::test]
 async fn test_voice_disabled_validation() {
@@ -1574,6 +1606,154 @@ async fn ai_log_persists_tool_result_with_storage() {
     assert_eq!(logs.data[0].event_kind, "tool_result");
     assert_eq!(logs.data[0].tool_name, Some("list_sessions".to_string()));
     assert_eq!(logs.data[0].duration_ms, Some(150));
+}
+
+/// Test completed tool results update the original pending tool_call row.
+#[tokio::test]
+async fn ai_log_tool_result_updates_pending_tool_call_status() {
+    let config = test_voice_config("ws://127.0.0.1:9".to_string(), true, Some("test-key"));
+    let (state, _dir, pool) = test_state_with_storage(config).await;
+    let session_state = OmniSessionState::new();
+
+    persist_tool_call(
+        &state,
+        &session_state,
+        "list_sessions",
+        "call-success",
+        &json!({ "target_name": "local" }),
+    )
+    .await;
+    persist_tool_result(
+        &state,
+        &session_state,
+        "list_sessions",
+        Some("call-success"),
+        true,
+        None,
+        Some(42),
+        Some(r#"{"success":true,"data":[]}"#.to_string()),
+    )
+    .await;
+
+    let repo = AiLogRepository::new(pool);
+    let logs = repo.list(10, None).await.expect("list logs");
+    let tool_call = logs
+        .data
+        .iter()
+        .find(|entry| entry.event_kind == "tool_call")
+        .expect("tool_call log");
+    assert_eq!(tool_call.status, "success");
+    assert_eq!(tool_call.duration_ms, Some(42));
+    assert_eq!(tool_call.error_message, None);
+    assert_eq!(
+        tool_call.tool_result_json,
+        Some(r#"{"success":true,"data":[]}"#.to_string())
+    );
+    assert!(
+        tool_call
+            .raw_event_json
+            .contains(r#""tool_call_id":"call-success""#)
+    );
+    assert!(
+        tool_call
+            .raw_event_json
+            .contains(r#""source":"qwen_function_call""#)
+    );
+    assert!(
+        tool_call
+            .raw_event_json
+            .contains(r#""argument_keys":["target_name"]"#)
+    );
+    assert!(tool_call.metrics_json.contains(r#""argument_count":1"#));
+}
+
+/// Test AI log persistence for blocked tool results.
+#[tokio::test]
+async fn ai_log_persists_blocked_tool_result_with_storage() {
+    let config = test_voice_config("ws://127.0.0.1:9".to_string(), true, Some("test-key"));
+    let (state, _dir, pool) = test_state_with_storage(config).await;
+    let session_state = OmniSessionState::new();
+
+    persist_tool_call(
+        &state,
+        &session_state,
+        "delete_session",
+        "call-blocked",
+        &json!({ "target_name": "local", "session": "demo" }),
+    )
+    .await;
+    persist_tool_blocked(
+        &state,
+        &session_state,
+        "delete_session",
+        Some("call-blocked"),
+        "confirmation_required",
+        Some(r#"{"success":false,"blocked":true}"#.to_string()),
+    )
+    .await;
+
+    let repo = AiLogRepository::new(pool);
+    let logs = repo.list(10, None).await.expect("list logs");
+    assert_eq!(logs.data.len(), 2);
+    let tool_result = logs
+        .data
+        .iter()
+        .find(|entry| entry.event_kind == "tool_result")
+        .expect("tool_result log");
+    assert_eq!(tool_result.status, "blocked");
+    assert_eq!(tool_result.tool_name, Some("delete_session".to_string()));
+    assert_eq!(tool_result.tool_call_id, Some("call-blocked".to_string()));
+    assert_eq!(
+        tool_result.error_message,
+        Some("confirmation_required".to_string())
+    );
+    let tool_call = logs
+        .data
+        .iter()
+        .find(|entry| entry.event_kind == "tool_call")
+        .expect("tool_call log");
+    assert_eq!(tool_call.status, "blocked");
+    assert_eq!(
+        tool_call.error_message,
+        Some("confirmation_required".to_string())
+    );
+    assert_eq!(
+        tool_call.tool_result_json,
+        Some(r#"{"success":false,"blocked":true}"#.to_string())
+    );
+    assert!(
+        tool_call
+            .raw_event_json
+            .contains(r#""requires_confirmation":true"#)
+    );
+}
+
+/// Test AI log persistence for non-tool errors.
+#[tokio::test]
+async fn ai_log_persists_voice_error_with_storage() {
+    let config = test_voice_config("ws://127.0.0.1:9".to_string(), true, Some("test-key"));
+    let (state, _dir, pool) = test_state_with_storage(config).await;
+    let session_state = OmniSessionState::new();
+
+    persist_ai_error(
+        &state,
+        &session_state,
+        "qwen_message_error",
+        "invalid function arguments",
+        Some(r#"{"type":"error"}"#.to_string()),
+    )
+    .await;
+
+    let repo = AiLogRepository::new(pool);
+    let logs = repo.list(10, None).await.expect("list logs");
+    assert_eq!(logs.data.len(), 1);
+    assert_eq!(logs.data[0].event_kind, "error");
+    assert_eq!(logs.data[0].status, "error");
+    assert_eq!(
+        logs.data[0].error_message,
+        Some("qwen_message_error: invalid function arguments".to_string())
+    );
+    assert_eq!(logs.data[0].raw_event_json, r#"{"type":"error"}"#);
 }
 
 /// Test AI log failure does not break voice flow when storage is None.

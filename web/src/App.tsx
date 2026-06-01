@@ -354,7 +354,14 @@ export function PanelVisibility() {
       {(showNewConnectionForm || editingConnection) && <NewConnectionForm />}
       {showSettingsPanel && <SettingsPanel />}
       {showErrorLogsPanel && <ErrorLogsPanel />}
-      {omniStatus !== "disabled" && showAiAssistant && <AiAssistant />}
+      {omniStatus !== "disabled" && (
+        <div
+          data-testid="ai-assistant-wrapper"
+          style={showAiAssistant ? {} : { display: "none" }}
+        >
+          <AiAssistant />
+        </div>
+      )}
       {omniStatus !== "disabled" && !showAiAssistant && (
         <AiLauncher onOpen={() => setShowAiAssistant(true)} />
       )}

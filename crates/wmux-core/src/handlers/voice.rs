@@ -32,11 +32,12 @@ use wmux_core::storage::{
 
 use crate::state::AppState;
 use crate::voice::audit::redact_secrets;
-use crate::voice::{ConfirmationState, OmniSkillExecutor, is_dangerous};
+use crate::voice::{ConfirmationState, OmniSkillExecution, OmniSkillExecutor, is_dangerous};
 
 /// Session timeout constants
 const SESSION_TIMEOUT_MINUTES: u64 = 120;
 const TIMEOUT_WARNING_MINUTES: u64 = 110;
+const TOOL_EXECUTION_TIMEOUT_SECONDS: u64 = 15;
 
 /// Function call argument accumulator state
 #[derive(Debug, Default)]
@@ -369,8 +370,13 @@ async fn persist_tool_call(
     call_id: &str,
     params: &serde_json::Value,
 ) {
+    let argument_keys: Vec<String> = params
+        .as_object()
+        .map(|obj| obj.keys().cloned().collect())
+        .unwrap_or_default();
     let event_json = redacted_json(serde_json::json!({
         "skill": skill,
+        "call_id": call_id,
         "params": params,
     }));
     persist_omni_history_message(
@@ -387,7 +393,23 @@ async fn persist_tool_call(
     let model = get_omni_config(state)
         .map(|c| c.model)
         .unwrap_or_else(|_| "qwen-omni".to_string());
-    let args_json = serde_json::to_string(params).ok();
+    let args_json = redacted_json(params.clone());
+    let raw_event_json = redacted_json(serde_json::json!({
+        "type": "tool_call",
+        "source": "qwen_function_call",
+        "conversation_id": &session_state.conversation_id,
+        "tool_name": skill,
+        "tool_call_id": call_id,
+        "requires_confirmation": is_dangerous(skill, params),
+        "argument_keys": argument_keys,
+        "arguments": params,
+    }))
+    .unwrap_or_else(|| "{}".to_string());
+    let metrics_json = serde_json::to_string(&serde_json::json!({
+        "argument_bytes": args_json.as_ref().map(|value| value.len()).unwrap_or(0),
+        "argument_count": params.as_object().map(|obj| obj.len()).unwrap_or(0),
+    }))
+    .unwrap_or_else(|_| "{}".to_string());
     persist_ai_log(
         state,
         NewAiLogEntry {
@@ -401,9 +423,9 @@ async fn persist_tool_call(
             tool_call_id: Some(call_id.to_string()),
             tool_arguments_json: args_json,
             tool_result_json: None,
-            metrics_json: "{}".to_string(),
+            metrics_json,
             duration_ms: None,
-            raw_event_json: "{}".to_string(),
+            raw_event_json,
             error_message: None,
             created_at: None,
         },
@@ -425,6 +447,16 @@ async fn persist_tool_result(
         .map(|c| c.model)
         .unwrap_or_else(|_| "qwen-omni".to_string());
     let status = if success { "success" } else { "error" };
+    update_tool_call_status(
+        state,
+        session_state,
+        call_id,
+        status,
+        duration_ms,
+        result_json.as_deref(),
+        error.as_deref(),
+    )
+    .await;
     persist_ai_log(
         state,
         NewAiLogEntry {
@@ -452,6 +484,120 @@ async fn persist_tool_result(
         error,
     };
     persist_voice_event(state, session_state, &event).await;
+}
+
+async fn persist_tool_blocked(
+    state: &AppState,
+    session_state: &OmniSessionState,
+    skill: &str,
+    call_id: Option<&str>,
+    reason: &str,
+    result_json: Option<String>,
+) {
+    let model = get_omni_config(state)
+        .map(|c| c.model)
+        .unwrap_or_else(|_| "qwen-omni".to_string());
+    update_tool_call_status(
+        state,
+        session_state,
+        call_id,
+        "blocked",
+        None,
+        result_json.as_deref(),
+        Some(reason),
+    )
+    .await;
+    persist_ai_log(
+        state,
+        NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "tool_result".to_string(),
+            model,
+            status: "blocked".to_string(),
+            prompt_text: None,
+            tool_name: Some(skill.to_string()),
+            tool_call_id: call_id.map(|s| s.to_string()),
+            tool_arguments_json: None,
+            tool_result_json: result_json,
+            metrics_json: "{}".to_string(),
+            duration_ms: None,
+            raw_event_json: "{}".to_string(),
+            error_message: Some(reason.to_string()),
+            created_at: None,
+        },
+    )
+    .await;
+}
+
+async fn update_tool_call_status(
+    state: &AppState,
+    session_state: &OmniSessionState,
+    call_id: Option<&str>,
+    status: &str,
+    duration_ms: Option<i64>,
+    tool_result_json: Option<&str>,
+    error_message: Option<&str>,
+) {
+    let Some(call_id) = call_id.filter(|value| !value.trim().is_empty()) else {
+        return;
+    };
+    let Some(pool) = state.storage.as_ref() else {
+        return;
+    };
+    let repository = AiLogRepository::new(pool.clone());
+    if let Err(err) = repository
+        .update_tool_call_status(
+            &session_state.conversation_id,
+            call_id,
+            status,
+            duration_ms,
+            tool_result_json,
+            error_message,
+        )
+        .await
+    {
+        tracing::error!(
+            raw_error = %err,
+            conversation_id = %session_state.conversation_id,
+            tool_call_id = %call_id,
+            status,
+            "ai tool_call status update failed"
+        );
+    }
+}
+
+async fn persist_ai_error(
+    state: &AppState,
+    session_state: &OmniSessionState,
+    code: &str,
+    message: &str,
+    raw_event_json: Option<String>,
+) {
+    let model = get_omni_config(state)
+        .map(|c| c.model)
+        .unwrap_or_else(|_| "qwen-omni".to_string());
+    persist_ai_log(
+        state,
+        NewAiLogEntry {
+            id: None,
+            conversation_id: session_state.conversation_id.clone(),
+            event_kind: "error".to_string(),
+            model,
+            status: "error".to_string(),
+            prompt_text: None,
+            tool_name: None,
+            tool_call_id: None,
+            tool_arguments_json: None,
+            tool_result_json: None,
+            metrics_json: "{}".to_string(),
+            duration_ms: None,
+            raw_event_json: raw_event_json.unwrap_or_else(|| "{}".to_string()),
+            error_message: Some(format!("{code}: {message}")),
+            created_at: None,
+        },
+    )
+    .await;
 }
 
 /// Connect to Qwen DashScope WebSocket endpoint with auth header.
@@ -565,6 +711,14 @@ async fn bridge_voice(
                             }
                             Err(error) => {
                                 tracing::error!("client message handling failed: {}", error);
+                                persist_ai_error(
+                                    &state,
+                                    &session_state,
+                                    "message_handling_error",
+                                    &error,
+                                    None,
+                                )
+                                .await;
                                 let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                                     code: "message_handling_error".to_string(),
                                     message: error,
@@ -597,6 +751,14 @@ async fn bridge_voice(
                             Ok(None) => {} // No event to forward
                             Err(error) => {
                                 tracing::error!("Qwen message handling failed: {}", error);
+                                persist_ai_error(
+                                    &state,
+                                    &session_state,
+                                    "qwen_message_error",
+                                    &error,
+                                    None,
+                                )
+                                .await;
                                 let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                                     code: "qwen_message_error".to_string(),
                                     message: error,
@@ -611,6 +773,14 @@ async fn bridge_voice(
                     Some(Ok(_)) => {} // Ignore binary/ping messages
                     Some(Err(error)) => {
                         tracing::error!("Qwen receive error: {}", error);
+                        persist_ai_error(
+                            &state,
+                            &session_state,
+                            "qwen_connection_error",
+                            &error.to_string(),
+                            None,
+                        )
+                        .await;
                         let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                             code: "qwen_connection_error".to_string(),
                             message: error.to_string(),
@@ -667,9 +837,18 @@ async fn bridge_voice(
 
                 if session_state.is_timed_out() {
                     tracing::warn!("voice session timed out after {} minutes", SESSION_TIMEOUT_MINUTES);
+                    let message = format!("Voice session timed out after {} minutes", SESSION_TIMEOUT_MINUTES);
+                    persist_ai_error(
+                        &state,
+                        &session_state,
+                        "session_timeout",
+                        &message,
+                        None,
+                    )
+                    .await;
                     let _ = send_omni_event_raw(&mut client_tx, &OmniServerEvent::Error {
                         code: "session_timeout".to_string(),
-                        message: format!("Voice session timed out after {} minutes", SESSION_TIMEOUT_MINUTES),
+                        message,
                     }).await;
                     break;
                 }
@@ -808,11 +987,11 @@ async fn handle_client_message(
             let duration_ms = Some(start.elapsed().as_millis() as i64);
             let success = result.is_ok();
             let error = result.as_ref().err().cloned();
-            let result_json = if success {
-                serde_json::to_string(&serde_json::json!({"success": true})).ok()
-            } else {
-                None
+            let output = match &result {
+                Ok(execution) => execution.output.clone(),
+                Err(error) => serde_json::json!({ "success": false, "error": error }),
             };
+            let result_json = serde_json::to_string(&output).ok();
             persist_tool_result(
                 state,
                 session_state,
@@ -828,10 +1007,7 @@ async fn handle_client_message(
             // Send tool result to Qwen
             let tool_result = serde_json::json!({
                 "call_id": call_id,
-                "output": {
-                    "success": success,
-                    "error": error.clone()
-                }
+                "output": output
             });
             let _ = tool_result_tx.try_send(tool_result);
             Ok(ClientMessageEffects {
@@ -870,7 +1046,12 @@ async fn handle_client_message(
                 false,
                 Some("action_cancelled".to_string()),
                 None,
-                None,
+                serde_json::to_string(&serde_json::json!({
+                    "success": false,
+                    "blocked": true,
+                    "reason": "action_cancelled"
+                }))
+                .ok(),
             )
             .await;
             // Just send cancellation result to Qwen
@@ -966,6 +1147,23 @@ async fn handle_qwen_message(
             }))
         }
 
+        "response.text.delta"
+        | "response.output_text.delta"
+        | "output_text.delta"
+        | "response.audio_transcript.delta"
+        | "response.audio.transcript.delta" => {
+            let text_content = value
+                .get("text")
+                .or_else(|| value.get("transcript"))
+                .or_else(|| value.get("content"))
+                .or_else(|| value.get("delta"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            Ok(Some(OmniServerEvent::AssistantDelta {
+                text: text_content.to_string(),
+            }))
+        }
+
         // Function call handling - accumulate deltas
         "response.function_call_arguments.delta" | "function_call.arguments.delta" => {
             let call_id = value
@@ -1018,6 +1216,11 @@ async fn handle_qwen_message(
             if !accumulator.arguments.is_empty() || accumulator.name.is_some() {
                 let skill = accumulator.name.clone().unwrap_or_default();
                 let args_str = accumulator.arguments.clone();
+                let call_id = if call_id.is_empty() {
+                    accumulator.call_id.as_deref().unwrap_or("")
+                } else {
+                    call_id
+                };
 
                 let params: serde_json::Value = if args_str.is_empty() {
                     serde_json::Value::Object(serde_json::Map::new())
@@ -1047,6 +1250,21 @@ async fn handle_qwen_message(
                         .confirmation_state
                         .request_confirmation(skill.clone(), params_with_skill)
                         .await;
+                    persist_tool_blocked(
+                        state,
+                        session_state,
+                        &skill,
+                        Some(call_id),
+                        "confirmation_required",
+                        serde_json::to_string(&serde_json::json!({
+                            "success": false,
+                            "blocked": true,
+                            "reason": "confirmation_required",
+                            "confirmation_id": confirmation.id.to_string()
+                        }))
+                        .ok(),
+                    )
+                    .await;
 
                     Ok(Some(OmniServerEvent::IntentReceived {
                         skill: skill.clone(),
@@ -1061,11 +1279,11 @@ async fn handle_qwen_message(
                     let duration_ms = Some(start.elapsed().as_millis() as i64);
                     let success = result.is_ok();
                     let error = result.as_ref().err().cloned();
-                    let result_json = if success {
-                        serde_json::to_string(&serde_json::json!({"success": true})).ok()
-                    } else {
-                        None
+                    let output = match &result {
+                        Ok(execution) => execution.output.clone(),
+                        Err(error) => serde_json::json!({ "success": false, "error": error }),
                     };
+                    let result_json = serde_json::to_string(&output).ok();
                     persist_tool_result(
                         state,
                         session_state,
@@ -1081,10 +1299,7 @@ async fn handle_qwen_message(
                     // Send tool result
                     let tool_result = serde_json::json!({
                         "call_id": call_id,
-                        "output": {
-                            "success": success,
-                            "error": error
-                        }
+                        "output": output
                     });
                     let _ = tool_result_tx.try_send(tool_result);
 
@@ -1112,6 +1327,14 @@ async fn handle_qwen_message(
                 .and_then(|v| v.as_str())
                 .or_else(|| value.pointer("/error/message").and_then(|v| v.as_str()))
                 .unwrap_or("Unknown Qwen error");
+            persist_ai_error(
+                state,
+                session_state,
+                error_code,
+                error_msg,
+                serde_json::to_string(&value).ok(),
+            )
+            .await;
             Ok(Some(OmniServerEvent::Error {
                 code: error_code.to_string(),
                 message: error_msg.to_string(),
@@ -1171,14 +1394,24 @@ async fn execute_voice_action(
     params: &serde_json::Value,
     state: &AppState,
     confirmed: bool,
-) -> Result<(), String> {
+) -> Result<OmniSkillExecution, String> {
     let executor = OmniSkillExecutor::new(state.clone());
-    let execution = if confirmed {
-        executor.execute_preconfirmed(skill, params.clone()).await
-    } else {
-        executor.execute(skill, params.clone()).await
+    let execution = async {
+        if confirmed {
+            executor.execute_preconfirmed(skill, params.clone()).await
+        } else {
+            executor.execute(skill, params.clone()).await
+        }
     };
-    execution.map(|_| ()).map_err(|e| e.to_string())
+    tokio::time::timeout(
+        Duration::from_secs(TOOL_EXECUTION_TIMEOUT_SECONDS),
+        execution,
+    )
+    .await
+    .map_err(|_| {
+        format!("tool execution timed out after {TOOL_EXECUTION_TIMEOUT_SECONDS}s: {skill}")
+    })?
+    .map_err(|e| e.to_string())
 }
 
 async fn apply_session_context_defaults(

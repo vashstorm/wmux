@@ -22,6 +22,7 @@ vi.mock("./components/AiAssistant.js", () => ({
       AiAssistant
     </div>
   ),
+  loadLauncherPos: () => ({ x: 100, y: 100 }),
 }))
 
 vi.mock("@mui/icons-material/Assistant", () => ({
@@ -159,7 +160,7 @@ describe("PanelVisibility - Panel mount/unmount", () => {
       ctx.setOmniStatus("idle" as OmniStatus)
       ctx.setShowAiAssistant(false)
     })
-    expect(screen.queryByTestId("ai-assistant")).not.toBeInTheDocument()
+    expect(screen.getByTestId("ai-assistant-wrapper")).toHaveStyle({ display: "none" })
   })
 
   test("multiple panels coexist when all states active", async () => {

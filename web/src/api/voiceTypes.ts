@@ -196,6 +196,12 @@ export interface VoiceAssistantMessageEvent extends OmniServerEventBase {
   text: string
 }
 
+/** Incremental assistant text response */
+export interface VoiceAssistantDeltaEvent extends OmniServerEventBase {
+  type: "assistant_delta"
+  text: string
+}
+
 /** Voice session error */
 export interface VoiceErrorEvent extends OmniServerEventBase {
   type: "error"
@@ -218,6 +224,7 @@ export type OmniServerEvent =
   | VoiceIntentReceivedEvent
   | VoiceActionResultEvent
   | VoiceAssistantMessageEvent
+  | VoiceAssistantDeltaEvent
   | VoiceErrorEvent
   | VoiceSessionTimeoutEvent
 
@@ -245,6 +252,7 @@ const SERVER_EVENT_TYPES = [
   "intent_received",
   "action_result",
   "assistant_message",
+  "assistant_delta",
   "error",
   "session_timeout",
 ] as const
@@ -393,6 +401,15 @@ export function isVoiceAssistantMessageEvent(
   event: OmniServerEvent,
 ): event is VoiceAssistantMessageEvent {
   return event.type === "assistant_message"
+}
+
+/**
+ * Type guard for VoiceAssistantDeltaEvent.
+ */
+export function isVoiceAssistantDeltaEvent(
+  event: OmniServerEvent,
+): event is VoiceAssistantDeltaEvent {
+  return event.type === "assistant_delta"
 }
 
 /**

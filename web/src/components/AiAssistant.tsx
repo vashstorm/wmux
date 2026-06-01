@@ -28,6 +28,7 @@ import {
   isVoiceErrorEvent,
   isVoiceConnectedEvent,
   isVoiceAssistantMessageEvent,
+  isVoiceAssistantDeltaEvent,
 } from "../api/voiceTypes.js"
 import { useAppState } from "../state/store.js"
 import {
@@ -60,6 +61,7 @@ type ResizeStart = {
   startY: number
   startWidth: number
   startHeight: number
+  startPos: AssistantPos
   direction: "width" | "height" | "both"
 }
 type DragStart = {
@@ -223,6 +225,7 @@ export function AiAssistant() {
   const [micDisabled, setMicDisabled] = useState(false)
   const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable)
   const [history, setHistory] = useState<OmniConversationMessage[]>([])
+  const [assistantDraft, setAssistantDraft] = useState("")
   const [historyLoading, setHistoryLoading] = useState(false)
   const [inputText, setInputText] = useState("")
   const [assistantSize, setAssistantSize] = useState(loadAssistantSize)
@@ -230,6 +233,7 @@ export function AiAssistant() {
     dialogPosFromLauncher(loadLauncherPos(), loadAssistantSize()),
   )
   const chatRef = useRef<HTMLDivElement | null>(null)
+  const assistantDraftRef = useRef("")
   const resizeStartRef = useRef<ResizeStart | null>(null)
   const dragStartRef = useRef<DragStart | null>(null)
 
@@ -312,7 +316,19 @@ export function AiAssistant() {
     try {
       await clearOmniHistory()
     } catch {}
+    assistantDraftRef.current = ""
+    setAssistantDraft("")
     setHistory([])
+  }, [])
+
+  const appendAssistantDraft = useCallback((text: string) => {
+    assistantDraftRef.current += text
+    setAssistantDraft(assistantDraftRef.current)
+  }, [])
+
+  const clearAssistantDraft = useCallback(() => {
+    assistantDraftRef.current = ""
+    setAssistantDraft("")
   }, [])
 
   const scrollChatToBottom = useCallback(() => {
@@ -334,6 +350,7 @@ export function AiAssistant() {
         startY: clientY,
         startWidth: assistantSize.width,
         startHeight: assistantSize.height,
+        startPos: assistantPos,
         direction,
       }
       const cursorMap = {
@@ -344,7 +361,7 @@ export function AiAssistant() {
       document.body.style.cursor = cursorMap[direction]
       document.body.style.userSelect = "none"
     },
-    [assistantSize],
+    [assistantSize, assistantPos],
   )
 
   const updateAssistantResize = useCallback(
@@ -357,7 +374,20 @@ export function AiAssistant() {
         width: start.direction === "height" ? start.startWidth : start.startWidth + deltaX,
         height: start.direction === "width" ? start.startHeight : start.startHeight + deltaY,
       })
+      
+      const actualDeltaX = nextSize.width - start.startWidth
+      const actualDeltaY = nextSize.height - start.startHeight
+      
+      const nextPos = clampAssistantPos(
+        {
+          x: start.direction === "height" ? start.startPos.x : start.startPos.x - actualDeltaX,
+          y: start.direction === "width" ? start.startPos.y : start.startPos.y - actualDeltaY,
+        },
+        nextSize,
+      )
+      
       setAssistantSize(nextSize)
+      setAssistantPos(nextPos)
     },
     [],
   )
@@ -391,6 +421,7 @@ export function AiAssistant() {
 
       if (isVoiceTranscriptDoneEvent(event)) {
         setOmniTranscript("")
+        clearAssistantDraft()
         setOmniStatus("processing")
         setHistory((prev) => [
           ...prev,
@@ -450,19 +481,32 @@ export function AiAssistant() {
         return
       }
 
+      if (isVoiceAssistantDeltaEvent(event)) {
+        if (event.text) {
+          appendAssistantDraft(event.text)
+        }
+        setOmniStatus("speaking")
+        setOmniError(null)
+        return
+      }
+
       if (isVoiceAssistantMessageEvent(event)) {
+        const text = event.text || assistantDraftRef.current
+        clearAssistantDraft()
         setOmniStatus("idle")
-        setHistory((prev) => [
-          ...prev,
-          {
-            id: `local-${Date.now()}-assistant-message`,
-            conversationId: "default",
-            role: "assistant",
-            kind: "assistant_text",
-            text: event.text,
-            createdAt: new Date().toISOString(),
-          },
-        ])
+        if (text) {
+          setHistory((prev) => [
+            ...prev,
+            {
+              id: `local-${Date.now()}-assistant-message`,
+              conversationId: "default",
+              role: "assistant",
+              kind: "assistant_text",
+              text,
+              createdAt: new Date().toISOString(),
+            },
+          ])
+        }
         return
       }
 
@@ -479,6 +523,8 @@ export function AiAssistant() {
     },
     [
       appendVoiceTranscript,
+      appendAssistantDraft,
+      clearAssistantDraft,
       setOmniTranscript,
       setOmniConfirmation,
       setOmniError,
@@ -497,6 +543,7 @@ export function AiAssistant() {
     omniStatusRef.current = "connecting"
     setOmniStatus("connecting")
     setOmniTranscript("")
+    clearAssistantDraft()
     setOmniError(null)
 
     const ws = new OmniWebSocket({
@@ -532,7 +579,14 @@ export function AiAssistant() {
     sendSessionContext(ws)
     ws.connect()
     wsRef.current = ws
-  }, [handleServerMessage, sendSessionContext, setOmniStatus, setOmniTranscript, setOmniError])
+  }, [
+    clearAssistantDraft,
+    handleServerMessage,
+    sendSessionContext,
+    setOmniStatus,
+    setOmniTranscript,
+    setOmniError,
+  ])
 
   const startListening = useCallback(async () => {
     if (micDisabled) return
@@ -571,13 +625,22 @@ export function AiAssistant() {
       )
       setMicCapturing(true)
       setOmniTranscript("")
+      clearAssistantDraft()
       setOmniError(null)
     } catch {
       setMicCapturing(false)
       setOmniError("Microphone access denied")
       setOmniStatus("error")
     }
-  }, [connectVoice, setOmniTranscript, setOmniError, setOmniStatus, micDisabled, micAvailable])
+  }, [
+    clearAssistantDraft,
+    connectVoice,
+    setOmniTranscript,
+    setOmniError,
+    setOmniStatus,
+    micDisabled,
+    micAvailable,
+  ])
 
   const stopListening = useCallback(() => {
     pipelineRef.current?.stopCapture()
@@ -648,6 +711,7 @@ export function AiAssistant() {
       ])
       setInputText("")
       setOmniTranscript("")
+      clearAssistantDraft()
       setOmniError(null)
       omniStatusRef.current = "processing"
       setOmniStatus("processing")
@@ -656,7 +720,15 @@ export function AiAssistant() {
       }
       wsRef.current.send({ type: "text_message", text })
     },
-    [connectVoice, inputText, sendSessionContext, setOmniError, setOmniStatus, setOmniTranscript],
+    [
+      clearAssistantDraft,
+      connectVoice,
+      inputText,
+      sendSessionContext,
+      setOmniError,
+      setOmniStatus,
+      setOmniTranscript,
+    ],
   )
 
   useEffect(() => {
@@ -794,6 +866,7 @@ export function AiAssistant() {
     !historyLoading &&
     visibleHistory.length === 0 &&
     !omniTranscript &&
+    !assistantDraft &&
     !omniError &&
     !omniPendingConfirmation
   const handleMicToggle = micCapturing
@@ -814,6 +887,7 @@ export function AiAssistant() {
     historyLoading,
     latestHistoryId,
     omniTranscript,
+    assistantDraft,
     omniPendingConfirmation?.confirmationId,
     omniError,
     showEmptyState,
@@ -926,6 +1000,16 @@ export function AiAssistant() {
           </div>
         )}
 
+        {assistantDraft && (
+          <div className="voice-message voice-message--assistant voice-message--live">
+            <div className="voice-message-meta">
+              <span>AI</span>
+              <span>Live</span>
+            </div>
+            <div className="voice-message-bubble">{assistantDraft}</div>
+          </div>
+        )}
+
         {omniPendingConfirmation && (
           <div className="voice-confirmation">
             <div className="voice-confirmation-text">
@@ -1003,7 +1087,11 @@ export function AiAssistant() {
             onClick={handleMicToggle}
             disabled={!micCapturing && (isDisabled || wsConnecting || micDisabled || !micAvailable)}
           >
-            {micCapturing ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
+            {isDisabled || micDisabled || !micAvailable ? (
+              <MicOffIcon fontSize="small" />
+            ) : (
+              <MicIcon fontSize="small" />
+            )}
           </button>
         </div>
       </form>

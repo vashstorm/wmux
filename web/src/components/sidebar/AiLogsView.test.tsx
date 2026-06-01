@@ -330,4 +330,82 @@ describe("AiLogsView", () => {
     const chip = screen.getByText("tool_call")
     expect(chip).toBeInTheDocument()
   })
+
+  test("renders tool call id and argument summary", async () => {
+    const entry: client.AiLogEntry = {
+      ...createMockLogEntry("log-tool"),
+      eventKind: "tool_call",
+      status: "pending",
+      toolName: "send_keys",
+      toolCallId: "call-abcdef123456789",
+      toolArgumentsJson: JSON.stringify({
+        target_name: "local",
+        session_name: "demo",
+        pane_index: 1,
+        keys: "echo hello",
+      }),
+      durationMs: null,
+    }
+    mockListAiLogs.mockResolvedValue({ data: [entry], nextCursor: null })
+
+    render(
+      <TestWrapper>
+        <AiLogsView />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-log-row-log-tool")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("pending")).toBeInTheDocument()
+    expect(screen.getByText(/call call-abcdef/i)).toBeInTheDocument()
+    expect(screen.getByText(/target local/i)).toBeInTheDocument()
+    expect(screen.getByText(/session demo/i)).toBeInTheDocument()
+    expect(screen.getByText(/keys: echo hello/i)).toBeInTheDocument()
+    expect(screen.getByText("-")).toBeInTheDocument()
+  })
+
+  test("issues toggle filters error and blocked logs", async () => {
+    const okEntry = createMockLogEntry("log-ok")
+    const errorEntry = {
+      ...createMockLogEntry("log-error"),
+      status: "error",
+      eventKind: "tool_result",
+      toolName: "list_sessions",
+      errorMessage: "tool execution timed out after 15s: list_sessions",
+    }
+    const blockedEntry = {
+      ...createMockLogEntry("log-blocked"),
+      status: "blocked",
+      eventKind: "tool_result",
+      toolName: "delete_session",
+      errorMessage: "confirmation_required",
+      durationMs: null,
+    }
+    mockListAiLogs.mockResolvedValue({
+      data: [okEntry, errorEntry, blockedEntry],
+      nextCursor: null,
+    })
+
+    render(
+      <TestWrapper>
+        <AiLogsView />
+      </TestWrapper>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-log-row-log-ok")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("ai-log-row-log-error")).toBeInTheDocument()
+    expect(screen.getByTestId("ai-log-row-log-blocked")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId("ai-logs-issues-toggle"))
+
+    expect(screen.queryByTestId("ai-log-row-log-ok")).not.toBeInTheDocument()
+    expect(screen.getByTestId("ai-log-row-log-error")).toBeInTheDocument()
+    expect(screen.getByTestId("ai-log-row-log-blocked")).toBeInTheDocument()
+    expect(screen.getByText(/timed out after 15s/i)).toBeInTheDocument()
+    expect(screen.getByText("confirmation_required")).toBeInTheDocument()
+  })
 })

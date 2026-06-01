@@ -315,6 +315,11 @@ pub enum OmniServerEvent {
         /// Assistant message text.
         text: String,
     },
+    /// Incremental assistant text response.
+    AssistantDelta {
+        /// Partial assistant response text.
+        text: String,
+    },
     /// Voice session error.
     Error {
         /// Stable error code.
@@ -658,6 +663,9 @@ mod tests {
             },
             OmniServerEvent::AssistantMessage {
                 text: "Done".to_string(),
+            },
+            OmniServerEvent::AssistantDelta {
+                text: "Don".to_string(),
             },
             OmniServerEvent::Error {
                 code: "voice_disabled".to_string(),

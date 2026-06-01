@@ -99,6 +99,29 @@ impl AiLogRepository {
         Ok(())
     }
 
+    pub async fn update_tool_call_status(
+        &self,
+        conversation_id: &str,
+        tool_call_id: &str,
+        status: &str,
+        duration_ms: Option<i64>,
+        tool_result_json: Option<&str>,
+        error_message: Option<&str>,
+    ) -> Result<(), AiLogRepoError> {
+        sqlx::query(
+            "UPDATE ai_logs SET status = ?, duration_ms = ?, tool_result_json = ?, error_message = ? WHERE conversation_id = ? AND tool_call_id = ? AND event_kind = 'tool_call'",
+        )
+        .bind(status)
+        .bind(duration_ms)
+        .bind(tool_result_json)
+        .bind(error_message)
+        .bind(conversation_id)
+        .bind(tool_call_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     async fn get_by_id(&self, id: &str) -> Result<AiLogEntry, AiLogRepoError> {
         let row = sqlx::query_as::<_, AiLogEntry>(
             "SELECT id, conversation_id, event_kind, model, status, prompt_text, tool_name, tool_call_id, tool_arguments_json, tool_result_json, metrics_json, duration_ms, raw_event_json, error_message, created_at FROM ai_logs WHERE id = ?",

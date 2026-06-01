@@ -539,6 +539,59 @@ describe("AiAssistant", () => {
     expect(audioPipelineMocks.enqueuePlayback).toHaveBeenCalledWith("AAAA", 24000)
   })
 
+  test("shows assistant text while voice reply audio is streaming", async () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    await screen.findByText("Ask AI with your voice")
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {
+      target: { value: "say hello" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }))
+
+    await waitFor(() => {
+      expect(voiceClientMocks.send).toHaveBeenCalledWith({
+        type: "text_message",
+        text: "say hello",
+      })
+    })
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "assistant_delta",
+        text: "Hel",
+      })
+      voiceClientMocks.onMessage?.({
+        type: "audio_delta",
+        pcm16Base64: "AAAA",
+        sampleRate: 24000,
+      })
+      voiceClientMocks.onMessage?.({
+        type: "assistant_delta",
+        text: "lo",
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText("Live")).toBeInTheDocument()
+      expect(screen.getByText("Hello")).toBeInTheDocument()
+    })
+
+    act(() => {
+      voiceClientMocks.onMessage?.({
+        type: "assistant_message",
+        text: "Hello",
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText("Live")).not.toBeInTheDocument()
+    })
+    expect(screen.getByText("Hello")).toBeInTheDocument()
+  })
+
   test("scrolls to the newest message during text conversations", async () => {
     renderWithStateSetup((ctx) => {
       ctx.setOmniStatus("idle")

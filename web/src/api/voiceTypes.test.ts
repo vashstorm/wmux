@@ -16,6 +16,7 @@ import {
   isVoiceIntentReceivedEvent,
   isVoiceActionResultEvent,
   isVoiceAssistantMessageEvent,
+  isVoiceAssistantDeltaEvent,
   isVoiceErrorEvent,
   isVoiceSessionTimeoutEvent,
   isValidVoiceSkill,
@@ -168,6 +169,14 @@ describe("voiceTypes", () => {
       expect(isOmniServerEvent(event)).toBe(true)
       if (isOmniServerEvent(event)) {
         expect(isVoiceAssistantMessageEvent(event)).toBe(true)
+      }
+    })
+
+    it("recognizes assistant_delta event", () => {
+      const event = { type: "assistant_delta", text: "Don" }
+      expect(isOmniServerEvent(event)).toBe(true)
+      if (isOmniServerEvent(event)) {
+        expect(isVoiceAssistantDeltaEvent(event)).toBe(true)
       }
     })
 
@@ -403,6 +412,7 @@ describe("voiceTypes", () => {
           confirmationRequired: false,
         },
         { type: "action_result", skill: "list_sessions", success: true },
+        { type: "assistant_delta", text: "Don" },
         { type: "error", code: "voice_disabled", message: "Voice is disabled" },
         { type: "session_timeout", remainingSeconds: 30 },
       ]

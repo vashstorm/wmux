@@ -1010,7 +1010,7 @@ export interface AiLogEntry {
   toolArgumentsJson?: string | null
   toolResultJson?: string | null
   metricsJson?: string | null
-  durationMs: number
+  durationMs: number | null
   rawEventJson?: string | null
   errorMessage?: string | null
   createdAt: string

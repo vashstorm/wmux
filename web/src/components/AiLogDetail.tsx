@@ -41,6 +41,7 @@ function getStatusColor(status: string): "success" | "error" | "warning" | "defa
       return "success"
     case "error":
       return "error"
+    case "blocked":
     case "pending":
       return "warning"
     default:
@@ -113,9 +114,13 @@ function formatJson(jsonStr: string | null | undefined): string {
   }
 }
 
+function formatDuration(durationMs: number | null | undefined): string {
+  return typeof durationMs === "number" ? `${durationMs}ms` : "-"
+}
+
 export function AiLogDetail({ log, onClose }: AiLogDetailProps) {
-  const isSuccess = log.status === "success"
   const isError = log.status === "error"
+  const isIssue = isError || log.status === "blocked"
 
   return (
     <Box
@@ -357,7 +362,7 @@ export function AiLogDetail({ log, onClose }: AiLogDetailProps) {
             borderColor: "divider",
           }}
         >
-          <DetailRow label="Duration" value={`${log.durationMs}ms`} />
+          <DetailRow label="Duration" value={formatDuration(log.durationMs)} />
         </Box>
 
         {log.metricsJson && (
@@ -402,7 +407,7 @@ export function AiLogDetail({ log, onClose }: AiLogDetailProps) {
           </>
         )}
 
-        {isError && log.errorMessage && (
+        {isIssue && log.errorMessage && (
           <>
             <Typography
               variant="caption"
@@ -414,18 +419,18 @@ export function AiLogDetail({ log, onClose }: AiLogDetailProps) {
                 fontWeight: "var(--font-weight-semibold)",
               }}
             >
-              Error
+              {isError ? "Error" : "Issue"}
             </Typography>
             <Box
               sx={{
                 mt: 0.5,
                 mb: 2,
                 p: 1.5,
-                bgcolor: "error.main",
-                color: "error.contrastText",
+                bgcolor: isError ? "error.main" : "warning.main",
+                color: isError ? "error.contrastText" : "warning.contrastText",
                 borderRadius: "var(--radius-sm)",
                 border: "1px solid",
-                borderColor: "error.dark",
+                borderColor: isError ? "error.dark" : "warning.dark",
               }}
             >
               <Typography

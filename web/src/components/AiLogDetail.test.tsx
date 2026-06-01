@@ -76,6 +76,21 @@ describe("AiLogDetail", () => {
     expect(screen.getByText("Rate limit exceeded")).toBeInTheDocument()
   })
 
+  test("renders blocked reason as issue panel", () => {
+    const log = createMockLog({
+      status: "blocked",
+      errorMessage: "confirmation_required",
+      durationMs: null,
+    })
+
+    render(<AiLogDetail log={log} onClose={() => {}} />)
+
+    expect(screen.getByText("blocked")).toBeInTheDocument()
+    expect(screen.getByText("Issue")).toBeInTheDocument()
+    expect(screen.getByText("confirmation_required")).toBeInTheDocument()
+    expect(screen.getByText("-")).toBeInTheDocument()
+  })
+
   test("renders raw event json when present", () => {
     const log = createMockLog({
       rawEventJson: JSON.stringify({ raw: "event_data" }),
