@@ -1,6 +1,7 @@
 export const LAUNCHER_POS_STORAGE_KEY = "wmux-launcher-pos"
+export const LAUNCHER_POS_CHANGE_EVENT = "wmux:launcher-pos-change"
 
-const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 }
+export const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 }
 const VIEWPORT_MARGIN_PX = 16
 
 export type AssistantPos = { x: number; y: number }
@@ -44,4 +45,35 @@ export function saveLauncherPos(pos: AssistantPos): void {
   try {
     localStorage.setItem(LAUNCHER_POS_STORAGE_KEY, JSON.stringify(pos))
   } catch {}
+}
+
+export function emitLauncherPosChange(pos: AssistantPos): void {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent<AssistantPos>(LAUNCHER_POS_CHANGE_EVENT, { detail: pos }))
+}
+
+export function dialogPosFromLauncher(
+  launcherPos: AssistantPos,
+  dialogSize: { width: number; height: number },
+): AssistantPos {
+  return clampAssistantPos(
+    {
+      x: launcherPos.x + LAUNCHER_ELEM_SIZE.width - dialogSize.width,
+      y: launcherPos.y + LAUNCHER_ELEM_SIZE.height - dialogSize.height,
+    },
+    dialogSize,
+  )
+}
+
+export function launcherPosFromDialog(
+  dialogPos: AssistantPos,
+  dialogSize: { width: number; height: number },
+): AssistantPos {
+  return clampAssistantPos(
+    {
+      x: dialogPos.x + dialogSize.width - LAUNCHER_ELEM_SIZE.width,
+      y: dialogPos.y + dialogSize.height - LAUNCHER_ELEM_SIZE.height,
+    },
+    LAUNCHER_ELEM_SIZE,
+  )
 }

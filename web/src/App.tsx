@@ -3,6 +3,7 @@ import "./styles/layout.css"
 import "./styles/overlays.css"
 import "./styles/components.css"
 import "./styles/fonts.css"
+import "./styles/ai-assistant.css"
 
 import { useEffect, useRef, useState, useCallback, lazy, Suspense, type CSSProperties } from "react"
 import { ThemeProvider, CssBaseline, IconButton, Tooltip, CircularProgress } from "@mui/material"
@@ -31,6 +32,8 @@ import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js"
 import { normalizeThemeId } from "./ui/themes.js"
 import AssistantIcon from "@mui/icons-material/Assistant"
 import {
+  LAUNCHER_ELEM_SIZE,
+  emitLauncherPosChange,
   loadLauncherPos,
   saveLauncherPos,
   clampAssistantPos,
@@ -235,8 +238,6 @@ function WorkspaceNavigationSync() {
   return null
 }
 
-const LAUNCHER_SIZE = { width: 42, height: 42 }
-
 function AiLauncher({ onOpen }: { onOpen: () => void }) {
   const [pos, setPos] = useState<AssistantPos>(() => loadLauncherPos())
   const dragRef = useRef<{
@@ -271,7 +272,9 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
       const dy = clientY - d.originY
       if (!d.moved && Math.hypot(dx, dy) > 4) d.moved = true
       if (!d.moved) return
-      setPos(clampAssistantPos({ x: d.baseX + dx, y: d.baseY + dy }, LAUNCHER_SIZE))
+      const nextPos = clampAssistantPos({ x: d.baseX + dx, y: d.baseY + dy }, LAUNCHER_ELEM_SIZE)
+      setPos(nextPos)
+      emitLauncherPosChange(nextPos)
     },
     [],
   )
@@ -286,6 +289,7 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
       document.body.style.cursor = ""
       setPos((current) => {
         saveLauncherPos(current)
+        emitLauncherPosChange(current)
         return current
       })
       if (!wasDrag) onOpen()
@@ -303,7 +307,12 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
     window.addEventListener("pointercancel", onPointerUp)
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
-    const onResize = () => setPos((current) => clampAssistantPos(current, LAUNCHER_SIZE))
+    const onResize = () =>
+      setPos((current) => {
+        const nextPos = clampAssistantPos(current, LAUNCHER_ELEM_SIZE)
+        emitLauncherPosChange(nextPos)
+        return nextPos
+      })
     window.addEventListener("resize", onResize)
     return () => {
       window.removeEventListener("pointermove", onPointerMove)
@@ -326,7 +335,7 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
         if (e.button !== 0) return
         e.preventDefault()
         startDrag(e.clientX, e.clientY, e.pointerId)
-        e.currentTarget.setPointerCapture(e.pointerId)
+        e.currentTarget.setPointerCapture?.(e.pointerId)
       }}
       onMouseDown={(e) => {
         if (dragRef.current || e.button !== 0) return
@@ -367,8 +376,8 @@ export function PanelVisibility() {
           <ErrorLogsPanel />
         </Suspense>
       )}
-      {omniStatus !== "disabled" && showAiAssistant && (
-        <div data-testid="ai-assistant-wrapper">
+      {omniStatus !== "disabled" && (
+        <div data-testid="ai-assistant-wrapper" style={{ display: showAiAssistant ? "block" : "none" }}>
           <Suspense fallback={<CircularProgress />}>
             <AiAssistant />
           </Suspense>

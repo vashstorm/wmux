@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { AiAssistant } from "./AiAssistant.js"
+import { LAUNCHER_POS_CHANGE_EVENT } from "./AiAssistantUtils.js"
 import { AppProvider, useAppState } from "../state/store.js"
 import { useEffect } from "react"
 import type { OmniStatus } from "../state/store.js"
@@ -64,6 +65,7 @@ vi.mock("../api/audioPipeline.js", () => ({
 
 beforeEach(() => {
   localStorage.removeItem("wmux-ai-assistant-size")
+  localStorage.removeItem("wmux-launcher-pos")
   voiceClientMocks.send.mockClear()
   voiceClientMocks.connect.mockClear()
   voiceClientMocks.close.mockClear()
@@ -272,6 +274,51 @@ describe("AiAssistant", () => {
     expect(JSON.parse(localStorage.getItem("wmux-ai-assistant-size") ?? "{}")).toEqual({
       width: 440,
       height: 600,
+    })
+  })
+
+  test("keeps launcher position anchored to dialog bottom-right after dragging", async () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    const dialog = document.querySelector(".ai-assistant") as HTMLElement
+    const header = document.querySelector(".voice-header") as HTMLElement
+    fireEvent.pointerDown(header, { button: 0, pointerId: 1, clientX: 500, clientY: 260 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 440, clientY: 230 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 440, clientY: 230 })
+
+    await waitFor(() => {
+      expect(localStorage.getItem("wmux-launcher-pos")).not.toBeNull()
+    })
+
+    const dialogX = Number.parseInt(dialog.style.getPropertyValue("--ai-assistant-x"), 10)
+    const dialogY = Number.parseInt(dialog.style.getPropertyValue("--ai-assistant-y"), 10)
+    const dialogWidth = Number.parseInt(dialog.style.getPropertyValue("--ai-assistant-width"), 10)
+    const dialogHeight = Number.parseInt(dialog.style.getPropertyValue("--ai-assistant-height"), 10)
+    expect(JSON.parse(localStorage.getItem("wmux-launcher-pos") ?? "{}")).toEqual({
+      x: dialogX + dialogWidth - 42,
+      y: dialogY + dialogHeight - 42,
+    })
+  })
+
+  test("moves dialog when launcher position changes", async () => {
+    renderWithStateSetup((ctx) => {
+      ctx.setOmniStatus("idle")
+    })
+
+    const dialog = document.querySelector(".ai-assistant") as HTMLElement
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(LAUNCHER_POS_CHANGE_EVENT, {
+          detail: { x: 900, y: 700 },
+        }),
+      )
+    })
+
+    await waitFor(() => {
+      expect(dialog.style.getPropertyValue("--ai-assistant-x")).toBe("562px")
+      expect(dialog.style.getPropertyValue("--ai-assistant-y")).toBe("222px")
     })
   })
 

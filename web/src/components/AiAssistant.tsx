@@ -49,10 +49,11 @@ import {
   type Project,
   type WindowInfo,
 } from "../api/client.js"
-import "../styles/ai-assistant.css"
 import {
-  LAUNCHER_POS_STORAGE_KEY,
+  LAUNCHER_POS_CHANGE_EVENT,
   clampAssistantPos,
+  dialogPosFromLauncher,
+  launcherPosFromDialog,
   loadLauncherPos,
   saveLauncherPos,
   type AssistantPos,
@@ -69,7 +70,6 @@ const ASSISTANT_SIZE_STORAGE_KEY = "wmux-ai-assistant-size"
 const DEFAULT_ASSISTANT_SIZE = { width: 380, height: 520 }
 const MIN_ASSISTANT_SIZE = { width: 320, height: 360 }
 const VIEWPORT_MARGIN_PX = 16
-const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 }
 
 type AssistantSize = typeof DEFAULT_ASSISTANT_SIZE
 type TokenUsage = {
@@ -108,8 +108,6 @@ function clampAssistantSize(size: AssistantSize): AssistantSize {
   }
 }
 
-// Utility functions (clampAssistantPos, loadLauncherPos, saveLauncherPos) are now in AiAssistantUtils.ts
-
 function loadAssistantSize(): AssistantSize {
   try {
     const raw = localStorage.getItem(ASSISTANT_SIZE_STORAGE_KEY)
@@ -128,27 +126,6 @@ function saveAssistantSize(size: AssistantSize): void {
   try {
     localStorage.setItem(ASSISTANT_SIZE_STORAGE_KEY, JSON.stringify(size))
   } catch {}
-}
-
-/** Compute where the dialog should open, anchoring to the launcher and expanding toward the screen center. */
-function dialogPosFromLauncher(
-  launcherPos: AssistantPos,
-  dialogSize: { width: number; height: number },
-): AssistantPos {
-  if (typeof window === "undefined") return { x: VIEWPORT_MARGIN_PX, y: VIEWPORT_MARGIN_PX }
-  const iconCenterX = launcherPos.x + LAUNCHER_ELEM_SIZE.width / 2
-  const iconCenterY = launcherPos.y + LAUNCHER_ELEM_SIZE.height / 2
-  // Align the dialog edge that is closest to the nearest screen edge with the icon's same edge.
-  // This makes the dialog expand toward the screen center.
-  const x =
-    iconCenterX > window.innerWidth / 2
-      ? launcherPos.x + LAUNCHER_ELEM_SIZE.width - dialogSize.width // right half → right-align
-      : launcherPos.x // left half  → left-align
-  const y =
-    iconCenterY > window.innerHeight / 2
-      ? launcherPos.y + LAUNCHER_ELEM_SIZE.height - dialogSize.height // bottom half → bottom-align
-      : launcherPos.y // top half    → top-align
-  return clampAssistantPos({ x, y }, dialogSize)
 }
 
 function formatTime(iso: string): string {
@@ -316,12 +293,72 @@ export function AiAssistant() {
   const [assistantPos, setAssistantPos] = useState<AssistantPos>(() =>
     dialogPosFromLauncher(loadLauncherPos(), loadAssistantSize()),
   )
+  const assistantSizeRef = useRef(assistantSize)
+  const assistantPosRef = useRef(assistantPos)
   const chatRef = useRef<HTMLDivElement | null>(null)
   const assistantDraftRef = useRef("")
   const audioMutedRef = useRef(false)
   const suppressAssistantOutputRef = useRef(false)
   const resizeStartRef = useRef<ResizeStart | null>(null)
   const dragStartRef = useRef<DragStart | null>(null)
+
+  const [showTokenPopover, setShowTokenPopover] = useState(false)
+  const [pulseActive, setPulseActive] = useState(false)
+  const tokenMeterContainerRef = useRef<HTMLDivElement | null>(null)
+
+  const prevTotalRef = useRef(0)
+
+  useEffect(() => {
+    const handleLauncherPosChange = (event: Event) => {
+      const nextLauncherPos = (event as CustomEvent<AssistantPos>).detail
+      if (
+        !nextLauncherPos ||
+        typeof nextLauncherPos.x !== "number" ||
+        typeof nextLauncherPos.y !== "number"
+      ) {
+        return
+      }
+      const nextPos = dialogPosFromLauncher(nextLauncherPos, assistantSizeRef.current)
+      assistantPosRef.current = nextPos
+      setAssistantPos(nextPos)
+    }
+    window.addEventListener(LAUNCHER_POS_CHANGE_EVENT, handleLauncherPosChange)
+    return () => window.removeEventListener(LAUNCHER_POS_CHANGE_EVENT, handleLauncherPosChange)
+  }, [])
+
+  useEffect(() => {
+    const nextTotal = tokenUsage.total.totalTokens
+    if (nextTotal > prevTotalRef.current && prevTotalRef.current > 0) {
+      setPulseActive(true)
+      const timer = setTimeout(() => setPulseActive(false), 800)
+      return () => clearTimeout(timer)
+    }
+    prevTotalRef.current = nextTotal
+  }, [tokenUsage.total.totalTokens])
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        showTokenPopover &&
+        tokenMeterContainerRef.current &&
+        !tokenMeterContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowTokenPopover(false)
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [showTokenPopover])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showTokenPopover) {
+        setShowTokenPopover(false)
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [showTokenPopover])
 
   const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
     const targetName = selectedPane?.targetName ?? selectedTargetName
@@ -476,6 +513,8 @@ export function AiAssistant() {
         nextSize,
       )
       
+      assistantSizeRef.current = nextSize
+      assistantPosRef.current = nextPos
       setAssistantSize(nextSize)
       setAssistantPos(nextPos)
     },
@@ -490,6 +529,7 @@ export function AiAssistant() {
     document.body.style.userSelect = ""
     setAssistantSize((current) => {
       saveAssistantSize(current)
+      saveLauncherPos(launcherPosFromDialog(assistantPosRef.current, current))
       return current
     })
   }, [])
@@ -1103,9 +1143,13 @@ export function AiAssistant() {
       if (!drag || drag.pointerId !== pointerId) return
       const dx = clientX - drag.originX
       const dy = clientY - drag.originY
-      setAssistantPos((prev) => {
-        const size = loadAssistantSize()
-        return clampAssistantPos({ x: drag.baseX + dx, y: drag.baseY + dy }, size)
+      setAssistantPos(() => {
+        const nextPos = clampAssistantPos(
+          { x: drag.baseX + dx, y: drag.baseY + dy },
+          assistantSizeRef.current,
+        )
+        assistantPosRef.current = nextPos
+        return nextPos
       })
     },
     [],
@@ -1117,13 +1161,22 @@ export function AiAssistant() {
     dragStartRef.current = null
     document.body.style.cursor = ""
     document.body.style.userSelect = ""
-    // Dialog position is session-only; not persisted (reopening always re-anchors to launcher)
+    saveLauncherPos(launcherPosFromDialog(assistantPosRef.current, assistantSizeRef.current))
   }, [])
 
   useEffect(() => {
     const handleWindowResize = () => {
-      setAssistantSize((current) => clampAssistantSize(current))
-      setAssistantPos((current) => clampAssistantPos(current, loadAssistantSize()))
+      setAssistantSize((current) => {
+        const nextSize = clampAssistantSize(current)
+        assistantSizeRef.current = nextSize
+        return nextSize
+      })
+      setAssistantPos((current) => {
+        const nextPos = clampAssistantPos(current, assistantSizeRef.current)
+        assistantPosRef.current = nextPos
+        saveLauncherPos(launcherPosFromDialog(nextPos, assistantSizeRef.current))
+        return nextPos
+      })
     }
     window.addEventListener("resize", handleWindowResize)
     return () => window.removeEventListener("resize", handleWindowResize)
@@ -1255,7 +1308,7 @@ export function AiAssistant() {
           if (target.closest("button")) return
           e.preventDefault()
           startDrag(e.clientX, e.clientY, e.pointerId)
-          e.currentTarget.setPointerCapture(e.pointerId)
+          e.currentTarget.setPointerCapture?.(e.pointerId)
         }}
         onMouseDown={(e) => {
           if (dragStartRef.current || e.button !== 0) return
@@ -1271,9 +1324,117 @@ export function AiAssistant() {
         <div className="voice-status-label">
           <span>{omniStatus}</span>
         </div>
-        <div className="voice-token-meter" data-testid="ai-token-meter" aria-live="polite">
-          <span>Total {formatTokenCount(tokenUsage.total.totalTokens)}</span>
-          {tokenUsage.last && <span>Last {formatTokenCount(tokenUsage.last.totalTokens)}</span>}
+        <div className="voice-token-meter-container" ref={tokenMeterContainerRef}>
+          <button
+            type="button"
+            id="ai-token-popover-btn"
+            className={`voice-token-meter-btn ${showTokenPopover ? "voice-token-meter-btn--active" : ""} ${pulseActive ? "voice-token-meter-btn--pulse" : ""}`}
+            data-testid="ai-token-meter"
+            aria-live="polite"
+            aria-label="View token usage details"
+            onClick={() => setShowTokenPopover(!showTokenPopover)}
+          >
+            <span className="token-icon" aria-hidden="true">🪙</span>
+            <span className="token-count-total">Total {formatTokenCount(tokenUsage.total.totalTokens)}</span>
+            {tokenUsage.last && (
+              <span className="token-count-last">Last {formatTokenCount(tokenUsage.last.totalTokens)}</span>
+            )}
+          </button>
+
+          {showTokenPopover && (
+            <div className="voice-token-popover" id="ai-token-popover" role="dialog" aria-label="Token Usage Statistics">
+              <div className="voice-token-popover-header">
+                <span className="popover-title">Token Usage Details</span>
+                <button
+                  type="button"
+                  id="ai-token-reset-btn"
+                  className="voice-token-reset-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleNewChat()
+                  }}
+                  title="Reset conversation and stats"
+                >
+                  Reset Chat & Stats
+                </button>
+              </div>
+
+              <div className="voice-token-visual-bar">
+                <div className="bar-label">
+                  <span>Input vs Output Allocation</span>
+                </div>
+                <div className="progress-track">
+                  <div
+                    className="progress-segment input-segment"
+                    style={{
+                      width: `${
+                        tokenUsage.total.totalTokens > 0
+                          ? (tokenUsage.total.inputTokens / tokenUsage.total.totalTokens) * 100
+                          : 50
+                      }%`,
+                    }}
+                    title={`Input: ${formatTokenCount(tokenUsage.total.inputTokens)} tokens`}
+                  />
+                  <div
+                    className="progress-segment output-segment"
+                    style={{
+                      width: `${
+                        tokenUsage.total.totalTokens > 0
+                          ? (tokenUsage.total.outputTokens / tokenUsage.total.totalTokens) * 100
+                          : 50
+                      }%`,
+                    }}
+                    title={`Output: ${formatTokenCount(tokenUsage.total.outputTokens)} tokens`}
+                  />
+                </div>
+                <div className="progress-legend">
+                  <span className="legend-item input-legend">
+                    <span className="legend-dot" /> Input ({tokenUsage.total.totalTokens > 0 ? Math.round((tokenUsage.total.inputTokens / tokenUsage.total.totalTokens) * 100) : 0}%)
+                  </span>
+                  <span className="legend-item output-legend">
+                    <span className="legend-dot" /> Output ({tokenUsage.total.totalTokens > 0 ? Math.round((tokenUsage.total.outputTokens / tokenUsage.total.totalTokens) * 100) : 0}%)
+                  </span>
+                </div>
+              </div>
+
+              <table className="voice-token-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Last Msg</th>
+                    <th>Total Session</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span className="indicator-dot input-dot" />
+                      Input
+                    </td>
+                    <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.inputTokens) : "-"}</td>
+                    <td>{formatTokenCount(tokenUsage.total.inputTokens)}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span className="indicator-dot output-dot" />
+                      Output
+                    </td>
+                    <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.outputTokens) : "-"}</td>
+                    <td>{formatTokenCount(tokenUsage.total.outputTokens)}</td>
+                  </tr>
+                  <tr className="table-row-total">
+                    <td>Total</td>
+                    <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.totalTokens) : "-"}</td>
+                    <td>{formatTokenCount(tokenUsage.total.totalTokens)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="voice-token-popover-footer">
+                <span>Metrics auto-reset when starting a new chat session.</span>
+              </div>
+            </div>
+          )}
         </div>
         <button
           type="button"

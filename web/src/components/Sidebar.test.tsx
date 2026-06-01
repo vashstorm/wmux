@@ -5,6 +5,7 @@ import { ConfirmDialog } from "./ConfirmDialog.js"
 import { AppProvider, useAppState } from "../state/store.js"
 import * as client from "../api/client.js"
 import { ApiError } from "../api/errors.js"
+import { useEffect } from "react"
 
 vi.mock("../api/client.js", () => ({
   listConnections: vi.fn(),
@@ -725,7 +726,10 @@ describe("Projects view", () => {
     ])
 
     function SelectedPaneChecker() {
-      const { selectedPane } = useAppState()
+      const { selectedPane, setSelectedTargetName } = useAppState()
+      useEffect(() => {
+        setSelectedTargetName("conn1")
+      }, [setSelectedTargetName])
       return (
         <span data-testid="selected-pane-state">
           {selectedPane
@@ -781,7 +785,10 @@ describe("Projects view", () => {
     })
 
     function SelectedPaneChecker() {
-      const { selectedPane } = useAppState()
+      const { selectedPane, setSelectedTargetName } = useAppState()
+      useEffect(() => {
+        setSelectedTargetName("conn1")
+      }, [setSelectedTargetName])
       return (
         <span data-testid="selected-pane-state">
           {selectedPane
