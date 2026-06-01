@@ -64,11 +64,17 @@ export const SidebarHeader = memo(function SidebarHeader({ activeView, onViewCha
                   : "0 2px 8px rgba(79, 107, 237, 0.3)",
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <rect x="1" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
-              <rect x="7" y="1" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="1" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.6" />
-              <rect x="7" y="7" width="4" height="4" rx="1" fill="white" fillOpacity="0.9" />
+            {/* W monogram — matches favicon design */}
+            <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+              <polyline
+                points="1,1.5 3.8,10.5 7,5.5 10.2,10.5 13,1.5"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeOpacity="0.95"
+              />
             </svg>
           </Box>
           <Typography

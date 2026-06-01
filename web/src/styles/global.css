@@ -54,26 +54,50 @@ h6 {
   transition: outline-color var(--transition-fast);
 }
 
+/* --- Selection styling --- */
+::selection {
+  background-color: var(--color-accent-subtle);
+  color: inherit;
+}
+
 /* --- Scrollbar styling --- */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+* {
+  --scrollbar-thumb: rgba(148, 163, 184, 0.25);
+  --scrollbar-track: transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+[data-mui-color-scheme="dark"] * {
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
 }
 
-::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-full);
-  background: rgba(148, 163, 184, 0.25);
-  border: 1px solid transparent;
-  background-clip: padding-box;
-  transition: background var(--transition-fast);
-}
+/* Legacy fallback for WebKit/Blink browsers wrapped in supports block */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: var(--radius-full);
+    background: var(--scrollbar-thumb);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    transition: background var(--transition-fast);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.45);
+  }
+
+  [data-mui-color-scheme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
 }
 
 /* --- Button reset --- */

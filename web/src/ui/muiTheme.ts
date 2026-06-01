@@ -51,7 +51,13 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
   return {
     MuiCssBaseline: {
       styleOverrides: {
-        "*": { boxSizing: "border-box" },
+        "*": {
+          boxSizing: "border-box",
+          scrollbarWidth: "thin",
+          scrollbarColor: isDark
+            ? "rgba(255,255,255,0.12) transparent"
+            : "rgba(0,0,0,0.14) transparent",
+        },
         "*::before": { boxSizing: "border-box" },
         "*::after": { boxSizing: "border-box" },
         "::-webkit-scrollbar": { width: "6px", height: "6px" },
@@ -196,9 +202,14 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
       styleOverrides: {
         paper: {
           borderRadius: 16,
-          ...(isDark && {
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0))",
-          }),
+          backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+          backgroundColor: isDark ? "rgba(22, 27, 34, 0.82)" : "rgba(255, 255, 255, 0.88)",
+          border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)",
+          boxShadow: isDark
+            ? "0 24px 48px rgba(0,0,0,0.5), 0 0 1px 1px rgba(255,255,255,0.1)"
+            : "0 24px 48px rgba(15,23,42,0.12), 0 0 1px 1px rgba(0,0,0,0.04)",
+          backgroundImage: "none",
         },
       },
     },

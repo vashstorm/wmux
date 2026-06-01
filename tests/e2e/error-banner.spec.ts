@@ -31,8 +31,15 @@ test.describe("error banner", () => {
 			window.sessionStorage.removeItem("wmux-auth-token");
 		});
 
+		// 1. Set up promise to wait for the initial page-load config fetch
+		const initConfigPromise = page.waitForResponse(response => response.url().includes("/api/config"));
 		await page.goto("/");
+		await initConfigPromise;
+
+		// 2. Set up promise to wait for the SettingsPanel's config fetch
+		const configResponsePromise = page.waitForResponse(response => response.url().includes("/api/config"));
 		await page.getByTestId("open-settings-button").click();
+		await configResponsePromise;
 
 		await expect(page.getByTestId("error-banner")).toBeVisible();
 
