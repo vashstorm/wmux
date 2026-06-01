@@ -44,6 +44,7 @@ pub fn spawn_cleanup_task(pool: SqlitePool) -> Arc<Mutex<Option<JoinHandle<()>>>
 
 async fn run_cleanup_once(pool: &SqlitePool) {
     let cutoff = cutoff_31_days_ago();
+
     match crate::storage::AiUsageRepository::new(pool.clone())
         .delete_expired(&cutoff)
         .await
@@ -54,6 +55,32 @@ async fn run_cleanup_once(pool: &SqlitePool) {
         Ok(_) => {}
         Err(err) => {
             tracing::error!(raw_error = %err, "failed to delete expired AI usage events");
+        }
+    }
+
+    match crate::storage::AiLogRepository::new(pool.clone())
+        .delete_expired(&cutoff)
+        .await
+    {
+        Ok(count) if count > 0 => {
+            tracing::info!(count, cutoff = %cutoff, "deleted expired AI logs");
+        }
+        Ok(_) => {}
+        Err(err) => {
+            tracing::error!(raw_error = %err, "failed to delete expired AI logs");
+        }
+    }
+
+    match crate::storage::OmniHistoryRepository::new(pool.clone())
+        .delete_expired(&cutoff)
+        .await
+    {
+        Ok(count) if count > 0 => {
+            tracing::info!(count, cutoff = %cutoff, "deleted expired voice history");
+        }
+        Ok(_) => {}
+        Err(err) => {
+            tracing::error!(raw_error = %err, "failed to delete expired voice history");
         }
     }
 }

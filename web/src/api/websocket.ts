@@ -28,7 +28,6 @@ export interface TerminalWebSocketOptions {
 export class TerminalWebSocket {
   private ws: WebSocket | null = null
   private options: TerminalWebSocketOptions
-  private writeLock = false
   private writeQueue: ClientMessage[] = []
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
@@ -112,22 +111,16 @@ export class TerminalWebSocket {
   }
 
   private flushQueue(): void {
-    while (this.writeQueue.length > 0) {
+    while (this.writeQueue.length > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
       const msg = this.writeQueue.shift()
-      if (msg && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (msg) {
         this.ws.send(JSON.stringify(msg))
       }
     }
-    this.writeLock = false
   }
 
   send(message: ClientMessage): void {
     if (this.closed) {
-      return
-    }
-
-    if (this.writeLock) {
-      this.writeQueue.push(message)
       return
     }
 
@@ -136,14 +129,8 @@ export class TerminalWebSocket {
       return
     }
 
-    this.writeLock = true
     this.ws.send(JSON.stringify(message))
-    this.writeLock = false
-
-    // Process any queued messages
-    if (this.writeQueue.length > 0) {
-      this.flushQueue()
-    }
+    this.flushQueue()
   }
 
   disconnect(): void {

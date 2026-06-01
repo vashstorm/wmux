@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,

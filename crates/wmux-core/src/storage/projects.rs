@@ -120,7 +120,25 @@ impl ProjectRepository {
         .await;
 
         match result {
-            Ok(_) => self.get_by_id(&id).await,
+            Ok(_) => Ok(Project {
+                id,
+                name: new_project.name.clone(),
+                path: new_project.path.clone(),
+                description: new_project.description.clone(),
+                session_name,
+                status: "stopped".to_string(),
+                workdir,
+                layout_json,
+                details_json,
+                progress_json,
+                ai_html: String::new(),
+                ai_status: "idle".to_string(),
+                ai_error: String::new(),
+                last_synced_at: None,
+                schema_version: 1,
+                created_at: now.clone(),
+                updated_at: now,
+            }),
             Err(err) => {
                 if let sqlx::Error::Database(db_err) = &err {
                     if db_err.code().as_deref() == Some("2067") {
@@ -191,7 +209,25 @@ impl ProjectRepository {
         .await;
 
         match result {
-            Ok(_) => self.get_by_id(id).await,
+            Ok(_) => Ok(Project {
+                id: id.to_string(),
+                name: new_name.clone(),
+                path: new_path.clone(),
+                description: new_description.clone(),
+                session_name: new_session_name.clone(),
+                status: current.status.clone(),
+                workdir: new_workdir.clone(),
+                layout_json: new_layout_json.clone(),
+                details_json: new_details_json.clone(),
+                progress_json: new_progress_json.clone(),
+                ai_html: current.ai_html.clone(),
+                ai_status: current.ai_status.clone(),
+                ai_error: current.ai_error.clone(),
+                last_synced_at: current.last_synced_at.clone(),
+                schema_version: current.schema_version,
+                created_at: current.created_at.clone(),
+                updated_at: now,
+            }),
             Err(err) => {
                 if let sqlx::Error::Database(db_err) = &err {
                     if db_err.code().as_deref() == Some("2067") {
@@ -209,6 +245,7 @@ impl ProjectRepository {
         layout_json: &str,
         status: &str,
         last_synced_at: &str,
+        current: &Project,
     ) -> Result<Project, ProjectRepoError> {
         let now = now_utc();
 
@@ -221,12 +258,19 @@ impl ProjectRepository {
         .bind(&now)
         .bind(id)
         .execute(&self.pool)
-        .await;
+        .await?;
 
-        match result {
-            Ok(_) => self.get_by_id(id).await,
-            Err(err) => Err(ProjectRepoError::Database(err)),
+        if result.rows_affected() == 0 {
+            return Err(ProjectRepoError::NotFound(id.to_string()));
         }
+
+        Ok(Project {
+            status: status.to_string(),
+            layout_json: layout_json.to_string(),
+            last_synced_at: Some(last_synced_at.to_string()),
+            updated_at: now,
+            ..current.clone()
+        })
     }
 
     pub async fn update_ai_result(
@@ -235,6 +279,7 @@ impl ProjectRepository {
         ai_html: &str,
         ai_status: &str,
         ai_error: &str,
+        current: &Project,
     ) -> Result<Project, ProjectRepoError> {
         let now = now_utc();
 
@@ -247,12 +292,19 @@ impl ProjectRepository {
         .bind(&now)
         .bind(id)
         .execute(&self.pool)
-        .await;
+        .await?;
 
-        match result {
-            Ok(_) => self.get_by_id(id).await,
-            Err(err) => Err(ProjectRepoError::Database(err)),
+        if result.rows_affected() == 0 {
+            return Err(ProjectRepoError::NotFound(id.to_string()));
         }
+
+        Ok(Project {
+            ai_html: ai_html.to_string(),
+            ai_status: ai_status.to_string(),
+            ai_error: ai_error.to_string(),
+            updated_at: now,
+            ..current.clone()
+        })
     }
 
     pub async fn delete(&self, id: &str) -> Result<(), ProjectRepoError> {
@@ -273,6 +325,15 @@ impl ProjectRepository {
 mod tests {
     use super::*;
     use crate::storage::db;
+
+    fn dummy() -> Project {
+        Project {
+            status: "stopped".to_string(),
+            ai_status: "idle".to_string(),
+            schema_version: 1,
+            ..Default::default()
+        }
+    }
 
     async fn setup_test_db() -> (SqlitePool, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -653,6 +714,7 @@ mod tests {
                 "{\"schemaVersion\":2,\"windows\":[]}",
                 "running",
                 "2026-05-22T12:00:00Z",
+                &created,
             )
             .await
             .expect("update_snapshot");
@@ -694,6 +756,7 @@ mod tests {
                 "{\"schemaVersion\":2,\"windows\":[]}",
                 "running",
                 "2026-05-22T12:00:00Z",
+                &created,
             )
             .await
             .expect("update_snapshot");
@@ -702,7 +765,7 @@ mod tests {
         assert_eq!(snapshot.status, "running");
 
         let updated = repo
-            .update_ai_result(&created.id, "<html>AI result</html>", "completed", "")
+            .update_ai_result(&created.id, "<html>AI result</html>", "completed", "", &snapshot)
             .await
             .expect("update_ai_result");
 
@@ -723,7 +786,7 @@ mod tests {
         let repo = ProjectRepository::new(pool);
 
         let result = repo
-            .update_snapshot("nonexistent-id", "{}", "running", "2026-05-22T12:00:00Z")
+            .update_snapshot("nonexistent-id", "{}", "running", "2026-05-22T12:00:00Z", &dummy())
             .await;
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -738,7 +801,7 @@ mod tests {
         let repo = ProjectRepository::new(pool);
 
         let result = repo
-            .update_ai_result("nonexistent-id", "<html></html>", "idle", "")
+            .update_ai_result("nonexistent-id", "<html></html>", "idle", "", &dummy())
             .await;
         assert!(result.is_err());
         match result.unwrap_err() {

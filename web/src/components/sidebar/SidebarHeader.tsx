@@ -5,6 +5,7 @@ import BarChartIcon from "@mui/icons-material/BarChart"
 import SmartToyIcon from "@mui/icons-material/SmartToy"
 import { alpha } from "@mui/material/styles"
 import { SidebarIconButton } from "./SidebarIconButton.js"
+import { memo } from "react"
 
 type SidebarView = "projects" | "session" | "stats" | "ai_logs"
 
@@ -20,7 +21,7 @@ const NAV_ITEMS: { view: SidebarView; Icon: typeof FolderIcon; label: string; te
   { view: "ai_logs", Icon: SmartToyIcon, label: "AI Logs", testId: "open-ai-logs-button" },
 ]
 
-export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) {
+export const SidebarHeader = memo(function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) {
   return (
     <Box
       className="sidebar-header"
@@ -153,4 +154,4 @@ export function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) 
       </Stack>
     </Box>
   )
-}
+})

@@ -26,23 +26,21 @@ import {
   Tooltip,
   SvgIcon,
 } from "@mui/material"
-import {
-  Add as AddIcon,
-  Analytics as AnalyticsIcon,
-  Close as CloseIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  ExpandMore as ExpandMoreIcon,
-  Extension as ExtensionIcon,
-  Lan as LanIcon,
-  Memory as MemoryIcon,
-  SettingsOutlined as SettingsOutlinedIcon,
-  SmartToy as SmartToyIcon,
-  Star as StarIcon,
-  TextFields as TextFieldsIcon,
-  Remove as RemoveIcon,
-  RestartAlt as RestartAltIcon,
-} from "@mui/icons-material"
+import AddIcon from "@mui/icons-material/Add"
+import AnalyticsIcon from "@mui/icons-material/Analytics"
+import CloseIcon from "@mui/icons-material/Close"
+import DeleteIcon from "@mui/icons-material/Delete"
+import EditIcon from "@mui/icons-material/Edit"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import ExtensionIcon from "@mui/icons-material/Extension"
+import LanIcon from "@mui/icons-material/Lan"
+import MemoryIcon from "@mui/icons-material/Memory"
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined"
+import SmartToyIcon from "@mui/icons-material/SmartToy"
+import StarIcon from "@mui/icons-material/Star"
+import TextFieldsIcon from "@mui/icons-material/TextFields"
+import RemoveIcon from "@mui/icons-material/Remove"
+import RestartAltIcon from "@mui/icons-material/RestartAlt"
 import {
   getConfig,
   type AppConfig,

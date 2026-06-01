@@ -1,3 +1,4 @@
+use axum::Extension;
 use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,7 @@ use wmux_core::config::{
 use wmux_core::skills::OmniSkillDef;
 
 use crate::http::{ApiError, ApiResult};
-use crate::state::AppState;
+use crate::state::{AppState, CachedConfig};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,24 +84,17 @@ struct ConfigOmniResponse {
     vad_threshold: f32,
 }
 
-pub async fn get(State(state): State<AppState>) -> ApiResult<ConfigResponse> {
-    let config = state
-        .store
-        .snapshot()
-        .map_err(|_| ApiError::internal("failed to read configuration"))?;
-    Ok(Json(new_config_response(&config, &state.skills.list())))
+pub async fn get(State(state): State<AppState>, Extension(cached): Extension<CachedConfig>) -> ApiResult<ConfigResponse> {
+    Ok(Json(new_config_response(&cached.0, &state.skills.list())))
+
 }
 
 pub async fn update(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Json(mut payload): Json<Config>,
 ) -> ApiResult<ConfigResponse> {
-    let current = state
-        .store
-        .snapshot()
-        .map_err(|_| ApiError::internal("failed to read configuration"))?;
-
-    preserve_secret_fields(&current, &mut payload);
+    preserve_secret_fields(&cached.0, &mut payload);
 
     payload
         .validate_auth()
@@ -116,16 +110,13 @@ pub async fn update(
         return Err(store_error(error));
     }
 
-    if let Ok(latest) = state.store.snapshot() {
-        state.connections.replace_all(latest.connections);
-    }
-
     tracing::info!("config updated");
 
     let latest = state
         .store
         .snapshot()
         .map_err(|_| ApiError::internal("failed to read configuration"))?;
+    state.connections.replace_all(latest.connections.clone());
     Ok(Json(new_config_response(&latest, &state.skills.list())))
 }
 

@@ -56,6 +56,7 @@ pub async fn run_migrations(pool: &sqlx::SqlitePool) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_ai_usage_events_created_at ON ai_usage_events(created_at);
         CREATE INDEX IF NOT EXISTS idx_ai_usage_events_project_created ON ai_usage_events(project_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_ai_usage_events_status_created ON ai_usage_events(status, created_at);
 
         CREATE TABLE IF NOT EXISTS voice_conversation_messages (
             id TEXT PRIMARY KEY NOT NULL,

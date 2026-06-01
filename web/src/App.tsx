@@ -4,8 +4,8 @@ import "./styles/overlays.css"
 import "./styles/components.css"
 import "./styles/fonts.css"
 
-import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react"
-import { ThemeProvider, CssBaseline, IconButton, Tooltip } from "@mui/material"
+import { useEffect, useRef, useState, useCallback, lazy, Suspense, type CSSProperties } from "react"
+import { ThemeProvider, CssBaseline, IconButton, Tooltip, CircularProgress } from "@mui/material"
 import LightModeIcon from "@mui/icons-material/LightMode"
 import DarkModeIcon from "@mui/icons-material/DarkMode"
 import { AppProvider, useAppState } from "./state/store.js"
@@ -21,11 +21,12 @@ import { MainPanel } from "./components/MainPanel.js"
 import { Sidebar } from "./components/Sidebar.js"
 import { ErrorBanner } from "./components/ErrorBanner.js"
 import { ConfirmDialog } from "./components/ConfirmDialog.js"
-import { NewConnectionForm } from "./components/NewConnectionForm.js"
-import { SettingsPanel } from "./components/SettingsPanel.js"
-import { ErrorLogsPanel } from "./components/ErrorLogsPanel.js"
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js"
-import { AiAssistant } from "./components/AiAssistant.js"
+
+const NewConnectionForm = lazy(() => import("./components/NewConnectionForm.js").then(m => ({ default: m.NewConnectionForm })))
+const SettingsPanel = lazy(() => import("./components/SettingsPanel.js").then(m => ({ default: m.SettingsPanel })))
+const ErrorLogsPanel = lazy(() => import("./components/ErrorLogsPanel.js").then(m => ({ default: m.ErrorLogsPanel })))
+const AiAssistant = lazy(() => import("./components/AiAssistant.js").then(m => ({ default: m.AiAssistant })))
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js"
 import { normalizeThemeId } from "./ui/themes.js"
 import AssistantIcon from "@mui/icons-material/Assistant"
@@ -34,7 +35,7 @@ import {
   saveLauncherPos,
   clampAssistantPos,
   type AssistantPos,
-} from "./components/AiAssistant.js"
+} from "./components/AiAssistantUtils.js"
 
 function UISettingsInit() {
   const { setUISettings, setOmniStatus } = useAppState()
@@ -351,15 +352,26 @@ export function PanelVisibility() {
 
   return (
     <>
-      {(showNewConnectionForm || editingConnection) && <NewConnectionForm />}
-      {showSettingsPanel && <SettingsPanel />}
-      {showErrorLogsPanel && <ErrorLogsPanel />}
-      {omniStatus !== "disabled" && (
-        <div
-          data-testid="ai-assistant-wrapper"
-          style={showAiAssistant ? {} : { display: "none" }}
-        >
-          <AiAssistant />
+      {(showNewConnectionForm || editingConnection) && (
+        <Suspense fallback={<CircularProgress />}>
+          <NewConnectionForm />
+        </Suspense>
+      )}
+      {showSettingsPanel && (
+        <Suspense fallback={<CircularProgress />}>
+          <SettingsPanel />
+        </Suspense>
+      )}
+      {showErrorLogsPanel && (
+        <Suspense fallback={<CircularProgress />}>
+          <ErrorLogsPanel />
+        </Suspense>
+      )}
+      {omniStatus !== "disabled" && showAiAssistant && (
+        <div data-testid="ai-assistant-wrapper">
+          <Suspense fallback={<CircularProgress />}>
+            <AiAssistant />
+          </Suspense>
         </div>
       )}
       {omniStatus !== "disabled" && !showAiAssistant && (

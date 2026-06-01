@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Instant;
 
 use axum::extract::{Request, State};
@@ -7,7 +8,7 @@ use axum::response::{IntoResponse, Response};
 use wmux_core::protocol::ErrorResponse;
 
 use crate::http::ApiErrorLog;
-use crate::state::AppState;
+use crate::state::{AppState, CachedConfig};
 
 pub async fn auth_middleware(
     State(state): State<AppState>,
@@ -116,12 +117,16 @@ fn target_name_from_query(query: &str) -> Option<String> {
 
 async fn authenticate(
     state: AppState,
-    request: Request,
+    mut request: Request,
     allow_query_token: bool,
     next: Next,
 ) -> Response {
     let token = match state.store.snapshot() {
-        Ok(config) => config.auth.token.trim().to_string(),
+        Ok(config) => {
+            let token = config.auth.token.trim().to_string();
+            request.extensions_mut().insert(CachedConfig(Arc::new(config)));
+            token
+        }
         Err(error) => {
             tracing::error!(raw_error = %error, "failed to read config for auth");
             return error_response(

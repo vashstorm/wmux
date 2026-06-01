@@ -1,4 +1,4 @@
-import type { ElementType } from "react"
+import { memo, type ElementType } from "react"
 import { Box, Tabs, Tab, Stack, Typography, keyframes } from "@mui/material"
 import SvgIcon, { type SvgIconProps } from "@mui/material/SvgIcon"
 import CodeIcon from "@mui/icons-material/Code"
@@ -327,7 +327,7 @@ function getStatusTone(window: WindowSummary): TabStatusTone {
   return tabStatusTones.none
 }
 
-export function WindowTabs({
+export const WindowTabs = memo(function WindowTabs({
   windows,
   loadedPanesByWindow,
   selectedWindowId,
@@ -650,4 +650,4 @@ export function WindowTabs({
       </Tabs>
     </Box>
   )
-}
+})

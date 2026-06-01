@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useRef, useState, memo } from "react"
 import { Box, Stack, Typography, TextField, ListItemButton, Tooltip } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -21,7 +21,7 @@ interface SessionCardProps {
   hasProject?: boolean
 }
 
-export function SessionCard({
+export const SessionCard = memo(function SessionCard({
   session,
   isSelected,
   onOpen,
@@ -420,7 +420,7 @@ export function SessionCard({
       )}
     </Box>
   )
-}
+})
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr)

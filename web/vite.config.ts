@@ -14,12 +14,14 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 500,
+    target: "es2022",
+    minify: "esbuild",
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ["react", "react-dom"],
-          mui: ["@mui/material", "@emotion/react", "@emotion/styled", "@mui/icons-material"],
+          mui: ["@mui/material", "@emotion/react", "@emotion/styled"],
           xterm: ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-web-links"],
         },
       },

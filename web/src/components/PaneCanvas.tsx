@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { Box, Typography } from "@mui/material"
 import TerminalIcon from "@mui/icons-material/Terminal"
 import { Terminal } from "./Terminal.js"
@@ -40,7 +40,7 @@ function scaleToPercent(value: number, max: number): string {
   return `${(value / max) * 100}%`
 }
 
-export function PaneCanvas({
+export const PaneCanvas = memo(function PaneCanvas({
   panes,
   selectedPaneId,
   onSelectPane,
@@ -256,4 +256,4 @@ export function PaneCanvas({
       </Box>
     </Box>
   )
-}
+})

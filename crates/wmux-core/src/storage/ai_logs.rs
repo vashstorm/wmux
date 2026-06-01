@@ -18,7 +18,7 @@ impl AiLogRepository {
         Self { pool }
     }
 
-    pub async fn insert(&self, entry: &NewAiLogEntry) -> Result<AiLogEntry, AiLogRepoError> {
+    pub async fn insert(&self, entry: &NewAiLogEntry) -> Result<(), AiLogRepoError> {
         let id = entry
             .id
             .as_ref()
@@ -53,7 +53,7 @@ impl AiLogRepository {
         .execute(&self.pool)
         .await?;
 
-        self.get_by_id(&id).await
+        Ok(())
     }
 
     pub async fn list(
@@ -122,14 +122,12 @@ impl AiLogRepository {
         Ok(())
     }
 
-    async fn get_by_id(&self, id: &str) -> Result<AiLogEntry, AiLogRepoError> {
-        let row = sqlx::query_as::<_, AiLogEntry>(
-            "SELECT id, conversation_id, event_kind, model, status, prompt_text, tool_name, tool_call_id, tool_arguments_json, tool_result_json, metrics_json, duration_ms, raw_event_json, error_message, created_at FROM ai_logs WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row)
+    pub async fn delete_expired(&self, cutoff: &str) -> Result<u64, AiLogRepoError> {
+        let result = sqlx::query("DELETE FROM ai_logs WHERE created_at < ?")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 }
 
@@ -311,21 +309,20 @@ mod tests {
             created_at: Some("2026-05-28T10:00:00Z".to_string()),
         };
 
-        let inserted = repo.insert(&entry).await.expect("insert json entry");
+        repo.insert(&entry).await.expect("insert json entry");
 
+        // Retrieve via list and verify all JSON fields are preserved
+        let result = repo.list(1, None).await.expect("list json entry");
         assert_eq!(
-            inserted.tool_arguments_json,
+            result.data[0].tool_arguments_json,
             Some("{\"command\":\"ls\"}".to_string())
         );
         assert_eq!(
-            inserted.tool_result_json,
+            result.data[0].tool_result_json,
             Some("{\"output\":\"file1 file2\"}".to_string())
         );
-        assert_eq!(inserted.metrics_json, "{\"tokens\":150}");
-        assert_eq!(inserted.raw_event_json, "{\"raw\":\"data\"}");
-
-        // Retrieve via list
-        let result = repo.list(1, None).await.expect("list json entry");
         assert_eq!(result.data[0].metrics_json, "{\"tokens\":150}");
+        assert_eq!(result.data[0].raw_event_json, "{\"raw\":\"data\"}");
+
     }
 }

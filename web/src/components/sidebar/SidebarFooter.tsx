@@ -2,6 +2,7 @@ import { Badge, Box, Stack, Tooltip } from "@mui/material"
 import SettingsIcon from "@mui/icons-material/Settings"
 import DescriptionIcon from "@mui/icons-material/Description"
 import { SidebarIconButton } from "./SidebarIconButton.js"
+import { memo } from "react"
 
 interface SidebarFooterProps {
   errorLogCount: number
@@ -11,7 +12,7 @@ interface SidebarFooterProps {
   terminalThemeToggle?: React.ReactNode
 }
 
-export function SidebarFooter({
+export const SidebarFooter = memo(function SidebarFooter({
   errorLogCount,
   onOpenSettings,
   onOpenErrorLogs,
@@ -101,4 +102,4 @@ export function SidebarFooter({
       </Stack>
     </Box>
   )
-}
+})

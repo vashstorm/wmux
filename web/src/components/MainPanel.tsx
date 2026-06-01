@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { Box, Typography } from "@mui/material"
 import { useAppState } from "../state/store.js"
 import { WindowTabs } from "./WindowTabs.js"
@@ -157,7 +157,6 @@ export function MainPanel() {
   )
 
   useEffect(() => {
-    if (!selectedPane) return
 
     let cancelled = false
     let inFlight = false
@@ -165,7 +164,7 @@ export function MainPanel() {
 
     const syncActiveWindow = async () => {
       if (document.visibilityState === "hidden") return
-      if (cancelled || inFlight) return
+      if (!selectedPane || cancelled || inFlight) return
 
       inFlight = true
       try {

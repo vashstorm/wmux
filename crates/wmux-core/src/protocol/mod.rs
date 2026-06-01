@@ -847,7 +847,7 @@ mod tests {
     #[test]
     fn generate_qwen_tools_returns_builtin_tools() {
         let tools = generate_qwen_tools(&[]);
-        assert_eq!(tools.len(), 33, "should have 33 voice skills");
+        assert_eq!(tools.len(), 34, "should have 34 voice skills");
 
         // Verify each tool has required structure
         for tool in &tools {

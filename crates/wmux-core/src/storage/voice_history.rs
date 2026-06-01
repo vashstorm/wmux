@@ -21,7 +21,7 @@ impl OmniHistoryRepository {
     pub async fn insert(
         &self,
         msg: &OmniConversationMessage,
-    ) -> Result<OmniConversationMessage, OmniHistoryRepoError> {
+    ) -> Result<(), OmniHistoryRepoError> {
         let id = if msg.id.trim().is_empty() {
             Uuid::new_v4().to_string()
         } else {
@@ -50,7 +50,7 @@ impl OmniHistoryRepository {
         .execute(&self.pool)
         .await?;
 
-        self.get_by_id(&id).await
+        Ok(())
     }
 
     pub async fn list(
@@ -90,14 +90,12 @@ impl OmniHistoryRepository {
         Ok(())
     }
 
-    async fn get_by_id(&self, id: &str) -> Result<OmniConversationMessage, OmniHistoryRepoError> {
-        let row = sqlx::query_as::<_, OmniConversationMessage>(
-            "SELECT id, conversation_id, role, kind, text, event_json, target_name, session_name, window_name, pane_index, created_at FROM voice_conversation_messages WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row)
+    pub async fn delete_expired(&self, cutoff: &str) -> Result<u64, OmniHistoryRepoError> {
+        let result = sqlx::query("DELETE FROM voice_conversation_messages WHERE created_at < ?")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 }
 

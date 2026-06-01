@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, type CSSProperties } from "react"
+import { useEffect, useRef, useState, useCallback, useMemo, memo, type CSSProperties } from "react"
 import { Box } from "@mui/material"
 import WifiOffIcon from "@mui/icons-material/WifiOff"
 import "@xterm/xterm/css/xterm.css"
@@ -44,7 +44,7 @@ function redrawTerminal(terminal: XTermType) {
   terminal.refresh(0, Math.max(0, terminal.rows - 1))
 }
 
-export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
+export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
   const { setError, uiSettings } = useAppState()
   const { targetName, session, window: windowId, pane } = selectedPane
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -60,12 +60,14 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
   const [disconnected, setDisconnected] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [xtermLoading, setXtermLoading] = useState(true)
-  const terminalThemeId =
-    windowTheme ??
-    uiSettings.windowTheme ??
-    uiSettings.theme ??
-    document.documentElement.dataset.theme
-  const terminalTheme = getTerminalTheme(terminalThemeId)
+  const terminalTheme = useMemo(() => {
+    const id =
+      windowTheme ??
+      uiSettings.windowTheme ??
+      uiSettings.theme ??
+      document.documentElement.dataset.theme
+    return getTerminalTheme(id)
+  }, [windowTheme, uiSettings.windowTheme, uiSettings.theme])
   const terminalStyle = {
     "--terminal-background": terminalTheme.background ?? "var(--color-background)",
     backgroundColor: terminalTheme.background ?? "var(--color-background)",
@@ -121,14 +123,6 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
       resizeFrameRef.current = null
       fitAndSyncSize(true)
     })
-
-    for (const delay of [80, 240, 500]) {
-      const timeoutId = window.setTimeout(() => {
-        resizeTimeoutRefs.current = resizeTimeoutRefs.current.filter((id) => id !== timeoutId)
-        fitAndSyncSize(true)
-      }, delay)
-      resizeTimeoutRefs.current.push(timeoutId)
-    }
   }, [clearDeferredFits, fitAndSyncSize])
 
   useEffect(() => {
@@ -372,4 +366,4 @@ export function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProp
       )}
     </Box>
   )
-}
+})

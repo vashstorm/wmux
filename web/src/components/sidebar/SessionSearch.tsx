@@ -1,13 +1,14 @@
 import { TextField, InputAdornment, Box } from "@mui/material"
 import SearchIcon from "@mui/icons-material/Search"
 import { alpha } from "@mui/material/styles"
+import { memo } from "react"
 
 interface SessionSearchProps {
   value: string
   onChange: (value: string) => void
 }
 
-export function SessionSearch({ value, onChange }: SessionSearchProps) {
+export const SessionSearch = memo(function SessionSearch({ value, onChange }: SessionSearchProps) {
   return (
     <Box
       sx={{
@@ -70,4 +71,4 @@ export function SessionSearch({ value, onChange }: SessionSearchProps) {
       />
     </Box>
   )
-}
+})

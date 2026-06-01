@@ -16,15 +16,13 @@ import {
   FormControlLabel,
   Checkbox,
 } from "@mui/material"
-import {
-  Close as CloseIcon,
-  Refresh as RefreshIcon,
-  ContentCopy as ContentCopyIcon,
-  Check as CheckIcon,
-  Search as SearchIcon,
-  WrapText as WrapTextIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material"
+import CloseIcon from "@mui/icons-material/Close"
+import RefreshIcon from "@mui/icons-material/Refresh"
+import ContentCopyIcon from "@mui/icons-material/ContentCopy"
+import CheckIcon from "@mui/icons-material/Check"
+import SearchIcon from "@mui/icons-material/Search"
+import WrapTextIcon from "@mui/icons-material/WrapText"
+import CheckCircleIcon from "@mui/icons-material/CheckCircle"
 import { clearErrorLogs, fetchErrorLogs } from "../api/client.js"
 import { ApiError, getErrorMessage } from "../api/errors.js"
 import { useAppState } from "../state/store.js"

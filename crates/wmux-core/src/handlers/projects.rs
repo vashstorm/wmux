@@ -1,3 +1,4 @@
+use axum::Extension;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -9,7 +10,7 @@ use std::time::Instant;
 use crate::http::{ApiError, ApiResult};
 use crate::project_ai::{generate_sanitized_html, get_active_provider};
 use crate::project_runtime::{launch_or_sync_project, snapshot_from_tmux};
-use crate::state::AppState;
+use crate::state::{AppState, CachedConfig};
 use crate::storage::models::{NewAiUsageEvent, NewProject, Project, ProjectLayout, UpdateProject};
 use crate::storage::{AiUsageRepository, ProjectRepository};
 use crate::tmux::Adapter;
@@ -35,6 +36,7 @@ pub async fn list(State(state): State<AppState>) -> ApiResult<ProjectListRespons
 
 pub async fn create(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Json(mut payload): Json<NewProject>,
 ) -> Result<(StatusCode, Json<Project>), ApiError> {
     if payload.name.trim().is_empty() {
@@ -47,15 +49,7 @@ pub async fn create(
         .as_deref()
         .unwrap_or(payload.name.as_str());
 
-    let config = state
-        .store
-        .snapshot()
-        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
-    let tmux_path = if config.tmux.path.is_empty() {
-        "tmux"
-    } else {
-        &config.tmux.path
-    };
+    let tmux_path = tmux_path_from_config(&cached);
     let adapter = Adapter::new(tmux_path);
 
     if let Ok(true) = adapter.has_session(session_to_check).await {
@@ -72,7 +66,7 @@ pub async fn create(
             .format(&time::format_description::well_known::Rfc3339)
             .expect("RFC3339 format is infallible");
         if let Ok(updated) = repo
-            .update_snapshot(&project.id, &project.layout_json, "running", &now_str)
+            .update_snapshot(&project.id, &project.layout_json, "running", &now_str, &project)
             .await
         {
             project = updated;
@@ -116,6 +110,7 @@ pub struct DeleteParams {
 
 pub async fn delete(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Path(id): Path<String>,
     axum::extract::Query(params): axum::extract::Query<DeleteParams>,
 ) -> Result<Response, ApiError> {
@@ -126,21 +121,9 @@ pub async fn delete(
     repo.delete(&id).await.map_err(map_project_error)?;
 
     if params.kill_session {
-        let session_name = if project.session_name.is_empty() {
-            &project.name
-        } else {
-            &project.session_name
-        };
+        let session_name = session_name_for(&project);
 
-        let config = state
-            .store
-            .snapshot()
-            .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
-        let tmux_path = if config.tmux.path.is_empty() {
-            "tmux"
-        } else {
-            &config.tmux.path
-        };
+        let tmux_path = tmux_path_from_config(&cached);
         let adapter = Adapter::new(tmux_path);
 
         if let Ok(true) = adapter.has_session(session_name).await {
@@ -153,11 +136,30 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
+
 fn storage(state: &AppState) -> Result<sqlx::SqlitePool, ApiError> {
     state
         .storage
         .clone()
         .ok_or_else(|| ApiError::internal("storage not initialized"))
+}
+
+/// Returns the tmux executable path from config, or "tmux" if not configured.
+fn tmux_path_from_config(cached: &CachedConfig) -> &str {
+    if cached.0.tmux.path.is_empty() {
+        "tmux"
+    } else {
+        &cached.0.tmux.path
+    }
+}
+
+/// Returns the session name for a project, falling back to project name if empty.
+fn session_name_for(project: &Project) -> &str {
+    if project.session_name.is_empty() {
+        &project.name
+    } else {
+        &project.session_name
+    }
 }
 
 fn map_project_error(err: crate::storage::ProjectRepoError) -> ApiError {
@@ -182,31 +184,20 @@ fn map_tmux_error(err: crate::tmux::TmuxError) -> ApiError {
 
 pub async fn launch(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Path(id): Path<String>,
 ) -> ApiResult<ProjectActionResponse> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state
-        .store
-        .snapshot()
-        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
-    let tmux_path = if config.tmux.path.is_empty() {
-        "tmux"
-    } else {
-        &config.tmux.path
-    };
+    let tmux_path = tmux_path_from_config(&cached);
     let adapter = Adapter::new(tmux_path);
 
     let layout: ProjectLayout = serde_json::from_str(&project.layout_json)
         .map_err(|e| ApiError::bad_request(format!("invalid layout JSON: {}", e)))?;
 
-    let session_name = if project.session_name.is_empty() {
-        &project.name
-    } else {
-        &project.session_name
-    };
+    let session_name = session_name_for(&project);
 
     let snapshot = launch_or_sync_project(&adapter, session_name, &layout)
         .await
@@ -220,6 +211,7 @@ pub async fn launch(
             &time::OffsetDateTime::now_utc()
                 .format(&time::format_description::well_known::Rfc3339)
                 .expect("RFC3339 format is infallible"),
+            &project,
         )
         .await
         .map_err(map_project_error)?;
@@ -240,28 +232,17 @@ pub async fn launch(
 
 pub async fn sync_from_tmux(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Path(id): Path<String>,
 ) -> ApiResult<ProjectActionResponse> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state
-        .store
-        .snapshot()
-        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
-    let tmux_path = if config.tmux.path.is_empty() {
-        "tmux"
-    } else {
-        &config.tmux.path
-    };
+    let tmux_path = tmux_path_from_config(&cached);
     let adapter = Adapter::new(tmux_path);
 
-    let session_name = if project.session_name.is_empty() {
-        &project.name
-    } else {
-        &project.session_name
-    };
+    let session_name = session_name_for(&project);
 
     let exists = adapter
         .has_session(session_name)
@@ -286,6 +267,7 @@ pub async fn sync_from_tmux(
             &time::OffsetDateTime::now_utc()
                 .format(&time::format_description::well_known::Rfc3339)
                 .expect("RFC3339 format is infallible"),
+            &project,
         )
         .await
         .map_err(map_project_error)?;
@@ -306,16 +288,14 @@ pub async fn sync_from_tmux(
 
 pub async fn generate_ai_html(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Path(id): Path<String>,
 ) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
     let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
 
-    let config = state
-        .store
-        .snapshot()
-        .map_err(|e| ApiError::internal(format!("failed to read config: {}", e)))?;
+    let config = &cached.0;
     let provider_for_log = get_active_provider(&config.intelligence).ok();
     let started_at = Instant::now();
 
@@ -323,7 +303,7 @@ pub async fn generate_ai_html(
         Ok(ai_html) => {
             let duration_ms = started_at.elapsed().as_millis() as i64;
             let updated = repo
-                .update_ai_result(&id, &ai_html, "completed", "")
+                .update_ai_result(&id, &ai_html, "completed", "", &project)
                 .await
                 .map_err(map_project_error)?;
             record_project_ai_usage_event(
@@ -350,7 +330,7 @@ pub async fn generate_ai_html(
             let duration_ms = started_at.elapsed().as_millis() as i64;
             let api_err: ApiError = err.into();
             let error_msg = api_err.message().to_string();
-            let _ = repo.update_ai_result(&id, "", "error", &error_msg).await;
+            let _ = repo.update_ai_result(&id, "", "error", &error_msg, &project).await;
             record_project_ai_usage_event(
                 &pool,
                 &project,

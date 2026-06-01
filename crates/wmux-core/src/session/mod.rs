@@ -14,7 +14,7 @@ use portable_pty::{Child, ChildKiller, CommandBuilder, MasterPty, PtySize, nativ
 
 const DEFAULT_WINDOW_ROWS: u16 = 24;
 const DEFAULT_WINDOW_COLS: u16 = 80;
-const CHANNEL_CAPACITY: usize = 256;
+const CHANNEL_CAPACITY: usize = 1024;
 const TERMINAL_CLOSE_GRACE_MS: u64 = 200;
 const TMUX_CLIENT_FLAGS: &str = "active-pane";
 const TERMINAL_GROUP_PREFIX: &str = "wmux-terminal-";
@@ -458,7 +458,7 @@ fn spawn_terminal_reader_task(
     close_sent: Arc<AtomicBool>,
 ) {
     tokio::task::spawn_blocking(move || {
-        let mut buffer = [0_u8; 8192];
+        let mut buffer = [0_u8; 32768];
         loop {
             match reader.read(&mut buffer) {
                 Ok(0) => {

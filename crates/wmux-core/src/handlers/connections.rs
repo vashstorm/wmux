@@ -1,3 +1,4 @@
+use axum::Extension;
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -9,7 +10,7 @@ use wmux_core::config::{Config, ConfigError, ConnectionConfig};
 use wmux_core::tmux::Adapter;
 
 use crate::http::{ApiError, ApiResult};
-use crate::state::AppState;
+use crate::state::{AppState, CachedConfig};
 
 #[derive(Serialize)]
 pub struct ConnectionsListResponse {
@@ -63,12 +64,11 @@ pub async fn list(State(state): State<AppState>) -> ApiResult<ConnectionsListRes
     }))
 }
 
-pub async fn list_health(State(state): State<AppState>) -> ApiResult<ConnectionHealthListResponse> {
-    let config = current_config(&state)?;
+pub async fn list_health(State(state): State<AppState>, Extension(cached): Extension<CachedConfig>) -> ApiResult<ConnectionHealthListResponse> {
     let connections = state.connections.list();
     let mut data = Vec::with_capacity(connections.len());
     for connection in &connections {
-        data.push(check_connection_health(connection, &config.tmux.path).await);
+        data.push(check_connection_health(connection, &cached.0.tmux.path).await);
     }
     Ok(Json(ConnectionHealthListResponse { data }))
 }
@@ -99,12 +99,12 @@ pub async fn get(
 
 pub async fn health(
     State(state): State<AppState>,
+    Extension(cached): Extension<CachedConfig>,
     Path(id): Path<String>,
 ) -> ApiResult<ConnectionHealthResponse> {
     let connection = find_connection(&state, &id)?;
-    let config = current_config(&state)?;
     Ok(Json(
-        check_connection_health(&connection, &config.tmux.path).await,
+        check_connection_health(&connection, &cached.0.tmux.path).await,
     ))
 }
 

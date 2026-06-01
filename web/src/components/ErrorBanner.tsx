@@ -1,5 +1,6 @@
 import { useAppState } from "../state/store.js"
-import { ErrorOutlined as ErrorOutlinedIcon, Close as CloseIcon } from "@mui/icons-material"
+import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined"
+import CloseIcon from "@mui/icons-material/Close"
 
 export function ErrorBanner() {
   const { error, setError } = useAppState()

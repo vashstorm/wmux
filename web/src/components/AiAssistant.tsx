@@ -50,6 +50,13 @@ import {
   type WindowInfo,
 } from "../api/client.js"
 import "../styles/ai-assistant.css"
+import {
+  LAUNCHER_POS_STORAGE_KEY,
+  clampAssistantPos,
+  loadLauncherPos,
+  saveLauncherPos,
+  type AssistantPos,
+} from "./AiAssistantUtils.js"
 
 const LEVEL_SEGMENTS = 12
 const AUDIO_PIPELINE_CONFIG = {
@@ -59,14 +66,12 @@ const AUDIO_PIPELINE_CONFIG = {
   vadThreshold: 0,
 }
 const ASSISTANT_SIZE_STORAGE_KEY = "wmux-ai-assistant-size"
-export const LAUNCHER_POS_STORAGE_KEY = "wmux-launcher-pos"
 const DEFAULT_ASSISTANT_SIZE = { width: 380, height: 520 }
 const MIN_ASSISTANT_SIZE = { width: 320, height: 360 }
-const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 }
 const VIEWPORT_MARGIN_PX = 16
+const LAUNCHER_ELEM_SIZE = { width: 42, height: 42 }
 
 type AssistantSize = typeof DEFAULT_ASSISTANT_SIZE
-export type AssistantPos = { x: number; y: number }
 type TokenUsage = {
   inputTokens: number
   outputTokens: number
@@ -103,46 +108,7 @@ function clampAssistantSize(size: AssistantSize): AssistantSize {
   }
 }
 
-export function clampAssistantPos(
-  pos: AssistantPos,
-  size: { width: number; height: number },
-): AssistantPos {
-  if (typeof window === "undefined") return pos
-  const maxX = window.innerWidth - size.width - VIEWPORT_MARGIN_PX
-  const maxY = window.innerHeight - size.height - VIEWPORT_MARGIN_PX
-  return {
-    x: Math.round(Math.max(VIEWPORT_MARGIN_PX, Math.min(maxX, pos.x))),
-    y: Math.round(Math.max(VIEWPORT_MARGIN_PX, Math.min(maxY, pos.y))),
-  }
-}
-
-function defaultLauncherPos(): AssistantPos {
-  if (typeof window === "undefined") return { x: VIEWPORT_MARGIN_PX, y: VIEWPORT_MARGIN_PX }
-  return {
-    x: window.innerWidth - LAUNCHER_ELEM_SIZE.width - VIEWPORT_MARGIN_PX,
-    y: window.innerHeight - LAUNCHER_ELEM_SIZE.height - VIEWPORT_MARGIN_PX,
-  }
-}
-
-export function loadLauncherPos(): AssistantPos {
-  try {
-    const raw = localStorage.getItem(LAUNCHER_POS_STORAGE_KEY)
-    if (!raw) return defaultLauncherPos()
-    const parsed = JSON.parse(raw) as Partial<AssistantPos>
-    if (typeof parsed.x !== "number" || typeof parsed.y !== "number") {
-      return defaultLauncherPos()
-    }
-    return clampAssistantPos({ x: parsed.x, y: parsed.y }, LAUNCHER_ELEM_SIZE)
-  } catch {
-    return defaultLauncherPos()
-  }
-}
-
-export function saveLauncherPos(pos: AssistantPos): void {
-  try {
-    localStorage.setItem(LAUNCHER_POS_STORAGE_KEY, JSON.stringify(pos))
-  } catch {}
-}
+// Utility functions (clampAssistantPos, loadLauncherPos, saveLauncherPos) are now in AiAssistantUtils.ts
 
 function loadAssistantSize(): AssistantSize {
   try {
