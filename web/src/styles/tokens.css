@@ -149,9 +149,9 @@
   --shadow-footer-top: 0 -1px 0 rgba(15, 23, 42, 0.04), 0 -2px 8px rgba(15, 23, 42, 0.02);
 
   /* Session card */
-  --color-session-card-bg: #ffffff;
-  --color-session-card-border: rgba(15, 23, 42, 0.06);
-  --color-session-card-hover: #f8fafc;
+  --color-session-card-bg: #f8fafc;
+  --color-session-card-border: rgba(15, 23, 42, 0.09);
+  --color-session-card-hover: #f1f5f9;
   --color-session-card-selected: rgba(79, 70, 229, 0.04);
   --color-session-card-selected-border: rgba(79, 70, 229, 0.2);
   --color-session-card-selected-glow: 0 0 0 3px rgba(79, 70, 229, 0.08), var(--shadow-sm);
@@ -223,9 +223,9 @@
   --shadow-footer-top: 0 -1px 0 rgba(255, 255, 255, 0.03), 0 -2px 12px rgba(0, 0, 0, 0.15);
 
   /* Session card */
-  --color-session-card-bg: #182030;
-  --color-session-card-border: rgba(255, 255, 255, 0.04);
-  --color-session-card-hover: #202b40;
+  --color-session-card-bg: #121926;
+  --color-session-card-border: rgba(255, 255, 255, 0.08);
+  --color-session-card-hover: #1b2435;
   --color-session-card-selected: rgba(99, 102, 241, 0.06);
   --color-session-card-selected-border: rgba(99, 102, 241, 0.22);
   --color-session-card-selected-glow: 0 0 0 3px rgba(99, 102, 241, 0.12), var(--shadow-sm);

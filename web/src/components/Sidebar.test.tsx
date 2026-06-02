@@ -375,7 +375,6 @@ describe("session card attention rendering", () => {
     expect(actions).toHaveStyle({ position: "absolute" })
     expect(actions).toHaveStyle({
       right: "8px",
-      transform: "translate(8px, -50%)",
       pointerEvents: "none",
     })
   })
@@ -531,6 +530,7 @@ describe("sidebar navigation and logs features", () => {
 
 describe("Projects view", () => {
   beforeEach(() => {
+    vi.useRealTimers()
     mockListConnections.mockResolvedValue([{ targetName: "conn1", type: "local" }])
     mockListConnectionHealth.mockResolvedValue([])
     mockFetchErrorLogs.mockResolvedValue({
@@ -726,16 +726,21 @@ describe("Projects view", () => {
     ])
 
     function SelectedPaneChecker() {
-      const { selectedPane, setSelectedTargetName } = useAppState()
+      const { selectedPane, selectedTargetName, setSelectedTargetName, connections } = useAppState()
       useEffect(() => {
-        setSelectedTargetName("conn1")
-      }, [setSelectedTargetName])
+        if (connections.length > 0 && selectedTargetName !== "conn1") {
+          setSelectedTargetName("conn1")
+        }
+      }, [connections, selectedTargetName, setSelectedTargetName])
       return (
-        <span data-testid="selected-pane-state">
-          {selectedPane
-            ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}`
-            : "none"}
-        </span>
+        <>
+          <span data-testid="selected-target-state">{selectedTargetName ?? "none"}</span>
+          <span data-testid="selected-pane-state">
+            {selectedPane
+              ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}`
+              : "none"}
+          </span>
+        </>
       )
     }
 
@@ -745,6 +750,9 @@ describe("Projects view", () => {
         <SelectedPaneChecker />
       </TestWrapper>,
     )
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-target-state")).toHaveTextContent("conn1")
+    })
     fireEvent.click(screen.getByTestId("open-projects-button"))
     await waitFor(() => expect(screen.getByTestId("project-item-p1")).toBeInTheDocument())
 
@@ -785,16 +793,21 @@ describe("Projects view", () => {
     })
 
     function SelectedPaneChecker() {
-      const { selectedPane, setSelectedTargetName } = useAppState()
+      const { selectedPane, selectedTargetName, setSelectedTargetName, connections } = useAppState()
       useEffect(() => {
-        setSelectedTargetName("conn1")
-      }, [setSelectedTargetName])
+        if (connections.length > 0 && selectedTargetName !== "conn1") {
+          setSelectedTargetName("conn1")
+        }
+      }, [connections, selectedTargetName, setSelectedTargetName])
       return (
-        <span data-testid="selected-pane-state">
-          {selectedPane
-            ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}`
-            : "none"}
-        </span>
+        <>
+          <span data-testid="selected-target-state">{selectedTargetName ?? "none"}</span>
+          <span data-testid="selected-pane-state">
+            {selectedPane
+              ? `${selectedPane.targetName}:${selectedPane.session}:${selectedPane.window}:${selectedPane.pane}`
+              : "none"}
+          </span>
+        </>
       )
     }
 
@@ -804,6 +817,9 @@ describe("Projects view", () => {
         <SelectedPaneChecker />
       </TestWrapper>,
     )
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-target-state")).toHaveTextContent("conn1")
+    })
     fireEvent.click(screen.getByTestId("open-projects-button"))
     await waitFor(() => expect(screen.getByTestId("project-item-p1")).toBeInTheDocument())
     await waitFor(() => expect(mockListConnections).toHaveBeenCalled())

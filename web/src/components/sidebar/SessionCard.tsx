@@ -77,7 +77,7 @@ export const SessionCard = memo(function SessionCard({
       data-testid={`session-card-${sname}`}
       sx={{
         width: "100%",
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius-sm)",
         border: "1px solid",
         borderColor: isSelected
           ? "var(--color-session-card-selected-border)"
@@ -87,40 +87,31 @@ export const SessionCard = memo(function SessionCard({
           ? "linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 60%)"
           : "none",
         boxShadow: isSelected ? "var(--color-session-card-selected-glow)" : "none",
-        transition: [
-          "border-color var(--transition-base)",
-          "background-color var(--transition-base)",
-          "box-shadow var(--transition-base)",
-          "transform var(--transition-base)",
-        ].join(", "),
-        position: "relative",
-        overflow: "hidden",
-        // Left accent indicator bar
         "&::before": {
           content: '""',
           position: "absolute",
           left: 0,
-          top: "18%",
-          bottom: "18%",
-          width: "2px",
-          borderRadius: "0 2px 2px 0",
+          top: 0,
+          bottom: 0,
+          width: "3px",
           bgcolor: isSelected ? "var(--color-accent)" : "transparent",
-          transition: [
-            "background-color var(--transition-base)",
-            "top var(--transition-spring)",
-            "bottom var(--transition-spring)",
-          ].join(", "),
+          transition: "background-color var(--transition-base)",
         },
-        "&:hover::before": {
-          bgcolor: isSelected ? "var(--color-accent)" : "var(--color-surface-border-hover)",
-          top: "8%",
-          bottom: "8%",
-        },
+        transition: "all var(--transition-base)",
+        position: "relative",
+        overflow: "hidden",
         "&:hover": {
+          bgcolor: isSelected
+            ? "var(--color-session-card-selected)"
+            : "var(--color-session-card-hover)",
           borderColor: isSelected
             ? "var(--color-session-card-selected-border)"
             : "var(--color-surface-border-hover)",
           boxShadow: isSelected ? "var(--color-session-card-selected-glow)" : "var(--shadow-sm)",
+          transform: "translateX(2px)",
+        },
+        "&:hover .session-card-icon": {
+          transform: "scale(1.08)",
         },
       }}
     >
@@ -166,12 +157,11 @@ export const SessionCard = memo(function SessionCard({
           sx={{
             flexDirection: "row",
             alignItems: "center",
-            gap: "6px",
-            py: "7px",
-            pl: "16px",
-            pr: "12px",
+            gap: 1.25,
+            py: 1,
+            px: 1.25,
             minWidth: 0,
-            borderRadius: "var(--radius-md)",
+            borderRadius: "var(--radius-sm)",
             bgcolor: "transparent",
             transition: "background-color var(--transition-fast)",
             "&.Mui-selected": { bgcolor: "transparent" },
@@ -186,41 +176,46 @@ export const SessionCard = memo(function SessionCard({
               minWidth: 0,
               display: "flex",
               alignItems: "center",
-              gap: "5px",
-              transition: "padding-right var(--transition-spring)",
-              ".session-card:hover &": {
-                paddingRight: "90px",
-              },
+              gap: 1.25,
+              pr: 9,
             }}
           >
             <Box
               className="session-card-icon"
               sx={{
+                width: 32,
+                height: 32,
+                borderRadius: "var(--radius-sm)",
+                background: isSelected
+                  ? "var(--color-accent-gradient)"
+                  : "var(--color-surface)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 20,
-                height: 20,
-                borderRadius: "4px",
-                bgcolor: hasProject
-                  ? (theme) => alpha(theme.palette.primary.main, 0.15)
-                  : (theme) => alpha(theme.palette.text.disabled, 0.05),
-                color: hasProject ? "primary.main" : "text.secondary",
                 flexShrink: 0,
-                transition: "all var(--transition-base)",
-                ".session-card:hover &": {
-                  bgcolor: hasProject
-                    ? (theme) => alpha(theme.palette.primary.main, 0.25)
-                    : (theme) => alpha(theme.palette.text.secondary, 0.1),
-                  color: hasProject ? "primary.main" : "text.primary",
-                  transform: "scale(1.08)",
-                },
+                transition:
+                  "transform var(--transition-fast), background var(--transition-base)",
+                boxShadow: isSelected ? "var(--glow-accent)" : "none",
               }}
             >
               {hasProject ? (
-                <FolderIcon data-testid="session-icon-project" sx={{ fontSize: 13 }} />
+                <FolderIcon
+                  data-testid="session-icon-project"
+                  sx={{
+                    fontSize: 16,
+                    color: isSelected ? "#fff" : "var(--color-text-muted)",
+                    transition: "color var(--transition-base)",
+                  }}
+                />
               ) : (
-                <TerminalIcon data-testid="session-icon-terminal" sx={{ fontSize: 13 }} />
+                <TerminalIcon
+                  data-testid="session-icon-terminal"
+                  sx={{
+                    fontSize: 16,
+                    color: isSelected ? "#fff" : "var(--color-text-muted)",
+                    transition: "color var(--transition-base)",
+                  }}
+                />
               )}
             </Box>
             <Tooltip
@@ -256,21 +251,20 @@ export const SessionCard = memo(function SessionCard({
                 onMouseEnter={updateNameOverflow}
                 onFocus={updateNameOverflow}
                 sx={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "var(--font-size-xs)",
+                  fontSize: "var(--font-size-sm)",
                   fontWeight: isSelected
                     ? "var(--font-weight-semibold)"
-                    : "var(--font-weight-normal)",
-                  color: isSelected ? "text.primary" : "text.secondary",
+                    : "var(--font-weight-medium)",
+                  color: isSelected ? "var(--color-accent)" : "var(--color-text)",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
-                  lineHeight: 1.4,
+                  lineHeight: 1.3,
                   flex: 1,
                   minWidth: 0,
                   transition: "color var(--transition-base), font-weight var(--transition-base)",
                   ".session-card:hover &": {
-                    color: "text.primary",
+                    color: isSelected ? "var(--color-accent)" : "var(--color-text)",
                   },
                 }}
                 noWrap
@@ -301,42 +295,21 @@ export const SessionCard = memo(function SessionCard({
             </Typography>
           )}
 
-          {/* Hover action buttons — slide in from right */}
+          {/* Hover action buttons — visible on hover */}
           <Stack
             direction="row"
             className="session-card-actions"
+            spacing={0.25}
             sx={{
-              alignItems: "center",
               position: "absolute",
-              right: "8px",
-              top: "50%",
-              transform: "translate(8px, -50%)",
+              right: 8,
               opacity: 0,
               pointerEvents: "none",
-              transition: "opacity var(--transition-base), transform var(--transition-spring)",
+              transition: "opacity var(--transition-fast)",
               ".session-card:hover &": {
                 opacity: 1,
-                transform: "translate(0, -50%)",
                 pointerEvents: "auto",
               },
-              display: "flex",
-              gap: "2px",
-              maxWidth: "calc(100% - 16px)",
-              bgcolor: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "rgba(20, 26, 38, 0.92)"
-                  : "rgba(255, 255, 255, 0.92)",
-              backdropFilter: "blur(12px) saturate(160%)",
-              pl: "4px",
-              pr: "4px",
-              py: "3px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid",
-              borderColor: "divider",
-              boxShadow: (theme) =>
-                theme.palette.mode === "dark"
-                  ? "0 4px 12px rgba(0,0,0,0.4)"
-                  : "0 4px 12px rgba(0,0,0,0.08)",
             }}
           >
             <SidebarIconButton
@@ -351,16 +324,14 @@ export const SessionCard = memo(function SessionCard({
               title={hasProject ? "Open project" : "Build project"}
               data-testid={`build-project-${sname}`}
               sx={{
-                color: hasProject ? "primary.main" : "text.disabled",
                 width: 24,
                 height: 24,
-                "& .MuiSvgIcon-root": { fontSize: "14px" },
-                transition:
-                  "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--color-text-muted)",
+                "& .MuiSvgIcon-root": { fontSize: 13 },
                 "&:hover": {
-                  bgcolor: "action.hover",
-                  color: "primary.main",
-                  transform: "scale(1.2)",
+                  bgcolor: "var(--color-surface-hover)",
+                  color: "var(--color-accent)",
                 },
               }}
             />
@@ -376,16 +347,14 @@ export const SessionCard = memo(function SessionCard({
               title="Rename"
               data-testid={`rename-session-${sname}`}
               sx={{
-                color: "text.disabled",
                 width: 24,
                 height: 24,
-                "& .MuiSvgIcon-root": { fontSize: "14px" },
-                transition:
-                  "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
+                borderRadius: "var(--radius-sm)",
+                color: "var(--color-text-muted)",
+                "& .MuiSvgIcon-root": { fontSize: 13 },
                 "&:hover": {
-                  bgcolor: "action.hover",
-                  color: "text.primary",
-                  transform: "scale(1.2) rotate(-8deg)",
+                  bgcolor: "var(--color-surface-hover)",
+                  color: "var(--color-accent)",
                 },
               }}
             />
@@ -402,17 +371,12 @@ export const SessionCard = memo(function SessionCard({
               title="Kill session"
               data-testid={`kill-session-${sname}`}
               sx={{
-                color: "text.disabled",
                 width: 24,
                 height: 24,
-                "& .MuiSvgIcon-root": { fontSize: "14px" },
-                transition:
-                  "color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-spring)",
-                "&:hover": {
-                  bgcolor: "error.main",
-                  color: "common.white",
-                  transform: "scale(1.2)",
-                },
+                borderRadius: "var(--radius-sm)",
+                color: "var(--color-text-muted)",
+                "& .MuiSvgIcon-root": { fontSize: 13 },
+                "&:hover": { bgcolor: "rgba(239,68,68,0.12)", color: "var(--color-danger)" },
               }}
             />
           </Stack>

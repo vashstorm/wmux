@@ -409,17 +409,37 @@ export function ProjectsView() {
                   borderRadius: "var(--radius-sm)",
                   cursor: sessionActionProjectId === project.id ? "progress" : "pointer",
                   border: "1px solid",
-                  borderColor: isSelected ? "var(--color-glass-highlight-border)" : "transparent",
-                  bgcolor: isSelected ? "var(--color-accent-subtle)" : "transparent",
-                  borderLeft: isSelected
-                    ? "3px solid var(--color-accent)"
-                    : "3px solid transparent",
+                  borderColor: isSelected
+                    ? "var(--color-session-card-selected-border)"
+                    : "var(--color-session-card-border)",
+                  bgcolor: isSelected
+                    ? "var(--color-session-card-selected)"
+                    : "var(--color-session-card-bg)",
+                  backgroundImage: isSelected
+                    ? "linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 60%)"
+                    : "none",
+                  boxShadow: isSelected ? "var(--color-session-card-selected-glow)" : "none",
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: "3px",
+                    bgcolor: isSelected ? "var(--color-accent)" : "transparent",
+                    transition: "background-color var(--transition-base)",
+                  },
                   transition: "all var(--transition-base)",
                   "&:hover": {
-                    bgcolor: isSelected ? "var(--color-accent-subtle)" : "var(--color-surface)",
+                    bgcolor: isSelected
+                      ? "var(--color-session-card-selected)"
+                      : "var(--color-session-card-hover)",
                     borderColor: isSelected
-                      ? "var(--color-glass-highlight-border)"
-                      : "var(--color-surface-border)",
+                      ? "var(--color-session-card-selected-border)"
+                      : "var(--color-surface-border-hover)",
+                    boxShadow: isSelected
+                      ? "var(--color-session-card-selected-glow)"
+                      : "var(--shadow-sm)",
                     transform: "translateX(2px)",
                     "& .project-actions": { opacity: 1, pointerEvents: "auto" },
                   },
@@ -474,7 +494,7 @@ export function ProjectsView() {
                   >
                     {project.name}
                   </Typography>
-                  {(project.path || project.description) && (
+                  {project.path && (
                     <Typography
                       sx={{
                         fontSize: "var(--font-size-2xs)",
@@ -486,7 +506,7 @@ export function ProjectsView() {
                         mt: 0.25,
                       }}
                     >
-                      {project.path || project.description}
+                      {project.path}
                     </Typography>
                   )}
                 </Box>
