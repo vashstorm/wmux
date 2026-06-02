@@ -83,7 +83,7 @@ describe("StatsView", () => {
     expect(screen.getByText("Wmux")).toBeInTheDocument()
     expect(screen.getByText("Project HTML")).toBeInTheDocument()
     expect(screen.getByText("dev")).toBeInTheDocument()
-    expect(screen.getByText("Window Analysis")).toBeInTheDocument()
+    expect(screen.queryByText("Window Analysis")).not.toBeInTheDocument()
   })
 
   test("clicking Errors reloads stats with an error status filter", async () => {

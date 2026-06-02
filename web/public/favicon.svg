@@ -1,72 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Wmux">
-  <defs>
-    <!-- Deep dark background gradient -->
-    <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
-      <stop offset="0%" stop-color="#0d1117"/>
-      <stop offset="100%" stop-color="#161b27"/>
-    </linearGradient>
-
-    <!-- W stroke gradient: cool blue-white -->
-    <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#f0f6ff"/>
-      <stop offset="100%" stop-color="#94aabf"/>
-    </linearGradient>
-
-    <!-- Green glow for cursor bar -->
-    <filter id="cursorGlow" x="-60%" y="-200%" width="220%" height="500%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Soft glow around the W -->
-    <filter id="wGlow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Squircle clip -->
-    <clipPath id="clip">
-      <rect x="48" y="48" width="928" height="928" rx="220"/>
-    </clipPath>
-  </defs>
-
   <!-- Squircle background -->
-  <rect x="48" y="48" width="928" height="928" rx="220" fill="url(#bg)"/>
+  <rect x="48" y="48" width="928" height="928" rx="220" fill="#111827"/>
 
-  <!-- Very subtle inner top highlight rim -->
-  <rect x="48" y="48" width="928" height="928" rx="220"
-        fill="none"
-        stroke="url(#wGrad)"
-        stroke-width="2"
-        opacity="0.08"
-        clip-path="url(#clip)"/>
-
-  <!-- Bold geometric W — 5-point polyline, thick round strokes -->
-  <!-- Points: top-left → bottom-left-valley → center-peak → bottom-right-valley → top-right -->
+  <!-- Bold geometric W -->
   <polyline
     points="168,300 330,740 512,468 694,740 856,300"
     fill="none"
-    stroke="url(#wGrad)"
+    stroke="#e8f0fe"
     stroke-width="96"
     stroke-linecap="round"
     stroke-linejoin="round"
-    filter="url(#wGlow)"
   />
 
-  <!-- Green terminal cursor bar beneath the W -->
-  <rect x="334" y="800" width="356" height="28" rx="14"
-        fill="#4ade80"
-        filter="url(#cursorGlow)"
-        opacity="0.95"/>
+  <!-- Green terminal cursor bar -->
+  <rect x="334" y="800" width="356" height="28" rx="14" fill="#4ade80"/>
 
-  <!-- Hairline green underline accent (sharper layer on top) -->
-  <rect x="374" y="808" width="276" height="12" rx="6"
-        fill="#86efac"
-        opacity="0.7"/>
+  <!-- Brighter inner highlight on cursor bar -->
+  <rect x="374" y="806" width="276" height="12" rx="6" fill="#86efac" opacity="0.8"/>
 </svg>

@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build dev clean test typecheck format e2e tauri-build tauri-e2e tauri-dev app icons
+.PHONY: build dev clean test typecheck format e2e tauri-build tauri-e2e tauri-dev app
 
 PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 TAURI_DRIVER ?= tauri-driver
@@ -10,6 +10,10 @@ MACOS_DMG_DIR ?= target/release/bundle/dmg
 
 RUST_SOURCES := $(shell find crates -type f \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' \))
 WEB_SOURCES := $(shell find web/src web/index.html web/package.json web/vite.config.ts web/tsconfig.json -type f 2>/dev/null)
+
+ICON_SVG   := web/public/favicon.svg
+ICON_OUT   := src-tauri/icons
+ICON_STAMP := $(ICON_OUT)/icon.icns
 
 build: bin/wmux
 
@@ -23,25 +27,21 @@ web/dist/index.html: $(WEB_SOURCES) web/.bun-install-stamp
 target/release/wmux-server: $(RUST_SOURCES)
 	WMUX_VERSION=$(VERSION) cargo build --release -p wmux-server
 
-bin/wmux: target/release/wmux-server web/dist/index.html
+bin/wmux: $(ICON_STAMP) target/release/wmux-server web/dist/index.html
 	mkdir -p bin
 	rm -f bin/wmux
 	cp target/release/wmux-server bin/wmux
 
-dev: bin/wmux
+dev: $(ICON_STAMP) bin/wmux
 	exec ./bin/wmux
 
-# SVG source → Tauri icon assets (icon.png + icon.icns)
-ICON_SVG := web/public/favicon.svg
-ICON_OUT := src-tauri/icons
 
-icons: $(ICON_SVG)
+# Regenerate native icon assets whenever favicon.svg changes.
+# Requires rsvg-convert (brew install librsvg) and iconutil (macOS built-in).
+$(ICON_STAMP): $(ICON_SVG)
 	@echo "Generating icons from $(ICON_SVG)…"
 	@command -v rsvg-convert >/dev/null 2>&1 || { echo "rsvg-convert not found. Install with: brew install librsvg"; exit 1; }
-	@mkdir -p /tmp/wmux.iconset
-	@# Render master 1024px PNG
-	@rsvg-convert -w 1024 -h 1024 $(ICON_SVG) -o /tmp/wmux-icon-1024.png
-	@# Generate all iconset sizes
+	@mkdir -p /tmp/wmux.iconset $(ICON_OUT)
 	@for spec in \
 		"icon_16x16.png:16" \
 		"icon_16x16@2x.png:32" \
@@ -56,11 +56,12 @@ icons: $(ICON_SVG)
 			name=$${spec%%:*}; size=$${spec##*:}; \
 			rsvg-convert -w $$size -h $$size $(ICON_SVG) -o /tmp/wmux.iconset/$$name; \
 		done
-	@# Copy 512px as the canonical icon.png used by Tauri
 	@cp /tmp/wmux.iconset/icon_512x512.png $(ICON_OUT)/icon.png
-	@# Pack .icns
-	@iconutil -c icns /tmp/wmux.iconset -o $(ICON_OUT)/icon.icns
-	@echo "Done → $(ICON_OUT)/icon.png  $(ICON_OUT)/icon.icns"
+	@iconutil -c icns /tmp/wmux.iconset -o $(ICON_STAMP)
+	@echo "Done → $(ICON_OUT)/icon.png  $(ICON_STAMP)"
+
+# Convenience alias
+icons: $(ICON_STAMP)
 
 clean:
 	rm -rf bin web/dist web/.bun-install-stamp target src-tauri/target
@@ -82,10 +83,10 @@ e2e:
 tauri-dev:
 	cargo tauri dev
 
-tauri-build: icons
+tauri-build: $(ICON_STAMP)
 	cargo tauri build
 
-app:
+app: $(ICON_STAMP)
 	@if [ "$$(uname -s)" != "Darwin" ]; then \
 		echo "build app DMG install flow is only supported on macOS."; \
 		exit 1; \

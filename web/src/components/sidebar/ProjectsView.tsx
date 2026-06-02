@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   Box,
   Typography,
@@ -14,8 +14,11 @@ import {
   DialogActions,
   FormControlLabel,
   Checkbox,
+  Chip,
 } from "@mui/material"
 import AddIcon from "@mui/icons-material/Add"
+import { ProjectSearch } from "./ProjectSearch.js"
+import { SidebarIconButton } from "./SidebarIconButton.js"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
 import CloseIcon from "@mui/icons-material/Close"
@@ -71,6 +74,19 @@ export function ProjectsView() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
   const [killSessionCheckbox, setKillSessionCheckbox] = useState(false)
+
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const filteredProjects = useMemo(() => {
+    if (!searchQuery.trim()) return projects
+    const query = searchQuery.toLowerCase()
+    return projects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(query) ||
+        (p.path && p.path.toLowerCase().includes(query)) ||
+        (p.description && p.description.toLowerCase().includes(query)),
+    )
+  }, [projects, searchQuery])
 
   const loadProjects = useCallback(async () => {
     setLoading(true)
@@ -275,25 +291,7 @@ export function ProjectsView() {
 
   return (
     <Box data-testid="projects-view" sx={{ minHeight: 1 }}>
-      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-        <Typography
-          variant="subtitle2"
-          sx={{ fontSize: "var(--font-size-sm)", fontWeight: "var(--font-weight-semibold)" }}
-        >
-          Projects
-        </Typography>
-        <IconButton
-          size="small"
-          onClick={() => {
-            resetForm()
-            setShowForm(!showForm)
-          }}
-          data-testid="projects-add-button"
-          aria-label="Add project"
-        >
-          {showForm ? <CloseIcon fontSize="small" /> : <AddIcon fontSize="small" />}
-        </IconButton>
-      </Stack>
+      <ProjectSearch value={searchQuery} onChange={setSearchQuery} />
 
       <Collapse in={showForm} timeout={200} unmountOnExit>
         <Box
@@ -363,235 +361,316 @@ export function ProjectsView() {
         </Typography>
       )}
 
-      {loading && projects.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 2 }}>
-          Loading...
-        </Typography>
-      ) : projects.length === 0 ? (
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          data-testid="projects-empty"
-          sx={{ textAlign: "center", py: 2 }}
+      <Box className="sidebar-projects-section" sx={{ px: 0 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          className="sidebar-projects-header"
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            py: "var(--spacing-xs)",
+            px: "var(--spacing-sm)",
+            mb: 0.5,
+          }}
         >
-          No projects yet
-        </Typography>
-      ) : (
-        <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-          {projects.map((project) => {
-            const sessionName = projectSessionName(project)
-            const isSelected =
-              selectedProject?.id === project.id ||
-              (selectedPane?.targetName === selectedTargetName &&
-                selectedPane.session === sessionName)
-            return (
-              <Box
-                key={project.id}
-                data-testid={`project-item-${project.id}`}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open project details for ${project.name}`}
-                aria-busy={sessionActionProjectId === project.id}
-                onClick={() => handleOpenProjectDetails(project)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault()
-                    handleOpenProjectDetails(project)
-                  }
-                }}
+          <Typography
+            className="sidebar-section-label"
+            variant="caption"
+            sx={{
+              fontSize: "var(--font-size-xs)",
+              fontWeight: "var(--font-weight-semibold)",
+              color: "text.secondary",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Projects
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            {filteredProjects.length > 0 && (
+              <Chip
+                label={filteredProjects.length}
+                size="small"
+                className="sidebar-project-count"
                 sx={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.25,
-                  px: 1.25,
-                  py: 1,
-                  borderRadius: "var(--radius-sm)",
-                  cursor: sessionActionProjectId === project.id ? "progress" : "pointer",
+                  fontSize: "var(--font-size-xs)",
+                  fontWeight: "var(--font-weight-semibold)",
+                  color: "text.disabled",
+                  bgcolor: "background.default",
                   border: "1px solid",
-                  borderColor: isSelected
-                    ? "var(--color-session-card-selected-border)"
-                    : "var(--color-session-card-border)",
-                  bgcolor: isSelected
-                    ? "var(--color-session-card-selected)"
-                    : "var(--color-session-card-bg)",
-                  backgroundImage: isSelected
-                    ? "linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 60%)"
-                    : "none",
-                  boxShadow: isSelected ? "var(--color-session-card-selected-glow)" : "none",
-                  "&::before": {
-                    content: '""',
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: "3px",
-                    bgcolor: isSelected ? "var(--color-accent)" : "transparent",
-                    transition: "background-color var(--transition-base)",
-                  },
-                  transition: "all var(--transition-base)",
-                  "&:hover": {
-                    bgcolor: isSelected
-                      ? "var(--color-session-card-selected)"
-                      : "var(--color-session-card-hover)",
-                    borderColor: isSelected
-                      ? "var(--color-session-card-selected-border)"
-                      : "var(--color-surface-border-hover)",
-                    boxShadow: isSelected
-                      ? "var(--color-session-card-selected-glow)"
-                      : "var(--shadow-sm)",
-                    transform: "translateX(2px)",
-                    "& .project-actions": { opacity: 1, pointerEvents: "auto" },
-                  },
-                  "&:hover .project-icon": {
-                    transform: "scale(1.08)",
-                  },
+                  borderColor: "divider",
+                  minHeight: 20,
+                  height: 20,
                 }}
-              >
-                {/* Folder icon avatar */}
+              />
+            )}
+            <SidebarIconButton
+              className="sidebar-project-create-button"
+              icon={showForm ? CloseIcon : AddIcon}
+              variant="compact"
+              onClick={() => {
+                resetForm()
+                setShowForm(!showForm)
+              }}
+              data-testid="projects-add-button"
+              aria-label="Add project"
+              aria-expanded={showForm}
+              title="Add project"
+              sx={{
+                bgcolor: "background.default",
+                border: "1px solid",
+                borderColor: "divider",
+                color: "text.secondary",
+                "&:hover": {
+                  bgcolor: "action.hover",
+                  color: "primary.main",
+                  borderColor: (theme) => `rgba(${theme.palette.primary.main}, 0.3)`,
+                },
+              }}
+            />
+          </Stack>
+        </Stack>
+
+        {loading && projects.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 2 }}>
+            Loading...
+          </Typography>
+        ) : projects.length === 0 ? (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            data-testid="projects-empty"
+            sx={{ textAlign: "center", py: 2 }}
+          >
+            No projects yet
+          </Typography>
+        ) : filteredProjects.length === 0 ? (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            data-testid="projects-search-empty"
+            sx={{ textAlign: "center", py: 2 }}
+          >
+            No projects match your search
+          </Typography>
+        ) : (
+          <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+            {filteredProjects.map((project) => {
+              const sessionName = projectSessionName(project)
+              const isSelected =
+                selectedProject?.id === project.id ||
+                (selectedPane?.targetName === selectedTargetName &&
+                  selectedPane.session === sessionName)
+              return (
                 <Box
-                  className="project-icon"
+                  key={project.id}
+                  data-testid={`project-item-${project.id}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open project details for ${project.name}`}
+                  aria-busy={sessionActionProjectId === project.id}
+                  onClick={() => handleOpenProjectDetails(project)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      handleOpenProjectDetails(project)
+                    }
+                  }}
                   sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "var(--radius-sm)",
-                    background: isSelected
-                      ? "var(--color-accent-gradient)"
-                      : "var(--color-surface)",
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    transition:
-                      "transform var(--transition-fast), background var(--transition-base)",
-                    boxShadow: isSelected ? "var(--glow-accent)" : "none",
+                    gap: 1.25,
+                    px: 1.25,
+                    py: 1,
+                    borderRadius: "var(--radius-sm)",
+                    cursor: sessionActionProjectId === project.id ? "progress" : "pointer",
+                    border: "1px solid",
+                    borderColor: isSelected
+                      ? "var(--color-session-card-selected-border)"
+                      : "var(--color-session-card-border)",
+                    bgcolor: isSelected
+                      ? "var(--color-session-card-selected)"
+                      : "var(--color-session-card-bg)",
+                    backgroundImage: isSelected
+                      ? "linear-gradient(135deg, var(--color-accent-subtle) 0%, transparent 60%)"
+                      : "none",
+                    boxShadow: isSelected ? "var(--color-session-card-selected-glow)" : "none",
+                    "&::before": {
+                      content: '""',
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: "3px",
+                      bgcolor: isSelected ? "var(--color-accent)" : "transparent",
+                      transition: "background-color var(--transition-base)",
+                    },
+                    transition: "all var(--transition-base)",
+                    "&:hover": {
+                      bgcolor: isSelected
+                        ? "var(--color-session-card-selected)"
+                        : "var(--color-session-card-hover)",
+                      borderColor: isSelected
+                        ? "var(--color-session-card-selected-border)"
+                        : "var(--color-surface-border-hover)",
+                      boxShadow: isSelected
+                        ? "var(--color-session-card-selected-glow)"
+                        : "var(--shadow-sm)",
+                      transform: "translateX(2px)",
+                      "& .project-actions": { opacity: 1, pointerEvents: "auto" },
+                    },
+                    "&:hover .project-icon": {
+                      transform: "scale(1.08)",
+                    },
                   }}
                 >
-                  <FolderOpenIcon
+                  {/* Folder icon avatar */}
+                  <Box
+                    className="project-icon"
                     sx={{
-                      fontSize: 16,
-                      color: isSelected ? "#fff" : "var(--color-text-muted)",
-                      transition: "color var(--transition-base)",
-                    }}
-                  />
-                </Box>
-
-                {/* Text */}
-                <Box sx={{ flex: 1, minWidth: 0, pr: 9 }}>
-                  <Typography
-                    sx={{
-                      fontSize: "var(--font-size-sm)",
-                      fontWeight: isSelected
-                        ? "var(--font-weight-semibold)"
-                        : "var(--font-weight-medium)",
-                      color: isSelected ? "var(--color-accent)" : "var(--color-text)",
-                      lineHeight: 1.3,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      transition: "color var(--transition-base)",
+                      width: 32,
+                      height: 32,
+                      borderRadius: "var(--radius-sm)",
+                      background: isSelected
+                        ? "var(--color-accent-gradient)"
+                        : "var(--color-surface)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      transition:
+                        "transform var(--transition-fast), background var(--transition-base)",
+                      boxShadow: isSelected ? "var(--glow-accent)" : "none",
                     }}
                   >
-                    {project.name}
-                  </Typography>
-                  {project.path && (
+                    <FolderOpenIcon
+                      sx={{
+                        fontSize: 16,
+                        color: isSelected ? "#fff" : "var(--color-text-muted)",
+                        transition: "color var(--transition-base)",
+                      }}
+                    />
+                  </Box>
+
+                  {/* Text */}
+                  <Box sx={{ flex: 1, minWidth: 0, pr: 9 }}>
                     <Typography
                       sx={{
-                        fontSize: "var(--font-size-2xs)",
-                        color: "var(--color-text-muted)",
+                        fontSize: "var(--font-size-sm)",
+                        fontWeight: isSelected
+                          ? "var(--font-weight-semibold)"
+                          : "var(--font-weight-medium)",
+                        color: isSelected ? "var(--color-accent)" : "var(--color-text)",
                         lineHeight: 1.3,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        mt: 0.25,
+                        transition: "color var(--transition-base)",
                       }}
                     >
-                      {project.path}
+                      {project.name}
                     </Typography>
-                  )}
-                </Box>
+                    {project.path && (
+                      <Typography
+                        sx={{
+                          fontSize: "var(--font-size-2xs)",
+                          color: "var(--color-text-muted)",
+                          lineHeight: 1.3,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          mt: 0.25,
+                        }}
+                      >
+                        {project.path}
+                      </Typography>
+                    )}
+                  </Box>
 
-                {/* Action buttons (visible on hover) */}
-                <Stack
-                  className="project-actions"
-                  direction="row"
-                  spacing={0.25}
-                  sx={{
-                    position: "absolute",
-                    right: 8,
-                    opacity: 0,
-                    pointerEvents: "none",
-                    transition: "opacity var(--transition-fast)",
-                  }}
-                >
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleOpenOrCreateSession(project)
-                    }}
-                    data-testid={`project-open-session-${project.id}`}
-                    aria-label={`Open or create session for ${project.name}`}
-                    title="Open or create session"
-                    disabled={sessionActionProjectId !== null}
+                  {/* Action buttons (visible on hover) */}
+                  <Stack
+                    className="project-actions"
+                    direction="row"
+                    spacing={0.25}
                     sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--color-text-muted)",
-                      "&:hover": {
-                        bgcolor: "var(--color-surface-hover)",
-                        color: "var(--color-accent)",
-                      },
+                      position: "absolute",
+                      right: 8,
+                      opacity: 0,
+                      pointerEvents: "none",
+                      transition: "opacity var(--transition-fast)",
                     }}
                   >
-                    <TerminalIcon sx={{ fontSize: 13 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      startEdit(project)
-                    }}
-                    data-testid={`project-edit-${project.id}`}
-                    aria-label="Edit"
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--color-text-muted)",
-                      "&:hover": {
-                        bgcolor: "var(--color-surface-hover)",
-                        color: "var(--color-accent)",
-                      },
-                    }}
-                  >
-                    <EditIcon sx={{ fontSize: 13 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteClick(project)
-                    }}
-                    data-testid={`project-delete-${project.id}`}
-                    aria-label="Delete"
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--color-text-muted)",
-                      "&:hover": { bgcolor: "rgba(239,68,68,0.12)", color: "var(--color-danger)" },
-                    }}
-                  >
-                    <DeleteIcon sx={{ fontSize: 13 }} />
-                  </IconButton>
-                </Stack>
-              </Box>
-            )
-          })}
-        </Stack>
-      )}
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleOpenOrCreateSession(project)
+                      }}
+                      data-testid={`project-open-session-${project.id}`}
+                      aria-label={`Open or create session for ${project.name}`}
+                      title="Open or create session"
+                      disabled={sessionActionProjectId !== null}
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--color-text-muted)",
+                        "&:hover": {
+                          bgcolor: "var(--color-surface-hover)",
+                          color: "var(--color-accent)",
+                        },
+                      }}
+                    >
+                      <TerminalIcon sx={{ fontSize: 13 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startEdit(project)
+                      }}
+                      data-testid={`project-edit-${project.id}`}
+                      aria-label="Edit"
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--color-text-muted)",
+                        "&:hover": {
+                          bgcolor: "var(--color-surface-hover)",
+                          color: "var(--color-accent)",
+                        },
+                      }}
+                    >
+                      <EditIcon sx={{ fontSize: 13 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteClick(project)
+                      }}
+                      data-testid={`project-delete-${project.id}`}
+                      aria-label="Delete"
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--color-text-muted)",
+                        "&:hover": { bgcolor: "rgba(239,68,68,0.12)", color: "var(--color-danger)" },
+                      }}
+                    >
+                      <DeleteIcon sx={{ fontSize: 13 }} />
+                    </IconButton>
+                  </Stack>
+                </Box>
+              )
+            })}
+          </Stack>
+        )}
+      </Box>
 
       <Dialog
         open={deleteDialogOpen}

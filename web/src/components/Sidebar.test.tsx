@@ -702,6 +702,79 @@ describe("Projects view", () => {
     })
   })
 
+  test("PROJECTS header is displayed and searching projects filters the list", async () => {
+    vi.mocked(client.listProjects).mockResolvedValue([
+      {
+        id: "p1",
+        name: "React Web App",
+        path: "/dev/react",
+        description: "frontend application",
+        createdAt: "",
+        updatedAt: "",
+        sessionName: "react-web-app",
+        status: "stopped",
+        workdir: "",
+        layoutJson: "{}",
+        detailsJson: "{}",
+        progressJson: "{}",
+        aiHtml: "",
+        aiStatus: "idle",
+        aiError: "",
+        lastSyncedAt: null,
+        schemaVersion: 1,
+      },
+      {
+        id: "p2",
+        name: "Rust Server",
+        path: "/dev/rust",
+        description: "backend api",
+        createdAt: "",
+        updatedAt: "",
+        sessionName: "rust-server",
+        status: "stopped",
+        workdir: "",
+        layoutJson: "{}",
+        detailsJson: "{}",
+        progressJson: "{}",
+        aiHtml: "",
+        aiStatus: "idle",
+        aiError: "",
+        lastSyncedAt: null,
+        schemaVersion: 1,
+      },
+    ])
+
+    render(
+      <TestWrapper>
+        <Sidebar />
+      </TestWrapper>,
+    )
+
+    fireEvent.click(screen.getByTestId("open-projects-button"))
+    
+    await waitFor(() => {
+      expect(screen.getByText("Projects")).toBeInTheDocument()
+      expect(screen.getByText("React Web App")).toBeInTheDocument()
+      expect(screen.getByText("Rust Server")).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByTestId("project-search").querySelector("input")!
+    fireEvent.change(searchInput, { target: { value: "react" } })
+
+    await waitFor(() => {
+      expect(screen.getByText("React Web App")).toBeInTheDocument()
+      expect(screen.queryByText("Rust Server")).not.toBeInTheDocument()
+    })
+
+    fireEvent.change(searchInput, { target: { value: "golang" } })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("projects-search-empty")).toBeInTheDocument()
+      expect(screen.queryByText("React Web App")).not.toBeInTheDocument()
+      expect(screen.queryByText("Rust Server")).not.toBeInTheDocument()
+    })
+  })
+
   test("project session action creates missing session and jumps to it", async () => {
     vi.mocked(client.listProjects).mockResolvedValue([
       {

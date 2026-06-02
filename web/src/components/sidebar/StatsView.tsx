@@ -6,8 +6,6 @@ import {
   List,
   ListItem,
   Stack,
-  Switch,
-  FormControlLabel,
   Tooltip,
   Chip,
 } from "@mui/material"
@@ -22,6 +20,7 @@ import {
   getAiUsageSubtitle,
   getAiUsageTitle,
   parseAiUsageResponse,
+  formatDuration,
 } from "../aiUsagePresentation.js"
 
 const DEFAULT_REFRESH_INTERVAL_MS = 30000
@@ -33,6 +32,15 @@ const STATS_FONT_SIZE = {
 
 type StatusFilter = "error" | null
 
+function formatTimestampShort(timestamp: string): string {
+  try {
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  } catch {
+    return timestamp
+  }
+}
+
 export function StatsView() {
   const { selectedAiEvent, setSelectedAiEvent, showConfirm } = useAppState()
   const [events, setEvents] = useState<AiUsageEvent[]>([])
@@ -42,7 +50,7 @@ export function StatsView() {
   const [cleaning, setCleaning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cleanupMessage, setCleanupMessage] = useState<string | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const autoRefresh = true
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
   const intervalRef = useRef<number | null>(null)
 
@@ -151,18 +159,6 @@ export function StatsView() {
           Tmux Analysis
         </Typography>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                data-testid="stats-auto-refresh-switch"
-              />
-            }
-            label="Auto"
-            sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: STATS_FONT_SIZE.body } }}
-          />
           <IconButton
             size="small"
             onClick={handleManualRefresh}
@@ -374,21 +370,44 @@ export function StatsView() {
             const kindLabel = getAiUsageKindLabel(event, parsed)
             const title = getAiUsageTitle(event, parsed)
             const subtitle = getAiUsageSubtitle(event, parsed)
+            const isSelected = selectedAiEvent?.id === event.id
             return (
               <ListItem
                 key={event.id}
                 onClick={() => setSelectedAiEvent(event)}
                 data-testid={`stats-event-${event.id}`}
                 sx={{
-                  px: 1,
-                  py: 1,
-                  my: 0.5,
-                  borderRadius: "var(--radius-sm)",
+                  px: 1.5,
+                  py: 1.25,
+                  my: 0.75,
+                  borderRadius: "var(--radius-md)",
                   cursor: "pointer",
-                  bgcolor: selectedAiEvent?.id === event.id ? "action.selected" : "transparent",
-                  "&:hover": { bgcolor: "action.hover" },
-                  transition: "background-color 0.15s",
+                  bgcolor: isSelected
+                    ? "var(--color-accent-subtle)"
+                    : "var(--color-panel)",
+                  border: "1px solid",
+                  borderColor: isSelected
+                    ? "var(--color-accent)"
+                    : event.status === "error"
+                      ? "rgba(239, 68, 68, 0.25)"
+                      : "var(--color-panel-border)",
+                  "&:hover": {
+                    bgcolor: isSelected
+                      ? "var(--color-accent-subtle)"
+                      : "var(--color-surface-hover)",
+                    borderColor: isSelected
+                      ? "var(--color-accent)"
+                      : event.status === "error"
+                        ? "rgba(239, 68, 68, 0.45)"
+                        : "var(--color-surface-border-hover)",
+                    transform: "translateY(-1px)",
+                    boxShadow: "var(--shadow-sm)",
+                  },
+                  transition: "all var(--transition-base)",
                   overflow: "hidden",
+                  boxShadow: event.status === "error"
+                    ? "var(--glow-danger)"
+                    : "none",
                 }}
               >
                 <Stack
@@ -438,83 +457,81 @@ export function StatsView() {
                       },
                     }}
                   />
-                  <Stack
-                    direction="row"
-                    sx={{
-                      flex: 1,
-                      minWidth: 0,
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      py: 0.25,
-                      pr: 1,
-                      gap: 1,
-                    }}
-                  >
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        sx={{ alignItems: "center", minWidth: 0 }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: STATS_FONT_SIZE.body,
-                            fontWeight: "var(--font-weight-medium)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                          title={`${kindLabel}: ${title} ${subtitle}`}
-                        >
-                          {title}
-                        </Typography>
+                  <Stack direction="column" sx={{ flex: 1, minWidth: 0, gap: 0.25 }}>
+                    <Stack
+                      direction="row"
+                      sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}
+                    >
+                      <Stack direction="row" spacing={0.5} sx={{ minWidth: 0, alignItems: "center" }}>
+                        {kindLabel !== "Window Analysis" && (
+                          <Chip
+                            label={kindLabel}
+                            size="small"
+                            color={kindLabel === "Project HTML" ? "secondary" : "default"}
+                            variant="outlined"
+                            sx={{ fontSize: "var(--font-size-2xs)", height: 18, px: 0.5 }}
+                          />
+                        )}
+                        {event.status === "error" && (
+                          <Chip
+                            label="error"
+                            size="small"
+                            color="error"
+                            sx={{ fontSize: "var(--font-size-2xs)", height: 18, px: 0.5 }}
+                          />
+                        )}
+                        {event.windowNumber != null && (
+                          <Chip
+                            label={`W${event.windowNumber}`}
+                            size="small"
+                            sx={{
+                              fontSize: "var(--font-size-2xs)",
+                              height: 18,
+                              px: 0.5,
+                              bgcolor: (theme) =>
+                                theme.palette.mode === "dark"
+                                  ? "rgba(255, 255, 255, 0.08)"
+                                  : "rgba(0, 0, 0, 0.04)",
+                              color: "text.secondary",
+                              border: "none",
+                              fontWeight: "var(--font-weight-medium)",
+                            }}
+                          />
+                        )}
                       </Stack>
                       <Typography
                         variant="caption"
                         color="text.secondary"
+                        sx={{ fontSize: "var(--font-size-2xs)", whiteSpace: "nowrap" }}
+                      >
+                        {formatTimestampShort(event.createdAt)}
+                      </Typography>
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}
+                    >
+                      <Typography
+                        variant="body2"
                         sx={{
-                          display: "block",
-                          fontSize: STATS_FONT_SIZE.meta,
+                          fontSize: "var(--font-size-xs)",
+                          fontWeight: 500,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
+                          color: "text.primary",
                         }}
+                        title={`${kindLabel}: ${title} ${subtitle}`}
                       >
-                        {subtitle}
+                        {title}
                       </Typography>
-                    </Box>
-                    <Stack
-                      direction="row"
-                      spacing={0.5}
-                      sx={{ flexShrink: 0, alignItems: "center" }}
-                    >
-                      <Chip
-                        label={kindLabel}
-                        size="small"
-                        color={kindLabel === "Project HTML" ? "secondary" : "default"}
-                        variant="outlined"
-                        sx={{ height: 20, fontSize: STATS_FONT_SIZE.meta }}
-                      />
-                      {event.windowNumber != null && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{
-                            fontSize: STATS_FONT_SIZE.meta,
-                            fontWeight: "var(--font-weight-medium)",
-                            bgcolor: (theme) =>
-                              theme.palette.mode === "dark"
-                                ? "rgba(255, 255, 255, 0.08)"
-                                : "rgba(0, 0, 0, 0.04)",
-                            px: 0.75,
-                            py: 0.1,
-                            borderRadius: "var(--radius-sm)",
-                          }}
-                        >
-                          W{event.windowNumber}
-                        </Typography>
-                      )}
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontSize: "var(--font-size-2xs)" }}
+                      >
+                        {formatDuration(event.durationMs)}
+                      </Typography>
                     </Stack>
                   </Stack>
                 </Stack>
