@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "path": ".",
+  "server": {
+    "bind": "127.0.0.1:7331"
+  },
+  "auth": {
+    "token": ""
+  },
+  "tmux": {
+    "path": "tmux"
+  },
+  "connections": [
+    {
+      "id": "local",
+      "type": "local"
+    }
+  ]
+}

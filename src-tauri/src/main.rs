@@ -90,6 +90,32 @@ fn tauri_config_path(manifest_dir: &std::path::Path) -> PathBuf {
         }
     }
 
-    wmux_core::config::fallback_config_path()
-        .unwrap_or_else(|_| PathBuf::from(wmux_core::config::default_config_path()))
+    if let Ok(fallback) = wmux_core::config::fallback_config_path() {
+        if fallback.exists() {
+            return fallback;
+        }
+        // First launch: create config in ~/Library/Application Support/wmux/
+        if let Ok(config_path) = ensure_config_exists(&fallback) {
+            return config_path;
+        }
+    }
+
+    PathBuf::from(wmux_core::config::default_config_path())
+}
+
+fn ensure_config_exists(default_path: &std::path::Path) -> std::io::Result<PathBuf> {
+    if default_path.exists() {
+        return Ok(default_path.to_path_buf());
+    }
+
+    // Create parent directory if needed
+    if let Some(parent) = default_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Write default config from embedded resource
+    let default_config = include_str!("../config.default.jsonc");
+    std::fs::write(default_path, default_config)?;
+
+    Ok(default_path.to_path_buf())
 }
