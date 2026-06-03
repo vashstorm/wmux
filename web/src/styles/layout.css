@@ -1,5 +1,19 @@
 @import "./tokens.css";
 
+/* --- Suppress layout transitions during window resize ---
+   When macOS zooms the window (double-click title bar / green button), the
+   outer frame snaps to the new size immediately but CSS transitions on
+   `.sidebar`, `.main-panel`, etc. make the content appear to lag behind.
+   A JS ResizeObserver adds .is-resizing to <body> for the duration of the
+   resize and removes it shortly after, so all transitions are disabled exactly
+   while the window is being resized. */
+body.is-resizing *,
+body.is-resizing *::before,
+body.is-resizing *::after {
+  transition-duration: 0ms !important;
+  animation-duration: 0ms !important;
+}
+
 /* --- App shell layout --- */
 .app-shell {
   --app-shell-header-height: 42px;

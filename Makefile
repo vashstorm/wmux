@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := build
 
-.PHONY: build dev clean test typecheck format e2e tauri-build tauri-e2e tauri-dev app
+.PHONY: build dev clean test typecheck format e2e tauri-build tauri-e2e tauri-dev
 
 PLAYWRIGHT ?= ./web/node_modules/.bin/playwright test -c playwright.config.ts
 TAURI_DRIVER ?= tauri-driver
