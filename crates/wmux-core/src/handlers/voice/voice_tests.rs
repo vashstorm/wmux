@@ -420,7 +420,7 @@ async fn voice_proxy_uses_mock_qwen_and_maps_events() {
     );
     assert_eq!(
         session_update["session"]["tools"].as_array().unwrap().len(),
-        34
+        41
     );
 
     let client_audio = OmniClientMessage::AudioFrame {
@@ -1045,7 +1045,7 @@ fn test_session_update_structure() {
     );
 
     let tools_array = session.get("tools").and_then(|v| v.as_array()).unwrap();
-    assert_eq!(tools_array.len(), 34);
+    assert_eq!(tools_array.len(), 41);
 }
 
 /// Test audio frame message conversion.
@@ -1243,7 +1243,7 @@ async fn session_context_message_is_forwarded_without_creating_response() {
             .as_array()
             .expect("tools array")
             .len(),
-        34
+        41
     );
 }
 

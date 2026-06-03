@@ -718,6 +718,98 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                 "required": ["target_name", "session_name", "window_name", "pane_index"]
             }),
         ),
+        builtin_skill(
+            "set_theme",
+            "Set Theme",
+            OmniSkillRiskLevel::Safe,
+            "Switch between light and dark theme for the application UI.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "theme": { "type": "string", "enum": ["light", "dark"], "description": "Target theme to apply." }
+                },
+                "required": ["theme"]
+            }),
+        ),
+        builtin_skill(
+            "set_font_size",
+            "Set Font Size",
+            OmniSkillRiskLevel::Safe,
+            "Adjust the UI font size for menus, labels, and panel tabs.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "size": { "type": "integer", "minimum": 12, "maximum": 24, "description": "Font size in pixels." }
+                },
+                "required": ["size"]
+            }),
+        ),
+        builtin_skill(
+            "set_terminal_font",
+            "Set Terminal Font",
+            OmniSkillRiskLevel::Safe,
+            "Adjust the terminal's font size and weight.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "fontSize": { "type": "integer", "minimum": 10, "maximum": 28, "description": "Terminal font size in pixels." },
+                    "fontWeight": { "type": "string", "enum": ["normal", "bold", "500", "600"], "description": "Terminal font weight." }
+                },
+                "required": ["fontSize"]
+            }),
+        ),
+        builtin_skill(
+            "toggle_omni",
+            "Toggle Omni",
+            OmniSkillRiskLevel::Write,
+            "Enable or disable the Omni voice assistant.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "enabled": { "type": "boolean", "description": "Whether to enable or disable Omni." }
+                },
+                "required": ["enabled"]
+            }),
+        ),
+        builtin_skill(
+            "set_voice",
+            "Set Voice",
+            OmniSkillRiskLevel::Write,
+            "Switch the Omni voice character (e.g., Cindy, Andy, Emily).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "voice": { "type": "string", "description": "Voice character name." }
+                },
+                "required": ["voice"]
+            }),
+        ),
+        builtin_skill(
+            "toggle_continuous_listening",
+            "Toggle Continuous Listening",
+            OmniSkillRiskLevel::Write,
+            "Enable or disable continuous voice listening mode.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "enabled": { "type": "boolean", "description": "Whether to enable or disable continuous listening." }
+                },
+                "required": ["enabled"]
+            }),
+        ),
+        builtin_skill(
+            "toggle_vad",
+            "Toggle VAD",
+            OmniSkillRiskLevel::Write,
+            "Enable or disable Voice Activity Detection (VAD).",
+            json!({
+                "type": "object",
+                "properties": {
+                    "enabled": { "type": "boolean", "description": "Whether to enable or disable VAD." },
+                    "threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0, "description": "VAD sensitivity threshold." }
+                }
+            }),
+        ),
     ]
 }
 

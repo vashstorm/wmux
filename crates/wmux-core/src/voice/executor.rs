@@ -253,6 +253,13 @@ impl OmniSkillExecutor {
             "delete_window" => self.delete_window(params, false).await,
             "kill_pane" => self.kill_pane(params, false).await,
             "clear_pane" => self.clear_pane(params).await,
+            "set_theme" => self.set_theme(params).await,
+            "set_font_size" => self.set_font_size(params).await,
+            "set_terminal_font" => self.set_terminal_font(params).await,
+            "toggle_omni" => self.toggle_omni(params).await,
+            "set_voice" => self.set_voice(params).await,
+            "toggle_continuous_listening" => self.toggle_continuous_listening(params).await,
+            "toggle_vad" => self.toggle_vad(params).await,
             other => Err(OmniExecutorError::bad_request(format!(
                 "unsupported voice skill: {other}"
             ))),
@@ -1073,6 +1080,102 @@ impl OmniSkillExecutor {
         })
     }
 
+    async fn set_theme(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let theme = required_string(&params, "theme")?;
+        if theme != "light" && theme != "dark" {
+            return Err(OmniExecutorError::bad_request("theme must be light or dark"));
+        }
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.ui.theme = theme.clone();
+        config.ui.window_theme = theme;
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "set_theme".to_string(), success: true, error: None },
+            output: json!({ "skill": "set_theme", "success": true }),
+        })
+    }
+
+    async fn set_font_size(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let size = required_i64(&params, "size")?;
+        if size < 12 || size > 24 {
+            return Err(OmniExecutorError::bad_request("font size must be between 12 and 24"));
+        }
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.ui.font_size = size as u16;
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "set_font_size".to_string(), success: true, error: None },
+            output: json!({ "skill": "set_font_size", "success": true }),
+        })
+    }
+
+    async fn set_terminal_font(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let font_size = required_i64(&params, "fontSize")?;
+        if font_size < 10 || font_size > 28 {
+            return Err(OmniExecutorError::bad_request("terminal font size must be between 10 and 28"));
+        }
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.ui.terminal_font_size = font_size as u16;
+        if let Some(fw) = params.get("fontWeight").and_then(|v| v.as_str()) {
+            config.ui.terminal_font_weight = fw.to_string();
+        }
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "set_terminal_font".to_string(), success: true, error: None },
+            output: json!({ "skill": "set_terminal_font", "success": true }),
+        })
+    }
+
+    async fn toggle_omni(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let enabled = required_bool(&params, "enabled")?;
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.omni.enabled = enabled;
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "toggle_omni".to_string(), success: true, error: None },
+            output: json!({ "skill": "toggle_omni", "success": true }),
+        })
+    }
+
+    async fn set_voice(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let voice = required_string(&params, "voice")?;
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.omni.voice = Some(voice.clone());
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "set_voice".to_string(), success: true, error: None },
+            output: json!({ "skill": "set_voice", "success": true }),
+        })
+    }
+
+    async fn toggle_continuous_listening(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let enabled = required_bool(&params, "enabled")?;
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.omni.continuous_listening = enabled;
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "toggle_continuous_listening".to_string(), success: true, error: None },
+            output: json!({ "skill": "toggle_continuous_listening", "success": true }),
+        })
+    }
+
+    async fn toggle_vad(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let enabled = required_bool(&params, "enabled")?;
+        let mut config = self.state.store.snapshot().map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        config.omni.vad_enabled = enabled;
+        if let Some(threshold) = params.get("threshold").and_then(|v| v.as_f64()) {
+            if threshold < 0.0 || threshold > 1.0 {
+                return Err(OmniExecutorError::bad_request("VAD threshold must be between 0.0 and 1.0"));
+            }
+            config.omni.vad_threshold = threshold as f32;
+        }
+        self.state.store.replace(config).map_err(|e| OmniExecutorError::bad_request(e.to_string()))?;
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult { skill: "toggle_vad".to_string(), success: true, error: None },
+            output: json!({ "skill": "toggle_vad", "success": true }),
+        })
+    }
+
     fn local_target_when_model_used_session_as_target(
         &self,
         target_name: String,
@@ -1573,6 +1676,18 @@ fn append_query(path: &mut String, key: &str, value: &str) {
 
 fn required_string(params: &Value, field: &'static str) -> Result<String, OmniExecutorError> {
     value_as_string(params.get(field), field)
+}
+
+fn required_i64(params: &Value, field: &str) -> Result<i64, OmniExecutorError> {
+    params.get(field)
+        .and_then(|v| v.as_i64())
+        .ok_or_else(|| OmniExecutorError::bad_request(format!("{} is required and must be an integer", field)))
+}
+
+fn required_bool(params: &Value, field: &str) -> Result<bool, OmniExecutorError> {
+    params.get(field)
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| OmniExecutorError::bad_request(format!("{} is required and must be a boolean", field)))
 }
 
 fn required_string_alias(
@@ -2951,6 +3066,13 @@ esac
                 "clear_pane",
                 json!({ "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
             ),
+            ("set_theme", json!({ "theme": "dark" })),
+            ("set_font_size", json!({ "size": 16 })),
+            ("set_terminal_font", json!({ "fontSize": 14 })),
+            ("toggle_omni", json!({ "enabled": true })),
+            ("set_voice", json!({ "voice": "Cindy" })),
+            ("toggle_continuous_listening", json!({ "enabled": true })),
+            ("toggle_vad", json!({ "enabled": true })),
         ];
 
         let dispatch_ids = cases
