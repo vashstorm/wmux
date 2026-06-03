@@ -19,7 +19,7 @@
     "active": true,
     "icon": ["icons/icon.icns", "../web/public/favicon.svg"],
     "targets": ["app"],
-    "resources": ["skills"],
+    "resources": ["../skills"],
     "macOS": {
       "minimumSystemVersion": "11.0"
     }
