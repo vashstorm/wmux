@@ -2520,6 +2520,7 @@ ui: scale ${formState.uiScaleStep > 0 ? "+" : ""}${formState.uiScaleStep}`}</Typ
                 </Box>
 
                 <Box
+                  className="settings-footer"
                   sx={{
                     p: 2,
                     borderTop: 1,
@@ -2527,7 +2528,6 @@ ui: scale ${formState.uiScaleStep > 0 ? "+" : ""}${formState.uiScaleStep}`}</Typ
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    bgcolor: "background.paper",
                   }}
                 >
                   <Box

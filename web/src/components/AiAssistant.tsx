@@ -52,6 +52,7 @@ import {
 import {
   LAUNCHER_POS_CHANGE_EVENT,
   clampAssistantPos,
+  scalePosOnResize,
   dialogPosFromLauncher,
   launcherPosFromDialog,
   loadLauncherPos,
@@ -1165,18 +1166,34 @@ export function AiAssistant() {
   }, [])
 
   useEffect(() => {
+    let lastWidth = window.innerWidth
+    let lastHeight = window.innerHeight
+
     const handleWindowResize = () => {
+      const newWidth = window.innerWidth
+      const newHeight = window.innerHeight
+
       setAssistantSize((current) => {
         const nextSize = clampAssistantSize(current)
         assistantSizeRef.current = nextSize
         return nextSize
       })
       setAssistantPos((current) => {
-        const nextPos = clampAssistantPos(current, assistantSizeRef.current)
+        const nextPos = scalePosOnResize(
+          current,
+          assistantSizeRef.current,
+          lastWidth,
+          lastHeight,
+          newWidth,
+          newHeight,
+        )
         assistantPosRef.current = nextPos
         saveLauncherPos(launcherPosFromDialog(nextPos, assistantSizeRef.current))
         return nextPos
       })
+
+      lastWidth = newWidth
+      lastHeight = newHeight
     }
     window.addEventListener("resize", handleWindowResize)
     return () => window.removeEventListener("resize", handleWindowResize)

@@ -27,6 +27,42 @@ export function clampAssistantPos(
   }
 }
 
+export function scalePosOnResize(
+  pos: AssistantPos,
+  size: { width: number; height: number },
+  oldWidth: number,
+  oldHeight: number,
+  newWidth: number,
+  newHeight: number,
+): AssistantPos {
+  if (typeof window === "undefined") return pos
+  const oldRangeX = oldWidth - size.width - 2 * VIEWPORT_MARGIN_PX
+  const oldRangeY = oldHeight - size.height - 2 * VIEWPORT_MARGIN_PX
+
+  let px = 1
+  let py = 1
+
+  if (oldRangeX > 0) {
+    px = (pos.x - VIEWPORT_MARGIN_PX) / oldRangeX
+  }
+  if (oldRangeY > 0) {
+    py = (pos.y - VIEWPORT_MARGIN_PX) / oldRangeY
+  }
+
+  px = Math.max(0, Math.min(1, px))
+  py = Math.max(0, Math.min(1, py))
+
+  const newRangeX = newWidth - size.width - 2 * VIEWPORT_MARGIN_PX
+  const newRangeY = newHeight - size.height - 2 * VIEWPORT_MARGIN_PX
+
+  const scaledPos = {
+    x: Math.round(VIEWPORT_MARGIN_PX + px * newRangeX),
+    y: Math.round(VIEWPORT_MARGIN_PX + py * newRangeY),
+  }
+
+  return clampAssistantPos(scaledPos, size)
+}
+
 export function loadLauncherPos(): AssistantPos {
   try {
     const raw = localStorage.getItem(LAUNCHER_POS_STORAGE_KEY)

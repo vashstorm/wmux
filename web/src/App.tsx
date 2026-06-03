@@ -37,6 +37,7 @@ import {
   loadLauncherPos,
   saveLauncherPos,
   clampAssistantPos,
+  scalePosOnResize,
   type AssistantPos,
 } from "./components/AiAssistantUtils.js"
 
@@ -75,6 +76,13 @@ function UISettingsInit() {
 function MuiThemeShell({ children }: { children: React.ReactNode }) {
   const { uiSettings } = useAppState()
   const theme = useModeTheme(uiSettings.theme)
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      "data-mui-color-scheme",
+      uiSettings.theme === "dark" ? "dark" : "light",
+    )
+  }, [uiSettings.theme])
 
   return (
     <ThemeProvider theme={theme}>
@@ -307,12 +315,27 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
     window.addEventListener("pointercancel", onPointerUp)
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
-    const onResize = () =>
+    let lastWidth = window.innerWidth
+    let lastHeight = window.innerHeight
+    const onResize = () => {
+      const newWidth = window.innerWidth
+      const newHeight = window.innerHeight
       setPos((current) => {
-        const nextPos = clampAssistantPos(current, LAUNCHER_ELEM_SIZE)
+        const nextPos = scalePosOnResize(
+          current,
+          LAUNCHER_ELEM_SIZE,
+          lastWidth,
+          lastHeight,
+          newWidth,
+          newHeight,
+        )
+        saveLauncherPos(nextPos)
         emitLauncherPosChange(nextPos)
         return nextPos
       })
+      lastWidth = newWidth
+      lastHeight = newHeight
+    }
     window.addEventListener("resize", onResize)
     return () => {
       window.removeEventListener("pointermove", onPointerMove)
