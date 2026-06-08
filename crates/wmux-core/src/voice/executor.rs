@@ -260,6 +260,9 @@ impl OmniSkillExecutor {
             "set_voice" => self.set_voice(params).await,
             "toggle_continuous_listening" => self.toggle_continuous_listening(params).await,
             "toggle_vad" => self.toggle_vad(params).await,
+            "switch_window" => self.switch_window(params).await,
+            "run_claude_prompt" => self.run_claude_prompt(params, false).await,
+            "run_codex_prompt" => self.run_codex_prompt(params, false).await,
             other => Err(OmniExecutorError::bad_request(format!(
                 "unsupported voice skill: {other}"
             ))),
@@ -295,6 +298,8 @@ impl OmniSkillExecutor {
             }
             "delete_window" => self.delete_window(params, true).await,
             "kill_pane" => self.kill_pane(params, true).await,
+            "run_claude_prompt" => self.run_claude_prompt(params, true).await,
+            "run_codex_prompt" => self.run_codex_prompt(params, true).await,
             other => Err(OmniExecutorError::bad_request(format!(
                 "skill does not support confirmation: {other}"
             ))),
@@ -821,11 +826,11 @@ impl OmniSkillExecutor {
             required_string(&params, "target_name")?,
             &session,
         );
-        let window = required_string_alias(&params, &["window", "window_name"])?;
         let new_name = required_string(&params, "new_name")?;
 
         let adapter = self.tmux_adapter_for_target(&target_name)?;
         let windows = adapter.list_windows(&session).await.map_err(tmux_error)?;
+        let window = resolve_window_ref(&params, &windows)?;
         let win_info = windows
             .iter()
             .find(|w| window_matches(w, &window))
@@ -985,7 +990,10 @@ impl OmniSkillExecutor {
             required_string(&params, "target_name")?,
             &session,
         );
-        let window = required_string_alias(&params, &["window", "window_name"])?;
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let windows = adapter.list_windows(&session).await.map_err(tmux_error)?;
+        let window = resolve_window_ref(&params, &windows)?;
         self.execute_backend_request(
             "delete_window",
             Method::DELETE,
@@ -1176,6 +1184,134 @@ impl OmniSkillExecutor {
         })
     }
 
+    async fn switch_window(&self, params: Value) -> Result<OmniSkillExecution, OmniExecutorError> {
+        let session = required_string_alias(&params, &["session", "session_name", "sessionName"])?;
+        let target_name = params
+            .get("target_name")
+            .or_else(|| params.get("targetName"))
+            .and_then(|v| v.as_str())
+            .map(|s| self.local_target_when_model_used_session_as_target(s.to_string(), &session))
+            .unwrap_or_else(|| "local".to_string());
+        let window_name = optional_string_alias(&params, &["window", "window_name", "windowName"]);
+        let window_index = params
+            .get("window_index")
+            .or_else(|| params.get("windowIndex"))
+            .and_then(|v| v.as_i64());
+
+        if window_name.is_none() && window_index.is_none() {
+            return Err(OmniExecutorError::bad_request(
+                "window_name or window_index is required",
+            ));
+        }
+
+        let mut event_params = serde_json::Map::new();
+        event_params.insert("target_name".to_string(), Value::String(target_name));
+        event_params.insert("session_name".to_string(), Value::String(session));
+        if let Some(name) = window_name {
+            event_params.insert("window_name".to_string(), Value::String(name));
+        }
+        if let Some(index) = window_index {
+            event_params.insert("window_index".to_string(), Value::Number(index.into()));
+        }
+
+        let event = OmniServerEvent::IntentReceived {
+            skill: "switch_window".to_string(),
+            params: Value::Object(event_params),
+            confirmation_required: false,
+            confirmation_id: None,
+        };
+        Ok(OmniSkillExecution {
+            event,
+            output: json!({ "skill": "switch_window", "success": true }),
+        })
+    }
+
+    async fn run_claude_prompt(
+        &self,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        self.run_agent_prompt("run_claude_prompt", "claude", &params, confirmed)
+            .await
+    }
+
+    async fn run_codex_prompt(
+        &self,
+        params: Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        self.run_agent_prompt("run_codex_prompt", "codex exec", &params, confirmed)
+            .await
+    }
+
+    async fn run_agent_prompt(
+        &self,
+        skill: &str,
+        cli_command: &str,
+        params: &Value,
+        confirmed: bool,
+    ) -> Result<OmniSkillExecution, OmniExecutorError> {
+        if !confirmed {
+            return self.confirmation_required(skill, params.clone()).await;
+        }
+
+        let prompt = required_text(params, "prompt")?;
+        let session = optional_string_alias(params, &["session", "session_name", "sessionName"])
+            .unwrap_or_else(|| "default".to_string());
+        let target_name = params
+            .get("target_name")
+            .or_else(|| params.get("targetName"))
+            .and_then(|v| v.as_str())
+            .map(|s| self.local_target_when_model_used_session_as_target(s.to_string(), &session))
+            .unwrap_or_else(|| "local".to_string());
+        let window = optional_string_alias(params, &["window", "window_name", "windowName"])
+            .unwrap_or_else(|| "0".to_string());
+        let pane = optional_string_alias(params, &["pane", "pane_index", "paneIndex"])
+            .unwrap_or_else(|| "0".to_string());
+
+        let adapter = self.tmux_adapter_for_target(&target_name)?;
+        let panes = adapter
+            .list_panes(&session, &window)
+            .await
+            .map_err(tmux_error)?;
+        if !panes.iter().any(|p| pane_matches(p, &pane)) {
+            return Err(OmniExecutorError::not_found(format!(
+                "pane not found: {target_name}/{session}/{window}/{pane}"
+            )));
+        }
+
+        let command = if cli_command == "claude" {
+            format!("claude -p {}", shell_escape(&prompt))
+        } else {
+            format!("{} {}", cli_command, shell_escape(&prompt))
+        };
+
+        let target = tmux_pane_target(&session, &window, &pane);
+        adapter
+            .send_keys(&target, &[command.as_str(), "Enter"])
+            .await
+            .map_err(tmux_error)?;
+
+        Ok(OmniSkillExecution {
+            event: OmniServerEvent::ActionResult {
+                skill: skill.to_string(),
+                success: true,
+                error: None,
+            },
+            output: json!({
+                "skill": skill,
+                "success": true,
+                "target": {
+                    "target_name": target_name,
+                    "session": session,
+                    "window": window,
+                    "pane": pane,
+                },
+                "prompt_preview": prompt.chars().take(120).collect::<String>(),
+            }),
+        })
+    }
+
     fn local_target_when_model_used_session_as_target(
         &self,
         target_name: String,
@@ -1237,6 +1373,9 @@ fn skill_name(skill: &OmniSkill) -> &'static str {
         OmniSkill::DeleteWindow => "delete_window",
         OmniSkill::KillPane => "kill_pane",
         OmniSkill::ClearPane => "clear_pane",
+        OmniSkill::SwitchWindow => "switch_window",
+        OmniSkill::RunClaudePrompt => "run_claude_prompt",
+        OmniSkill::RunCodexPrompt => "run_codex_prompt",
     }
 }
 
@@ -1776,6 +1915,37 @@ fn send_keys_payload(
         return Err(OmniExecutorError::bad_request("text is required"));
     }
     Ok(keys)
+}
+
+fn shell_escape(input: &str) -> String {
+    if input.is_empty() {
+        return "''".to_string();
+    }
+    format!("'{}'", input.replace('\'', "'\\''"))
+}
+
+fn resolve_window_ref(
+    params: &Value,
+    windows: &[crate::tmux::Window],
+) -> Result<String, OmniExecutorError> {
+    if let Some(name) = optional_string_alias(params, &["window", "window_name", "windowName"]) {
+        return Ok(name);
+    }
+    let index = params
+        .get("window_index")
+        .or_else(|| params.get("windowIndex"))
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| {
+            OmniExecutorError::bad_request("window_name or window_index is required")
+        })?;
+    let idx = (index as usize).saturating_sub(1);
+    let win = windows.get(idx).ok_or_else(|| {
+        OmniExecutorError::not_found(format!(
+            "window index out of range: {index} (session has {} windows)",
+            windows.len()
+        ))
+    })?;
+    Ok(win.name.clone())
 }
 
 fn pane_matches(pane_info: &crate::tmux::Pane, pane: &str) -> bool {
@@ -3073,6 +3243,18 @@ esac
             ("set_voice", json!({ "voice": "Cindy" })),
             ("toggle_continuous_listening", json!({ "enabled": true })),
             ("toggle_vad", json!({ "enabled": true })),
+            (
+                "switch_window",
+                json!({ "session_name": "alpha", "window_name": "editor" }),
+            ),
+            (
+                "run_claude_prompt",
+                json!({ "prompt": "review this file", "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
+            (
+                "run_codex_prompt",
+                json!({ "prompt": "fix the test", "target_name": "local", "session_name": "alpha", "window_name": "editor", "pane_index": "0" }),
+            ),
         ];
 
         let dispatch_ids = cases

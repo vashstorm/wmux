@@ -190,6 +190,8 @@ pub fn is_dangerous(skill: &str, params: &serde_json::Value) -> bool {
             | "delete_pane"
             | "kill_pane"
             | "run_project"
+            | "run_claude_prompt"
+            | "run_codex_prompt"
             | "delete_project"
             | "cleanup_tmux_analysis"
             | "clear_ai_logs"

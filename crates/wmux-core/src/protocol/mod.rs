@@ -170,6 +170,12 @@ pub enum OmniSkill {
     KillPane,
     /// Clear the visible content and scroll history of a pane.
     ClearPane,
+    /// Switch the UI focus to a tmux window inside an existing session.
+    SwitchWindow,
+    /// Run `claude -p "<prompt>"` in a tmux pane (dangerous, requires confirmation).
+    RunClaudePrompt,
+    /// Run `codex exec "<prompt>"` in a tmux pane (dangerous, requires confirmation).
+    RunCodexPrompt,
 }
 
 /// Target specification for voice actions.
@@ -847,7 +853,7 @@ mod tests {
     #[test]
     fn generate_qwen_tools_returns_builtin_tools() {
         let tools = generate_qwen_tools(&[]);
-        assert_eq!(tools.len(), 41, "should have 41 voice skills");
+        assert_eq!(tools.len(), 44, "should have 44 voice skills");
 
         // Verify each tool has required structure
         for tool in &tools {

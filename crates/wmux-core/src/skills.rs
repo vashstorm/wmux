@@ -447,13 +447,14 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
             "rename_window",
             "Rename Window",
             OmniSkillRiskLevel::Write,
-            "Rename an existing tmux window.",
+            "Rename an existing tmux window by its current name or index.",
             json!({
                 "type": "object",
                 "properties": {
                     "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
                     "session_name": { "type": "string", "description": "Session name containing the window." },
-                    "window_name": { "type": "string", "description": "Current window name or index." },
+                    "window_name": { "type": "string", "description": "Current window ID, exact name, tmux display index, or ordinal text such as '第二个'." },
+                    "window_index": { "type": "integer", "minimum": 1, "description": "1-based ordinal in the current UI order for commands like 'rename the second window'." },
                     "new_name": { "type": "string", "description": "New name for the window." }
                 },
                 "required": ["target_name", "session_name", "window_name", "new_name"]
@@ -675,15 +676,16 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
             "delete_window",
             "Delete Window",
             OmniSkillRiskLevel::Dangerous,
-            "Delete a tmux window and all its panes. This is destructive and requires confirmation.",
+            "Delete a tmux window and all its panes. This is destructive and requires confirmation. All processes running in the window's panes will be terminated.",
             json!({
                 "type": "object",
                 "properties": {
                     "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
                     "session_name": { "type": "string", "description": "Session name containing the window." },
-                    "window_name": { "type": "string", "description": "Window name or index to delete." }
+                    "window_name": { "type": "string", "description": "Window ID, exact name, tmux display index, or ordinal text such as '第二个' to delete." },
+                    "window_index": { "type": "integer", "minimum": 1, "description": "1-based ordinal in the current UI order for commands like 'delete the second window' or '删除第二个 window'." }
                 },
-                "required": ["target_name", "session_name", "window_name"]
+                "required": ["target_name", "session_name"]
             }),
         ),
         builtin_skill(
@@ -808,6 +810,56 @@ pub fn builtin_skill_defs() -> Vec<OmniSkillDef> {
                     "enabled": { "type": "boolean", "description": "Whether to enable or disable VAD." },
                     "threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0, "description": "VAD sensitivity threshold." }
                 }
+            }),
+        ),
+        builtin_skill(
+            "switch_window",
+            "Switch Window",
+            OmniSkillRiskLevel::Safe,
+            "Switch the UI focus to a tmux window inside an existing session. Use window_index (1-based) for ordinal requests like 'the second window'.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server. Defaults to the current focus when omitted." },
+                    "session_name": { "type": "string", "description": "Session name containing the window. Defaults to the current focused session when omitted by the user." },
+                    "window_name": { "type": "string", "description": "Window ID or exact window name to select." },
+                    "window_index": { "type": "integer", "minimum": 1, "description": "1-based ordinal for commands like 'the second window' or '第二个窗口'." }
+                },
+                "required": ["session_name"]
+            }),
+        ),
+        builtin_skill(
+            "run_claude_prompt",
+            "Run Claude Prompt",
+            OmniSkillRiskLevel::Dangerous,
+            "Run `claude -p \"<prompt>\"` in a tmux pane. This writes to a terminal and requires confirmation before executing.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "Prompt text to pass to the claude CLI." },
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name. Omit to use the current focused session." },
+                    "window_name": { "type": "string", "description": "Window name, index, or ID. Omit to use the current focused window." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID. Omit to use the current focused pane." }
+                },
+                "required": ["prompt"]
+            }),
+        ),
+        builtin_skill(
+            "run_codex_prompt",
+            "Run Codex Prompt",
+            OmniSkillRiskLevel::Dangerous,
+            "Run `codex exec \"<prompt>\"` in a tmux pane. This writes to a terminal and requires confirmation before executing.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "Prompt text to pass to the codex CLI." },
+                    "target_name": { "type": "string", "description": "Target connection name. Use 'local' for the local tmux server." },
+                    "session_name": { "type": "string", "description": "Session name. Omit to use the current focused session." },
+                    "window_name": { "type": "string", "description": "Window name, index, or ID. Omit to use the current focused window." },
+                    "pane_index": { "type": "string", "description": "Pane index or ID. Omit to use the current focused pane." }
+                },
+                "required": ["prompt"]
             }),
         ),
     ]
