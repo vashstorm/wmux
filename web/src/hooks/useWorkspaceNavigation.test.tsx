@@ -8,22 +8,24 @@ import * as apiClient from "../api/client.js"
 
 let mockConnections: ConnectionConfig[] = []
 let mockSelectedPane: SelectedPane | null = null
+const mockStore = vi.hoisted(() => ({
+  setSelectedTargetName: vi.fn(),
+  setSessions: vi.fn(),
+  setWindows: vi.fn(),
+  setPanes: vi.fn(),
+  setSelectedPane: vi.fn(),
+}))
 
 vi.mock("../state/store.js", () => {
-  const mockSetSelectedTargetName = vi.fn()
-  const mockSetSessions = vi.fn()
-  const mockSetWindows = vi.fn()
-  const mockSetPanes = vi.fn()
-  const mockSetSelectedPane = vi.fn()
   return {
     useAppState: () => ({
       connections: mockConnections,
       selectedPane: mockSelectedPane,
-      setSelectedTargetName: mockSetSelectedTargetName,
-      setSessions: mockSetSessions,
-      setWindows: mockSetWindows,
-      setPanes: mockSetPanes,
-      setSelectedPane: mockSetSelectedPane,
+      setSelectedTargetName: mockStore.setSelectedTargetName,
+      setSessions: mockStore.setSessions,
+      setWindows: mockStore.setWindows,
+      setPanes: mockStore.setPanes,
+      setSelectedPane: mockStore.setSelectedPane,
     }),
   }
 })
@@ -64,8 +66,23 @@ function setLocationSearch(search: string): void {
   })
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  mockStore.setSelectedTargetName.mockClear()
+  mockStore.setSessions.mockClear()
+  mockStore.setWindows.mockClear()
+  mockStore.setPanes.mockClear()
+  mockStore.setSelectedPane.mockClear()
 
   mockConnections = []
   mockSelectedPane = null
@@ -340,6 +357,84 @@ describe("useWorkspaceNavigation", () => {
       expect(vi.mocked(apiClient.listSessions)).toHaveBeenCalledWith("local")
       expect(vi.mocked(apiClient.listWindows)).toHaveBeenCalledWith("local", "session1")
       expect(vi.mocked(apiClient.listPanes)).toHaveBeenCalledWith("local", "session1", "window1")
+    })
+
+    it("should not restore stale URL selection after the user switches sessions during startup", async () => {
+      const location = { connection: "local", session: "session1" }
+      const windowsDeferred = deferred<Awaited<ReturnType<typeof apiClient.listWindows>>>()
+
+      vi.mocked(workspaceUrl.parseWorkspaceUrl).mockReturnValue(location)
+      vi.mocked(workspaceUrl.toSelectedPane).mockReturnValue({
+        targetName: "local",
+        session: "session1",
+      })
+
+      mockConnections = [{ targetName: "local", type: "local" }]
+
+      vi.mocked(apiClient.listSessions).mockResolvedValue({
+        targetName: "local",
+        mode: "local",
+        data: [{ name: "session1", id: "session1" }],
+      })
+
+      vi.mocked(apiClient.listWindows).mockReturnValue(windowsDeferred.promise)
+      vi.mocked(apiClient.listPanes).mockResolvedValue({
+        targetName: "local",
+        session: "session1",
+        window: "w1",
+        mode: "local",
+        data: [
+          {
+            ID: "p1",
+            Title: "bash",
+            Index: 0,
+            Active: true,
+            Width: 80,
+            Height: 24,
+            Left: 0,
+            Top: 0,
+          },
+        ],
+      })
+
+      const { rerender } = renderHook(() => useWorkspaceNavigation())
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(vi.mocked(apiClient.listWindows)).toHaveBeenCalledWith("local", "session1")
+
+      mockSelectedPane = { targetName: "local", session: "session2", window: "@2", pane: "%2" }
+      act(() => {
+        rerender()
+      })
+
+      expect(mockPushState).toHaveBeenCalledWith(null, "", "?mocked-url")
+
+      await act(async () => {
+        windowsDeferred.resolve({
+          targetName: "local",
+          session: "session1",
+          mode: "local",
+          data: [
+            {
+              ID: "w1",
+              Name: "win1",
+              Index: 0,
+              Active: true,
+              PaneCount: 1,
+              ActivePaneID: "p1",
+              ActivePaneTitle: "bash",
+            },
+          ],
+        })
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(mockStore.setSelectedPane).not.toHaveBeenCalledWith(
+        expect.objectContaining({ session: "session1" }),
+      )
     })
   })
 

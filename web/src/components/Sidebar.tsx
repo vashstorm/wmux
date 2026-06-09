@@ -14,6 +14,7 @@ import {
   listProjects,
   createProject,
   type Project,
+  type SessionInfoData,
 } from "../api/client.js"
 import { getErrorMessage } from "../api/errors.js"
 import { useAppState } from "../state/store.js"
@@ -72,6 +73,16 @@ export function Sidebar({
   )
   const [projects, setProjects] = useState<Project[]>([])
   const prevSelectedRef = useRef<string | null>(null)
+  const sessionListRevisionRef = useRef(0)
+  const recentlyOpenedSessionRef = useRef<{ key: string; revision: number } | null>(null)
+
+  const applySessions = useCallback(
+    (targetName: string, nextSessions: SessionInfoData[] | undefined) => {
+      sessionListRevisionRef.current += 1
+      setSessions(targetName, nextSessions ?? [])
+    },
+    [setSessions],
+  )
 
   useEffect(() => {
     const handleVoiceNavigation = (event: Event) => {
@@ -157,7 +168,7 @@ export function Sidebar({
             return [] as Project[]
           }),
         ])
-        setSessions(targetName, sessionsResponse.data ?? [])
+        applySessions(targetName, sessionsResponse.data)
         setProjects(projectsResponse ?? [])
       } catch (err) {
         if (isApiError(err)) {
@@ -170,7 +181,7 @@ export function Sidebar({
         }
       }
     },
-    [setSessions, setError],
+    [applySessions, setError],
   )
 
   useEffect(() => {
@@ -299,7 +310,23 @@ export function Sidebar({
   useEffect(() => {
     if (!selectedTargetName || selectedPane?.targetName !== selectedTargetName) return
     if (!sessions[selectedTargetName]) return
-    if (targetSessions.some((session) => session.name === selectedPane.session)) return
+    const selectedSessionKey = `${selectedPane.targetName}:${selectedPane.session}`
+    if (targetSessions.some((session) => session.name === selectedPane.session)) {
+      if (
+        recentlyOpenedSessionRef.current?.key === selectedSessionKey &&
+        sessionListRevisionRef.current > recentlyOpenedSessionRef.current.revision
+      ) {
+        recentlyOpenedSessionRef.current = null
+      }
+      return
+    }
+    if (
+      recentlyOpenedSessionRef.current?.key === selectedSessionKey &&
+      sessionListRevisionRef.current > recentlyOpenedSessionRef.current.revision
+    ) {
+      recentlyOpenedSessionRef.current = null
+      return
+    }
 
     setSelectedPane(null)
   }, [targetSessions, selectedTargetName, selectedPane, sessions, setSelectedPane])
@@ -318,6 +345,10 @@ export function Sidebar({
     try {
       const windowsResponse = await listWindows(targetName, sessionName)
       const windows = windowsResponse.data ?? []
+      recentlyOpenedSessionRef.current = {
+        key: `${targetName}:${sessionName}`,
+        revision: sessionListRevisionRef.current,
+      }
 
       if (windows.length === 0) {
         setSelectedPane({ targetName: targetName, session: sessionName })
@@ -346,6 +377,7 @@ export function Sidebar({
         pane: initialPane?.ID,
       })
     } catch (err) {
+      recentlyOpenedSessionRef.current = null
       setSelectedPane(null)
       if (isApiError(err)) {
         setError({ code: err.code, message: getErrorMessage(err.code, err.message) })
@@ -367,7 +399,7 @@ export function Sidebar({
       setNewSessionName("")
       setShowNewSessionForm(false)
       const response = await listSessions(targetName)
-      setSessions(targetName, response.data ?? [])
+      applySessions(targetName, response.data)
     } catch (err) {
       if (isApiError(err)) {
         setError({ code: err.code, message: getErrorMessage(err.code, err.message) })
@@ -383,14 +415,14 @@ export function Sidebar({
         Promise.resolve(listSessions(targetName)).catch(() => null),
         Promise.resolve(listProjects()).catch(() => [] as Project[]),
       ])
-      setSessions(targetName, sessionsResponse?.data ?? [])
+      applySessions(targetName, sessionsResponse?.data)
       setProjects(projectsResponse ?? [])
     } catch (err) {
       if (isApiError(err)) {
         setError({ code: err.code, message: getErrorMessage(err.code, err.message) })
       }
     }
-  }, [selectedTargetName, setSessions, setError])
+  }, [selectedTargetName, applySessions, setError])
 
   const handleKillSession = (sessionName: string) => {
     if (!selectedTargetName) return

@@ -18,7 +18,7 @@ import {
  * - On selectedPane change: write URL via pushState/replaceState as appropriate
  *
  * Feedback loop prevention:
- * - isApplyingNavigationRef: suppresses URL write effect during URL restore
+ * - suppressNextWrittenSearchRef: suppresses URL writes caused by URL restore
  * - lastWrittenSearchRef: prevents duplicate URL writes
  * - initializedRef: prevents running restore logic multiple times
  */
@@ -33,15 +33,42 @@ export function useWorkspaceNavigation(): void {
     setSelectedPane,
   } = useAppState()
 
-  // Refs for feedback loop prevention
-  // Using a counter instead of boolean to handle cases where setSelectedPane
-  // is called with the same value (e.g., null → null), which wouldn't trigger
-  // the effect but we still need to reset the suppression.
-  const suppressCountRef = useRef(0)
+  // Refs for feedback loop prevention.
+  const suppressNextWrittenSearchRef = useRef<string | null>(null)
   const lastWrittenSearchRef = useRef<string>("")
   const initializedRef = useRef(false)
   const previousSelectedPaneRef = useRef<typeof selectedPane>(null)
   const restoredConnectionsRef = useRef(new Set<string>())
+  const selectedPaneRef = useRef<typeof selectedPane>(selectedPane)
+  selectedPaneRef.current = selectedPane
+
+  function sameSelectedPane(
+    a: typeof selectedPane,
+    b: typeof selectedPane,
+  ): boolean {
+    if (a === b) return true
+    if (!a || !b) return false
+    return (
+      a.targetName === b.targetName &&
+      a.session === b.session &&
+      a.window === b.window &&
+      a.pane === b.pane
+    )
+  }
+
+  function restoreWasOvertaken(startedFrom: typeof selectedPane): boolean {
+    return !sameSelectedPane(selectedPaneRef.current, startedFrom)
+  }
+
+  function applyRestoredSelectedPane(pane: typeof selectedPane): void {
+    const formatted = formatWorkspaceUrl(fromSelectedPane(pane))
+    const currentFormatted = formatWorkspaceUrl(fromSelectedPane(selectedPaneRef.current))
+
+    if (formatted !== currentFormatted) {
+      suppressNextWrittenSearchRef.current = formatted
+    }
+    setSelectedPane(pane)
+  }
 
   // Restore state from URL on mount
   useEffect(() => {
@@ -65,6 +92,7 @@ export function useWorkspaceNavigation(): void {
     }
 
     // Restore navigation state
+    restoredConnectionsRef.current.add(location.connection)
     restoreFromLocation(location)
   }, [connections])
 
@@ -103,12 +131,13 @@ export function useWorkspaceNavigation(): void {
   ): Promise<void> {
     if (!location) return
 
-    suppressCountRef.current++
+    const startedFrom = selectedPaneRef.current
     try {
       setSelectedTargetName(location.connection)
 
       // Validate session exists
       const sessionsResponse = await listSessions(location.connection)
+      if (restoreWasOvertaken(startedFrom)) return
       const sessions = sessionsResponse.data ?? []
       setSessions(location.connection, sessions)
 
@@ -117,7 +146,7 @@ export function useWorkspaceNavigation(): void {
       )
 
       if (!sessionExists) {
-        setSelectedPane(null)
+        applyRestoredSelectedPane(null)
         window.history.replaceState(null, "", window.location.pathname)
         return
       }
@@ -125,13 +154,14 @@ export function useWorkspaceNavigation(): void {
       // If window specified, load windows and panes
       if (location.window) {
         const windowsResponse = await listWindows(location.connection, location.session)
+        if (restoreWasOvertaken(startedFrom)) return
         const windows = windowsResponse.data ?? []
         setWindows(location.connection, location.session, windows)
 
         const windowExists = windows.some((w) => w.ID === location.window)
 
         if (!windowExists) {
-          setSelectedPane(null)
+          applyRestoredSelectedPane(null)
           window.history.replaceState(null, "", window.location.pathname)
           return
         }
@@ -142,6 +172,7 @@ export function useWorkspaceNavigation(): void {
           location.session,
           location.window,
         )
+        if (restoreWasOvertaken(startedFrom)) return
         const panes = panesResponse.data ?? []
         setPanes(location.connection, location.session, location.window, panes)
 
@@ -149,37 +180,41 @@ export function useWorkspaceNavigation(): void {
         if (location.pane) {
           const paneExists = panes.some((p) => p.ID === location.pane)
           if (!paneExists) {
-            setSelectedPane(null)
+            applyRestoredSelectedPane(null)
             window.history.replaceState(null, "", window.location.pathname)
             return
           }
         }
 
-        setSelectedPane(toSelectedPane(location))
+        if (restoreWasOvertaken(startedFrom)) return
+        applyRestoredSelectedPane(toSelectedPane(location))
       } else {
         // No window specified — load windows and select the first one
         const windowsResponse = await listWindows(location.connection, location.session)
+        if (restoreWasOvertaken(startedFrom)) return
         const windows = windowsResponse.data ?? []
         setWindows(location.connection, location.session, windows)
 
         if (windows.length === 0) {
-          setSelectedPane(toSelectedPane(location))
+          applyRestoredSelectedPane(toSelectedPane(location))
           return
         }
 
         const firstWindow = windows[0]
         if (!firstWindow) {
-          setSelectedPane(toSelectedPane(location))
+          applyRestoredSelectedPane(toSelectedPane(location))
           return
         }
 
         const panesResponse = await listPanes(location.connection, location.session, firstWindow.ID)
+        if (restoreWasOvertaken(startedFrom)) return
         const panes = panesResponse.data ?? []
         setPanes(location.connection, location.session, firstWindow.ID, panes)
 
         const activePane = panes.find((p) => p.Active) ?? panes[0]
 
-        setSelectedPane({
+        if (restoreWasOvertaken(startedFrom)) return
+        applyRestoredSelectedPane({
           targetName: location.connection,
           session: location.session,
           window: firstWindow.ID,
@@ -187,15 +222,9 @@ export function useWorkspaceNavigation(): void {
         })
       }
     } catch (error) {
-      setSelectedPane(null)
+      if (restoreWasOvertaken(startedFrom)) return
+      applyRestoredSelectedPane(null)
       window.history.replaceState(null, "", window.location.pathname)
-    } finally {
-      // If the URL-write effect already decremented (because selectedPane changed),
-      // this is a no-op. If selectedPane didn't change (e.g., null → null),
-      // this ensures suppression is cleared synchronously.
-      if (suppressCountRef.current > 0) {
-        suppressCountRef.current--
-      }
     }
   }
 
@@ -205,20 +234,12 @@ export function useWorkspaceNavigation(): void {
       const search = window.location.search
       const location = parseWorkspaceUrl(search)
 
-      suppressCountRef.current++
-      try {
-        if (!location) {
-          setSelectedPane(null)
-        } else {
-          // Just restore selectedPane, don't reload data during popstate
-          // (user is navigating back/forward through history we created)
-          setSelectedPane(toSelectedPane(location))
-        }
-      } finally {
-        // Same rationale as restoreFromLocation: synchronous safety net.
-        if (suppressCountRef.current > 0) {
-          suppressCountRef.current--
-        }
+      if (!location) {
+        applyRestoredSelectedPane(null)
+      } else {
+        // Just restore selectedPane, don't reload data during popstate
+        // (user is navigating back/forward through history we created)
+        applyRestoredSelectedPane(toSelectedPane(location))
       }
     }
 
@@ -231,22 +252,20 @@ export function useWorkspaceNavigation(): void {
 
   // Write URL when selectedPane changes
   useEffect(() => {
-    // During URL restore or popstate handling, suppress the write
-    // but update tracking refs to prevent future duplicate writes.
-    // Use a counter to handle cases where selectedPane doesn't change
-    // (e.g., null → null), which wouldn't trigger the effect again.
-    if (suppressCountRef.current > 0) {
-      suppressCountRef.current--
-      const location = fromSelectedPane(selectedPane)
-      const formatted = formatWorkspaceUrl(location)
+    const location = fromSelectedPane(selectedPane)
+    const formatted = formatWorkspaceUrl(location)
+
+    // During URL restore or popstate handling, suppress only the exact URL write
+    // caused by that restore. User navigation while an async restore is in flight
+    // must still update the URL.
+    if (suppressNextWrittenSearchRef.current === formatted) {
+      suppressNextWrittenSearchRef.current = null
       lastWrittenSearchRef.current = formatted
       previousSelectedPaneRef.current = selectedPane
       return
     }
 
     // Skip duplicate writes
-    const location = fromSelectedPane(selectedPane)
-    const formatted = formatWorkspaceUrl(location)
     const fullPath = formatted || window.location.pathname
 
     if (formatted === lastWrittenSearchRef.current) return

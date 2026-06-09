@@ -250,6 +250,84 @@ describe("Sidebar session loading", () => {
 
       expect(mockListPanes).not.toHaveBeenCalled()
     })
+
+    test("keeps a newly selected session when a stale startup sync returns later", async () => {
+      let sessionList = [{ name: "session1" }, { name: "session2" }]
+      mockListSessions.mockImplementation(async () => ({
+        targetName: "conn1",
+        mode: "local",
+        data: sessionList,
+      }))
+
+      mockListWindows.mockResolvedValue({
+        targetName: "conn1",
+        session: "session2",
+        mode: "local",
+        data: [
+          {
+            ID: "@2",
+            Name: "terminal",
+            Index: 0,
+            Active: true,
+            PaneCount: 1,
+            ActivePaneID: "%2",
+            ActivePaneTitle: "bash",
+          },
+        ],
+      })
+
+      mockListPanes.mockResolvedValue({
+        targetName: "conn1",
+        session: "session2",
+        window: "@2",
+        mode: "local",
+        data: [
+          {
+            ID: "%2",
+            Title: "bash",
+            Index: 0,
+            Active: true,
+            Width: 80,
+            Height: 24,
+            Left: 0,
+            Top: 0,
+          },
+        ],
+      })
+
+      function SelectedPaneChecker() {
+        const { selectedPane } = useAppState()
+        return <span data-testid="selected-session">{selectedPane?.session ?? "none"}</span>
+      }
+
+      render(
+        <TestWrapper>
+          <Sidebar />
+          <SelectedPaneChecker />
+        </TestWrapper>,
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId("session-card-session2")).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId("session-open-session2"))
+
+      await waitFor(() => {
+        expect(screen.getByTestId("selected-session").textContent).toBe("session2")
+      })
+
+      sessionList = [{ name: "session1" }]
+
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"))
+      })
+
+      await waitFor(() => {
+        expect(mockListSessions).toHaveBeenCalledTimes(3)
+      })
+      expect(screen.getByTestId("selected-session").textContent).toBe("session2")
+    })
   })
 
   describe("handleOpenSession error path", () => {
