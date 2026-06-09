@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use wmux_core::config::Config;
-use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::intelligence::{
     self, ActiveProvider, IntelligenceStore, SessionIntelligence, WindowCacheDecision,
 };
+use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
+use crate::services::connections::{
+    find_connection as svc_find_connection, require_local_connection,
+};
 use crate::state::AppState;
-use crate::services::connections::{find_connection as svc_find_connection, require_local_connection};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,9 +129,10 @@ struct TargetContext {
 }
 
 fn adapter(state: &AppState) -> IpcResult<Adapter> {
-    let config = state.store.snapshot().map_err(|_| {
-        IpcError::internal("failed to read configuration")
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|_| IpcError::internal("failed to read configuration"))?;
     Ok(Adapter::new(config.tmux.path))
 }
 
@@ -178,10 +181,7 @@ fn build_pane_target(session: &str, window: &str, pane: &str) -> String {
     format!("{}.{pane}", build_window_target(session, window))
 }
 
-pub async fn list_sessions(
-    state: &AppState,
-    target: String,
-) -> IpcResult<SessionsListResponse> {
+pub async fn list_sessions(state: &AppState, target: String) -> IpcResult<SessionsListResponse> {
     let target = target_context(&state, target).await?;
     let mut data = target
         .adapter
@@ -227,9 +227,10 @@ pub async fn analyze_session(
     let target = target_context(&state, target).await?;
     require_session(&target.adapter, &session).await?;
 
-    let config = state.store.snapshot().map_err(|_| {
-        IpcError::bad_request("failed to read configuration")
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|_| IpcError::bad_request("failed to read configuration"))?;
 
     let Some(provider) = intelligence::active_provider(&config) else {
         return Err(IpcError::bad_request(
@@ -364,8 +365,15 @@ pub async fn delete_session(
     target: String,
     session: String,
 ) -> IpcResult<OperationResponse> {
-    write_session_operation(state.clone(), target, session, String::new(), String::new(), "delete_session")
-        .await
+    write_session_operation(
+        state.clone(),
+        target,
+        session,
+        String::new(),
+        String::new(),
+        "delete_session",
+    )
+    .await
 }
 
 pub async fn rename_session(
@@ -400,8 +408,15 @@ pub async fn delete_window(
     session: String,
     window: String,
 ) -> IpcResult<OperationResponse> {
-    write_session_operation(state.clone(), target, session, window, String::new(), "delete_window")
-        .await
+    write_session_operation(
+        state.clone(),
+        target,
+        session,
+        window,
+        String::new(),
+        "delete_window",
+    )
+    .await
 }
 
 pub async fn split_pane(
@@ -849,11 +864,17 @@ mod tests {
 
     #[test]
     fn build_window_target_works() {
-        assert_eq!(build_window_target("session1", "window1"), "session1:window1");
+        assert_eq!(
+            build_window_target("session1", "window1"),
+            "session1:window1"
+        );
     }
 
     #[test]
     fn build_pane_target_works() {
-        assert_eq!(build_pane_target("session1", "window1", "pane1"), "session1:window1.pane1");
+        assert_eq!(
+            build_pane_target("session1", "window1", "pane1"),
+            "session1:window1.pane1"
+        );
     }
 }

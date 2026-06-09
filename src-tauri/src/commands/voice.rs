@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State, ipc::Channel};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use wmux_core::protocol::{OmniClientMessage, OmniServerEvent};
 
 use crate::state::IpcState;
@@ -134,9 +134,7 @@ pub async fn voice_send(
 
 /// Close the active voice session.
 #[tauri::command]
-pub async fn voice_close(
-    _state: State<'_, IpcState>,
-) -> Result<(), String> {
+pub async fn voice_close(_state: State<'_, IpcState>) -> Result<(), String> {
     tracing::debug!("voice_close called");
 
     // In a full implementation, this would:

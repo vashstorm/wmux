@@ -103,12 +103,22 @@ pub fn require_local_connection(connection: &ConnectionConfig) -> IpcResult<()> 
 }
 
 pub fn list_connections(state: &AppState) -> Vec<RuntimeConnection> {
-    state
+    let mut connections: Vec<RuntimeConnection> = state
         .connections
         .list()
         .into_iter()
         .map(RuntimeConnection::from)
-        .collect()
+        .collect();
+
+    if connections.is_empty() {
+        connections.push(RuntimeConnection {
+            target_name: "local".to_string(),
+            connection_type: "local".to_string(),
+            ..Default::default()
+        });
+    }
+
+    connections
 }
 
 #[derive(Serialize)]

@@ -144,7 +144,10 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
       setDisconnected(false)
       setErrorMessage(null)
 
-      const ipc = new TerminalIpc({
+      let ipc: TerminalIpc | null = null
+      const isCurrentConnection = () => ipc !== null && wsRef.current === ipc
+
+      ipc = new TerminalIpc({
         targetName,
         session,
         window: windowId,
@@ -152,6 +155,7 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
         rows: terminalSize?.rows,
         cols: terminalSize?.cols,
         onMessage: (message) => {
+          if (!isCurrentConnection()) return
           switch (message.type) {
             case "output": {
               terminalRef.current?.write(message.data)
@@ -177,20 +181,23 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
           }
         },
         onOpen: () => {
+          if (!isCurrentConnection()) return
           setDisconnected(false)
           setErrorMessage(null)
           setError(null)
         },
         onClose: () => {
+          if (!isCurrentConnection()) return
           setDisconnected(true)
         },
         onError: () => {
+          if (!isCurrentConnection()) return
           setErrorMessage("IPC connection failed")
         },
       })
 
-      void ipc.connect()
       wsRef.current = ipc
+      void ipc.connect()
     },
     [targetName, fitAndSyncSize, pane, session, setError, windowId],
   )

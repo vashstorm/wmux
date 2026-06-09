@@ -30,9 +30,11 @@ export class TerminalIpc {
   private channel: Channel<string> | null = null;
   private closed = false;
   private unlistenClose: (() => void) | null = null;
+  public readonly connectionId: string;
 
   constructor(options: TerminalIpcOptions) {
     this.options = options;
+    this.connectionId = Math.random().toString(36).substring(2, 15);
   }
 
   async connect(): Promise<void> {
@@ -57,16 +59,6 @@ export class TerminalIpc {
       }
     };
 
-    this.channel.onerror = (error: Error) => {
-      this.options.onError?.(error);
-    };
-
-    this.channel.onclose = () => {
-      if (!this.closed) {
-        this.options.onClose?.();
-      }
-    };
-
     try {
       await invoke("terminal_open", {
         targetName,
@@ -75,11 +67,12 @@ export class TerminalIpc {
         pane,
         cols: cols ?? 80,
         rows: rows ?? 24,
+        connectionId: this.connectionId,
         onOutput: this.channel,
       });
 
       this.unlistenClose = await listen<{ payload: string }>("terminal-closed", (event) => {
-        const key = `${targetName}:${session}${pane ? `:${pane}` : ""}`;
+        const key = `${targetName}:${session}${pane ? `:${pane}` : ""}:${this.connectionId}`;
         if (event.payload === key) {
           this.options.onClose?.();
         }
@@ -111,6 +104,7 @@ export class TerminalIpc {
       targetName,
       session,
       pane,
+      connectionId: this.connectionId,
       data,
     });
   }
@@ -121,6 +115,7 @@ export class TerminalIpc {
       targetName,
       session,
       pane,
+      connectionId: this.connectionId,
       cols,
       rows,
     });
@@ -139,15 +134,13 @@ export class TerminalIpc {
         targetName,
         session,
         pane,
+        connectionId: this.connectionId,
       });
     } catch {
       // Ignore close errors
     }
 
-    if (this.channel) {
-      await this.channel.close();
-      this.channel = null;
-    }
+    this.channel = null;
 
     if (this.unlistenClose) {
       this.unlistenClose();

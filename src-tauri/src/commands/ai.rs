@@ -1,11 +1,11 @@
-use tauri::State;
+use crate::state::IpcState;
 use serde::{Deserialize, Serialize};
+use tauri::State;
 use wmux_core::ipc_error::IpcError;
 use wmux_core::storage::{
     AiLogRepository, AiUsageRepository,
     models::{AiLogListResponse, AiUsageEvent, AiUsageSummary},
 };
-use crate::state::IpcState;
 
 fn map_error(e: IpcError) -> String {
     format!("{}: {}", e.code(), e.message())
@@ -25,7 +25,10 @@ pub struct AiStatsCleanupResponse {
 }
 
 fn storage(state: &IpcState) -> Result<sqlx::SqlitePool, String> {
-    state.app_state.storage.clone()
+    state
+        .app_state
+        .storage
+        .clone()
         .ok_or_else(|| map_error(IpcError::internal("storage not initialized")))
 }
 
@@ -48,7 +51,8 @@ pub async fn list_ai_logs(
 pub async fn clear_ai_logs(state: State<'_, IpcState>) -> Result<(), String> {
     let pool = storage(&state)?;
     let repo = AiLogRepository::new(pool.clone());
-    repo.clear().await
+    repo.clear()
+        .await
         .map_err(|e| map_error(IpcError::internal(format!("database error: {}", e))))
 }
 
@@ -62,10 +66,12 @@ pub async fn get_ai_stats(
     let pool = storage(&state)?;
     let repo = AiUsageRepository::new(pool.clone());
     let limit = limit.unwrap_or(50).min(200).max(1);
-    let data = repo.list(limit, project_id.as_deref(), status.as_deref())
+    let data = repo
+        .list(limit, project_id.as_deref(), status.as_deref())
         .await
         .map_err(|e| map_error(IpcError::internal(format!("database error: {}", e))))?;
-    let summary = repo.summary(project_id.as_deref())
+    let summary = repo
+        .summary(project_id.as_deref())
         .await
         .map_err(|e| map_error(IpcError::internal(format!("database error: {}", e))))?;
     Ok(AiStatsResponse { data, summary })
@@ -78,7 +84,8 @@ pub async fn cleanup_stale_window_events(
 ) -> Result<AiStatsCleanupResponse, String> {
     let pool = storage(&state)?;
     let repo = AiUsageRepository::new(pool.clone());
-    let deleted = repo.delete_stale_window_events(project_id.as_deref())
+    let deleted = repo
+        .delete_stale_window_events(project_id.as_deref())
         .await
         .map_err(|e| map_error(IpcError::internal(format!("database error: {}", e))))?;
     Ok(AiStatsCleanupResponse { deleted })

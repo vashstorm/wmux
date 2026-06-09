@@ -3,7 +3,9 @@ use std::time::Instant;
 use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::project_ai::{generate_sanitized_html, get_active_provider};
 use wmux_core::project_runtime::{launch_or_sync_project, snapshot_from_tmux};
-use wmux_core::storage::models::{NewAiUsageEvent, NewProject, Project, ProjectLayout, UpdateProject};
+use wmux_core::storage::models::{
+    NewAiUsageEvent, NewProject, Project, ProjectLayout, UpdateProject,
+};
 use wmux_core::storage::{AiUsageRepository, ProjectRepository};
 use wmux_core::tmux::Adapter;
 
@@ -21,25 +23,21 @@ pub struct ProjectActionResponse {
     pub operation: String,
 }
 
-pub fn list_projects(state: &AppState) -> IpcResult<Vec<Project>> {
+pub async fn list_projects(state: &AppState) -> IpcResult<Vec<Project>> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let projects = tokio::runtime::Handle::current()
-        .block_on(repo.list())
-        .map_err(map_project_error)?;
+    let projects = repo.list().await.map_err(map_project_error)?;
     Ok(projects)
 }
 
-pub fn get_project(state: &AppState, id: &str) -> IpcResult<Project> {
+pub async fn get_project(state: &AppState, id: &str) -> IpcResult<Project> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = tokio::runtime::Handle::current()
-        .block_on(repo.get_by_id(id))
-        .map_err(map_project_error)?;
+    let project = repo.get_by_id(id).await.map_err(map_project_error)?;
     Ok(project)
 }
 
-pub fn create_project(
+pub async fn create_project(
     state: &AppState,
     payload: NewProject,
     tmux_path: &str,
@@ -57,31 +55,29 @@ pub fn create_project(
 
     let adapter = Adapter::new(tmux_path);
 
-    let runtime = tokio::runtime::Handle::current();
-    let has_session = runtime.block_on(adapter.has_session(session_to_check));
+    let has_session = adapter.has_session(session_to_check).await;
     if let Ok(true) = has_session {
-        if let Ok(snapshot) = runtime.block_on(snapshot_from_tmux(&adapter, session_to_check)) {
+        if let Ok(snapshot) = snapshot_from_tmux(&adapter, session_to_check).await {
             payload.layout_json = Some(snapshot.layout_json);
         }
     }
 
     let repo = ProjectRepository::new(pool.clone());
-    let mut project = runtime
-        .block_on(repo.create(&payload))
-        .map_err(map_project_error)?;
+    let mut project = repo.create(&payload).await.map_err(map_project_error)?;
 
-    if let Ok(true) = runtime.block_on(adapter.has_session(session_to_check)) {
+    if let Ok(true) = adapter.has_session(session_to_check).await {
         let now_str = time::OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .expect("RFC3339 format is infallible");
-        if let Ok(updated) = runtime
-            .block_on(repo.update_snapshot(
+        if let Ok(updated) = repo
+            .update_snapshot(
                 &project.id,
                 &project.layout_json,
                 "running",
                 &now_str,
                 &project,
-            ))
+            )
+            .await
         {
             project = updated;
         }
@@ -91,22 +87,20 @@ pub fn create_project(
     Ok(project)
 }
 
-pub fn update_project(
+pub async fn update_project(
     state: &AppState,
     id: &str,
     payload: UpdateProject,
 ) -> IpcResult<Project> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = tokio::runtime::Handle::current()
-        .block_on(repo.update(id, &payload))
-        .map_err(map_project_error)?;
+    let project = repo.update(id, &payload).await.map_err(map_project_error)?;
 
     tracing::info!(project_id = %project.id, name = %project.name, "project updated");
     Ok(project)
 }
 
-pub fn delete_project(
+pub async fn delete_project(
     state: &AppState,
     id: &str,
     kill_session: bool,
@@ -114,20 +108,15 @@ pub fn delete_project(
 ) -> IpcResult<()> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = tokio::runtime::Handle::current()
-        .block_on(repo.get_by_id(id))
-        .map_err(map_project_error)?;
+    let project = repo.get_by_id(id).await.map_err(map_project_error)?;
 
-    tokio::runtime::Handle::current()
-        .block_on(repo.delete(id))
-        .map_err(map_project_error)?;
+    repo.delete(id).await.map_err(map_project_error)?;
 
     if kill_session {
         let session_name = session_name_for(&project);
         let adapter = Adapter::new(tmux_path);
-        let runtime = tokio::runtime::Handle::current();
-        if let Ok(true) = runtime.block_on(adapter.has_session(session_name)) {
-            let _ = runtime.block_on(adapter.kill_session(session_name));
+        if let Ok(true) = adapter.has_session(session_name).await {
+            let _ = adapter.kill_session(session_name).await;
         }
     }
 
@@ -135,16 +124,14 @@ pub fn delete_project(
     Ok(())
 }
 
-pub fn launch_project(
+pub async fn launch_project(
     state: &AppState,
     id: &str,
     tmux_path: &str,
 ) -> IpcResult<ProjectActionResponse> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = tokio::runtime::Handle::current()
-        .block_on(repo.get_by_id(id))
-        .map_err(map_project_error)?;
+    let project = repo.get_by_id(id).await.map_err(map_project_error)?;
 
     let adapter = Adapter::new(tmux_path);
 
@@ -153,13 +140,12 @@ pub fn launch_project(
 
     let session_name = session_name_for(&project);
 
-    let runtime = tokio::runtime::Handle::current();
-    let snapshot = runtime
-        .block_on(launch_or_sync_project(&adapter, session_name, &layout))
+    let snapshot = launch_or_sync_project(&adapter, session_name, &layout)
+        .await
         .map_err(map_tmux_error)?;
 
-    let updated = runtime
-        .block_on(repo.update_snapshot(
+    let updated = repo
+        .update_snapshot(
             &id,
             &snapshot.layout_json,
             &snapshot.status,
@@ -167,7 +153,8 @@ pub fn launch_project(
                 .format(&time::format_description::well_known::Rfc3339)
                 .expect("RFC3339 format is infallible"),
             &project,
-        ))
+        )
+        .await
         .map_err(map_project_error)?;
 
     tracing::info!(
@@ -184,23 +171,21 @@ pub fn launch_project(
     })
 }
 
-pub fn sync_from_tmux(
+pub async fn sync_from_tmux(
     state: &AppState,
     id: &str,
     tmux_path: &str,
 ) -> IpcResult<ProjectActionResponse> {
     let pool = storage(state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = tokio::runtime::Handle::current()
-        .block_on(repo.get_by_id(id))
-        .map_err(map_project_error)?;
+    let project = repo.get_by_id(id).await.map_err(map_project_error)?;
 
     let adapter = Adapter::new(tmux_path);
     let session_name = session_name_for(&project);
 
-    let runtime = tokio::runtime::Handle::current();
-    let exists = runtime
-        .block_on(adapter.has_session(session_name))
+    let exists = adapter
+        .has_session(session_name)
+        .await
         .map_err(map_tmux_error)?;
     if !exists {
         return Err(IpcError::not_found(format!(
@@ -209,12 +194,12 @@ pub fn sync_from_tmux(
         )));
     }
 
-    let snapshot = runtime
-        .block_on(snapshot_from_tmux(&adapter, session_name))
+    let snapshot = snapshot_from_tmux(&adapter, session_name)
+        .await
         .map_err(map_tmux_error)?;
 
-    let updated = runtime
-        .block_on(repo.update_snapshot(
+    let updated = repo
+        .update_snapshot(
             &id,
             &snapshot.layout_json,
             &snapshot.status,
@@ -222,7 +207,8 @@ pub fn sync_from_tmux(
                 .format(&time::format_description::well_known::Rfc3339)
                 .expect("RFC3339 format is infallible"),
             &project,
-        ))
+        )
+        .await
         .map_err(map_project_error)?;
 
     tracing::info!(
@@ -279,7 +265,9 @@ pub async fn generate_ai_html(
         Err(err) => {
             let duration_ms = started_at.elapsed().as_millis() as i64;
             let error_msg = err.to_string();
-            let _ = repo.update_ai_result(&id, "", "error", &error_msg, &project).await;
+            let _ = repo
+                .update_ai_result(&id, "", "error", &error_msg, &project)
+                .await;
             record_project_ai_usage_event(
                 &pool,
                 &project,
@@ -329,9 +317,7 @@ fn map_project_error(err: crate::storage::ProjectRepoError) -> IpcError {
         crate::storage::ProjectRepoError::NotFound(msg) => IpcError::not_found(msg),
         crate::storage::ProjectRepoError::NameConflict(msg) => IpcError::conflict(msg),
         crate::storage::ProjectRepoError::ValidationError(msg) => IpcError::bad_request(msg),
-        crate::storage::ProjectRepoError::Database(_) => {
-            IpcError::internal("database error")
-        }
+        crate::storage::ProjectRepoError::Database(_) => IpcError::internal("database error"),
     }
 }
 

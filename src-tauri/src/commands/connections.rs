@@ -1,15 +1,17 @@
+use crate::state::IpcState;
 use tauri::State;
 use wmux_core::ipc_error::IpcError;
 use wmux_core::services;
-use wmux_core::services::connections::{RuntimeConnection, ConnectionHealthResponse};
-use crate::state::IpcState;
+use wmux_core::services::connections::{ConnectionHealthResponse, RuntimeConnection};
 
 fn map_error(e: IpcError) -> String {
     format!("{}: {}", e.code(), e.message())
 }
 
 #[tauri::command]
-pub async fn list_connections(state: State<'_, IpcState>) -> Result<Vec<RuntimeConnection>, String> {
+pub async fn list_connections(
+    state: State<'_, IpcState>,
+) -> Result<Vec<RuntimeConnection>, String> {
     Ok(services::connections::list_connections(&state.app_state))
 }
 
@@ -18,8 +20,7 @@ pub async fn create_connection(
     state: State<'_, IpcState>,
     connection: RuntimeConnection,
 ) -> Result<RuntimeConnection, String> {
-    services::connections::create_connection(&state.app_state, connection)
-        .map_err(map_error)
+    services::connections::create_connection(&state.app_state, connection).map_err(map_error)
 }
 
 #[tauri::command]
@@ -27,8 +28,7 @@ pub async fn get_connection(
     state: State<'_, IpcState>,
     id: String,
 ) -> Result<RuntimeConnection, String> {
-    services::connections::get_connection(&state.app_state, &id)
-        .map_err(map_error)
+    services::connections::get_connection(&state.app_state, &id).map_err(map_error)
 }
 
 #[tauri::command]
@@ -37,17 +37,12 @@ pub async fn update_connection(
     id: String,
     connection: RuntimeConnection,
 ) -> Result<RuntimeConnection, String> {
-    services::connections::update_connection(&state.app_state, &id, connection)
-        .map_err(map_error)
+    services::connections::update_connection(&state.app_state, &id, connection).map_err(map_error)
 }
 
 #[tauri::command]
-pub async fn delete_connection(
-    state: State<'_, IpcState>,
-    id: String,
-) -> Result<(), String> {
-    services::connections::delete_connection(&state.app_state, &id)
-        .map_err(map_error)
+pub async fn delete_connection(state: State<'_, IpcState>, id: String) -> Result<(), String> {
+    services::connections::delete_connection(&state.app_state, &id).map_err(map_error)
 }
 
 #[tauri::command]
@@ -55,9 +50,16 @@ pub async fn connection_health(
     state: State<'_, IpcState>,
     id: String,
 ) -> Result<ConnectionHealthResponse, String> {
-    let config = state.app_state.store.snapshot()
+    let config = state
+        .app_state
+        .store
+        .snapshot()
         .map_err(|_| map_error(IpcError::internal("failed to read configuration")))?;
-    let tmux_path = if config.tmux.path.is_empty() { "tmux" } else { &config.tmux.path };
+    let tmux_path = if config.tmux.path.is_empty() {
+        "tmux"
+    } else {
+        &config.tmux.path
+    };
     services::connections::get_connection_health(&state.app_state, &id, tmux_path)
         .await
         .map_err(map_error)
@@ -67,9 +69,16 @@ pub async fn connection_health(
 pub async fn list_connections_health(
     state: State<'_, IpcState>,
 ) -> Result<Vec<ConnectionHealthResponse>, String> {
-    let config = state.app_state.store.snapshot()
+    let config = state
+        .app_state
+        .store
+        .snapshot()
         .map_err(|_| map_error(IpcError::internal("failed to read configuration")))?;
-    let tmux_path = if config.tmux.path.is_empty() { "tmux" } else { &config.tmux.path };
+    let tmux_path = if config.tmux.path.is_empty() {
+        "tmux"
+    } else {
+        &config.tmux.path
+    };
     Ok(services::connections::list_connections_health(&state.app_state, tmux_path).await)
 }
 

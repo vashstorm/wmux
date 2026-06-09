@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use tauri::{Manager, RunEvent};
-use wmux_tauri::{commands, IpcState};
 use anyhow::Context;
+use tauri::{Manager, RunEvent};
+use wmux_tauri::{IpcState, commands};
 
 fn main() {
     let app = tauri::Builder::default()
@@ -84,10 +84,11 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("failed to build Wmux Tauri app");
 
-    app.run(|_app_handle, event| {
-        if matches!(event, RunEvent::ExitRequested { .. }) {
-        }
-    });
+    app.run(
+        |_app_handle, event| {
+            if matches!(event, RunEvent::ExitRequested { .. }) {}
+        },
+    );
 }
 
 fn tauri_config_path(manifest_dir: &std::path::Path) -> PathBuf {

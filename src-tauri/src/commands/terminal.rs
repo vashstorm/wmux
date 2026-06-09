@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use serde_json;
-use tauri::{ipc::Channel, AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, ipc::Channel};
 use tokio::sync::RwLock;
-use wmux_core::session::WindowSize;
 use wmux_core::services::terminal as svc;
+use wmux_core::session::WindowSize;
 
 use crate::state::{IpcState, TerminalSessionHandle, TerminalSessions};
 
@@ -18,6 +18,7 @@ pub async fn terminal_open(
     pane: Option<String>,
     cols: u16,
     rows: u16,
+    connection_id: String,
     on_output: Channel<String>,
 ) -> Result<(), String> {
     let target_name = target_name.trim();
@@ -30,7 +31,8 @@ pub async fn terminal_open(
         return Err("session is required".to_string());
     }
 
-    svc::require_terminal_target(&state.app_state, target_name).map_err(|e| e.message().to_string())?;
+    svc::require_terminal_target(&state.app_state, target_name)
+        .map_err(|e| e.message().to_string())?;
 
     let mut query = svc::TerminalQuery {
         target_name: Some(target_name.to_string()),
@@ -62,7 +64,8 @@ pub async fn terminal_open(
         format!("[{}] {}", code, e)
     })?;
 
-    let key = TerminalSessions::make_key(target_name, session_name, pane.as_deref());
+    let key =
+        TerminalSessions::make_key(target_name, session_name, pane.as_deref(), &connection_id);
 
     let session_arc = Arc::new(RwLock::new(Some(TerminalSessionHandle {
         session,
@@ -120,9 +123,10 @@ pub async fn terminal_input(
     target_name: String,
     session: String,
     pane: Option<String>,
+    connection_id: String,
     data: String,
 ) -> Result<(), String> {
-    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref());
+    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref(), &connection_id);
 
     let handles = state.terminal_sessions.handles.read().await;
     let session_arc = handles
@@ -147,10 +151,11 @@ pub async fn terminal_resize(
     target_name: String,
     session: String,
     pane: Option<String>,
+    connection_id: String,
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref());
+    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref(), &connection_id);
 
     let handles = state.terminal_sessions.handles.read().await;
     let session_arc = handles
@@ -172,8 +177,9 @@ pub async fn terminal_close(
     target_name: String,
     session: String,
     pane: Option<String>,
+    connection_id: String,
 ) -> Result<(), String> {
-    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref());
+    let key = TerminalSessions::make_key(&target_name, &session, pane.as_deref(), &connection_id);
 
     let session_arc = {
         let mut handles = state.terminal_sessions.handles.write().await;
@@ -196,10 +202,11 @@ mod tests {
 
     #[test]
     fn terminal_sessions_key_format() {
-        let key = TerminalSessions::make_key("local", "mysession", None);
-        assert_eq!(key, "local:mysession");
+        let key = TerminalSessions::make_key("local", "mysession", None, "conn123");
+        assert_eq!(key, "local:mysession:conn123");
 
-        let key_with_pane = TerminalSessions::make_key("local", "mysession", Some("pane0"));
-        assert_eq!(key_with_pane, "local:mysession:pane0");
+        let key_with_pane =
+            TerminalSessions::make_key("local", "mysession", Some("pane0"), "conn123");
+        assert_eq!(key_with_pane, "local:mysession:pane0:conn123");
     }
 }

@@ -82,17 +82,19 @@ struct ConfigOmniResponse {
 }
 
 pub fn get_config(state: &AppState) -> IpcResult<ConfigResponse> {
-    let config = state.store.snapshot().map_err(|_| {
-        IpcError::internal("failed to read configuration")
-    })?;
+    let config = state
+        .store
+        .snapshot()
+        .map_err(|_| IpcError::internal("failed to read configuration"))?;
     let skills = state.skills.list();
     Ok(new_config_response(&config, &skills))
 }
 
 pub fn update_config(state: &AppState, mut payload: Config) -> IpcResult<ConfigResponse> {
-    let current = state.store.snapshot().map_err(|_| {
-        IpcError::internal("failed to read configuration")
-    })?;
+    let current = state
+        .store
+        .snapshot()
+        .map_err(|_| IpcError::internal("failed to read configuration"))?;
 
     preserve_secret_fields(&current, &mut payload);
 
@@ -112,9 +114,10 @@ pub fn update_config(state: &AppState, mut payload: Config) -> IpcResult<ConfigR
 
     tracing::info!("config updated");
 
-    let latest = state.store.snapshot().map_err(|_| {
-        IpcError::internal("failed to read configuration")
-    })?;
+    let latest = state
+        .store
+        .snapshot()
+        .map_err(|_| IpcError::internal("failed to read configuration"))?;
     state.connections.replace_all(latest.connections.clone());
     let skills = state.skills.list();
     Ok(new_config_response(&latest, &skills))

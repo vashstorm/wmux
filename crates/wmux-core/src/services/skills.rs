@@ -36,7 +36,11 @@ pub fn create_skill(state: &AppState, skill: OmniSkillDef) -> IpcResult<OmniSkil
     Ok(saved)
 }
 
-pub fn update_skill(state: &AppState, id: String, mut skill: OmniSkillDef) -> IpcResult<OmniSkillDef> {
+pub fn update_skill(
+    state: &AppState,
+    id: String,
+    mut skill: OmniSkillDef,
+) -> IpcResult<OmniSkillDef> {
     if skill.id != id {
         skill.id = id;
     }
@@ -78,9 +82,7 @@ mod tests {
             source_file: None,
             source_order: None,
         };
-        let response = SkillListResponse {
-            data: vec![skill],
-        };
+        let response = SkillListResponse { data: vec![skill] };
         let json = serde_json::to_string(&response).expect("serialize");
         assert!(json.contains("test-skill"));
     }

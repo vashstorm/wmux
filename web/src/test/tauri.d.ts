@@ -3,10 +3,6 @@ declare module "@tauri-apps/api/core" {
 
   export class Channel<T = unknown> {
     onmessage: ((data: T) => void) | null;
-    onerror: ((error: Error) => void) | null;
-    onclose: (() => void) | null;
-    send(data: T): Promise<void>;
-    close(): Promise<void>;
   }
 }
 

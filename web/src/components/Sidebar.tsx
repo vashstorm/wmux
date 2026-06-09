@@ -151,16 +151,22 @@ export function Sidebar({
     async (targetName: string) => {
       try {
         const [sessionsResponse, projectsResponse] = await Promise.all([
-          Promise.resolve(listSessions(targetName)).catch(() => null),
-          Promise.resolve(listProjects()).catch(() => [] as Project[]),
+          listSessions(targetName),
+          Promise.resolve(listProjects()).catch((err) => {
+            console.error("Failed to load projects:", err)
+            return [] as Project[]
+          }),
         ])
-        setSessions(targetName, sessionsResponse?.data ?? [])
+        setSessions(targetName, sessionsResponse.data ?? [])
         setProjects(projectsResponse ?? [])
       } catch (err) {
         if (isApiError(err)) {
-          if (err.code !== "connection_failed" && err.code !== "unknown_error") {
-            setError({ code: err.code, message: getErrorMessage(err.code, err.message) })
-          }
+          setError({ code: err.code, message: getErrorMessage(err.code, err.message) })
+        } else {
+          setError({
+            code: "unknown_error",
+            message: err instanceof Error ? err.message : "Unknown error",
+          })
         }
       }
     },

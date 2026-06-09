@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { Terminal as XTerm } from "@xterm/xterm"
 import { Unicode11Addon } from "@xterm/addon-unicode11"
 import { Terminal } from "./Terminal.js"
@@ -77,16 +77,26 @@ let capturedOnMessage:
       error?: { code: string; message: string }
     }) => void)
   | null = null
+type MockTerminalIpcOptions = ConstructorParameters<typeof TerminalIpc>[0]
+const mockTerminalIpcInstances: Array<{
+  options: MockTerminalIpcOptions
+  connect: ReturnType<typeof vi.fn>
+  send: ReturnType<typeof vi.fn>
+  close: ReturnType<typeof vi.fn>
+}> = []
 
 vi.mock("../api/terminalIpc.js", () => ({
   TerminalIpc: vi.fn().mockImplementation((options) => {
     capturedOnMessage = options.onMessage
-    return {
+    const instance = {
+      options,
       connect: mockConnect,
       send: mockWsSend,
       close: mockClose,
       isConnected: vi.fn(() => false),
     }
+    mockTerminalIpcInstances.push(instance)
+    return instance
   }),
 }))
 
@@ -150,6 +160,7 @@ describe("Terminal", () => {
     mockSetError.mockClear()
     capturedOnResize = null
     capturedOnMessage = null
+    mockTerminalIpcInstances.length = 0
     vi.mocked(TerminalIpc).mockClear()
   })
 
@@ -341,6 +352,35 @@ describe("Terminal", () => {
     capturedOnMessage!({ type: "status", status: "connected" })
 
     expect(mockXTermWriteln).not.toHaveBeenCalled()
+  })
+
+  test("ignores close messages from an old IPC connection after reconnecting", async () => {
+    render(<Terminal selectedPane={mockSelectedPane} />)
+
+    await waitFor(() => {
+      expect(mockTerminalIpcInstances).toHaveLength(1)
+    })
+
+    act(() => {
+      mockTerminalIpcInstances[0]!.options.onMessage({ type: "close" })
+    })
+    expect(screen.getByTestId("terminal-disconnected")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId("reconnect-button"))
+
+    await waitFor(() => {
+      expect(mockTerminalIpcInstances).toHaveLength(2)
+    })
+
+    act(() => {
+      mockTerminalIpcInstances[1]!.options.onOpen?.()
+    })
+    expect(screen.queryByTestId("terminal-disconnected")).not.toBeInTheDocument()
+
+    act(() => {
+      mockTerminalIpcInstances[0]!.options.onMessage({ type: "close" })
+    })
+    expect(screen.queryByTestId("terminal-disconnected")).not.toBeInTheDocument()
   })
 
   test("derives terminal fontSize from uiScaleStep step 0 → 17px", async () => {

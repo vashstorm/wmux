@@ -1,7 +1,7 @@
 use std::time::Duration;
 use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::protocol::OmniTarget;
-use wmux_core::voice::{is_dangerous, OmniSkillExecutor};
+use wmux_core::voice::{OmniSkillExecutor, is_dangerous};
 
 pub use wmux_core::voice::OmniSkillExecution;
 
@@ -174,7 +174,7 @@ mod tests {
             "target_name": "local"
         });
         assert!(has_string_alias(&params, &["target_name", "targetName"]));
-        
+
         let params2 = serde_json::json!({
             "other": "value"
         });
@@ -185,7 +185,10 @@ mod tests {
     fn apply_session_context_defaults_adds_target() {
         let params = serde_json::json!({});
         let result = apply_session_context_defaults("list_sessions", params, Some("local"));
-        assert_eq!(result.get("target_name").and_then(|v| v.as_str()), Some("local"));
+        assert_eq!(
+            result.get("target_name").and_then(|v| v.as_str()),
+            Some("local")
+        );
     }
 
     #[test]

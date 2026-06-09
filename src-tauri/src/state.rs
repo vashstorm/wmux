@@ -29,10 +29,15 @@ impl TerminalSessions {
         }
     }
 
-    pub fn make_key(target_name: &str, session: &str, pane: Option<&str>) -> String {
+    pub fn make_key(
+        target_name: &str,
+        session: &str,
+        pane: Option<&str>,
+        connection_id: &str,
+    ) -> String {
         match pane {
-            Some(p) => format!("{}:{}:{}", target_name, session, p),
-            None => format!("{}:{}", target_name, session),
+            Some(p) => format!("{}:{}:{}:{}", target_name, session, p, connection_id),
+            None => format!("{}:{}:{}", target_name, session, connection_id),
         }
     }
 }
@@ -51,12 +56,14 @@ impl IpcState {
         let config = startup.config;
         let config_path = startup.config_path;
 
-        let logging_handle = wmux_core::logging::init_tracing(&config.logs, &config.path, &config_path)
-            .context("failed to initialize logging")?;
+        let logging_handle =
+            wmux_core::logging::init_tracing(&config.logs, &config.path, &config_path)
+                .context("failed to initialize logging")?;
 
-        let mut app_state = AppState::with_storage(store.clone(), assets_dir, logging_handle, &config_path)
-            .await
-            .context("failed to initialize SQLite storage")?;
+        let mut app_state =
+            AppState::with_storage(store.clone(), assets_dir, logging_handle, &config_path)
+                .await
+                .context("failed to initialize SQLite storage")?;
 
         let skills_dir = config_path
             .parent()
@@ -94,6 +101,10 @@ mod tests {
         fs::create_dir_all(&assets_dir).expect("create assets dir");
 
         let state = IpcState::new(config_path, assets_dir).await;
-        assert!(state.is_ok(), "IpcState should construct from config: {:?}", state.err());
+        assert!(
+            state.is_ok(),
+            "IpcState should construct from config: {:?}",
+            state.err()
+        );
     }
 }

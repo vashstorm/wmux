@@ -18,10 +18,7 @@ impl OmniHistoryRepository {
         Self { pool }
     }
 
-    pub async fn insert(
-        &self,
-        msg: &OmniConversationMessage,
-    ) -> Result<(), OmniHistoryRepoError> {
+    pub async fn insert(&self, msg: &OmniConversationMessage) -> Result<(), OmniHistoryRepoError> {
         let id = if msg.id.trim().is_empty() {
             Uuid::new_v4().to_string()
         } else {

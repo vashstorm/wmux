@@ -1,9 +1,9 @@
+use crate::state::IpcState;
 use tauri::State;
 use wmux_core::config::Config;
 use wmux_core::ipc_error::IpcError;
 use wmux_core::services;
 use wmux_core::services::config::ConfigResponse;
-use crate::state::IpcState;
 
 fn map_error(e: IpcError) -> String {
     format!("{}: {}", e.code(), e.message())
@@ -11,8 +11,7 @@ fn map_error(e: IpcError) -> String {
 
 #[tauri::command]
 pub async fn get_config(state: State<'_, IpcState>) -> Result<ConfigResponse, String> {
-    services::config::get_config(&state.app_state)
-        .map_err(map_error)
+    services::config::get_config(&state.app_state).map_err(map_error)
 }
 
 #[tauri::command]
@@ -20,8 +19,7 @@ pub async fn update_config(
     state: State<'_, IpcState>,
     config: Config,
 ) -> Result<ConfigResponse, String> {
-    services::config::update_config(&state.app_state, config)
-        .map_err(map_error)
+    services::config::update_config(&state.app_state, config).map_err(map_error)
 }
 
 #[cfg(test)]

@@ -765,7 +765,13 @@ mod tests {
         assert_eq!(snapshot.status, "running");
 
         let updated = repo
-            .update_ai_result(&created.id, "<html>AI result</html>", "completed", "", &snapshot)
+            .update_ai_result(
+                &created.id,
+                "<html>AI result</html>",
+                "completed",
+                "",
+                &snapshot,
+            )
             .await
             .expect("update_ai_result");
 
@@ -786,7 +792,13 @@ mod tests {
         let repo = ProjectRepository::new(pool);
 
         let result = repo
-            .update_snapshot("nonexistent-id", "{}", "running", "2026-05-22T12:00:00Z", &dummy())
+            .update_snapshot(
+                "nonexistent-id",
+                "{}",
+                "running",
+                "2026-05-22T12:00:00Z",
+                &dummy(),
+            )
             .await;
         assert!(result.is_err());
         match result.unwrap_err() {

@@ -1,6 +1,6 @@
+use crate::state::IpcState;
 use tauri::State;
 use wmux_core::http::ErrorLogsResponse;
-use crate::state::IpcState;
 
 #[tauri::command]
 pub async fn get_error_logs(state: State<'_, IpcState>) -> Result<ErrorLogsResponse, String> {
@@ -29,11 +29,9 @@ pub async fn get_error_logs(state: State<'_, IpcState>) -> Result<ErrorLogsRespo
 #[tauri::command]
 pub async fn clear_error_logs(state: State<'_, IpcState>) -> Result<(), String> {
     match &state.app_state.logging_handle.error_log {
-        Some(handle) => {
-            handle.clear().map_err(|e| {
-                format!("internal_error: failed to clear error logs: {}", e)
-            })
-        }
+        Some(handle) => handle
+            .clear()
+            .map_err(|e| format!("internal_error: failed to clear error logs: {}", e)),
         None => Ok(()),
     }
 }

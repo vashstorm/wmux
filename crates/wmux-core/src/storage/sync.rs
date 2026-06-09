@@ -102,7 +102,13 @@ async fn run_sync_once(pool: &SqlitePool, store: &Store) {
                         .format(&Rfc3339)
                         .expect("RFC3339 format is infallible");
                     if let Err(e) = repo
-                        .update_snapshot(&project.id, &project.layout_json, "stopped", &now_str, &project)
+                        .update_snapshot(
+                            &project.id,
+                            &project.layout_json,
+                            "stopped",
+                            &now_str,
+                            &project,
+                        )
                         .await
                     {
                         tracing::error!(project_id = %project.id, error = %e, "failed to update project status to stopped in sync task");

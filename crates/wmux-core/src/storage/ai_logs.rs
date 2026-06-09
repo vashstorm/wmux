@@ -323,6 +323,5 @@ mod tests {
         );
         assert_eq!(result.data[0].metrics_json, "{\"tokens\":150}");
         assert_eq!(result.data[0].raw_event_json, "{\"raw\":\"data\"}");
-
     }
 }

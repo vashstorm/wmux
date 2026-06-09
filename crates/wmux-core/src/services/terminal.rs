@@ -81,11 +81,7 @@ fn parse_optional_positive_u16(raw: Option<&str>) -> Result<Option<u16>, String>
 
 fn trimmed_non_empty(value: Option<&str>) -> Option<&str> {
     let value = value?.trim();
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
-    }
+    if value.is_empty() { None } else { Some(value) }
 }
 
 fn percent_encode_query_value(value: &str) -> String {
