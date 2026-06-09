@@ -1983,10 +1983,11 @@
 /* --- Window Tabs --- */
 .window-tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   padding: 0 calc(var(--spacing-lg) - 6px);
   flex-shrink: 0;
   min-height: 52px;
+  height: 52px;
   position: relative;
 }
 
@@ -2027,6 +2028,28 @@
 [data-mui-color-scheme="dark"] .window-tab {
   border-color: color-mix(in srgb, var(--color-panel-border) 35%, transparent);
   border-bottom-color: transparent;
+}
+
+/* Chrome-like Vertical Divider Line between inactive tabs */
+.window-tab::after {
+  display: none;
+}
+
+/* Hide divider line for the last tab */
+.window-tabs .MuiTabs-flexContainer .MuiTab-root:last-child::after {
+  display: none;
+}
+
+/* Hide divider line when tab is active or hovered */
+.window-tab.is-active::after,
+.window-tab:hover::after {
+  opacity: 0;
+}
+
+/* Hide divider line on preceding tab if current is active or hovered */
+.window-tab:has(+ .is-active)::after,
+.window-tab:has(+ .window-tab:hover)::after {
+  opacity: 0;
 }
 
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(1) {
@@ -2072,6 +2095,22 @@
   margin-bottom: -2px !important;
 }
 
+.window-tab.is-active.status-explicit {
+  border-bottom-color: rgba(220, 38, 38, 0.12);
+}
+.window-tab.is-active.status-attention {
+  border-bottom-color: rgba(217, 119, 6, 0.12);
+}
+.window-tab.is-active.status-running {
+  border-bottom-color: rgba(16, 185, 129, 0.12);
+}
+.window-tab.is-active.status-waiting {
+  border-bottom-color: rgba(245, 158, 11, 0.12);
+}
+.window-tab.is-active.status-blocked {
+  border-bottom-color: rgba(239, 68, 68, 0.12);
+}
+
 .window-tab-index {
   display: inline-flex;
   align-items: center;
@@ -2080,7 +2119,8 @@
   height: 17px;
   min-width: 17px;
   font-size: var(--font-size-2xs);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   border-radius: var(--radius-full);
   flex-shrink: 0;
@@ -2091,7 +2131,7 @@
 
 .window-tab-name {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
