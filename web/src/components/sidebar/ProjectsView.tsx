@@ -114,10 +114,6 @@ export function ProjectsView() {
   }
 
   const handleOpenProjectDetails = (project: Project) => {
-    if (selectedProject?.id === project.id) {
-      setSelectedProject(null)
-      return
-    }
     setSelectedProject(project)
   }
 
