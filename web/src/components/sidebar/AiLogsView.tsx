@@ -122,7 +122,8 @@ function getToolCallSummary(entry: AiLogEntry): string {
 
   if (target !== undefined && target !== null) parts.push(`target ${compactValue(target)}`)
   if (session !== undefined && session !== null) parts.push(`session ${compactValue(session)}`)
-  if (windowName !== undefined && windowName !== null) parts.push(`window ${compactValue(windowName)}`)
+  if (windowName !== undefined && windowName !== null)
+    parts.push(`window ${compactValue(windowName)}`)
   if (pane !== undefined && pane !== null) parts.push(`pane ${compactValue(pane)}`)
 
   return parts.join(" · ")
@@ -395,9 +396,7 @@ export function AiLogsView() {
                   },
                   transition: "all var(--transition-base)",
                   overflow: "hidden",
-                  boxShadow: isIssueLog(entry)
-                    ? "var(--glow-danger)"
-                    : "none",
+                  boxShadow: isIssueLog(entry) ? "var(--glow-danger)" : "none",
                 }}
               >
                 {(() => {
@@ -449,7 +448,9 @@ export function AiLogsView() {
                                     : "transparent",
                             opacity: 0.4,
                             animation:
-                              entry.status === "success" || entry.status === "error" || entry.status === "blocked"
+                              entry.status === "success" ||
+                              entry.status === "error" ||
+                              entry.status === "blocked"
                                 ? "pulse 2s infinite ease-in-out"
                                 : "none",
                           },

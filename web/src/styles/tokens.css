@@ -88,11 +88,11 @@
 :root,
 [data-mui-color-scheme="light"] {
   /* Background layers */
-  --color-background: #f5f2eb;            /* Warm cream backdrop */
-  --color-panel: #fdfcf9;                 /* Soft off-white paper panel */
-  --color-panel-border: #2b2621;          /* Solid charcoal-brown border */
-  --color-surface: #eae4d8;               /* Putty grey surface */
-  --color-surface-hover: #ded6c8;         /* Hover state putty grey */
+  --color-background: #f5f2eb; /* Warm cream backdrop */
+  --color-panel: #fdfcf9; /* Soft off-white paper panel */
+  --color-panel-border: #2b2621; /* Solid charcoal-brown border */
+  --color-surface: #eae4d8; /* Putty grey surface */
+  --color-surface-hover: #ded6c8; /* Hover state putty grey */
   --color-surface-border: #2b2621;
   --color-surface-border-hover: #2b2621;
 
@@ -104,15 +104,15 @@
   --color-accent-gradient: linear-gradient(135deg, #b85a3c 0%, #d5804c 100%);
 
   /* Text */
-  --color-text: #2b2621;                  /* Solid dark charcoal-brown */
-  --color-text-muted: #5f544b;            /* Muted sepia-brown */
-  --color-text-disabled: #8a7f74;         /* Faded light brown */
+  --color-text: #2b2621; /* Solid dark charcoal-brown */
+  --color-text-muted: #5f544b; /* Muted sepia-brown */
+  --color-text-disabled: #8a7f74; /* Faded light brown */
 
   /* Glass / highlight */
   --color-glass-highlight: rgba(253, 252, 249, 0.9);
   --color-glass-highlight-border: #2b2621;
   --color-glass-surface: rgba(253, 252, 249, 0.7);
-  --color-glass-blur: none;               /* Flat look, no blur needed */
+  --color-glass-blur: none; /* Flat look, no blur needed */
 
   /* Inputs */
   --color-input-bg: #fdfcf9;
@@ -122,9 +122,9 @@
   --color-input-placeholder: #8a7f74;
 
   /* Status */
-  --color-danger: #c94a3b;                /* Retro clay red */
-  --color-success: #5f8745;               /* Retro sage green */
-  --color-warning: #cf9c34;               /* Muted mustard yellow */
+  --color-danger: #c94a3b; /* Retro clay red */
+  --color-success: #5f8745; /* Retro sage green */
+  --color-warning: #cf9c34; /* Muted mustard yellow */
   --color-attention-explicit: #c94a3b;
   --color-attention: #cf9c34;
   --color-online: #5f8745;
@@ -163,11 +163,11 @@
    ============================================================ */
 [data-mui-color-scheme="dark"] {
   /* Background layers */
-  --color-background: #161719;            /* Deep charcoal CRT phosphor screen */
-  --color-panel: #202124;                 /* Dark bezel surface */
-  --color-panel-border: #a89984;          /* Soft retro grey-beige border */
-  --color-surface: #2e3034;               /* Charcoal panel surface */
-  --color-surface-hover: #3a3d42;         /* Dark hover state */
+  --color-background: #161719; /* Deep charcoal CRT phosphor screen */
+  --color-panel: #202124; /* Dark bezel surface */
+  --color-panel-border: #a89984; /* Soft retro grey-beige border */
+  --color-surface: #2e3034; /* Charcoal panel surface */
+  --color-surface-hover: #3a3d42; /* Dark hover state */
   --color-surface-border: #7c6f64;
   --color-surface-border-hover: #a89984;
 
@@ -179,9 +179,9 @@
   --color-accent-gradient: linear-gradient(135deg, #db8e3b 0%, #a7c080 100%);
 
   /* Text */
-  --color-text: #f2eeeb;                  /* Retro white-grey */
-  --color-text-muted: #bdae93;            /* Soft warm grey */
-  --color-text-disabled: #665c54;         /* Muted dark grey */
+  --color-text: #f2eeeb; /* Retro white-grey */
+  --color-text-muted: #bdae93; /* Soft warm grey */
+  --color-text-disabled: #665c54; /* Muted dark grey */
 
   /* Glass / highlight */
   --color-glass-highlight: rgba(255, 255, 255, 0.04);
@@ -197,9 +197,9 @@
   --color-input-placeholder: #665c54;
 
   /* Status (CRT Phosphors) */
-  --color-danger: #ea5a4b;                /* Retro bright red */
-  --color-success: #a7c080;               /* Phosphor green */
-  --color-warning: #db8e3b;               /* Amber yellow */
+  --color-danger: #ea5a4b; /* Retro bright red */
+  --color-success: #a7c080; /* Phosphor green */
+  --color-warning: #db8e3b; /* Amber yellow */
   --color-attention-explicit: #ea5a4b;
   --color-attention: #db8e3b;
   --color-online: #a7c080;

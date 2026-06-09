@@ -688,14 +688,12 @@ describe("Projects view", () => {
       schemaVersion: 1,
     })
     vi.mocked(client.deleteProject).mockReset().mockResolvedValue(undefined)
-    vi.mocked(client.createSession)
-      .mockReset()
-      .mockResolvedValue({
-        targetName: "conn1",
-        operation: "create_session",
-        mode: "local",
-        status: "ok",
-      })
+    vi.mocked(client.createSession).mockReset().mockResolvedValue({
+      targetName: "conn1",
+      operation: "create_session",
+      mode: "local",
+      status: "ok",
+    })
   })
 
   test("clicking Projects button loads projects and shows empty state", async () => {
@@ -829,7 +827,7 @@ describe("Projects view", () => {
     )
 
     fireEvent.click(screen.getByTestId("open-projects-button"))
-    
+
     await waitFor(() => {
       expect(screen.getByText("Projects")).toBeInTheDocument()
       expect(screen.getByText("React Web App")).toBeInTheDocument()

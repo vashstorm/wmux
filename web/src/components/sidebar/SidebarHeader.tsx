@@ -21,7 +21,10 @@ const NAV_ITEMS: { view: SidebarView; Icon: typeof FolderIcon; label: string; te
   { view: "ai_logs", Icon: SmartToyIcon, label: "AI Logs", testId: "open-ai-logs-button" },
 ]
 
-export const SidebarHeader = memo(function SidebarHeader({ activeView, onViewChange }: SidebarHeaderProps) {
+export const SidebarHeader = memo(function SidebarHeader({
+  activeView,
+  onViewChange,
+}: SidebarHeaderProps) {
   return (
     <Box
       className="sidebar-header"

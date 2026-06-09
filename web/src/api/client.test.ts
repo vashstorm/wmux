@@ -37,7 +37,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 }))
 
 const invoke = {
-  configure: (config: { successResults?: Record<string, unknown>; errorResponses?: Record<string, { code: string; message: string }> }) => {
+  configure: (config: {
+    successResults?: Record<string, unknown>
+    errorResponses?: Record<string, { code: string; message: string }>
+  }) => {
     mockInvoke.mockImplementation(async (cmd: string, _args?: Record<string, unknown>) => {
       const errorResponse = config.errorResponses?.[cmd]
       if (errorResponse) {
@@ -449,7 +452,9 @@ describe("api client", () => {
   test("listConnectionHealth returns health data", async () => {
     invoke.configure({
       successResults: {
-        list_connections_health: [{ targetName: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" }],
+        list_connections_health: [
+          { targetName: "1", status: "online", checkedAt: "2024-01-01T00:00:00Z" },
+        ],
       },
     })
     const result = await listConnectionHealth()
@@ -668,7 +673,9 @@ describe("api client", () => {
 
     test("project duplicate name throws ApiError", async () => {
       invoke.configure({
-        errorResponses: { create_project: { code: "conflict", message: "project name already exists" } },
+        errorResponses: {
+          create_project: { code: "conflict", message: "project name already exists" },
+        },
       })
       await expect(createProject({ name: "dup" })).rejects.toThrow(ApiError)
       try {

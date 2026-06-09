@@ -66,14 +66,10 @@ export function mapTauriErrorToIpcError(tauriError: unknown): IpcError {
 
     if (typeof errorObj.message === "string") {
       const code =
-        typeof errorObj.code === "string"
-          ? (errorObj.code as IpcErrorCode)
-          : "internal_error"
+        typeof errorObj.code === "string" ? (errorObj.code as IpcErrorCode) : "internal_error"
 
       const message =
-        typeof errorObj.message === "string"
-          ? errorObj.message
-          : "Unknown Tauri error"
+        typeof errorObj.message === "string" ? errorObj.message : "Unknown Tauri error"
 
       return new IpcError(code, message)
     }

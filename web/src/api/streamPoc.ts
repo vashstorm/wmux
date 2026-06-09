@@ -1,74 +1,71 @@
-import { invoke, Channel } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { invoke, Channel } from "@tauri-apps/api/core"
+import { listen } from "@tauri-apps/api/event"
 
 export interface StreamBurstComplete {
-  total: number;
+  total: number
 }
 
 export interface StreamBurstCleanup {
-  (): void;
+  (): void
 }
 
 export async function createStreamBurst(
   count: number,
   onChunk: (line: string) => void,
-  onDone: () => void
+  onDone: () => void,
 ): Promise<StreamBurstCleanup> {
-  const channel = new Channel<string>();
+  const channel = new Channel<string>()
 
   channel.onmessage = (message: string) => {
-    onChunk(message);
-  };
+    onChunk(message)
+  }
 
-  await invoke("stream_burst", { count, onEvent: channel });
+  await invoke("stream_burst", { count, onEvent: channel })
 
-  const unlistenComplete = await listen<StreamBurstComplete>(
-    "stream-burst-complete",
-    () => {
-      onDone();
-    }
-  );
+  const unlistenComplete = await listen<StreamBurstComplete>("stream-burst-complete", () => {
+    onDone()
+  })
 
   return () => {
-    unlistenComplete();
-  };
+    unlistenComplete()
+  }
 }
 
 export async function collectStreamBurst(
   count: number,
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
 ): Promise<string[]> {
-  const lines: string[] = [];
+  const lines: string[] = []
 
   return new Promise(async (resolve, reject) => {
-    let completed = false;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let completed = false
+    let timeoutId: ReturnType<typeof setTimeout>
 
     const cleanup = await createStreamBurst(
       count,
       (line) => {
-        if (completed) return;
-        lines.push(line);
+        if (completed) return
+        lines.push(line)
       },
       () => {
-        if (completed) return;
-        completed = true;
-        clearTimeout(timeoutId);
-        cleanup();
-        resolve(lines);
-      }
-    );
+        if (completed) return
+        completed = true
+        clearTimeout(timeoutId)
+        cleanup()
+        resolve(lines)
+      },
+    )
 
     timeoutId = setTimeout(() => {
       if (!completed) {
-        completed = true;
-        cleanup();
+        completed = true
+        cleanup()
         reject(
           new Error(
-            `Stream burst timeout after ${timeoutMs}ms. Received ${lines.length} of ${count} lines.`
-          )
-        );
+            `Stream burst timeout after ${timeoutMs}ms. Received ${lines.length} of ${count} lines.`,
+          ),
+        )
       }
-    }, timeoutMs);
-  });
+    }, timeoutMs)
+  })
 }

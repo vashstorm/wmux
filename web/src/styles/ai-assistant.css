@@ -81,7 +81,8 @@
 }
 
 @keyframes border-glow-processing {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: var(--shadow-lg), var(--glow-accent);
     border-color: var(--color-accent);
   }
@@ -188,32 +189,55 @@
 }
 
 @keyframes voice-launcher-pulse-success {
-  0%, 100% {
-    box-shadow: var(--shadow-md), 0 0 0 0 rgba(167, 192, 128, 0.4);
+  0%,
+  100% {
+    box-shadow:
+      var(--shadow-md),
+      0 0 0 0 rgba(167, 192, 128, 0.4);
   }
   50% {
-    box-shadow: var(--shadow-md), 0 0 0 8px rgba(167, 192, 128, 0);
+    box-shadow:
+      var(--shadow-md),
+      0 0 0 8px rgba(167, 192, 128, 0);
   }
 }
 
 @keyframes voice-launcher-pulse-accent {
-  0%, 100% {
-    box-shadow: var(--shadow-md), 0 0 0 0 rgba(219, 142, 59, 0.4);
+  0%,
+  100% {
+    box-shadow:
+      var(--shadow-md),
+      0 0 0 0 rgba(219, 142, 59, 0.4);
   }
   50% {
-    box-shadow: var(--shadow-md), 0 0 0 8px rgba(219, 142, 59, 0);
+    box-shadow:
+      var(--shadow-md),
+      0 0 0 8px rgba(219, 142, 59, 0);
   }
 }
 
 @keyframes launcher-icon-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes voice-launcher-shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-4px); }
-  40%, 80% { transform: translateX(4px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
 }
 
 /* --- Header --- */
@@ -276,7 +300,7 @@
 }
 
 .ai-assistant[data-ai-assistant-state="processing"] .voice-status-dot::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: -4px;
   border-radius: inherit;
@@ -670,7 +694,6 @@
   line-height: 1.3;
   text-align: center;
 }
-
 
 /* --- Chat Body --- */
 .voice-chat {
@@ -1098,8 +1121,16 @@
     to right,
     var(--color-accent) 0%,
     var(--color-accent) var(--volume-fill, 70%),
-    var(--color-surface-border, color-mix(in srgb, var(--color-surface) 60%, var(--color-panel-border))) var(--volume-fill, 70%),
-    var(--color-surface-border, color-mix(in srgb, var(--color-surface) 60%, var(--color-panel-border))) 100%
+    var(
+        --color-surface-border,
+        color-mix(in srgb, var(--color-surface) 60%, var(--color-panel-border))
+      )
+      var(--volume-fill, 70%),
+    var(
+        --color-surface-border,
+        color-mix(in srgb, var(--color-surface) 60%, var(--color-panel-border))
+      )
+      100%
   );
   pointer-events: none;
   transition: background var(--transition-fast);
@@ -1132,7 +1163,9 @@ input[type="range"].voice-volume-slider-popover::-webkit-slider-thumb {
   border-radius: var(--radius-full);
   background: #fff;
   border: 2px solid var(--color-accent);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25), 0 0 0 0 var(--color-accent);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.25),
+    0 0 0 0 var(--color-accent);
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
@@ -1141,12 +1174,16 @@ input[type="range"].voice-volume-slider-popover::-webkit-slider-thumb {
 
 input[type="range"].voice-volume-slider-popover:hover::-webkit-slider-thumb {
   transform: scale(1.15);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3), 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.3),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 input[type="range"].voice-volume-slider-popover:active::-webkit-slider-thumb {
   transform: scale(1.22);
-  box-shadow: 0 1px 6px rgba(0,0,0,0.35), 0 0 0 5px color-mix(in srgb, var(--color-accent) 15%, transparent);
+  box-shadow:
+    0 1px 6px rgba(0, 0, 0, 0.35),
+    0 0 0 5px color-mix(in srgb, var(--color-accent) 15%, transparent);
 }
 
 input[type="range"].voice-volume-slider-popover:disabled {
@@ -1192,7 +1229,8 @@ input[type="range"].voice-volume-slider-popover:disabled {
 }
 
 @keyframes connecting-bar-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.25;
     background: var(--color-text-disabled);
   }
@@ -1240,7 +1278,9 @@ input[type="range"].voice-volume-slider-popover:disabled {
 }
 
 @keyframes thinking-dot-pulse {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     transform: scale(0.6);
     opacity: 0.4;
   }

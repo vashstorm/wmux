@@ -16,11 +16,7 @@ export function ErrorBanner() {
       variant="filled"
       onClose={() => setError(null)}
       action={
-        <Button
-          color="inherit"
-          size="small"
-          onClick={() => setError(null)}
-        >
+        <Button color="inherit" size="small" onClick={() => setError(null)}>
           Dismiss
         </Button>
       }

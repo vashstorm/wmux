@@ -305,9 +305,7 @@ function findWindowByVoiceTarget(
 
   const trimmedQuery = query.trim()
   const idOrNameMatch = windows.find(
-    (windowInfo) =>
-      windowInfo.ID === trimmedQuery ||
-      matchesText(windowInfo.Name, trimmedQuery),
+    (windowInfo) => windowInfo.ID === trimmedQuery || matchesText(windowInfo.Name, trimmedQuery),
   )
   if (idOrNameMatch) return idOrNameMatch
 
@@ -361,7 +359,11 @@ function emitSidebarNavigation(route: string): void {
   window.dispatchEvent(new CustomEvent("wmux:navigate-sidebar", { detail: { route } }))
 }
 
-function compactSessionForTool(session: { name?: string; attached?: boolean; windowCount?: number }) {
+function compactSessionForTool(session: {
+  name?: string
+  attached?: boolean
+  windowCount?: number
+}) {
   return {
     name: session.name ?? "",
     attached: session.attached ?? false,
@@ -460,12 +462,35 @@ function parseVoiceConfirmation(text: string): "confirm" | "cancel" | null {
   if (exactCancel.has(normalized) || exactCancel.has(compact)) return "cancel"
   if (exactConfirm.has(normalized) || exactConfirm.has(compact)) return "confirm"
 
-  const cancelPhrases = ["cancel", "abort", "reject", "停止", "取消", "算了", "不要", "不行", "拒绝", "不确认"]
+  const cancelPhrases = [
+    "cancel",
+    "abort",
+    "reject",
+    "停止",
+    "取消",
+    "算了",
+    "不要",
+    "不行",
+    "拒绝",
+    "不确认",
+  ]
   if (cancelPhrases.some((phrase) => normalized.includes(phrase) || compact.includes(phrase))) {
     return "cancel"
   }
 
-  const confirmPhrases = ["confirm", "proceed", "approve", "go ahead", "do it", "确认", "确定", "可以", "执行", "同意", "继续"]
+  const confirmPhrases = [
+    "confirm",
+    "proceed",
+    "approve",
+    "go ahead",
+    "do it",
+    "确认",
+    "确定",
+    "可以",
+    "执行",
+    "同意",
+    "继续",
+  ]
   if (confirmPhrases.some((phrase) => normalized.includes(phrase) || compact.includes(phrase))) {
     return "confirm"
   }
@@ -798,10 +823,10 @@ export function AiAssistant() {
         width: start.direction === "height" ? start.startWidth : start.startWidth + deltaX,
         height: start.direction === "width" ? start.startHeight : start.startHeight + deltaY,
       })
-      
+
       const actualDeltaX = nextSize.width - start.startWidth
       const actualDeltaY = nextSize.height - start.startHeight
-      
+
       const nextPos = clampAssistantPos(
         {
           x: start.direction === "height" ? start.startPos.x : start.startPos.x - actualDeltaX,
@@ -809,7 +834,7 @@ export function AiAssistant() {
         },
         nextSize,
       )
-      
+
       assistantSizeRef.current = nextSize
       assistantPosRef.current = nextPos
       setAssistantSize(nextSize)
@@ -860,14 +885,19 @@ export function AiAssistant() {
         "position",
         "ordinal",
       ])
-      const windowOrdinal =
-        stringParam(params, ["window_index", "windowIndex", "index", "position", "ordinal"])
-          ? parseOrdinal(
-              stringParam(params, ["window_index", "windowIndex", "index", "position", "ordinal"]),
-            )
-          : windowQuery && /^第/.test(windowQuery.trim())
-            ? parseOrdinal(windowQuery)
-            : null
+      const windowOrdinal = stringParam(params, [
+        "window_index",
+        "windowIndex",
+        "index",
+        "position",
+        "ordinal",
+      ])
+        ? parseOrdinal(
+            stringParam(params, ["window_index", "windowIndex", "index", "position", "ordinal"]),
+          )
+        : windowQuery && /^第/.test(windowQuery.trim())
+          ? parseOrdinal(windowQuery)
+          : null
       const paneQuery = stringParam(params, ["pane", "pane_index", "paneIndex"])
 
       try {
@@ -1085,20 +1115,36 @@ export function AiAssistant() {
       try {
         let operation: unknown
         if (skill === "create_session") {
-          const sessionName = stringParam(params, ["session_name", "sessionName", "name", "session"])
+          const sessionName = stringParam(params, [
+            "session_name",
+            "sessionName",
+            "name",
+            "session",
+          ])
           if (!sessionName) {
             throw new Error("Session name is required to create a session")
           }
           operation = await createSession(targetName, sessionName)
         } else if (skill === "rename_session") {
-          const sessionName = stringParam(params, ["old_name", "oldName", "session_name", "sessionName", "session"])
+          const sessionName = stringParam(params, [
+            "old_name",
+            "oldName",
+            "session_name",
+            "sessionName",
+            "session",
+          ])
           const newName = stringParam(params, ["new_name", "newName", "name"])
           if (!sessionName || !newName) {
             throw new Error("Current session name and new name are required to rename a session")
           }
           operation = await renameSession(targetName, sessionName, newName)
         } else if (skill === "delete_session") {
-          const sessionName = stringParam(params, ["session_name", "sessionName", "session", "name"])
+          const sessionName = stringParam(params, [
+            "session_name",
+            "sessionName",
+            "session",
+            "name",
+          ])
           if (!sessionName) {
             throw new Error("Session name is required to delete a session")
           }
@@ -1133,23 +1179,41 @@ export function AiAssistant() {
 
       // Delegate mutation intents to the existing handler
       if (routeId === "sessions.create") {
-        void executeSessionMutationIntent("create_session", routeParams, callId, "invoke_backend_route", {
-          routeId,
-        })
+        void executeSessionMutationIntent(
+          "create_session",
+          routeParams,
+          callId,
+          "invoke_backend_route",
+          {
+            routeId,
+          },
+        )
         return
       }
 
       if (routeId === "sessions.rename") {
-        void executeSessionMutationIntent("rename_session", routeParams, callId, "invoke_backend_route", {
-          routeId,
-        })
+        void executeSessionMutationIntent(
+          "rename_session",
+          routeParams,
+          callId,
+          "invoke_backend_route",
+          {
+            routeId,
+          },
+        )
         return
       }
 
       if (routeId === "sessions.delete") {
-        void executeSessionMutationIntent("delete_session", routeParams, callId, "invoke_backend_route", {
-          routeId,
-        })
+        void executeSessionMutationIntent(
+          "delete_session",
+          routeParams,
+          callId,
+          "invoke_backend_route",
+          {
+            routeId,
+          },
+        )
         return
       }
 
@@ -1165,7 +1229,9 @@ export function AiAssistant() {
           case "sessions.list": {
             const targetName = resolveIntentTargetName(routeParams)
             if (!targetName) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name is required for sessions.list" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name is required for sessions.list",
+              })
               return
             }
             const data = await listSessions(targetName)
@@ -1177,7 +1243,9 @@ export function AiAssistant() {
             const targetName = resolveIntentTargetName(routeParams)
             const sessionName = resolveIntentSessionName(routeParams)
             if (!targetName || !sessionName) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for sessions.analyze" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name and session_name are required for sessions.analyze",
+              })
               return
             }
             const data = await analyzeSession(targetName, sessionName)
@@ -1189,7 +1257,9 @@ export function AiAssistant() {
             const targetName = resolveIntentTargetName(routeParams)
             const sessionName = resolveIntentSessionName(routeParams)
             if (!targetName || !sessionName) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for windows.list" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name and session_name are required for windows.list",
+              })
               return
             }
             const data = await listWindows(targetName, sessionName)
@@ -1201,7 +1271,9 @@ export function AiAssistant() {
             const targetName = resolveIntentTargetName(routeParams)
             const sessionName = resolveIntentSessionName(routeParams)
             if (!targetName || !sessionName) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for windows.create" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name and session_name are required for windows.create",
+              })
               return
             }
             const windowName = stringParam(routeParams, ["window_name", "windowName", "name"])
@@ -1215,7 +1287,9 @@ export function AiAssistant() {
             const sessionName = resolveIntentSessionName(routeParams)
             const windowId = stringParam(routeParams, ["window_id", "windowId"])
             if (!targetName || !sessionName || !windowId) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, and window_id are required for windows.delete" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name, session_name, and window_id are required for windows.delete",
+              })
               return
             }
             const data = await killWindow(targetName, sessionName, windowId)
@@ -1228,7 +1302,9 @@ export function AiAssistant() {
             const sessionName = resolveIntentSessionName(routeParams)
             const windowId = stringParam(routeParams, ["window_id", "windowId"])
             if (!targetName || !sessionName || !windowId) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, and window_id are required for panes.list" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "target_name, session_name, and window_id are required for panes.list",
+              })
               return
             }
             const data = await listPanes(targetName, sessionName, windowId)
@@ -1241,9 +1317,14 @@ export function AiAssistant() {
             const sessionName = resolveIntentSessionName(routeParams)
             const windowId = stringParam(routeParams, ["window_id", "windowId"])
             const paneId = stringParam(routeParams, ["pane_id", "paneId", "pane"])
-            const horizontal = stringParam(routeParams, ["direction", "split_direction", "splitDirection"]) === "horizontal"
+            const horizontal =
+              stringParam(routeParams, ["direction", "split_direction", "splitDirection"]) ===
+              "horizontal"
             if (!targetName || !sessionName || !windowId || !paneId) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, window_id, and pane_id are required for panes.split" })
+              sendToolResult("invoke_backend_route", callId, {
+                error:
+                  "target_name, session_name, window_id, and pane_id are required for panes.split",
+              })
               return
             }
             const data = await splitPane(targetName, sessionName, windowId, paneId, horizontal)
@@ -1257,7 +1338,10 @@ export function AiAssistant() {
             const windowId = stringParam(routeParams, ["window_id", "windowId"])
             const paneId = stringParam(routeParams, ["pane_id", "paneId", "pane"])
             if (!targetName || !sessionName || !windowId || !paneId) {
-              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, window_id, and pane_id are required for panes.delete" })
+              sendToolResult("invoke_backend_route", callId, {
+                error:
+                  "target_name, session_name, window_id, and pane_id are required for panes.delete",
+              })
               return
             }
             const data = await killPane(targetName, sessionName, windowId, paneId)
@@ -1274,7 +1358,9 @@ export function AiAssistant() {
           case "projects.create": {
             const name = stringParam(routeParams, ["name", "project_name", "projectName"])
             if (!name) {
-              sendToolResult("invoke_backend_route", callId, { error: "name is required for projects.create" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "name is required for projects.create",
+              })
               return
             }
             const data = await createProject({
@@ -1289,7 +1375,9 @@ export function AiAssistant() {
           case "projects.update": {
             const id = stringParam(routeParams, ["id", "project_id", "projectId"])
             if (!id) {
-              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.update" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "id is required for projects.update",
+              })
               return
             }
             const data = await updateProject(id, {
@@ -1304,7 +1392,9 @@ export function AiAssistant() {
           case "projects.delete": {
             const id = stringParam(routeParams, ["id", "project_id", "projectId"])
             if (!id) {
-              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.delete" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "id is required for projects.delete",
+              })
               return
             }
             const killSession = stringParam(routeParams, ["kill_session", "killSession"]) === "true"
@@ -1316,7 +1406,9 @@ export function AiAssistant() {
           case "projects.launch": {
             const id = stringParam(routeParams, ["id", "project_id", "projectId"])
             if (!id) {
-              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.launch" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "id is required for projects.launch",
+              })
               return
             }
             const data = await launchProject(id)
@@ -1327,7 +1419,9 @@ export function AiAssistant() {
           case "projects.sync_from_tmux": {
             const id = stringParam(routeParams, ["id", "project_id", "projectId"])
             if (!id) {
-              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.sync_from_tmux" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "id is required for projects.sync_from_tmux",
+              })
               return
             }
             const data = await syncProjectFromTmux(id)
@@ -1338,7 +1432,9 @@ export function AiAssistant() {
           case "projects.generate_ai_html": {
             const id = stringParam(routeParams, ["id", "project_id", "projectId"])
             if (!id) {
-              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.generate_ai_html" })
+              sendToolResult("invoke_backend_route", callId, {
+                error: "id is required for projects.generate_ai_html",
+              })
               return
             }
             const data = await generateProjectAiHtml(id)
@@ -1396,12 +1492,19 @@ export function AiAssistant() {
       }
 
       void invokeRoute().catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : `Failed to execute backend route ${routeId}`
+        const message =
+          error instanceof Error ? error.message : `Failed to execute backend route ${routeId}`
         setError({ code: "voice_tool_failed", message })
         sendToolResult("invoke_backend_route", callId, { error: message })
       })
     },
-    [executeSessionMutationIntent, resolveIntentTargetName, resolveIntentSessionName, sendToolResult, setError],
+    [
+      executeSessionMutationIntent,
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      sendToolResult,
+      setError,
+    ],
   )
 
   const resolveIntentWindowQuery = useCallback(
@@ -1421,23 +1524,20 @@ export function AiAssistant() {
     [],
   )
 
-  const resolveIntentWindowOrdinal = useCallback(
-    (params: VoiceIntentParams): number | null => {
-      const ordinalParam = stringParam(params, [
-        "window_index",
-        "windowIndex",
-        "index",
-        "position",
-        "ordinal",
-      ])
-      if (ordinalParam) {
-        return parseOrdinal(ordinalParam)
-      }
-      const windowText = stringParam(params, ["window", "window_name", "windowName"])
-      return windowText && /^第/.test(windowText.trim()) ? parseOrdinal(windowText) : null
-    },
-    [],
-  )
+  const resolveIntentWindowOrdinal = useCallback((params: VoiceIntentParams): number | null => {
+    const ordinalParam = stringParam(params, [
+      "window_index",
+      "windowIndex",
+      "index",
+      "position",
+      "ordinal",
+    ])
+    if (ordinalParam) {
+      return parseOrdinal(ordinalParam)
+    }
+    const windowText = stringParam(params, ["window", "window_name", "windowName"])
+    return windowText && /^第/.test(windowText.trim()) ? parseOrdinal(windowText) : null
+  }, [])
 
   const resolveIntentWindowTarget = useCallback(
     async (
@@ -1560,18 +1660,42 @@ export function AiAssistant() {
         if (skill === "split_pane") {
           const horizontal = params.horizontal === true || params.direction === "horizontal"
           const result = await splitPane(targetName, sessionName, windowName, paneName, horizontal)
-          output = { targetName, session: sessionName, window: windowName, pane: paneName, operation: compactOperationForTool(result) }
+          output = {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            operation: compactOperationForTool(result),
+          }
         } else if (skill === "kill_pane") {
           await killPane(targetName, sessionName, windowName, paneName)
-          output = { targetName, session: sessionName, window: windowName, pane: paneName, status: "killed" }
+          output = {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            status: "killed",
+          }
         } else if (skill === "read_pane_output") {
           const lines = typeof params.lines === "number" ? params.lines : 50
           const maxBytes = Math.min(lines * 200, 100000)
           const result = await capturePane(targetName, sessionName, windowName, paneName, maxBytes)
-          output = { targetName, session: sessionName, window: windowName, pane: paneName, output: result.output }
+          output = {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            output: result.output,
+          }
         } else if (skill === "clear_pane") {
           await clearPane(targetName, sessionName, windowName, paneName)
-          output = { targetName, session: sessionName, window: windowName, pane: paneName, status: "cleared" }
+          output = {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            status: "cleared",
+          }
         } else if (skill === "send_to_pane") {
           const text = stringParam(params, ["text"]) ?? ""
           const execute = params.execute === true
@@ -1590,7 +1714,14 @@ export function AiAssistant() {
           if (keys.length > 0) {
             await sendKeysToPane(targetName, sessionName, windowName, paneName, keys)
           }
-          output = { targetName, session: sessionName, window: windowName, pane: paneName, text, executed: execute || appendEnter }
+          output = {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            text,
+            executed: execute || appendEnter,
+          }
         } else {
           return
         }
@@ -1628,7 +1759,8 @@ export function AiAssistant() {
         return
       }
 
-      const targetName = resolveIntentTargetName(params) ?? selectedPane?.targetName ?? selectedTargetName
+      const targetName =
+        resolveIntentTargetName(params) ?? selectedPane?.targetName ?? selectedTargetName
       const sessionName = resolveIntentSessionName(params) ?? selectedPane?.session
       if (!targetName || !sessionName) {
         const message = "Target and session are required for agent prompt execution"
@@ -1641,17 +1773,16 @@ export function AiAssistant() {
         const explicitWindow = Boolean(resolveIntentWindowQuery(params))
         const selectedMatches =
           selectedPane?.targetName === targetName && selectedPane.session === sessionName
-        let windowName = selectedMatches && selectedPane?.window && !explicitWindow
-          ? selectedPane.window
-          : null
+        let windowName =
+          selectedMatches && selectedPane?.window && !explicitWindow ? selectedPane.window : null
         if (!windowName) {
           windowName = (await resolveIntentWindowTarget(targetName, sessionName, params)).window.ID
         }
 
         const paneQuery = resolveIntentPaneId(params)
-        let paneName = paneQuery ?? (
-          selectedMatches && selectedPane?.window === windowName ? selectedPane.pane : undefined
-        )
+        let paneName =
+          paneQuery ??
+          (selectedMatches && selectedPane?.window === windowName ? selectedPane.pane : undefined)
         if (!paneName) {
           const panesResponse = await listPanes(targetName, sessionName, windowName)
           paneName = findPane(panesResponse.data ?? [], null)?.ID
@@ -1661,9 +1792,7 @@ export function AiAssistant() {
         }
 
         const promptArg = shellDoubleQuote(prompt)
-        const command = agent === "claude"
-          ? `claude -p ${promptArg}`
-          : `codex exec ${promptArg}`
+        const command = agent === "claude" ? `claude -p ${promptArg}` : `codex exec ${promptArg}`
         await sendKeysToPane(targetName, sessionName, windowName, paneName, [command, "Enter"])
         sendToolResult(resultSkill, callId, {
           output: {
@@ -1705,14 +1834,23 @@ export function AiAssistant() {
         let output: Record<string, unknown> = {}
         if (skill === "list_projects") {
           const projects = await listProjects()
-          output = { count: projects.length, projects: projects.map((p) => ({ id: p.id, name: p.name, path: p.path })) }
+          output = {
+            count: projects.length,
+            projects: projects.map((p) => ({ id: p.id, name: p.name, path: p.path })),
+          }
         } else if (skill === "create_project") {
           const name = stringParam(params, ["name"]) ?? ""
           const projectPath = stringParam(params, ["path"]) ?? ""
           const description = stringParam(params, ["description"]) ?? undefined
           const sessionName = stringParam(params, ["session_name", "sessionName"]) ?? undefined
           const workdir = stringParam(params, ["workdir"]) ?? undefined
-          const result = await createProject({ name, path: projectPath, description, sessionName, workdir })
+          const result = await createProject({
+            name,
+            path: projectPath,
+            description,
+            sessionName,
+            workdir,
+          })
           output = { project: result }
         } else if (skill === "update_project") {
           const projectId = stringParam(params, ["project_id", "projectId"])
@@ -1807,13 +1945,23 @@ export function AiAssistant() {
         } else if (skill === "toggle_continuous_listening") {
           const enabled = params.enabled === true
           const config = await getConfig()
-          await updateConfig({ ...config, omni: { ...config.omni, continuousListening: enabled } } as AppConfig)
+          await updateConfig({
+            ...config,
+            omni: { ...config.omni, continuousListening: enabled },
+          } as AppConfig)
           output = { enabled }
         } else if (skill === "toggle_vad") {
           const enabled = params.enabled !== false
           const threshold = typeof params.threshold === "number" ? params.threshold : undefined
           const config = await getConfig()
-          await updateConfig({ ...config, omni: { ...config.omni, vadEnabled: enabled, ...(threshold !== undefined ? { vadThreshold: threshold } : {}) } } as AppConfig)
+          await updateConfig({
+            ...config,
+            omni: {
+              ...config.omni,
+              vadEnabled: enabled,
+              ...(threshold !== undefined ? { vadThreshold: threshold } : {}),
+            },
+          } as AppConfig)
           output = { enabled, threshold }
         } else if (skill === "set_theme") {
           const theme = stringParam(params, ["theme"])
@@ -1838,7 +1986,14 @@ export function AiAssistant() {
             throw new Error("Terminal font size is required")
           }
           const config = await getConfig()
-          await updateConfig({ ...config, ui: { ...config.ui, terminalFontSize: fontSize, ...(fontWeight ? { terminalFontWeight: fontWeight } : {}) } } as AppConfig)
+          await updateConfig({
+            ...config,
+            ui: {
+              ...config.ui,
+              terminalFontSize: fontSize,
+              ...(fontWeight ? { terminalFontWeight: fontWeight } : {}),
+            },
+          } as AppConfig)
           output = { fontSize, fontWeight }
         } else {
           return
@@ -1875,7 +2030,11 @@ export function AiAssistant() {
           const limit = typeof params.limit === "number" ? params.limit : 50
           const projectId = stringParam(params, ["project_id", "projectId"])
           const status = stringParam(params, ["status"])
-          const result = await listAiStats({ limit, projectId: projectId ?? undefined, status: status ?? undefined })
+          const result = await listAiStats({
+            limit,
+            projectId: projectId ?? undefined,
+            status: status ?? undefined,
+          })
           output = { result }
         } else if (skill === "cleanup_tmux_analysis") {
           const projectId = stringParam(params, ["project_id", "projectId"])
@@ -1912,7 +2071,8 @@ export function AiAssistant() {
       const startCommand = stringParam(params, ["start_command", "startCommand"])
 
       if (!targetName || !sessionName || !paneName || !projectPath || !startCommand) {
-        const message = "Target, session, pane, project path, and start command are required to run a project"
+        const message =
+          "Target, session, pane, project path, and start command are required to run a project"
         setError({ code: "voice_tool_failed", message })
         sendToolResult("run_project", callId, { error: message })
         return
@@ -2003,7 +2163,10 @@ export function AiAssistant() {
         return
       }
 
-      if (!confirmationRequired && (skill === "create_window" || skill === "rename_window" || skill === "delete_window")) {
+      if (
+        !confirmationRequired &&
+        (skill === "create_window" || skill === "rename_window" || skill === "delete_window")
+      ) {
         emitSidebarNavigation("session")
         void executeWindowMutationIntent(skill, params, callId)
         return
@@ -2011,15 +2174,21 @@ export function AiAssistant() {
 
       if (
         !confirmationRequired &&
-        (skill === "split_pane" || skill === "read_pane_output" || skill === "send_to_pane" ||
-         skill === "kill_pane" || skill === "clear_pane")
+        (skill === "split_pane" ||
+          skill === "read_pane_output" ||
+          skill === "send_to_pane" ||
+          skill === "kill_pane" ||
+          skill === "clear_pane")
       ) {
         emitSidebarNavigation("session")
         void executePaneMutationIntent(skill, params, callId)
         return
       }
 
-      if (!confirmationRequired && (skill === "run_claude_prompt" || skill === "run_codex_prompt")) {
+      if (
+        !confirmationRequired &&
+        (skill === "run_claude_prompt" || skill === "run_codex_prompt")
+      ) {
         emitSidebarNavigation("session")
         void executeAgentPromptIntent(skill, params, callId)
         return
@@ -2033,9 +2202,12 @@ export function AiAssistant() {
 
       if (
         !confirmationRequired &&
-        (skill === "create_project" || skill === "update_project" || skill === "launch_project" ||
-         skill === "sync_project_from_tmux" || skill === "generate_project_ai_html" ||
-         skill === "delete_project")
+        (skill === "create_project" ||
+          skill === "update_project" ||
+          skill === "launch_project" ||
+          skill === "sync_project_from_tmux" ||
+          skill === "generate_project_ai_html" ||
+          skill === "delete_project")
       ) {
         emitSidebarNavigation("projects")
         void executeProjectMutationIntent(skill, params, callId)
@@ -2053,17 +2225,32 @@ export function AiAssistant() {
         return
       }
 
-      if (!confirmationRequired && (skill === "toggle_omni" || skill === "set_voice" || skill === "toggle_continuous_listening" || skill === "toggle_vad" || skill === "set_theme" || skill === "set_font_size" || skill === "set_terminal_font")) {
+      if (
+        !confirmationRequired &&
+        (skill === "toggle_omni" ||
+          skill === "set_voice" ||
+          skill === "toggle_continuous_listening" ||
+          skill === "toggle_vad" ||
+          skill === "set_theme" ||
+          skill === "set_font_size" ||
+          skill === "set_terminal_font")
+      ) {
         void executeConfigIntent(skill, params, callId)
         return
       }
 
-      if (!confirmationRequired && (skill === "analyze_session" || skill === "list_tmux_analysis")) {
+      if (
+        !confirmationRequired &&
+        (skill === "analyze_session" || skill === "list_tmux_analysis")
+      ) {
         void executeAnalysisIntent(skill, params, callId)
         return
       }
 
-      if (!confirmationRequired && (skill === "cleanup_tmux_analysis" || skill === "clear_ai_logs")) {
+      if (
+        !confirmationRequired &&
+        (skill === "cleanup_tmux_analysis" || skill === "clear_ai_logs")
+      ) {
         void executeAnalysisIntent(skill, params, callId)
         return
       }
@@ -2349,7 +2536,8 @@ export function AiAssistant() {
       }
 
       if (isVoiceErrorEvent(event)) {
-        const isRecentSuccessfulConfirmation = Date.now() - lastSuccessfulConfirmationAtRef.current < 3000
+        const isRecentSuccessfulConfirmation =
+          Date.now() - lastSuccessfulConfirmationAtRef.current < 3000
         const isUnspecifiedError =
           (event.code === "dashscope_error" || event.code === "unknown") &&
           (event.message === "DashScope realtime error" || event.message === "Unknown error")
@@ -2587,13 +2775,7 @@ export function AiAssistant() {
     if (omniStatusRef.current !== "disabled") {
       setOmniStatus("idle")
     }
-  }, [
-    clearAssistantDraft,
-    setOmniConfirmation,
-    setOmniError,
-    setOmniStatus,
-    setOmniTranscript,
-  ])
+  }, [clearAssistantDraft, setOmniConfirmation, setOmniError, setOmniStatus, setOmniTranscript])
 
   const handleConfirm = useCallback(() => {
     sendPendingConfirmationResponse("confirm")
@@ -2944,15 +3126,26 @@ export function AiAssistant() {
             aria-label="View token usage details"
             onClick={() => setShowTokenPopover(!showTokenPopover)}
           >
-            <span className="token-icon" aria-hidden="true">🪙</span>
-            <span className="token-count-total">Total {formatTokenCount(tokenUsage.total.totalTokens)}</span>
+            <span className="token-icon" aria-hidden="true">
+              🪙
+            </span>
+            <span className="token-count-total">
+              Total {formatTokenCount(tokenUsage.total.totalTokens)}
+            </span>
             {tokenUsage.last && (
-              <span className="token-count-last">Last {formatTokenCount(tokenUsage.last.totalTokens)}</span>
+              <span className="token-count-last">
+                Last {formatTokenCount(tokenUsage.last.totalTokens)}
+              </span>
             )}
           </button>
 
           {showTokenPopover && (
-            <div className="voice-token-popover" id="ai-token-popover" role="dialog" aria-label="Token Usage Statistics">
+            <div
+              className="voice-token-popover"
+              id="ai-token-popover"
+              role="dialog"
+              aria-label="Token Usage Statistics"
+            >
               <div className="voice-token-popover-header">
                 <span className="popover-title">Token Usage Details</span>
                 <button
@@ -2998,13 +3191,22 @@ export function AiAssistant() {
                 </div>
                 <div className="progress-legend">
                   <span className="legend-item input-legend">
-                    <span className="legend-dot" /> Input ({Math.round(percentOfTotal(totalVisibleInputTokens, tokenUsage.total.totalTokens))}%)
+                    <span className="legend-dot" /> Input (
+                    {Math.round(
+                      percentOfTotal(totalVisibleInputTokens, tokenUsage.total.totalTokens),
+                    )}
+                    %)
                   </span>
                   <span className="legend-item skills-legend">
-                    <span className="legend-dot" /> Skills ({Math.round(percentOfTotal(totalSkillTokens, tokenUsage.total.totalTokens))}%)
+                    <span className="legend-dot" /> Skills (
+                    {Math.round(percentOfTotal(totalSkillTokens, tokenUsage.total.totalTokens))}%)
                   </span>
                   <span className="legend-item output-legend">
-                    <span className="legend-dot" /> Output ({Math.round(percentOfTotal(tokenUsage.total.outputTokens, tokenUsage.total.totalTokens))}%)
+                    <span className="legend-dot" /> Output (
+                    {Math.round(
+                      percentOfTotal(tokenUsage.total.outputTokens, tokenUsage.total.totalTokens),
+                    )}
+                    %)
                   </span>
                 </div>
               </div>
@@ -3039,7 +3241,9 @@ export function AiAssistant() {
                       <span className="indicator-dot output-dot" />
                       Output
                     </td>
-                    <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.outputTokens) : "-"}</td>
+                    <td>
+                      {tokenUsage.last ? formatTokenCount(tokenUsage.last.outputTokens) : "-"}
+                    </td>
                     <td>{formatTokenCount(tokenUsage.total.outputTokens)}</td>
                   </tr>
                   <tr>
@@ -3114,7 +3318,10 @@ export function AiAssistant() {
               <span>AI</span>
               <span>Thinking</span>
             </div>
-            <div className="voice-message-bubble voice-message-bubble--thinking" aria-label="AI is thinking">
+            <div
+              className="voice-message-bubble voice-message-bubble--thinking"
+              aria-label="AI is thinking"
+            >
               <span className="thinking-dot" />
               <span className="thinking-dot" />
               <span className="thinking-dot" />
@@ -3237,9 +3444,15 @@ export function AiAssistant() {
               {audioMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
             </button>
             {showVolumePopover && (
-              <div className="voice-volume-popover" ref={volumePopoverRef} data-testid="voice-volume-popover">
+              <div
+                className="voice-volume-popover"
+                ref={volumePopoverRef}
+                data-testid="voice-volume-popover"
+              >
                 <div className="voice-volume-header">
-                  <span className="voice-volume-pct">{audioMuted ? "—" : `${Math.round(volume * 100)}%`}</span>
+                  <span className="voice-volume-pct">
+                    {audioMuted ? "—" : `${Math.round(volume * 100)}%`}
+                  </span>
                   <button
                     type="button"
                     className={`voice-mute-icon-btn${audioMuted ? " voice-mute-icon-btn--muted" : ""}`}
@@ -3248,13 +3461,21 @@ export function AiAssistant() {
                     onClick={handleMuteToggle}
                     disabled={isDisabled}
                   >
-                    {audioMuted ? <VolumeOffIcon style={{ fontSize: 16 }} /> : <VolumeUpIcon style={{ fontSize: 16 }} />}
+                    {audioMuted ? (
+                      <VolumeOffIcon style={{ fontSize: 16 }} />
+                    ) : (
+                      <VolumeUpIcon style={{ fontSize: 16 }} />
+                    )}
                   </button>
                 </div>
                 <div className="voice-volume-track-wrap">
                   <div
                     className="voice-volume-track-bg"
-                    style={{ "--volume-fill": `${audioMuted ? 0 : volume * 100}%` } as React.CSSProperties}
+                    style={
+                      {
+                        "--volume-fill": `${audioMuted ? 0 : volume * 100}%`,
+                      } as React.CSSProperties
+                    }
                   />
                   <input
                     type="range"

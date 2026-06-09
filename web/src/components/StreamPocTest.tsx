@@ -1,48 +1,45 @@
-import { useState, useEffect, useCallback } from "react";
-import { createStreamBurst } from "../api/streamPoc.js";
+import { useState, useEffect, useCallback } from "react"
+import { createStreamBurst } from "../api/streamPoc.js"
 
 interface StreamPocTestProps {
-  count?: number;
-  autoStart?: boolean;
+  count?: number
+  autoStart?: boolean
 }
 
-export function StreamPocTest({
-  count = 100,
-  autoStart = false,
-}: StreamPocTestProps) {
-  const [lines, setLines] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function StreamPocTest({ count = 100, autoStart = false }: StreamPocTestProps) {
+  const [lines, setLines] = useState<string[]>([])
+  const [isRunning, setIsRunning] = useState(false)
+  const [isComplete, setIsComplete] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const runStream = useCallback(async () => {
-    setLines([]);
-    setIsRunning(true);
-    setIsComplete(false);
-    setError(null);
+    setLines([])
+    setIsRunning(true)
+    setIsComplete(false)
+    setError(null)
 
     try {
       const cleanup = await createStreamBurst(
         count,
         (line) => {
-          setLines((prev) => [...prev, line]);
+          setLines((prev) => [...prev, line])
         },
         () => {
-          setIsRunning(false);
-          setIsComplete(true);
-        }
-      );
+          setIsRunning(false)
+          setIsComplete(true)
+        },
+      )
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setIsRunning(false);
+      setError(e instanceof Error ? e.message : String(e))
+      setIsRunning(false)
     }
-  }, [count]);
+  }, [count])
 
   useEffect(() => {
     if (autoStart) {
-      runStream();
+      runStream()
     }
-  }, [autoStart, runStream]);
+  }, [autoStart, runStream])
 
   return (
     <div
@@ -69,9 +66,9 @@ export function StreamPocTest({
         </button>
         <button
           onClick={() => {
-            setLines([]);
-            setIsComplete(false);
-            setError(null);
+            setLines([])
+            setIsComplete(false)
+            setError(null)
           }}
           style={{ marginLeft: "8px", padding: "8px 16px" }}
         >
@@ -80,13 +77,10 @@ export function StreamPocTest({
       </div>
 
       <div style={{ fontSize: "12px", color: "#666", marginBottom: "8px" }}>
-        Count: {count} | Received: {lines.length} | Complete:{" "}
-        {isComplete ? "Yes" : "No"}
+        Count: {count} | Received: {lines.length} | Complete: {isComplete ? "Yes" : "No"}
       </div>
 
-      {error && (
-        <div style={{ color: "red", marginBottom: "8px" }}>Error: {error}</div>
-      )}
+      {error && <div style={{ color: "red", marginBottom: "8px" }}>Error: {error}</div>}
 
       <div
         style={{
@@ -115,5 +109,5 @@ export function StreamPocTest({
         </div>
       )}
     </div>
-  );
+  )
 }

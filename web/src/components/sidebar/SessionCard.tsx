@@ -186,15 +186,12 @@ export const SessionCard = memo(function SessionCard({
                 width: 32,
                 height: 32,
                 borderRadius: "var(--radius-sm)",
-                background: isSelected
-                  ? "var(--color-accent-gradient)"
-                  : "var(--color-surface)",
+                background: isSelected ? "var(--color-accent-gradient)" : "var(--color-surface)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                transition:
-                  "transform var(--transition-fast), background var(--transition-base)",
+                transition: "transform var(--transition-fast), background var(--transition-base)",
                 boxShadow: isSelected ? "var(--glow-accent)" : "none",
               }}
             >

@@ -655,7 +655,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setOmniConfirmation,
       setOmniError,
       setOmniHistory,
-    ]
+    ],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

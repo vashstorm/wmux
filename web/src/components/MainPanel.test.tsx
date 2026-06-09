@@ -539,7 +539,6 @@ describe("MainPanel", () => {
       app: "editor-app",
       summary: "Editing files",
     })
-
     ;(mockState as { selectedPane: SelectedPane }).selectedPane = {
       ...selectedPane,
       window: "@2",
@@ -754,9 +753,7 @@ describe("MainPanel", () => {
       selectedAiEvent: null,
       selectedProject: null,
       sessions: {
-        "conn-1": [
-          { name: "dev", intelligenceApp: "claude", intelligenceSummary: "" },
-        ],
+        "conn-1": [{ name: "dev", intelligenceApp: "claude", intelligenceSummary: "" }],
       },
       windows: {
         "conn-1:dev": {

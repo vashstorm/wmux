@@ -157,7 +157,6 @@ export function MainPanel() {
   )
 
   useEffect(() => {
-
     let cancelled = false
     let inFlight = false
     const intervalIdRef = { current: 0 }

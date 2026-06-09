@@ -655,7 +655,10 @@ export function ProjectsView() {
                         height: 24,
                         borderRadius: "var(--radius-sm)",
                         color: "var(--color-text-muted)",
-                        "&:hover": { bgcolor: "rgba(239,68,68,0.12)", color: "var(--color-danger)" },
+                        "&:hover": {
+                          bgcolor: "rgba(239,68,68,0.12)",
+                          color: "var(--color-danger)",
+                        },
                       }}
                     >
                       <DeleteIcon sx={{ fontSize: 13 }} />

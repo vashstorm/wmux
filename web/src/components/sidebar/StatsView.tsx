@@ -1,14 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import {
-  Box,
-  Typography,
-  IconButton,
-  List,
-  ListItem,
-  Stack,
-  Tooltip,
-  Chip,
-} from "@mui/material"
+import { Box, Typography, IconButton, List, ListItem, Stack, Tooltip, Chip } from "@mui/material"
 import DeleteSweepIcon from "@mui/icons-material/DeleteSweep"
 import RefreshIcon from "@mui/icons-material/Refresh"
 import { cleanupAiStats, listAiStats } from "../../api/client.js"
@@ -382,9 +373,7 @@ export function StatsView() {
                   my: 0.75,
                   borderRadius: "var(--radius-md)",
                   cursor: "pointer",
-                  bgcolor: isSelected
-                    ? "var(--color-accent-subtle)"
-                    : "var(--color-panel)",
+                  bgcolor: isSelected ? "var(--color-accent-subtle)" : "var(--color-panel)",
                   border: "1px solid",
                   borderColor: isSelected
                     ? "var(--color-accent)"
@@ -405,9 +394,7 @@ export function StatsView() {
                   },
                   transition: "all var(--transition-base)",
                   overflow: "hidden",
-                  boxShadow: event.status === "error"
-                    ? "var(--glow-danger)"
-                    : "none",
+                  boxShadow: event.status === "error" ? "var(--glow-danger)" : "none",
                 }}
               >
                 <Stack
@@ -462,7 +449,11 @@ export function StatsView() {
                       direction="row"
                       sx={{ justifyContent: "space-between", alignItems: "center", gap: 1 }}
                     >
-                      <Stack direction="row" spacing={0.5} sx={{ minWidth: 0, alignItems: "center" }}>
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        sx={{ minWidth: 0, alignItems: "center" }}
+                      >
                         {kindLabel !== "Window Analysis" && (
                           <Chip
                             label={kindLabel}

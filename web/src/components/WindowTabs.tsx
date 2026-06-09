@@ -354,10 +354,7 @@ export const WindowTabs = memo(function WindowTabs({
   }
 
   return (
-    <Box
-      className="window-tabs"
-      data-testid="window-tabs"
-    >
+    <Box className="window-tabs" data-testid="window-tabs">
       <Tabs
         variant="scrollable"
         scrollButtons={false}
@@ -374,7 +371,7 @@ export const WindowTabs = memo(function WindowTabs({
             display: "none",
           },
           "& .MuiTabs-flexContainer": {
-            gap: "6px",
+            gap: "12px",
             alignItems: "flex-end",
             paddingBottom: "1px",
           },
@@ -426,10 +423,7 @@ export const WindowTabs = memo(function WindowTabs({
                   data-testid={`window-tab-content-${window.id}`}
                   sx={{ alignItems: "center", minWidth: 0, maxWidth: "100%" }}
                 >
-                  <Box
-                    component="span"
-                    className="window-tab-index"
-                  >
+                  <Box component="span" className="window-tab-index">
                     {window.index}
                   </Box>
                   {appConfig && AppIcon && (
@@ -456,11 +450,7 @@ export const WindowTabs = memo(function WindowTabs({
                       <AppIcon sx={{ fontSize: "var(--font-size-sm)" }} />
                     </Box>
                   )}
-                  <Typography
-                    component="span"
-                    className="window-tab-name"
-                    variant="body2"
-                  >
+                  <Typography component="span" className="window-tab-name" variant="body2">
                     {displayName}
                   </Typography>
                   {hasAttentionBadge && (

@@ -654,7 +654,9 @@
   opacity: 0.7;
   width: 16px;
   text-align: center;
-  transition: opacity var(--transition-base), color var(--transition-base);
+  transition:
+    opacity var(--transition-base),
+    color var(--transition-base);
 }
 
 .settings-nav-item.is-active .nav-icon {
@@ -1984,16 +1986,20 @@
 .window-tabs {
   display: flex;
   align-items: flex-end;
-  padding: 0 var(--spacing-sm);
+  padding: 0 4px;
   flex-shrink: 0;
   height: 40px;
   position: relative;
   background-color: var(--color-surface);
 }
 
+.window-tabs .MuiTabs-flexContainer {
+  gap: 12px !important;
+}
+
 /* Bottom border line across the tab strip */
 .window-tabs::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 0;
@@ -2061,7 +2067,7 @@
 .window-tab.is-active {
   min-height: 32px !important;
   height: 32px !important;
-  max-width: 240px;
+  max-width: 180px;
   background-color: var(--color-background) !important;
   color: var(--color-text);
   border: 1px solid var(--color-panel-border) !important;
@@ -2160,7 +2166,6 @@
 }
 
 .window-tab.is-active .window-tab-name {
-  font-weight: var(--font-weight-semibold);
 }
 
 .window-tab-badge {

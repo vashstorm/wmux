@@ -18,14 +18,7 @@ describe("AiAssistantUtils - scalePosOnResize", () => {
       const elementSize = { width: 42, height: 42 }
       const pos = { x: 942, y: 742 }
 
-      const newPos = scalePosOnResize(
-        pos,
-        elementSize,
-        1000,
-        800,
-        1920,
-        1080
-      )
+      const newPos = scalePosOnResize(pos, elementSize, 1000, 800, 1920, 1080)
 
       // Expected position on 1920 x 1080 should also be bottom-right:
       // 1920 - 42 - 16 = 1862
@@ -51,14 +44,7 @@ describe("AiAssistantUtils - scalePosOnResize", () => {
       // RangeY = 800 - 40 - 32 = 728. Center = 16 + 0.5 * 728 = 380
       const pos = { x: 480, y: 380 }
 
-      const newPos = scalePosOnResize(
-        pos,
-        elementSize,
-        1000,
-        800,
-        2000,
-        1600
-      )
+      const newPos = scalePosOnResize(pos, elementSize, 1000, 800, 2000, 1600)
 
       // New Window 2000 x 1600
       // RangeX = 2000 - 40 - 32 = 1928. Expected = 16 + 0.5 * 1928 = 980

@@ -42,10 +42,7 @@ export function useWorkspaceNavigation(): void {
   const selectedPaneRef = useRef<typeof selectedPane>(selectedPane)
   selectedPaneRef.current = selectedPane
 
-  function sameSelectedPane(
-    a: typeof selectedPane,
-    b: typeof selectedPane,
-  ): boolean {
+  function sameSelectedPane(a: typeof selectedPane, b: typeof selectedPane): boolean {
     if (a === b) return true
     if (!a || !b) return false
     return (

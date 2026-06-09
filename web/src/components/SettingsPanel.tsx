@@ -476,7 +476,6 @@ export function SettingsPanel() {
       })
       setConfigConflict(null)
       setShowSettingsPanel(false)
-
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === "conflict") {
         setConfigConflict({

@@ -394,7 +394,10 @@ export async function updateConnection(
   data: ConnectionConfig,
 ): Promise<ConnectionConfig> {
   return normalizeConnectionConfig(
-    (await ipcInvoke<RawConnectionConfig>("update_connection", { id: targetName, connection: data }))!,
+    (await ipcInvoke<RawConnectionConfig>("update_connection", {
+      id: targetName,
+      connection: data,
+    }))!,
   )
 }
 
@@ -552,10 +555,10 @@ export async function listWindows(
   targetName: string,
   sessionName: string,
 ): Promise<WindowsListResponse> {
-  const response = (await ipcInvoke<WindowsListRawResponse>(
-    "list_windows",
-    { target: targetName, session: sessionName },
-  ))!
+  const response = (await ipcInvoke<WindowsListRawResponse>("list_windows", {
+    target: targetName,
+    session: sessionName,
+  }))!
   return {
     ...response,
     data: (response.data ?? []).map(normalizeWindowInfo),
@@ -569,10 +572,11 @@ export async function listPanes(
   sessionName: string,
   windowId: string,
 ): Promise<PanesListResponse> {
-  const response = (await ipcInvoke<PanesListRawResponse>(
-    "list_panes",
-    { target: targetName, session: sessionName, window: windowId },
-  ))!
+  const response = (await ipcInvoke<PanesListRawResponse>("list_panes", {
+    target: targetName,
+    session: sessionName,
+    window: windowId,
+  }))!
   return {
     ...response,
     data: (response.data ?? []).map(normalizePaneInfo),
@@ -638,10 +642,9 @@ type SessionsListRawResponse = {
 }
 
 export async function listSessions(targetName: string): Promise<SessionsListResponse> {
-  const response = (await ipcInvoke<SessionsListRawResponse>(
-    "list_sessions",
-    { target: targetName },
-  ))!
+  const response = (await ipcInvoke<SessionsListRawResponse>("list_sessions", {
+    target: targetName,
+  }))!
   return {
     ...response,
     data: (response.data ?? [])
@@ -672,17 +675,11 @@ export async function listSessions(targetName: string): Promise<SessionsListResp
 }
 
 export async function createSession(targetName: string, name: string): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "create_session",
-    { target: targetName, name },
-  ))!
+  return (await ipcInvoke<OperationResponse>("create_session", { target: targetName, name }))!
 }
 
 export async function killSession(targetName: string, session: string): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "delete_session",
-    { target: targetName, session },
-  ))!
+  return (await ipcInvoke<OperationResponse>("delete_session", { target: targetName, session }))!
 }
 
 export async function renameSession(
@@ -690,10 +687,11 @@ export async function renameSession(
   session: string,
   newName: string,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "rename_session",
-    { target: targetName, session, newName },
-  ))!
+  return (await ipcInvoke<OperationResponse>("rename_session", {
+    target: targetName,
+    session,
+    newName,
+  }))!
 }
 
 export async function createWindow(
@@ -701,10 +699,11 @@ export async function createWindow(
   session: string,
   name?: string,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "create_window",
-    { target: targetName, session, name },
-  ))!
+  return (await ipcInvoke<OperationResponse>("create_window", {
+    target: targetName,
+    session,
+    name,
+  }))!
 }
 
 export async function killWindow(
@@ -712,10 +711,11 @@ export async function killWindow(
   session: string,
   window: string,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "delete_window",
-    { target: targetName, session, window },
-  ))!
+  return (await ipcInvoke<OperationResponse>("delete_window", {
+    target: targetName,
+    session,
+    window,
+  }))!
 }
 
 export async function splitPane(
@@ -725,10 +725,13 @@ export async function splitPane(
   pane: string,
   horizontal: boolean,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "split_pane",
-    { target: targetName, session, window, pane, horizontal },
-  ))!
+  return (await ipcInvoke<OperationResponse>("split_pane", {
+    target: targetName,
+    session,
+    window,
+    pane,
+    horizontal,
+  }))!
 }
 
 export async function killPane(
@@ -737,12 +740,13 @@ export async function killPane(
   window: string,
   pane: string,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "delete_pane",
-    { target: targetName, session, window, pane },
-  ))!
+  return (await ipcInvoke<OperationResponse>("delete_pane", {
+    target: targetName,
+    session,
+    window,
+    pane,
+  }))!
 }
-
 
 export async function renameWindow(
   targetName: string,
@@ -750,10 +754,12 @@ export async function renameWindow(
   windowId: string,
   newName: string,
 ): Promise<OperationResponse> {
-  return (await ipcInvoke<OperationResponse>(
-    "rename_window",
-    { target: targetName, session, window: windowId, name: newName },
-  ))!
+  return (await ipcInvoke<OperationResponse>("rename_window", {
+    target: targetName,
+    session,
+    window: windowId,
+    name: newName,
+  }))!
 }
 
 export async function sendKeysToPane(
@@ -763,10 +769,13 @@ export async function sendKeysToPane(
   pane: string,
   keys: string[],
 ): Promise<void> {
-  await ipcInvoke<void>(
-    "send_keys_to_pane",
-    { target: targetName, session, window: windowId, pane, keys },
-  )
+  await ipcInvoke<void>("send_keys_to_pane", {
+    target: targetName,
+    session,
+    window: windowId,
+    pane,
+    keys,
+  })
 }
 
 export async function capturePane(
@@ -776,10 +785,13 @@ export async function capturePane(
   pane: string,
   maxBytes?: number,
 ): Promise<{ output: string }> {
-  return (await ipcInvoke<{ output: string }>(
-    "capture_pane",
-    { target: targetName, session, window: windowId, pane, maxBytes },
-  ))!
+  return (await ipcInvoke<{ output: string }>("capture_pane", {
+    target: targetName,
+    session,
+    window: windowId,
+    pane,
+    maxBytes,
+  }))!
 }
 
 export async function clearPane(
@@ -788,10 +800,7 @@ export async function clearPane(
   windowId: string,
   pane: string,
 ): Promise<void> {
-  await ipcInvoke<void>(
-    "clear_pane",
-    { target: targetName, session, window: windowId, pane },
-  )
+  await ipcInvoke<void>("clear_pane", { target: targetName, session, window: windowId, pane })
 }
 export interface ConnectionHealth {
   targetName: string
@@ -848,10 +857,10 @@ export async function analyzeSession(
   targetName: string,
   session: string,
 ): Promise<AnalyzeSessionResponse> {
-  return (await ipcInvoke<AnalyzeSessionResponse>(
-    "analyze_session",
-    { target: targetName, session },
-  ))!
+  return (await ipcInvoke<AnalyzeSessionResponse>("analyze_session", {
+    target: targetName,
+    session,
+  }))!
 }
 
 export async function fetchErrorLogs(): Promise<ErrorLogsResponse> {

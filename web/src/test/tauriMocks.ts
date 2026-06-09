@@ -4,10 +4,7 @@ export type InvokeResult<T = unknown> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
 
-export type InvokeHandler = (
-  cmd: string,
-  args?: Record<string, unknown>
-) => Promise<unknown>
+export type InvokeHandler = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
 export type EventHandler<T = unknown> = (payload: T) => void
 
@@ -64,14 +61,9 @@ export function createMockListen(): {
   emit: <T>(event: string, payload: T) => void
   reset: () => void
 } {
-  const mockFn = vi.fn(
-    <T = unknown>(
-      _event: string,
-      _handler: EventHandler<T>
-    ): (() => void) => {
-      return () => {}
-    }
-  )
+  const mockFn = vi.fn(<T = unknown>(_event: string, _handler: EventHandler<T>): (() => void) => {
+    return () => {}
+  })
 
   const emit = <T>(event: string, payload: T) => {
     const handlers = eventListeners.get(event)

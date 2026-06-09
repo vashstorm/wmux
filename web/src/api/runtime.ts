@@ -8,7 +8,8 @@ export function getRuntimeFlags(): RuntimeFlags {
   const mediaDevices = typeof navigator === "undefined" ? undefined : navigator.mediaDevices
 
   return {
-    isTauri: typeof (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ !== "undefined",
+    isTauri:
+      typeof (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ !== "undefined",
     isElectron: false,
     omniAvailable: typeof mediaDevices?.getUserMedia === "function",
   }

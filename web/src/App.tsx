@@ -24,11 +24,18 @@ import { ErrorBanner } from "./components/ErrorBanner.js"
 import { ConfirmDialog } from "./components/ConfirmDialog.js"
 import { ConfigConflictBanner } from "./components/ConfigConflictBanner.js"
 
-
-const NewConnectionForm = lazy(() => import("./components/NewConnectionForm.js").then(m => ({ default: m.NewConnectionForm })))
-const SettingsPanel = lazy(() => import("./components/SettingsPanel.js").then(m => ({ default: m.SettingsPanel })))
-const ErrorLogsPanel = lazy(() => import("./components/ErrorLogsPanel.js").then(m => ({ default: m.ErrorLogsPanel })))
-const AiAssistant = lazy(() => import("./components/AiAssistant.js").then(m => ({ default: m.AiAssistant })))
+const NewConnectionForm = lazy(() =>
+  import("./components/NewConnectionForm.js").then((m) => ({ default: m.NewConnectionForm })),
+)
+const SettingsPanel = lazy(() =>
+  import("./components/SettingsPanel.js").then((m) => ({ default: m.SettingsPanel })),
+)
+const ErrorLogsPanel = lazy(() =>
+  import("./components/ErrorLogsPanel.js").then((m) => ({ default: m.ErrorLogsPanel })),
+)
+const AiAssistant = lazy(() =>
+  import("./components/AiAssistant.js").then((m) => ({ default: m.AiAssistant })),
+)
 import { useWorkspaceNavigation } from "./hooks/useWorkspaceNavigation.js"
 import { normalizeThemeId } from "./ui/themes.js"
 import AssistantIcon from "@mui/icons-material/Assistant"
@@ -403,7 +410,10 @@ export function PanelVisibility() {
         </Suspense>
       )}
       {omniStatus !== "disabled" && (
-        <div data-testid="ai-assistant-wrapper" style={{ display: showAiAssistant ? "block" : "none" }}>
+        <div
+          data-testid="ai-assistant-wrapper"
+          style={{ display: showAiAssistant ? "block" : "none" }}
+        >
           <Suspense fallback={<CircularProgress />}>
             <AiAssistant />
           </Suspense>

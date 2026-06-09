@@ -43,7 +43,11 @@ function redrawTerminal(terminal: XTermType) {
   terminal.refresh(0, Math.max(0, terminal.rows - 1))
 }
 
-export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sourceSize }: TerminalProps) {
+export const Terminal = memo(function Terminal({
+  selectedPane,
+  windowTheme,
+  sourceSize,
+}: TerminalProps) {
   const { setError, uiSettings } = useAppState()
   const { targetName, session, window: windowId, pane } = selectedPane
   const wrapperRef = useRef<HTMLDivElement>(null)

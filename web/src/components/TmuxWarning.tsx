@@ -21,8 +21,8 @@ export function TmuxWarning() {
       sx={{ width: "100%", maxWidth: 720, mb: 2 }}
       data-testid="tmux-warning"
     >
-      <strong>Local tmux unavailable.</strong> Install tmux or update the tmux path in Settings before
-      using local connections.
+      <strong>Local tmux unavailable.</strong> Install tmux or update the tmux path in Settings
+      before using local connections.
     </Alert>
   )
 }
