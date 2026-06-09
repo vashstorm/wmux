@@ -8,6 +8,7 @@ import {
   useSelectedConnection,
   type SessionWindowState,
 } from "./store.js"
+import type { WindowInfo } from "../api/client.js"
 
 beforeEach(() => {
   localStorage.removeItem(UI_SETTINGS_STORAGE_KEY)
@@ -591,6 +592,55 @@ describe("attention field mapping", () => {
     fireEvent.click(screen.getByTestId("set-windows-attention"))
     fireEvent.click(screen.getByTestId("set-panes-explicit"))
     expect(screen.getByTestId("pane-attention-state").textContent).toBe("explicit")
+  })
+})
+
+describe("window intelligence field mapping", () => {
+  function TestWindowIntelligenceComponent() {
+    const state = useAppState()
+    const firstWindow = state.windows["1:session1"]?.windows[0]
+    return (
+      <div>
+        <span data-testid="window-app">{firstWindow?.intelligenceApp ?? ""}</span>
+        <span data-testid="window-status">{firstWindow?.intelligenceStatus ?? ""}</span>
+        <span data-testid="window-summary">{firstWindow?.intelligenceSummary ?? ""}</span>
+        <button
+          data-testid="set-camelcase-window"
+          onClick={() =>
+            state.setWindows("1", "session1", [
+              {
+                id: "@1",
+                name: "zsh",
+                index: 1,
+                active: true,
+                paneCount: 1,
+                activePaneId: "%1",
+                activePaneTitle: "zsh",
+                intelligenceApp: "opencode",
+                intelligenceStatus: "running",
+                intelligenceSummary: "SQLite window summary",
+              } as unknown as WindowInfo,
+            ])
+          }
+        >
+          Set CamelCase Window
+        </button>
+      </div>
+    )
+  }
+
+  test("preserves Tauri camelCase window intelligence fields", () => {
+    render(
+      <AppProvider>
+        <TestWindowIntelligenceComponent />
+      </AppProvider>,
+    )
+
+    fireEvent.click(screen.getByTestId("set-camelcase-window"))
+
+    expect(screen.getByTestId("window-app").textContent).toBe("opencode")
+    expect(screen.getByTestId("window-status").textContent).toBe("running")
+    expect(screen.getByTestId("window-summary").textContent).toBe("SQLite window summary")
   })
 })
 

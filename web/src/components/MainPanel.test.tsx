@@ -105,9 +105,18 @@ describe("MainPanel", () => {
   const setPanes = vi.fn()
   const setError = vi.fn()
 
-  const expectTitleSegments = (expected: { summary: string }) => {
+  const expectTitleSegments = (expected: { app?: string; status?: string; summary: string }) => {
     expect(screen.queryByTestId("main-title-session")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument()
+    if (expected.app) {
+      expect(screen.getByTestId("main-title-app").textContent).toBe(expected.app)
+    } else {
+      expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument()
+    }
+    if (expected.status) {
+      expect(screen.getByTestId("main-title-status").textContent).toBe(expected.status)
+    } else {
+      expect(screen.queryByTestId("main-title-status")).not.toBeInTheDocument()
+    }
     expect(screen.getByTestId("main-title-summary").textContent).toBe(expected.summary)
   }
 
@@ -335,7 +344,7 @@ describe("MainPanel", () => {
     expect(setSelectedPane).not.toHaveBeenCalled()
   })
 
-  test("renders title as summary without session or app name", () => {
+  test("renders title segments from selected window intelligence", () => {
     vi.mocked(useAppState).mockReturnValue({
       selectedPane,
       selectedAiEvent: null,
@@ -351,6 +360,7 @@ describe("MainPanel", () => {
             {
               ...windowOne,
               intelligenceApp: "copilot",
+              intelligenceStatus: "running",
               intelligenceSummary: "Window summary",
             },
           ],
@@ -390,6 +400,8 @@ describe("MainPanel", () => {
     render(<MainPanel />)
 
     expectTitleSegments({
+      app: "copilot",
+      status: "running",
       summary: "Window summary",
     })
   })
@@ -524,6 +536,7 @@ describe("MainPanel", () => {
     const { rerender } = render(<MainPanel />)
 
     expectTitleSegments({
+      app: "editor-app",
       summary: "Editing files",
     })
 
@@ -536,6 +549,7 @@ describe("MainPanel", () => {
     rerender(<MainPanel />)
 
     expectTitleSegments({
+      app: "server-app",
       summary: "Server running",
     })
   })
@@ -610,6 +624,7 @@ describe("MainPanel", () => {
     const { rerender } = render(<MainPanel />)
 
     expectTitleSegments({
+      app: "editor-app",
       summary: "Editing files",
     })
 
@@ -625,6 +640,7 @@ describe("MainPanel", () => {
     rerender(<MainPanel />)
 
     expectTitleSegments({
+      app: "server-app",
       summary: "Server running",
     })
   })
@@ -692,7 +708,7 @@ describe("MainPanel", () => {
     })
   })
 
-  test("hides title segments when no summary data is available", () => {
+  test("falls back to session name when no window or pane summary data is available", () => {
     vi.mocked(useAppState).mockReturnValue({
       selectedPane: {
         targetName: "conn-1",
@@ -722,8 +738,71 @@ describe("MainPanel", () => {
 
     expect(screen.queryByTestId("main-title-session")).not.toBeInTheDocument()
     expect(screen.queryByTestId("main-title-app")).not.toBeInTheDocument()
-    expect(screen.queryByTestId("main-title-summary")).not.toBeInTheDocument()
+    // Falls back to the session name when no window/pane intelligence is available
+    expect(screen.getByTestId("main-title-summary").textContent).toBe("solo")
     expect(screen.queryByText("Wmux")).not.toBeInTheDocument()
+  })
+
+  test("falls back to pane title when intelligenceSummary is empty string", () => {
+    vi.mocked(useAppState).mockReturnValue({
+      selectedPane: {
+        targetName: "conn-1",
+        session: "dev",
+        window: "@1",
+        pane: "%1",
+      },
+      selectedAiEvent: null,
+      selectedProject: null,
+      sessions: {
+        "conn-1": [
+          { name: "dev", intelligenceApp: "claude", intelligenceSummary: "" },
+        ],
+      },
+      windows: {
+        "conn-1:dev": {
+          windows: [
+            {
+              ...windowOne,
+              intelligenceSummary: "",
+            },
+          ],
+          loadedPanes: {
+            "@1": [
+              {
+                id: "%1",
+                title: "bash",
+                index: 0,
+                active: true,
+                width: 80,
+                height: 24,
+                left: 0,
+                top: 0,
+                intelligenceSummary: "",
+              },
+            ],
+          },
+          panesLoaded: true,
+        },
+      },
+      setSelectedPane,
+      setSelectedAiEvent: vi.fn(),
+      setWindows,
+      setPanes,
+      setError,
+      uiSettings: {
+        theme: "dark",
+        windowTheme: "dark",
+        fontSize: 16,
+        terminalFontSize: 14,
+        terminalFontWeight: "normal",
+      },
+    } as unknown as ReturnType<typeof useAppState>)
+
+    render(<MainPanel />)
+
+    expectTitleSegments({
+      summary: "bash",
+    })
   })
 
   test("renders ProjectDashboard when selectedProject is active", () => {

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use wmux_core::config::Config;
 use wmux_core::intelligence::{
     self, ActiveProvider, IntelligenceStore, SessionIntelligence, WindowCacheDecision,
 };
@@ -189,7 +188,7 @@ pub async fn list_sessions(state: &AppState, target: String) -> IpcResult<Sessio
         .list_sessions()
         .await
         .map_err(session_error)?;
-    apply_cached_session_intelligence(&state, target.name.as_str(), &mut data);
+    apply_cached_session_intelligence(&state, target.name.as_str(), &mut data).await;
     tracing::debug!(target_name = %target.name, "listed tmux sessions");
     Ok(SessionsListResponse {
         target_name: target.name,
@@ -304,7 +303,8 @@ pub async fn list_windows(
         .list_windows(&session)
         .await
         .map_err(session_error)?;
-    apply_cached_window_intelligence(&state, target.name.as_str(), session.as_str(), &mut data);
+    apply_cached_window_intelligence(&state, target.name.as_str(), session.as_str(), &mut data)
+        .await;
     Ok(WindowsListResponse {
         target_name: target.name,
         session: session.clone(),
@@ -500,52 +500,250 @@ async fn write_session_operation(
     })
 }
 
-fn apply_cached_session_intelligence(
+#[derive(Deserialize)]
+struct DbWindowIntelligence {
+    #[serde(default)]
+    app: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    confidence: f32,
+    #[serde(default)]
+    source: String,
+}
+
+fn canonical_analysis_target_name(target_name: &str) -> &str {
+    if target_name == "local" {
+        target_name
+    } else {
+        "local"
+    }
+}
+
+fn aggregate_window_results_no_provider(results: &[WindowAnalysisResult]) -> SessionIntelligence {
+    fn status_priority(status: &str) -> u8 {
+        match status {
+            "blocked" => 7,
+            "dead_loop" => 6,
+            "waiting_confirm" => 5,
+            "waiting" => 4,
+            "running" => 3,
+            "waiting_idle" => 2,
+            "none" => 1,
+            _ => 0,
+        }
+    }
+
+    let highest = results
+        .iter()
+        .max_by_key(|r| status_priority(&r.intelligence.status))
+        .expect("results is non-empty");
+
+    let mut app_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for result in results {
+        if let Some(counts) = &result.intelligence.app_counts {
+            for (app, count) in counts {
+                *app_counts.entry(app.clone()).or_insert(0) += *count;
+            }
+        } else {
+            *app_counts
+                .entry(result.intelligence.app.clone())
+                .or_insert(0) += 1;
+        }
+    }
+
+    let max_confidence = results
+        .iter()
+        .fold(0.0_f32, |acc, r| acc.max(r.intelligence.confidence));
+
+    let any_stale = results.iter().any(|r| r.intelligence.stale);
+    let error = results.iter().find_map(|r| r.intelligence.error.clone());
+
+    SessionIntelligence {
+        app: highest.intelligence.app.clone(),
+        status: highest.intelligence.status.clone(),
+        summary: highest.intelligence.summary.clone(),
+        source: highest.intelligence.source.clone(),
+        confidence: max_confidence,
+        stale: any_stale,
+        updated_at: highest.intelligence.updated_at.clone(),
+        error,
+        app_counts: if app_counts.is_empty() {
+            None
+        } else {
+            Some(app_counts)
+        },
+    }
+}
+
+async fn apply_cached_session_intelligence(
     state: &AppState,
     target_name: &str,
     sessions: &mut [Session],
 ) {
-    let Ok(config) = state.store.snapshot() else {
-        return;
-    };
-    if intelligence::active_provider(&config).is_none() {
-        return;
-    }
+    if let Some(pool) = &state.storage {
+        for session in sessions.iter_mut() {
+            // Try in-memory cache first if configured and active
+            let mut got_cached = false;
+            if let Ok(config) = state.store.snapshot() {
+                if intelligence::active_provider(&config).is_some() {
+                    let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+                    if let Some(result) =
+                        state
+                            .intelligence
+                            .get(target_name, session.name.as_str(), cache_ttl)
+                    {
+                        apply_session_intelligence(session, &result);
+                        got_cached = true;
+                    }
+                }
+            }
 
-    let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+            if got_cached {
+                continue;
+            }
 
-    for session in sessions {
-        if let Some(result) = state
-            .intelligence
-            .get(target_name, session.name.as_str(), cache_ttl)
-        {
-            apply_session_intelligence(session, &result);
+            // Retrieve from SQLite and aggregate
+            let analysis_target_name = canonical_analysis_target_name(target_name);
+            let query_result = sqlx::query_as::<_, (i64, String, String)>(
+                "WITH ranked_events AS ( \
+                     SELECT window_number, response_json, created_at, \
+                            ROW_NUMBER() OVER (PARTITION BY window_number ORDER BY created_at DESC) as rn \
+                     FROM ai_usage_events \
+                     WHERE target_name IN (?, ?) \
+                       AND session_name = ? \
+                       AND status = 'success' \
+                       AND window_number IS NOT NULL \
+                       AND response_json IS NOT NULL \
+                 ) \
+                 SELECT window_number, response_json, created_at \
+                 FROM ranked_events \
+                 WHERE rn = 1"
+            )
+            .bind(target_name)
+            .bind(analysis_target_name)
+            .bind(session.name.as_str())
+            .fetch_all(pool)
+            .await;
+
+            if let Ok(rows) = query_result {
+                if !rows.is_empty() {
+                    let mut window_results = Vec::new();
+                    for (_window_number, response_json, created_at) in rows {
+                        if let Ok(db_intel) =
+                            serde_json::from_str::<DbWindowIntelligence>(&response_json)
+                        {
+                            let intel = SessionIntelligence {
+                                app: db_intel.app,
+                                status: db_intel.status,
+                                summary: db_intel.summary,
+                                source: db_intel.source,
+                                confidence: db_intel.confidence,
+                                stale: false,
+                                updated_at: created_at,
+                                error: None,
+                                app_counts: None,
+                            };
+                            window_results.push(WindowAnalysisResult {
+                                intelligence: intel,
+                                provider_called: false,
+                                is_error: false,
+                            });
+                        }
+                    }
+
+                    if !window_results.is_empty() {
+                        let aggregated = aggregate_window_results_no_provider(&window_results);
+                        apply_session_intelligence(session, &aggregated);
+                    }
+                }
+            }
         }
     }
 }
 
-fn apply_cached_window_intelligence(
+async fn apply_cached_window_intelligence(
     state: &AppState,
     target_name: &str,
     session_name: &str,
     windows: &mut [Window],
 ) {
-    let Ok(config) = state.store.snapshot() else {
-        return;
-    };
-    if intelligence::active_provider(&config).is_none() {
-        return;
+    // 内存缓存只作为兜底；SQLite 中的最新成功分析记录是窗口 header 的权威来源。
+    if let Ok(config) = state.store.snapshot() {
+        if intelligence::active_provider(&config).is_some() {
+            let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+            for window in windows.iter_mut() {
+                if let Some((result, _, _, _, _)) = state.intelligence.get_window(
+                    target_name,
+                    session_name,
+                    window.id.as_str(),
+                    cache_ttl,
+                ) {
+                    apply_window_intelligence(window, &result);
+                }
+            }
+        }
     }
 
-    let cache_ttl = Duration::from_secs(config.intelligence.cache_ttl_sec as u64);
+    if let Some(pool) = &state.storage {
+        let analysis_target_name = canonical_analysis_target_name(target_name);
+        let query_result = sqlx::query_as::<_, (i64, String, String)>(
+            "WITH ranked_events AS ( \
+                 SELECT window_number, response_json, created_at, \
+                        ROW_NUMBER() OVER (PARTITION BY window_number ORDER BY created_at DESC) as rn \
+                 FROM ai_usage_events \
+                 WHERE target_name IN (?, ?) \
+                   AND session_name = ? \
+                   AND status = 'success' \
+                   AND window_number IS NOT NULL \
+                   AND response_json IS NOT NULL \
+             ) \
+             SELECT window_number, response_json, created_at \
+             FROM ranked_events \
+             WHERE rn = 1"
+        )
+        .bind(target_name)
+        .bind(analysis_target_name)
+        .bind(session_name)
+        .fetch_all(pool)
+        .await;
 
-    for window in windows {
-        if let Some((result, _, _, _, _)) =
-            state
-                .intelligence
-                .get_window(target_name, session_name, window.id.as_str(), cache_ttl)
-        {
-            apply_window_intelligence(window, &result);
+        match query_result {
+            Ok(rows) => {
+                for (window_number, response_json, created_at) in rows {
+                    if let Ok(db_intel) =
+                        serde_json::from_str::<DbWindowIntelligence>(&response_json)
+                    {
+                        let intel = SessionIntelligence {
+                            app: db_intel.app,
+                            status: db_intel.status,
+                            summary: db_intel.summary,
+                            source: db_intel.source,
+                            confidence: db_intel.confidence,
+                            stale: false,
+                            updated_at: created_at,
+                            error: None,
+                            app_counts: None,
+                        };
+                        if let Some(window) = windows
+                            .iter_mut()
+                            .find(|w| w.index == window_number as usize)
+                        {
+                            apply_window_intelligence(window, &intel);
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::error!(
+                    target_name = %target_name,
+                    session_name = %session_name,
+                    error = %err,
+                    "failed to fetch window intelligence from sqlite"
+                );
+            }
         }
     }
 }
@@ -717,9 +915,13 @@ async fn analyze_single_window(
                     project_id: None,
                     provider: provider_name,
                     model: provider.model.clone(),
-                    target_name: target_name.to_string(),
+                    target_name: canonical_analysis_target_name(target_name).to_string(),
                     session_name: session_name.to_string(),
-                    status: if is_error { "error".to_string() } else { "success".to_string() },
+                    status: if is_error {
+                        "error".to_string()
+                    } else {
+                        "success".to_string()
+                    },
                     duration_ms: elapsed_ms,
                     prompt_tokens: result.as_ref().ok().and_then(|r| r.prompt_tokens),
                     completion_tokens: result.as_ref().ok().and_then(|r| r.completion_tokens),
@@ -916,6 +1118,271 @@ mod tests {
         assert_eq!(
             build_pane_target("session1", "window1", "pane1"),
             "session1:window1.pane1"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_cached_window_intelligence_from_db() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        wmux_core::storage::db::run_migrations(&pool).await.unwrap();
+
+        let response_json = serde_json::json!({
+            "app": "vim",
+            "status": "running",
+            "summary": "Editing test file",
+            "confidence": 0.9,
+            "source": "openai/gpt-4"
+        })
+        .to_string();
+
+        let repo = wmux_core::storage::AiUsageRepository::new(pool.clone());
+        let event = wmux_core::storage::models::NewAiUsageEvent {
+            project_id: None,
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            target_name: "local".to_string(),
+            session_name: "test-session".to_string(),
+            status: "success".to_string(),
+            duration_ms: 100,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            estimated_cost: None,
+            error_message: None,
+            window_number: Some(1),
+            response_json: Some(response_json),
+        };
+        repo.insert(&event).await.unwrap();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_path = temp_dir.path().join("config.jsonc");
+        let store = wmux_core::config::load(&config_path).unwrap();
+
+        let app_state = AppState {
+            store,
+            connections: crate::state::RuntimeConnections::default(),
+            sessions: wmux_core::session::SessionManager::new(),
+            intelligence: wmux_core::intelligence::IntelligenceStore::default(),
+            assets_dir: std::path::PathBuf::from("."),
+            logging_handle: wmux_core::logging::LoggingHandle::empty(),
+            storage: Some(pool),
+            cleanup_handle: None,
+            sync_handle: None,
+            analysis_handle: None,
+            skills: crate::state::RuntimeSkills::default(),
+        };
+
+        let mut windows = vec![Window::new(
+            "window-id".to_string(),
+            "win1".to_string(),
+            1,
+            true,
+            1,
+            "pane-id".to_string(),
+            "pane-title".to_string(),
+        )];
+
+        apply_cached_window_intelligence(&app_state, "local", "test-session", &mut windows).await;
+
+        assert_eq!(windows[0].intelligence_app.as_deref(), Some("vim"));
+        assert_eq!(windows[0].intelligence_status.as_deref(), Some("running"));
+        assert_eq!(
+            windows[0].intelligence_summary.as_deref(),
+            Some("Editing test file")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_cached_window_intelligence_prefers_sqlite_over_memory_cache() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        wmux_core::storage::db::run_migrations(&pool).await.unwrap();
+
+        let response_json = serde_json::json!({
+            "app": "vim",
+            "status": "running",
+            "summary": "SQLite summary",
+            "confidence": 0.9,
+            "source": "deepseek/deepseek-v4-flash"
+        })
+        .to_string();
+
+        let repo = wmux_core::storage::AiUsageRepository::new(pool.clone());
+        let event = wmux_core::storage::models::NewAiUsageEvent {
+            project_id: None,
+            provider: "deepseek".to_string(),
+            model: "deepseek-v4-flash".to_string(),
+            target_name: "local".to_string(),
+            session_name: "test-session".to_string(),
+            status: "success".to_string(),
+            duration_ms: 100,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            estimated_cost: None,
+            error_message: None,
+            window_number: Some(1),
+            response_json: Some(response_json),
+        };
+        repo.insert(&event).await.unwrap();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_path = temp_dir.path().join("config.jsonc");
+        let store = wmux_core::config::load(&config_path).unwrap();
+        let mut config = store.snapshot().unwrap();
+        config.intelligence.enabled = true;
+        config.intelligence.active_provider = "test".to_string();
+        config.intelligence.providers = vec![wmux_core::config::IntelligenceProviderConfig {
+            name: "test".to_string(),
+            provider: "deepseek".to_string(),
+            model: "deepseek-v4-flash".to_string(),
+            api_key: "test-key".to_string(),
+            base_url: "https://example.test/v1".to_string(),
+        }];
+        store.replace_in_memory(config).unwrap();
+
+        let intelligence_store = wmux_core::intelligence::IntelligenceStore::default();
+        intelligence_store.set_window(
+            "local",
+            "test-session",
+            "window-id",
+            SessionIntelligence {
+                app: "stale-cache".to_string(),
+                status: "none".to_string(),
+                summary: "Stale summary".to_string(),
+                source: "memory".to_string(),
+                confidence: 0.1,
+                stale: false,
+                updated_at: wmux_core::intelligence::now_rfc3339(),
+                error: None,
+                app_counts: None,
+            },
+            "hash",
+            wmux_core::intelligence::CommandClass::Unknown,
+            "",
+            "signature",
+        );
+
+        let app_state = AppState {
+            store,
+            connections: crate::state::RuntimeConnections::default(),
+            sessions: wmux_core::session::SessionManager::new(),
+            intelligence: intelligence_store,
+            assets_dir: std::path::PathBuf::from("."),
+            logging_handle: wmux_core::logging::LoggingHandle::empty(),
+            storage: Some(pool),
+            cleanup_handle: None,
+            sync_handle: None,
+            analysis_handle: None,
+            skills: crate::state::RuntimeSkills::default(),
+        };
+
+        let mut windows = vec![Window::new(
+            "window-id".to_string(),
+            "win1".to_string(),
+            1,
+            true,
+            1,
+            "pane-id".to_string(),
+            "pane-title".to_string(),
+        )];
+
+        apply_cached_window_intelligence(&app_state, "local", "test-session", &mut windows).await;
+
+        assert_eq!(windows[0].intelligence_app.as_deref(), Some("vim"));
+        assert_eq!(windows[0].intelligence_status.as_deref(), Some("running"));
+        assert_eq!(
+            windows[0].intelligence_summary.as_deref(),
+            Some("SQLite summary")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_cached_window_intelligence_uses_local_sqlite_rows_for_local_connection_id()
+    {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
+        wmux_core::storage::db::run_migrations(&pool).await.unwrap();
+
+        let response_json = serde_json::json!({
+            "app": "opencode",
+            "status": "running",
+            "summary": "Local canonical target summary",
+            "confidence": 0.9,
+            "source": "deepseek/deepseek-v4-flash"
+        })
+        .to_string();
+
+        let repo = wmux_core::storage::AiUsageRepository::new(pool.clone());
+        let event = wmux_core::storage::models::NewAiUsageEvent {
+            project_id: None,
+            provider: "deepseek".to_string(),
+            model: "deepseek-v4-flash".to_string(),
+            target_name: "local".to_string(),
+            session_name: "test-session".to_string(),
+            status: "success".to_string(),
+            duration_ms: 100,
+            prompt_tokens: None,
+            completion_tokens: None,
+            total_tokens: None,
+            estimated_cost: None,
+            error_message: None,
+            window_number: Some(1),
+            response_json: Some(response_json),
+        };
+        repo.insert(&event).await.unwrap();
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let config_path = temp_dir.path().join("config.jsonc");
+        let store = wmux_core::config::load(&config_path).unwrap();
+
+        let app_state = AppState {
+            store,
+            connections: crate::state::RuntimeConnections::default(),
+            sessions: wmux_core::session::SessionManager::new(),
+            intelligence: wmux_core::intelligence::IntelligenceStore::default(),
+            assets_dir: std::path::PathBuf::from("."),
+            logging_handle: wmux_core::logging::LoggingHandle::empty(),
+            storage: Some(pool),
+            cleanup_handle: None,
+            sync_handle: None,
+            analysis_handle: None,
+            skills: crate::state::RuntimeSkills::default(),
+        };
+
+        let mut windows = vec![Window::new(
+            "window-id".to_string(),
+            "win1".to_string(),
+            1,
+            true,
+            1,
+            "pane-id".to_string(),
+            "pane-title".to_string(),
+        )];
+
+        apply_cached_window_intelligence(
+            &app_state,
+            "95cb2c8932f7b919fc59a3b255fb9390",
+            "test-session",
+            &mut windows,
+        )
+        .await;
+
+        assert_eq!(windows[0].intelligence_app.as_deref(), Some("opencode"));
+        assert_eq!(windows[0].intelligence_status.as_deref(), Some("running"));
+        assert_eq!(
+            windows[0].intelligence_summary.as_deref(),
+            Some("Local canonical target summary")
         );
     }
 }

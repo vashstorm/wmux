@@ -233,7 +233,10 @@ mod tests {
         assert_eq!(inserted.session_name, "dev");
         assert_eq!(inserted.window_number, Some(3));
         assert_eq!(inserted.status, "success");
-        assert_eq!(inserted.response_json, Some("{\"app\":\"vim\"}".to_string()));
+        assert_eq!(
+            inserted.response_json,
+            Some("{\"app\":\"vim\"}".to_string())
+        );
     }
 
     #[tokio::test]
@@ -254,11 +257,17 @@ mod tests {
         let all = repo.list(10, None, None).await.expect("list all");
         assert_eq!(all.len(), 3);
 
-        let errors = repo.list(10, None, Some("error")).await.expect("list errors");
+        let errors = repo
+            .list(10, None, Some("error"))
+            .await
+            .expect("list errors");
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].window_number, Some(2));
 
-        let successes = repo.list(10, None, Some("success")).await.expect("list successes");
+        let successes = repo
+            .list(10, None, Some("success"))
+            .await
+            .expect("list successes");
         assert_eq!(successes.len(), 2);
     }
 

@@ -79,50 +79,91 @@ export interface SelectedPane {
   pane?: string
 }
 
-function windowInfoToSummary(w: WindowInfo): WindowSummary {
+type WindowInfoLike = WindowInfo & {
+  id?: string
+  name?: string
+  index?: number
+  active?: boolean
+  paneCount?: number
+  activePaneId?: string
+  activePaneTitle?: string
+  attentionState?: "none" | "attention" | "explicit"
+  attentionCount?: number
+  intelligenceApp?: string
+  intelligenceStatus?: string
+  intelligenceSummary?: string
+  intelligenceSource?: string
+  intelligenceConfidence?: number
+  intelligenceStale?: boolean
+  intelligenceUpdatedAt?: string
+  intelligenceError?: string
+  intelligenceAppCounts?: Record<string, number>
+}
+
+type PaneInfoLike = PaneInfo & {
+  id?: string
+  title?: string
+  index?: number
+  active?: boolean
+  width?: number
+  height?: number
+  left?: number
+  top?: number
+  attentionState?: "none" | "attention" | "explicit"
+  intelligenceApp?: string
+  intelligenceStatus?: string
+  intelligenceSummary?: string
+  intelligenceSource?: string
+  intelligenceConfidence?: number
+  intelligenceStale?: boolean
+  intelligenceUpdatedAt?: string
+  intelligenceError?: string
+}
+
+function windowInfoToSummary(w: WindowInfoLike): WindowSummary {
   return {
-    id: w.ID,
-    name: w.Name,
-    index: w.Index,
-    active: w.Active,
-    paneCount: w.PaneCount,
-    activePaneID: w.ActivePaneID,
-    activePaneTitle: w.ActivePaneTitle,
-    attentionState: w.AttentionState,
-    attentionCount: w.AttentionCount,
-    intelligenceApp: w.IntelligenceApp,
-    intelligenceStatus: w.IntelligenceStatus,
-    intelligenceSummary: w.IntelligenceSummary,
-    intelligenceSource: w.IntelligenceSource,
-    intelligenceConfidence: w.IntelligenceConfidence,
-    intelligenceStale: w.IntelligenceStale,
-    intelligenceUpdatedAt: w.IntelligenceUpdatedAt,
-    intelligenceError: w.IntelligenceError,
-    intelligenceAppCounts: w.IntelligenceAppCounts,
+    id: w.ID ?? w.id ?? "",
+    name: w.Name ?? w.name ?? "",
+    index: w.Index ?? w.index ?? 0,
+    active: w.Active ?? w.active ?? false,
+    paneCount: w.PaneCount ?? w.paneCount ?? 0,
+    activePaneID: w.ActivePaneID ?? w.activePaneId ?? "",
+    activePaneTitle: w.ActivePaneTitle ?? w.activePaneTitle ?? "",
+    attentionState: w.AttentionState ?? w.attentionState,
+    attentionCount: w.AttentionCount ?? w.attentionCount,
+    intelligenceApp: w.IntelligenceApp ?? w.intelligenceApp,
+    intelligenceStatus: w.IntelligenceStatus ?? w.intelligenceStatus,
+    intelligenceSummary: w.IntelligenceSummary ?? w.intelligenceSummary,
+    intelligenceSource: w.IntelligenceSource ?? w.intelligenceSource,
+    intelligenceConfidence: w.IntelligenceConfidence ?? w.intelligenceConfidence,
+    intelligenceStale: w.IntelligenceStale ?? w.intelligenceStale,
+    intelligenceUpdatedAt: w.IntelligenceUpdatedAt ?? w.intelligenceUpdatedAt,
+    intelligenceError: w.IntelligenceError ?? w.intelligenceError,
+    intelligenceAppCounts: w.IntelligenceAppCounts ?? w.intelligenceAppCounts,
   }
 }
 
-function paneInfoToData(p: PaneInfo): PaneData {
+function paneInfoToData(p: PaneInfoLike): PaneData {
   return {
-    id: p.ID,
-    title: p.Title,
-    index: p.Index,
-    active: p.Active,
-    width: p.Width,
-    height: p.Height,
-    left: p.Left,
-    top: p.Top,
-    sourceCols: p.Width,
-    sourceRows: p.Height,
-    attentionState: p.AttentionState,
-    intelligenceApp: p.IntelligenceApp,
-    intelligenceStatus: p.IntelligenceStatus,
-    intelligenceSummary: p.IntelligenceSummary,
-    intelligenceSource: p.IntelligenceSource,
-    intelligenceConfidence: p.IntelligenceConfidence,
-    intelligenceStale: p.IntelligenceStale,
-    intelligenceUpdatedAt: p.IntelligenceUpdatedAt,
-    intelligenceError: p.IntelligenceError,
+    id: p.ID ?? p.id ?? "",
+    title: p.Title ?? p.title ?? "",
+    index: p.Index ?? p.index ?? 0,
+    active: p.Active ?? p.active ?? false,
+    width: p.Width ?? p.width ?? 0,
+    height: p.Height ?? p.height ?? 0,
+    left: p.Left ?? p.left ?? 0,
+    top: p.Top ?? p.top ?? 0,
+    sourceCols: p.Width ?? p.width ?? 0,
+    sourceRows: p.Height ?? p.height ?? 0,
+    attentionState: p.AttentionState ?? p.attentionState,
+    intelligenceApp: p.IntelligenceApp ?? p.intelligenceApp,
+    intelligenceStatus: p.IntelligenceStatus ?? p.intelligenceStatus,
+    intelligenceSummary: p.IntelligenceSummary ?? p.intelligenceSummary,
+    intelligenceSource: p.IntelligenceSource ?? p.intelligenceSource,
+    intelligenceConfidence: p.IntelligenceConfidence ?? p.intelligenceConfidence,
+    intelligenceStale: p.IntelligenceStale ?? p.intelligenceStale,
+    intelligenceUpdatedAt: p.IntelligenceUpdatedAt ?? p.intelligenceUpdatedAt,
+    intelligenceError: p.IntelligenceError ?? p.intelligenceError,
   }
 }
 

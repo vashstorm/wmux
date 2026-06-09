@@ -305,18 +305,19 @@ export function MainPanel() {
 
     const windowSummary = windowSummaries.find((w) => w.id === selectedPane.window)
     const paneData = currentPanes.find((p) => p.id === selectedPane.pane)
-    const status =
-      paneData?.intelligenceStatus ??
-      windowSummary?.intelligenceStatus ??
-      selectedSession?.intelligenceStatus
+    const app = windowSummary?.intelligenceApp?.trim() || undefined
+    const status = windowSummary?.intelligenceStatus?.trim() || undefined
     const summary =
-      windowSummary?.intelligenceSummary ??
-      paneData?.intelligenceSummary ??
-      paneData?.title ??
-      windowSummary?.activePaneTitle ??
-      selectedSession?.intelligenceSummary
+      windowSummary?.intelligenceSummary?.trim() ||
+      paneData?.intelligenceSummary?.trim() ||
+      paneData?.title?.trim() ||
+      windowSummary?.activePaneTitle?.trim() ||
+      selectedSession?.intelligenceSummary?.trim() ||
+      windowSummary?.name?.trim() ||
+      selectedPane.session
 
     return [
+      ...(app && app !== "none" ? [{ key: "app" as const, value: app }] : []),
       ...(status && status !== "none" ? [{ key: "status" as const, value: status }] : []),
       { key: "summary", value: summary },
     ].filter((segment): segment is TitleSegment => Boolean(segment.value && segment.value.trim()))
