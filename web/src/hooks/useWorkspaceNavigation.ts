@@ -96,7 +96,16 @@ export function useWorkspaceNavigation(): void {
     restoreFromLocation(location)
   }, [connections])
 
-  // Separate effect to handle when connections become available after initial mount
+  // Separate effect to handle when connections become available after initial mount.
+  // Intentionally depends only on `connections` — NOT on `selectedPane`.
+  //
+  // Why: when the user clicks a session, React commits the new selectedPane to state
+  // but the "write URL" effect (declared later) hasn't run yet, so
+  // window.location.search still contains the *previous* session's URL. If we
+  // included selectedPane in the deps, this effect would fire, read the stale URL,
+  // and call restoreFromLocation() with the old session — causing the auto-jump-back
+  // bug. Using selectedPaneRef.current (kept in sync on every render) lets us read
+  // the current value without adding it to the dependency array.
   useEffect(() => {
     if (!initializedRef.current) return
 
@@ -108,10 +117,11 @@ export function useWorkspaceNavigation(): void {
     // Skip if this connection was already handled in a previous render cycle
     if (restoredConnectionsRef.current.has(location.connection)) return
 
-    // Check if we already restored this location
+    // Check if we already restored this location (use ref to avoid stale-URL race)
+    const currentPane = selectedPaneRef.current
     if (
-      selectedPane?.targetName === location.connection &&
-      selectedPane?.session === location.session
+      currentPane?.targetName === location.connection &&
+      currentPane?.session === location.session
     ) {
       return
     }
@@ -123,7 +133,7 @@ export function useWorkspaceNavigation(): void {
       restoredConnectionsRef.current.add(location.connection)
       restoreFromLocation(location)
     }
-  }, [connections, selectedPane])
+  }, [connections])
 
   // Restore from location helper
   async function restoreFromLocation(
