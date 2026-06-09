@@ -3,6 +3,8 @@
 //! This crate provides the Tauri-specific functionality for the desktop app.
 //! It re-exports core types from wmux-core and provides Tauri command bindings.
 
+pub mod commands;
+
 pub use wmux_core::{IpcError, IpcResult};
 
 /// Re-export protocol error codes for convenience.

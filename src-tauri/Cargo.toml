@@ -9,6 +9,8 @@ default-run = "wmux-tauri"
 tauri = { version = "2", features = [] }
 tokio = { version = "1", features = ["rt"] }
 wmux-core = { path = "../crates/wmux-core" }
+serde = { version = "1", features = ["derive"] }
+tracing = "0.1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

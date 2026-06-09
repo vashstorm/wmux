@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+mod commands;
+
 use tauri::{Manager, RunEvent};
 use tokio::task::JoinHandle;
 
@@ -65,6 +67,9 @@ fn main() {
 
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            crate::commands::stream_poc::stream_burst
+        ])
         .build(tauri::generate_context!())
         .expect("failed to build Wmux Tauri app");
 
