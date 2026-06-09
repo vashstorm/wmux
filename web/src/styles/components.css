@@ -1980,137 +1980,143 @@
   align-self: stretch;
 }
 
-/* --- Window Tabs --- */
+/* --- Window Tabs (Chrome-style) --- */
 .window-tabs {
   display: flex;
   align-items: flex-end;
-  padding: 0 calc(var(--spacing-lg) - 6px);
+  padding: 0 var(--spacing-sm);
   flex-shrink: 0;
-  min-height: 52px;
-  height: 52px;
+  height: 40px;
   position: relative;
+  background-color: var(--color-surface);
+}
+
+/* Bottom border line across the tab strip */
+.window-tabs::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--color-panel-border);
+  opacity: 0.35;
+  z-index: 0;
+  pointer-events: none;
+}
+
+[data-mui-color-scheme="dark"] .window-tabs::after {
+  opacity: 0.25;
 }
 
 @keyframes tabSlideIn {
   from {
     opacity: 0;
-    transform: translateY(4px) scale(0.96);
+    transform: translateY(3px) scaleY(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scaleY(1);
   }
 }
 
+/* --- Base Tab (Inactive) --- */
 .window-tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 14px;
-  border-radius: 8px 8px 0 0;
+  padding: 0 14px !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
   font-size: var(--font-size-xs);
   white-space: nowrap;
   cursor: pointer;
   flex: 0 0 auto;
   min-width: 0;
-  overflow: visible;
-  min-height: 38px !important;
-  height: 38px !important;
-  margin-bottom: 0px !important;
-  position: relative;
-  border: 2px solid color-mix(in srgb, var(--color-panel-border) 35%, transparent);
-  border-bottom-color: transparent;
-  background-color: transparent;
-  transition: all var(--transition-fast);
-  animation: tabSlideIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: 180px;
+  overflow: hidden;
+  margin-right: 0 !important;
+  margin-bottom: 0 !important;
+  border: 1px solid var(--color-surface-border) !important;
+  border-bottom: none !important;
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+  animation: tabSlideIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 1;
 }
 
-[data-mui-color-scheme="dark"] .window-tab {
-  border-color: color-mix(in srgb, var(--color-panel-border) 35%, transparent);
-  border-bottom-color: transparent;
+.window-tab:hover {
+  outline: none;
+  background-color: var(--color-surface-hover) !important;
+  color: var(--color-text);
 }
 
-/* Chrome-like Vertical Divider Line between inactive tabs */
-.window-tab::after {
-  display: none;
+/* --- Active Tab --- */
+.window-tab.is-active {
+  min-height: 32px !important;
+  height: 32px !important;
+  max-width: 240px;
+  background-color: var(--color-background) !important;
+  color: var(--color-text);
+  border: 1px solid var(--color-panel-border) !important;
+  border-bottom: 1px solid var(--color-background) !important;
+  z-index: 2;
+  margin-bottom: -1px !important;
+  overflow: visible !important;
 }
 
-/* Hide divider line for the last tab */
-.window-tabs .MuiTabs-flexContainer .MuiTab-root:last-child::after {
-  display: none;
+/* --- Status-based active tab top accent --- */
+.window-tab.is-active {
+  box-shadow: inset 0 2px 0 0 rgba(0, 0, 0, 0.12);
 }
 
-/* Hide divider line when tab is active or hovered */
-.window-tab.is-active::after,
-.window-tab:hover::after {
-  opacity: 0;
+[data-mui-color-scheme="dark"] .window-tab.is-active {
+  box-shadow: inset 0 2px 0 0 rgba(255, 255, 255, 0.15);
 }
 
-/* Hide divider line on preceding tab if current is active or hovered */
-.window-tab:has(+ .is-active)::after,
-.window-tab:has(+ .window-tab:hover)::after {
-  opacity: 0;
+.window-tab.is-active.status-explicit {
+  box-shadow: inset 0 2px 0 0 var(--color-attention-explicit);
+}
+.window-tab.is-active.status-attention {
+  box-shadow: inset 0 2px 0 0 var(--color-attention);
+}
+.window-tab.is-active.status-running {
+  box-shadow: inset 0 2px 0 0 var(--color-success);
+}
+.window-tab.is-active.status-waiting {
+  box-shadow: inset 0 2px 0 0 var(--color-warning);
+}
+.window-tab.is-active.status-blocked {
+  box-shadow: inset 0 2px 0 0 var(--color-danger);
 }
 
+/* --- Tab Animations --- */
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(1) {
   animation-delay: 0ms;
 }
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(2) {
-  animation-delay: 30ms;
+  animation-delay: 25ms;
 }
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(3) {
-  animation-delay: 55ms;
+  animation-delay: 50ms;
 }
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(4) {
-  animation-delay: 75ms;
+  animation-delay: 70ms;
 }
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(5) {
-  animation-delay: 90ms;
+  animation-delay: 85ms;
 }
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(n + 6) {
   animation-delay: 100ms;
 }
 
-.window-tab:hover {
-  outline: none;
-  background-color: var(--color-surface);
-  border-color: color-mix(in srgb, var(--color-panel-border) 60%, transparent);
-  border-bottom-color: transparent;
-}
-
-[data-mui-color-scheme="dark"] .window-tab:hover {
-  background-color: var(--color-surface);
-  border-color: color-mix(in srgb, var(--color-panel-border) 60%, transparent);
-  border-bottom-color: transparent;
-}
-
-.window-tab.is-active {
-  min-height: 40px !important;
-  height: 40px !important;
-  outline: none;
-  border-color: var(--color-panel-border);
-  border-bottom-color: var(--color-background);
-  background-color: var(--color-background);
-  z-index: 2;
-  margin-bottom: -2px !important;
-}
-
-.window-tab.is-active.status-explicit {
-  border-bottom-color: rgba(220, 38, 38, 0.12);
-}
-.window-tab.is-active.status-attention {
-  border-bottom-color: rgba(217, 119, 6, 0.12);
-}
-.window-tab.is-active.status-running {
-  border-bottom-color: rgba(16, 185, 129, 0.12);
-}
-.window-tab.is-active.status-waiting {
-  border-bottom-color: rgba(245, 158, 11, 0.12);
-}
-.window-tab.is-active.status-blocked {
-  border-bottom-color: rgba(239, 68, 68, 0.12);
-}
-
+/* --- Tab Inner Elements --- */
 .window-tab-index {
   display: inline-flex;
   align-items: center;
@@ -2124,9 +2130,22 @@
   line-height: 1;
   border-radius: var(--radius-full);
   flex-shrink: 0;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-muted);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all var(--transition-fast);
+}
+
+[data-mui-color-scheme="dark"] .window-tab-index {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-muted);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .window-tab.is-active .window-tab-index {
+  background-color: var(--color-accent);
+  color: #fff;
+  border-color: transparent;
 }
 
 .window-tab-name {
@@ -2137,6 +2156,7 @@
   white-space: nowrap;
   min-width: 0;
   letter-spacing: -0.01em;
+  transition: font-weight var(--transition-fast);
 }
 
 .window-tab.is-active .window-tab-name {
@@ -2160,7 +2180,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: var(--spacing-md);
+  padding: 2px;
   background: var(--color-background);
 }
 

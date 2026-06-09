@@ -353,42 +353,10 @@ export const WindowTabs = memo(function WindowTabs({
     }
   }
 
-  const tabSxBase = {
-    minHeight: 34,
-    height: 34,
-    padding: "0 13px",
-    textTransform: "none" as const,
-    borderRadius: "8px",
-    gap: 1,
-    flexDirection: "row" as const,
-    flexShrink: 0,
-    minWidth: "auto",
-    overflow: "visible",
-  }
-
   return (
     <Box
       className="window-tabs"
       data-testid="window-tabs"
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        minHeight: 52,
-        paddingX: "calc(var(--spacing-lg) - 6px)",
-        paddingY: 0,
-        background: (theme) =>
-          theme.palette.mode === "dark" ? "rgba(13, 17, 23, 0.85)" : "rgba(250, 251, 253, 0.92)",
-        backdropFilter: "blur(16px) saturate(180%)",
-        WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        borderBottom: "1px solid",
-        borderColor: (theme) =>
-          theme.palette.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)",
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 1px 0 rgba(255,255,255,0.04), 0 4px 16px rgba(0,0,0,0.28)"
-            : "0 1px 0 rgba(0,0,0,0.05), 0 2px 12px rgba(0,0,0,0.05)",
-        flexShrink: 0,
-      }}
     >
       <Tabs
         variant="scrollable"
@@ -401,21 +369,18 @@ export const WindowTabs = memo(function WindowTabs({
           overflow: "hidden",
           "& .MuiTabs-scroller": {
             overflow: "auto hidden !important",
-            paddingTop: "9px",
-            paddingBottom: "9px",
           },
           "& .MuiTabs-indicator": {
             display: "none",
           },
           "& .MuiTabs-flexContainer": {
-            gap: "0px",
-            alignItems: "center",
-            paddingLeft: "6px",
-            paddingRight: "6px",
+            gap: "6px",
+            alignItems: "flex-end",
+            paddingBottom: "1px",
           },
         }}
       >
-        {windows.map((window, index) => {
+        {windows.map((window) => {
           const isActive = window.id === selectedWindowId
           const isAttentionExplicit = window.attentionState === "explicit"
           const isAttention = window.attentionState === "attention"
@@ -425,7 +390,7 @@ export const WindowTabs = memo(function WindowTabs({
           const appConfig = getAppIconConfig(appName)
           const AppIcon = appConfig?.Icon
           const statusTone = getStatusTone(window)
-          const hasNonDefaultStatus = statusTone.name !== "none"
+
           const tabClasses = [
             "window-tab",
             isActive && "is-active",
@@ -451,86 +416,8 @@ export const WindowTabs = memo(function WindowTabs({
               disableRipple
               disableFocusRipple
               sx={{
-                ...tabSxBase,
-                position: "relative",
-                maxWidth: isActive ? 260 : 160,
-                marginRight: "8px",
-                /* Active tab: filled background with subtle gradient */
-                background: isActive
-                  ? (theme) =>
-                      hasNonDefaultStatus
-                        ? statusTone.selectedBackgroundColor
-                        : theme.palette.mode === "dark"
-                          ? "rgba(107, 130, 245, 0.14)"
-                          : "rgba(255, 255, 255, 0.95)"
-                  : "transparent",
-                border: "1px solid",
-                borderColor: isActive
-                  ? (theme) =>
-                      hasNonDefaultStatus
-                        ? statusTone.softBorderColor
-                        : theme.palette.mode === "dark"
-                          ? "rgba(107, 130, 245, 0.5)"
-                          : "rgba(79, 107, 237, 0.45)"
-                  : (theme) =>
-                      theme.palette.mode === "dark"
-                        ? "rgba(255, 255, 255, 0.15)"
-                        : "rgba(15, 23, 42, 0.18)",
-                color: isActive
-                  ? hasNonDefaultStatus
-                    ? statusTone.color
-                    : "primary.main"
-                  : "text.secondary",
-                fontWeight: isActive ? 600 : 400,
-                transform: isActive ? "translateY(-1px)" : "none",
-                boxShadow: isActive
-                  ? (theme) =>
-                      hasNonDefaultStatus
-                        ? [
-                            `0 2px 12px ${statusTone.softBorderColor}`,
-                            theme.palette.mode === "dark"
-                              ? "0 4px 16px rgba(0,0,0,0.5)"
-                              : "0 2px 8px rgba(0,0,0,0.10)",
-                          ].join(", ")
-                        : theme.palette.mode === "dark"
-                          ? "0 2px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(107,130,245,0.35)"
-                          : "0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px rgba(79,107,237,0.25)"
-                  : "none",
-                transition: "all 180ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                "&:hover": {
-                  background: isActive
-                    ? undefined
-                    : (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(255,255,255,0.05)"
-                          : "rgba(0,0,0,0.04)",
-                  borderColor: hasNonDefaultStatus
-                    ? statusTone.softBorderColor
-                    : (theme) =>
-                        theme.palette.mode === "dark"
-                          ? "rgba(107,130,245,0.38)"
-                          : "rgba(79,107,237,0.3)",
-                  transform: "translateY(-1px)",
-                  color: isActive ? undefined : "text.primary",
-                },
-                /* Top-edge accent stripe for active tab */
-                "&::after": isActive
-                  ? {
-                      content: '""',
-                      position: "absolute",
-                      top: -1,
-                      left: "20%",
-                      right: "20%",
-                      height: "2px",
-                      borderRadius: "0 0 3px 3px",
-                      background: hasNonDefaultStatus
-                        ? statusTone.color
-                        : "linear-gradient(90deg, #4f6bed, #7c3aed)",
-                      boxShadow: hasNonDefaultStatus
-                        ? `0 0 8px ${statusTone.softBorderColor}`
-                        : "0 0 8px rgba(107,130,245,0.5)",
-                    }
-                  : {},
+                textTransform: "none",
+                minWidth: "auto",
               }}
               label={
                 <Stack
@@ -542,33 +429,6 @@ export const WindowTabs = memo(function WindowTabs({
                   <Box
                     component="span"
                     className="window-tab-index"
-                    sx={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 17,
-                      height: 17,
-                      minWidth: 17,
-                      flex: "0 0 17px",
-                      fontSize: "var(--font-size-2xs)",
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      borderRadius: "50%",
-                      background: isActive
-                        ? hasNonDefaultStatus
-                          ? statusTone.color
-                          : "linear-gradient(135deg, #4f6bed, #7c3aed)"
-                        : undefined,
-                      backgroundColor: isActive ? undefined : "action.disabledBackground",
-                      color: isActive ? "#fff" : "text.disabled",
-                      border: isActive ? "none" : "1px solid",
-                      borderColor: isActive ? "transparent" : "divider",
-                      boxShadow:
-                        isActive && !hasNonDefaultStatus
-                          ? "0 0 6px rgba(107,130,245,0.45)"
-                          : "none",
-                      transition: "all 180ms cubic-bezier(0.34, 1.56, 0.64, 1)",
-                    }}
                   >
                     {window.index}
                   </Box>
@@ -583,14 +443,14 @@ export const WindowTabs = memo(function WindowTabs({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: 20,
-                        height: 20,
-                        borderRadius: "6px",
+                        width: 18,
+                        height: 18,
+                        borderRadius: "4px",
                         color: appConfig.color,
                         backgroundColor: isActive ? appConfig.backgroundColor : "transparent",
-                        flex: "0 0 20px",
-                        opacity: isActive ? 1 : 0.65,
-                        transition: "all 180ms ease",
+                        flex: "0 0 18px",
+                        opacity: isActive ? 1 : 0.7,
+                        transition: "all 150ms ease",
                       }}
                     >
                       <AppIcon sx={{ fontSize: "var(--font-size-sm)" }} />
@@ -600,16 +460,6 @@ export const WindowTabs = memo(function WindowTabs({
                     component="span"
                     className="window-tab-name"
                     variant="body2"
-                    sx={{
-                      fontSize: "var(--font-size-xs)",
-                      fontWeight: isActive ? 600 : 400,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      minWidth: 0,
-                      flex: "1 1 auto",
-                      letterSpacing: "-0.01em",
-                    }}
                   >
                     {displayName}
                   </Typography>
