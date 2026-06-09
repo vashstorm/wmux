@@ -18,14 +18,31 @@ html {
   scroll-behavior: smooth;
 }
 
+:root {
+  --color-grid-dot: rgba(43, 38, 33, 0.05);
+  --color-scrollbar-thumb: rgba(43, 38, 33, 0.25);
+  --color-scrollbar-track: rgba(43, 38, 33, 0.05);
+}
+
+[data-mui-color-scheme="dark"] {
+  --color-grid-dot: rgba(242, 238, 235, 0.045);
+  --color-scrollbar-thumb: rgba(242, 238, 235, 0.2);
+  --color-scrollbar-track: rgba(0, 0, 0, 0.2);
+}
+
 body {
   font-family: var(--font-stack);
   line-height: var(--line-height-normal);
   letter-spacing: var(--letter-spacing-normal);
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "kern" 1, "liga" 1;
   min-height: 100vh;
   overflow: hidden;
   background-color: var(--color-background);
   color: var(--color-text);
+  /* Retro engineering grid / dot-matrix overlay */
+  background-image: radial-gradient(var(--color-grid-dot) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 
 #root {
@@ -62,14 +79,8 @@ h6 {
 
 /* --- Scrollbar styling --- */
 * {
-  --scrollbar-thumb: rgba(148, 163, 184, 0.25);
-  --scrollbar-track: transparent;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
   scrollbar-width: thin;
-}
-
-[data-mui-color-scheme="dark"] * {
-  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
 }
 
 /* Legacy fallback for WebKit/Blink browsers wrapped in supports block */
@@ -80,23 +91,20 @@ h6 {
   }
 
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--color-scrollbar-track);
   }
 
   ::-webkit-scrollbar-thumb {
-    border-radius: var(--radius-full);
-    background: var(--scrollbar-thumb);
+    border-radius: var(--radius-sm);
+    background: var(--color-scrollbar-thumb);
     border: 1px solid transparent;
     background-clip: padding-box;
     transition: background var(--transition-fast);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(148, 163, 184, 0.45);
-  }
-
-  [data-mui-color-scheme="dark"] ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--color-scrollbar-thumb);
+    filter: brightness(0.9);
   }
 }
 

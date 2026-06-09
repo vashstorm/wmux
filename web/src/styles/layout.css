@@ -177,8 +177,9 @@ body.is-resizing *::after {
   border-radius: var(--radius-input);
   font-size: var(--font-size-xs);
   background-color: var(--color-input-bg);
-  border: 1px solid var(--color-input-border);
+  border: 2px solid var(--color-input-border);
   color: var(--color-input-text);
+  box-shadow: var(--shadow-inner);
   transition: all var(--transition-base);
 }
 
@@ -188,7 +189,7 @@ body.is-resizing *::after {
 
 .sidebar-search:focus {
   border-color: var(--color-input-border-focus);
-  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+  box-shadow: var(--shadow-inner), 0 0 0 2px var(--color-accent-subtle);
 }
 
 .new-connection-button {

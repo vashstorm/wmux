@@ -295,9 +295,9 @@ describe("Terminal", () => {
 
     const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
     expect(xtermOptions.theme).toMatchObject({
-      background: "#f5f7fb",
-      cursor: "#4f6bed",
-      blue: "#4f6bed",
+      background: "#fdfcf9",
+      cursor: "#b85a3c",
+      blue: "#3f6a8a",
     })
   })
 
@@ -311,13 +311,13 @@ describe("Terminal", () => {
 
     const xtermOptions = vi.mocked(XTerm).mock.calls[0]![0]!
     expect(xtermOptions.theme).toMatchObject({
-      background: "#0a0e1a",
-      cursor: "#f59e0b",
-      blue: "#8b5cf6",
+      background: "#161719",
+      cursor: "#db8e3b",
+      blue: "#7daea3",
     })
     expect(
       screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background"),
-    ).toBe("#0a0e1a")
+    ).toBe("#161719")
   })
 
   test("applies the terminal theme background to the wrapper", () => {
@@ -325,8 +325,8 @@ describe("Terminal", () => {
 
     expect(
       screen.getByTestId("terminal-wrapper").style.getPropertyValue("--terminal-background"),
-    ).toBe("#f5f7fb")
-    expect(screen.getByTestId("terminal-wrapper").style.backgroundColor).toBe("rgb(245, 247, 251)")
+    ).toBe("#fdfcf9")
+    expect(screen.getByTestId("terminal-wrapper").style.backgroundColor).toBe("rgb(253, 252, 249)")
   })
 
   test("writes output data to xterm when receiving output message", async () => {

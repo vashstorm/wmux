@@ -363,21 +363,19 @@
   background-color: var(--color-panel);
   border: 1px solid var(--color-panel-border);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(12px);
-  background-color: rgba(20, 26, 34, 0.85); /* Glassmorphic dark overlay by default */
   transition: all var(--transition-base);
   animation: slideUp var(--transition-base) forwards;
 }
 
-/* Color theme adaptions for premium look */
+/* Color theme adaptions */
 [data-mui-color-scheme="light"] .error-banner {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(239, 68, 68, 0.2);
+  background-color: var(--color-panel);
+  border-color: var(--color-danger);
 }
 
 [data-mui-color-scheme="dark"] .error-banner {
-  background-color: rgba(20, 26, 34, 0.9);
-  border-color: rgba(239, 68, 68, 0.3);
+  background-color: var(--color-panel);
+  border-color: var(--color-danger);
 }
 
 .error-banner-icon {
@@ -820,7 +818,7 @@
   width: 64px;
   height: 64px;
   border-radius: var(--radius-full);
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: rgba(95, 135, 69, 0.1);
   color: var(--color-success);
   box-shadow: var(--glow-success);
   margin-bottom: var(--spacing-sm);
@@ -836,7 +834,7 @@
   50% {
     transform: scale(1.05);
     opacity: 1;
-    box-shadow: 0 0 24px rgba(16, 185, 129, 0.35);
+    box-shadow: 0 0 24px rgba(95, 135, 69, 0.35);
   }
 }
 
@@ -874,15 +872,15 @@
   background-color: rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-panel-border);
-  --scrollbar-thumb: rgba(99, 102, 241, 0.25);
-  --scrollbar-track: rgba(0, 0, 0, 0.05);
+  --scrollbar-thumb: rgba(184, 90, 60, 0.25);
+  --scrollbar-track: rgba(43, 38, 33, 0.05);
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   scrollbar-width: thin;
 }
 
 [data-mui-color-scheme="dark"] .error-logs-content {
   background-color: rgba(0, 0, 0, 0.25);
-  --scrollbar-thumb: rgba(99, 102, 241, 0.35);
+  --scrollbar-thumb: rgba(219, 142, 59, 0.35);
   --scrollbar-track: rgba(255, 255, 255, 0.02);
 }
 
@@ -950,26 +948,26 @@
 
 .error-log-entry-level.level-error {
   color: var(--color-danger);
-  background-color: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(201, 74, 59, 0.12);
+  border: 1px solid rgba(201, 74, 59, 0.25);
 }
 
 .error-log-entry-level.level-warn {
   color: var(--color-warning);
-  background-color: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background-color: rgba(207, 156, 52, 0.12);
+  border: 1px solid rgba(207, 156, 52, 0.25);
 }
 
 .error-log-entry-level.level-info {
   color: var(--color-success);
-  background-color: rgba(16, 185, 129, 0.12);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background-color: rgba(95, 135, 69, 0.12);
+  border: 1px solid rgba(95, 135, 69, 0.25);
 }
 
 .error-log-entry-level.level-other {
   color: var(--color-text-muted);
-  background-color: rgba(148, 163, 184, 0.12);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
 }
 
 .error-log-entry-timestamp {
@@ -1453,8 +1451,8 @@
   font-size: var(--font-size-xs);
   color: var(--color-danger);
   font-family: var(--font-mono);
-  background-color: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background-color: rgba(201, 74, 59, 0.1);
+  border: 1px solid rgba(201, 74, 59, 0.2);
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-sm);
   margin: 0;
@@ -1530,15 +1528,15 @@
 @keyframes iconRedPulse {
   0% {
     transform: scale(0.96);
-    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.2));
+    filter: drop-shadow(0 0 2px rgba(201, 74, 59, 0.2));
   }
   50% {
     transform: scale(1.06);
-    filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.65));
+    filter: drop-shadow(0 0 12px rgba(201, 74, 59, 0.65));
   }
   100% {
     transform: scale(0.96);
-    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.2));
+    filter: drop-shadow(0 0 2px rgba(201, 74, 59, 0.2));
   }
 }
 
@@ -2007,21 +2005,28 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 13px;
-  border-radius: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.14);
+  padding: 0 14px;
+  border-radius: 8px 8px 0 0;
   font-size: var(--font-size-xs);
   white-space: nowrap;
   cursor: pointer;
   flex: 0 0 auto;
   min-width: 0;
   overflow: visible;
-  min-height: 34px;
+  min-height: 38px !important;
+  height: 38px !important;
+  margin-bottom: 0px !important;
+  position: relative;
+  border: 2px solid color-mix(in srgb, var(--color-panel-border) 35%, transparent);
+  border-bottom-color: transparent;
+  background-color: transparent;
+  transition: all var(--transition-fast);
   animation: tabSlideIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 [data-mui-color-scheme="dark"] .window-tab {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: color-mix(in srgb, var(--color-panel-border) 35%, transparent);
+  border-bottom-color: transparent;
 }
 
 .window-tabs .MuiTabs-flexContainer .MuiTab-root:nth-child(1) {
@@ -2045,15 +2050,26 @@
 
 .window-tab:hover {
   outline: none;
-  border-color: rgba(15, 23, 42, 0.25);
+  background-color: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-panel-border) 60%, transparent);
+  border-bottom-color: transparent;
 }
 
 [data-mui-color-scheme="dark"] .window-tab:hover {
-  border-color: rgba(255, 255, 255, 0.22);
+  background-color: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-panel-border) 60%, transparent);
+  border-bottom-color: transparent;
 }
 
 .window-tab.is-active {
+  min-height: 40px !important;
+  height: 40px !important;
   outline: none;
+  border-color: var(--color-panel-border);
+  border-bottom-color: var(--color-background);
+  background-color: var(--color-background);
+  z-index: 2;
+  margin-bottom: -2px !important;
 }
 
 .window-tab-index {
@@ -2214,8 +2230,6 @@
   cursor: pointer;
   pointer-events: auto;
   background: var(--color-glass-surface);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid var(--color-surface-border);
   color: var(--color-text-muted);
   transition:
@@ -2351,52 +2365,52 @@
 }
 
 .intelligence-badge.is-dead_loop {
-  color: #b45309;
-  background-color: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.26);
+  color: var(--color-warning);
+  background-color: rgba(207, 156, 52, 0.14);
+  border-color: rgba(207, 156, 52, 0.3);
 }
 
 .intelligence-badge.is-blocked {
-  color: #be123c;
-  background-color: rgba(244, 63, 94, 0.13);
-  border-color: rgba(244, 63, 94, 0.24);
+  color: var(--color-danger);
+  background-color: rgba(201, 74, 59, 0.13);
+  border-color: rgba(201, 74, 59, 0.28);
 }
 
 .intelligence-badge.is-waiting {
-  color: #4338ca;
-  background-color: rgba(99, 102, 241, 0.14);
-  border-color: rgba(99, 102, 241, 0.24);
+  color: var(--color-accent);
+  background-color: var(--color-accent-subtle);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .intelligence-badge.is-waiting_confirm {
-  color: #7c2d12;
-  background-color: rgba(249, 115, 22, 0.13);
-  border-color: rgba(249, 115, 22, 0.24);
+  color: #9a3412;
+  background-color: rgba(184, 90, 60, 0.13);
+  border-color: rgba(184, 90, 60, 0.28);
 }
 
 .intelligence-badge.is-waiting_idle {
   opacity: 0.7;
-  color: #475569;
-  background-color: rgba(100, 116, 139, 0.12);
-  border-color: rgba(100, 116, 139, 0.2);
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border-color: var(--color-surface-border);
 }
 
 .intelligence-badge.is-running {
-  color: #047857;
-  background-color: rgba(16, 185, 129, 0.13);
-  border-color: rgba(16, 185, 129, 0.24);
+  color: var(--color-success);
+  background-color: rgba(95, 135, 69, 0.13);
+  border-color: rgba(95, 135, 69, 0.28);
 }
 
 .intelligence-badge.is-stale {
-  color: #64748b;
-  background-color: rgba(100, 116, 139, 0.1);
-  border-color: rgba(100, 116, 139, 0.18);
+  color: var(--color-text-disabled);
+  background-color: var(--color-surface);
+  border-color: var(--color-surface-border);
 }
 
 .intelligence-badge.is-error {
-  color: #b91c1c;
-  background-color: rgba(239, 68, 68, 0.13);
-  border-color: rgba(239, 68, 68, 0.24);
+  color: var(--color-danger);
+  background-color: rgba(201, 74, 59, 0.13);
+  border-color: rgba(201, 74, 59, 0.28);
 }
 
 .app-count-badge.MuiChip-root {

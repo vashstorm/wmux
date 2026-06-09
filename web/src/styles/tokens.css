@@ -24,8 +24,8 @@
   --font-weight-bold: 700;
   --font-weight-black: 800;
 
-  --letter-spacing-tight: -0.02em;
-  --letter-spacing-normal: -0.01em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: -0.011em;
   --letter-spacing-wide: 0.06em;
 
   --font-stack:
@@ -50,20 +50,20 @@
   --spacing-4xl: 72px;
   --spacing-5xl: 88px;
 
-  /* --- Border radius --- */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  /* --- Border radius (Boxier for Retro Style) --- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
-  --radius-input: 8px;
+  --radius-input: 4px;
 
   /* --- Transitions --- */
-  --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-base: 220ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-slow: 350ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-spring: 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  --transition-bounce: 350ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --transition-fast: 100ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-base: 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-slow: 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-spring: 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --transition-bounce: 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
   /* --- Z-index scale --- */
   --z-base: 0;
@@ -83,150 +83,152 @@
 }
 
 /* ============================================================
-   Light mode color tokens (default)
+   Light mode color tokens (Default Retro Warm-Paper)
    ============================================================ */
 :root,
 [data-mui-color-scheme="light"] {
   /* Background layers */
-  --color-background: #f8fafc;
-  --color-panel: #ffffff;
-  --color-panel-border: rgba(15, 23, 42, 0.06);
-  --color-surface: #f1f5f9;
-  --color-surface-hover: #e2e8f0;
-  --color-surface-border: rgba(15, 23, 42, 0.08);
-  --color-surface-border-hover: rgba(71, 85, 105, 0.2);
+  --color-background: #f5f2eb;            /* Warm cream backdrop */
+  --color-panel: #fdfcf9;                 /* Soft off-white paper panel */
+  --color-panel-border: #2b2621;          /* Solid charcoal-brown border */
+  --color-surface: #eae4d8;               /* Putty grey surface */
+  --color-surface-hover: #ded6c8;         /* Hover state putty grey */
+  --color-surface-border: #2b2621;
+  --color-surface-border-hover: #2b2621;
 
-  /* Accent (neutral blue) */
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
-  --color-accent-subtle: rgba(79, 70, 229, 0.08);
-  --color-accent-glow: 0 0 20px rgba(79, 70, 229, 0.15);
-  --color-accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  /* Accent (Terracotta clay & vintage copper) */
+  --color-accent: #b85a3c;
+  --color-accent-hover: #9e462a;
+  --color-accent-subtle: rgba(184, 90, 60, 0.08);
+  --color-accent-glow: 0 0 10px rgba(184, 90, 60, 0.12);
+  --color-accent-gradient: linear-gradient(135deg, #b85a3c 0%, #d5804c 100%);
 
   /* Text */
-  --color-text: #0f172a;
-  --color-text-muted: #475569;
-  --color-text-disabled: #94a3b8;
+  --color-text: #2b2621;                  /* Solid dark charcoal-brown */
+  --color-text-muted: #5f544b;            /* Muted sepia-brown */
+  --color-text-disabled: #8a7f74;         /* Faded light brown */
 
   /* Glass / highlight */
-  --color-glass-highlight: rgba(255, 255, 255, 0.75);
-  --color-glass-highlight-border: rgba(79, 70, 229, 0.15);
-  --color-glass-surface: rgba(255, 255, 255, 0.55);
-  --color-glass-blur: blur(16px) saturate(180%);
+  --color-glass-highlight: rgba(253, 252, 249, 0.9);
+  --color-glass-highlight-border: #2b2621;
+  --color-glass-surface: rgba(253, 252, 249, 0.7);
+  --color-glass-blur: none;               /* Flat look, no blur needed */
 
   /* Inputs */
-  --color-input-bg: #ffffff;
-  --color-input-border: rgba(15, 23, 42, 0.12);
-  --color-input-border-focus: #4f46e5;
-  --color-input-text: #0f172a;
-  --color-input-placeholder: #94a3b8;
+  --color-input-bg: #fdfcf9;
+  --color-input-border: #2b2621;
+  --color-input-border-focus: #b85a3c;
+  --color-input-text: #2b2621;
+  --color-input-placeholder: #8a7f74;
 
   /* Status */
-  --color-danger: #ef4444;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-attention-explicit: #ef4444;
-  --color-attention: #f59e0b;
-  --color-online: #10b981;
-  --color-offline: #ef4444;
+  --color-danger: #c94a3b;                /* Retro clay red */
+  --color-success: #5f8745;               /* Retro sage green */
+  --color-warning: #cf9c34;               /* Muted mustard yellow */
+  --color-attention-explicit: #c94a3b;
+  --color-attention: #cf9c34;
+  --color-online: #5f8745;
+  --color-offline: #c94a3b;
 
-  /* Status glows */
-  --glow-accent: 0 0 20px rgba(79, 70, 229, 0.2), 0 0 40px rgba(79, 70, 229, 0.08);
-  --glow-success: 0 0 16px rgba(16, 185, 129, 0.2);
-  --glow-warning: 0 0 16px rgba(245, 158, 11, 0.2);
-  --glow-danger: 0 0 16px rgba(239, 68, 68, 0.2);
+  /* Status glows (Clean flat status, no glowing radial gradients) */
+  --glow-accent: none;
+  --glow-accent-pulse: none;
+  --glow-success: none;
+  --glow-warning: none;
+  --glow-danger: none;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.05), 0 2px 4px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 10px 24px rgba(15, 23, 42, 0.08), 0 4px 8px rgba(15, 23, 42, 0.04);
-  --shadow-xl: 0 20px 48px rgba(15, 23, 42, 0.1), 0 8px 16px rgba(15, 23, 42, 0.06);
-  --color-shadow-glow: 0 0 12px rgba(79, 70, 229, 0.12);
+  /* Shadows (Flat Retro Offsets) */
+  --shadow-sm: 1px 1px 0px #2b2621;
+  --shadow-md: 3px 3px 0px #2b2621;
+  --shadow-lg: 5px 5px 0px #2b2621;
+  --shadow-xl: 7px 7px 0px #2b2621;
+  --color-shadow-glow: none;
 
   /* Inner shadow (for inset depth) */
-  --shadow-inner: inset 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-header-bottom: 0 1px 0 rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.02);
-  --shadow-footer-top: 0 -1px 0 rgba(15, 23, 42, 0.04), 0 -2px 8px rgba(15, 23, 42, 0.02);
+  --shadow-inner: inset 1px 1px 2px rgba(43, 38, 33, 0.15);
+  --shadow-header-bottom: 0 2px 0 #2b2621;
+  --shadow-footer-top: 0 -2px 0 #2b2621;
 
   /* Session card */
-  --color-session-card-bg: #f8fafc;
-  --color-session-card-border: rgba(15, 23, 42, 0.09);
-  --color-session-card-hover: #f1f5f9;
-  --color-session-card-selected: rgba(79, 70, 229, 0.04);
-  --color-session-card-selected-border: rgba(79, 70, 229, 0.2);
-  --color-session-card-selected-glow: 0 0 0 3px rgba(79, 70, 229, 0.08), var(--shadow-sm);
+  --color-session-card-bg: #fdfcf9;
+  --color-session-card-border: #2b2621;
+  --color-session-card-hover: #eae4d8;
+  --color-session-card-selected: rgba(184, 90, 60, 0.06);
+  --color-session-card-selected-border: #b85a3c;
+  --color-session-card-selected-glow: 2px 2px 0px #2b2621;
 }
 
 /* ============================================================
-   Dark mode color tokens
+   Dark mode color tokens (Retro CRT Terminal Console)
    ============================================================ */
 [data-mui-color-scheme="dark"] {
   /* Background layers */
-  --color-background: #080c14;
-  --color-panel: #0e1420;
-  --color-panel-border: rgba(255, 255, 255, 0.04);
-  --color-surface: #182030;
-  --color-surface-hover: #202b40;
-  --color-surface-border: rgba(255, 255, 255, 0.04);
-  --color-surface-border-hover: rgba(100, 116, 139, 0.24);
+  --color-background: #161719;            /* Deep charcoal CRT phosphor screen */
+  --color-panel: #202124;                 /* Dark bezel surface */
+  --color-panel-border: #a89984;          /* Soft retro grey-beige border */
+  --color-surface: #2e3034;               /* Charcoal panel surface */
+  --color-surface-hover: #3a3d42;         /* Dark hover state */
+  --color-surface-border: #7c6f64;
+  --color-surface-border-hover: #a89984;
 
-  /* Accent (neutral blue) */
-  --color-accent: #6366f1;
-  --color-accent-hover: #4f46e5;
-  --color-accent-subtle: rgba(99, 102, 241, 0.12);
-  --color-accent-glow: 0 0 22px rgba(99, 102, 241, 0.2);
-  --color-accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  /* Accent (Phosphor Amber / Gold) */
+  --color-accent: #db8e3b;
+  --color-accent-hover: #e79e4d;
+  --color-accent-subtle: rgba(219, 142, 59, 0.15);
+  --color-accent-glow: 0 0 10px rgba(219, 142, 59, 0.3);
+  --color-accent-gradient: linear-gradient(135deg, #db8e3b 0%, #a7c080 100%);
 
   /* Text */
-  --color-text: #f8fafc;
-  --color-text-muted: #94a3b8;
-  --color-text-disabled: #475569;
+  --color-text: #f2eeeb;                  /* Retro white-grey */
+  --color-text-muted: #bdae93;            /* Soft warm grey */
+  --color-text-disabled: #665c54;         /* Muted dark grey */
 
   /* Glass / highlight */
-  --color-glass-highlight: rgba(255, 255, 255, 0.03);
-  --color-glass-highlight-border: rgba(99, 102, 241, 0.18);
+  --color-glass-highlight: rgba(255, 255, 255, 0.04);
+  --color-glass-highlight-border: #db8e3b;
   --color-glass-surface: rgba(255, 255, 255, 0.02);
-  --color-glass-blur: blur(16px) saturate(180%);
+  --color-glass-blur: none;
 
   /* Inputs */
-  --color-input-bg: #182030;
-  --color-input-border: rgba(255, 255, 255, 0.08);
-  --color-input-border-focus: #6366f1;
-  --color-input-text: #f8fafc;
-  --color-input-placeholder: #475569;
+  --color-input-bg: #161719;
+  --color-input-border: #a89984;
+  --color-input-border-focus: #db8e3b;
+  --color-input-text: #f2eeeb;
+  --color-input-placeholder: #665c54;
 
-  /* Status */
-  --color-danger: #ef4444;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-attention-explicit: #ef4444;
-  --color-attention: #f59e0b;
-  --color-online: #10b981;
-  --color-offline: #ef4444;
+  /* Status (CRT Phosphors) */
+  --color-danger: #ea5a4b;                /* Retro bright red */
+  --color-success: #a7c080;               /* Phosphor green */
+  --color-warning: #db8e3b;               /* Amber yellow */
+  --color-attention-explicit: #ea5a4b;
+  --color-attention: #db8e3b;
+  --color-online: #a7c080;
+  --color-offline: #ea5a4b;
 
-  /* Status glows */
-  --glow-accent: 0 0 24px rgba(99, 102, 241, 0.3), 0 0 48px rgba(99, 102, 241, 0.12);
-  --glow-success: 0 0 18px rgba(16, 185, 129, 0.25);
-  --glow-warning: 0 0 18px rgba(245, 158, 11, 0.25);
-  --glow-danger: 0 0 18px rgba(239, 68, 68, 0.25);
+  /* Status glows (Subtle glowing text on dark CRT monitor) */
+  --glow-accent: 0 0 8px rgba(219, 142, 59, 0.4);
+  --glow-accent-pulse: 0 0 16px rgba(219, 142, 59, 0.6);
+  --glow-success: 0 0 8px rgba(167, 192, 128, 0.4);
+  --glow-warning: 0 0 8px rgba(219, 142, 59, 0.4);
+  --glow-danger: 0 0 8px rgba(234, 90, 75, 0.4);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.2);
-  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.5), 0 8px 16px rgba(0, 0, 0, 0.3);
-  --color-shadow-glow: 0 0 12px rgba(99, 102, 241, 0.2);
+  /* Shadows (CRT Solid Glow/Offset) */
+  --shadow-sm: 1px 1px 0px #db8e3b;
+  --shadow-md: 3px 3px 0px #db8e3b;
+  --shadow-lg: 5px 5px 0px #db8e3b;
+  --shadow-xl: 7px 7px 0px #db8e3b;
+  --color-shadow-glow: 0 0 8px rgba(219, 142, 59, 0.2);
 
-  /* Inner shadow (for inset depth) */
-  --shadow-inner: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-header-bottom: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.15);
-  --shadow-footer-top: 0 -1px 0 rgba(255, 255, 255, 0.03), 0 -2px 12px rgba(0, 0, 0, 0.15);
+  /* Inner shadow */
+  --shadow-inner: inset 1px 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-header-bottom: 0 2px 0 #a89984;
+  --shadow-footer-top: 0 -2px 0 #a89984;
 
   /* Session card */
-  --color-session-card-bg: #121926;
-  --color-session-card-border: rgba(255, 255, 255, 0.08);
-  --color-session-card-hover: #1b2435;
-  --color-session-card-selected: rgba(99, 102, 241, 0.06);
-  --color-session-card-selected-border: rgba(99, 102, 241, 0.22);
-  --color-session-card-selected-glow: 0 0 0 3px rgba(99, 102, 241, 0.12), var(--shadow-sm);
+  --color-session-card-bg: #202124;
+  --color-session-card-border: #a89984;
+  --color-session-card-hover: #2e3034;
+  --color-session-card-selected: rgba(219, 142, 59, 0.08);
+  --color-session-card-selected-border: #db8e3b;
+  --color-session-card-selected-glow: 2px 2px 0px #db8e3b;
 }

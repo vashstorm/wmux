@@ -55,18 +55,18 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
           boxSizing: "border-box",
           scrollbarWidth: "thin",
           scrollbarColor: isDark
-            ? "rgba(255,255,255,0.12) transparent"
-            : "rgba(0,0,0,0.14) transparent",
+            ? "rgba(242,238,235,0.2) rgba(0,0,0,0.2)"
+            : "rgba(43,38,33,0.25) rgba(43,38,33,0.05)",
         },
         "*::before": { boxSizing: "border-box" },
         "*::after": { boxSizing: "border-box" },
         "::-webkit-scrollbar": { width: "6px", height: "6px" },
-        "::-webkit-scrollbar-track": { background: "transparent" },
+        "::-webkit-scrollbar-track": { background: "var(--color-scrollbar-track)" },
         "::-webkit-scrollbar-thumb": {
-          background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.14)",
-          borderRadius: "999px",
+          background: "var(--color-scrollbar-thumb)",
+          borderRadius: "var(--radius-sm)",
           "&:hover": {
-            background: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.22)",
+            filter: "brightness(0.9)",
           },
         },
         "html, body": { height: "100%", overflow: "hidden" },
@@ -78,9 +78,18 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
       styleOverrides: {
         root: {
           backgroundImage: "none",
-          ...(isDark && {
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0))",
-          }),
+        },
+        outlined: {
+          borderColor: "var(--color-panel-border)",
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundImage: "none",
+          borderRadius: "var(--radius-md)",
+          borderColor: "var(--color-panel-border)",
         },
       },
     },
@@ -88,23 +97,52 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
       defaultProps: { disableElevation: true, disableRipple: false },
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           fontSize: "var(--font-size-sm)",
           fontWeight: 600,
           lineHeight: 1.3,
-          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          border: "2px solid var(--color-text)",
+          transition: "all var(--transition-fast)",
         },
         contained: {
+          boxShadow: "var(--shadow-sm)",
           "&:hover": {
-            transform: "translateY(-1px)",
-            boxShadow: `${palette.primary.main}33 0 4px 12px`,
+            transform: "translate(-1px, -1px)",
+            boxShadow: "var(--shadow-md)",
+            backgroundColor: palette.primary.dark,
           },
-          "&:active": { transform: "translateY(0)" },
+          "&:active": {
+            transform: "translate(1px, 1px)",
+            boxShadow: "none",
+          },
         },
         outlined: {
+          boxShadow: "var(--shadow-sm)",
           "&:hover": {
-            backgroundColor: isDark ? "rgba(107,130,245,0.08)" : "rgba(79,107,237,0.06)",
+            border: "2px solid var(--color-text)",
+            backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+            transform: "translate(-1px, -1px)",
+            boxShadow: "var(--shadow-md)",
           },
+          "&:active": {
+            transform: "translate(1px, 1px)",
+            boxShadow: "none",
+          },
+        },
+        sizeSmall: {
+          fontSize: "var(--font-size-xs)",
+          padding: "2px var(--spacing-sm)",
+          minHeight: 28,
+        },
+        sizeMedium: {
+          fontSize: "var(--font-size-sm)",
+          padding: "4px var(--spacing-md)",
+          minHeight: 34,
+        },
+        sizeLarge: {
+          fontSize: "var(--font-size-base)",
+          padding: "6px var(--spacing-lg)",
+          minHeight: 40,
         },
       },
     },
@@ -112,9 +150,11 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
       defaultProps: { disableRipple: false },
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          borderRadius: "var(--radius-sm)",
+          border: "1px solid transparent",
+          transition: "all var(--transition-fast)",
           "&:hover": {
+            borderColor: "var(--color-panel-border)",
             backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
           },
         },
@@ -126,8 +166,8 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
         root: {
           minHeight: 36,
           height: 36,
-          borderRadius: 8,
-          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          borderRadius: "var(--radius-sm)",
+          transition: "all var(--transition-fast)",
           fontSize: "var(--font-size-sm)",
           fontWeight: 500,
           textTransform: "none",
@@ -145,12 +185,16 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
       styleOverrides: {
         root: {
           "& .MuiOutlinedInput-root": {
-            borderRadius: 8,
+            borderRadius: "var(--radius-input)",
             fontSize: "var(--font-size-sm)",
             lineHeight: "var(--line-height-normal)",
-            transition: "box-shadow 150ms ease",
-            "&.Mui-focused": {
-              boxShadow: `0 0 0 3px ${palette.primary.main}24`,
+            boxShadow: "var(--shadow-inner)",
+            transition: "all var(--transition-base)",
+            "& fieldset": {
+              border: "2px solid var(--color-input-border) !important",
+            },
+            "&.Mui-focused fieldset": {
+              borderColor: "var(--color-input-border-focus) !important",
             },
           },
         },
@@ -159,10 +203,16 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 6,
+          borderRadius: "var(--radius-sm)",
           fontSize: "var(--font-size-xs)",
           fontWeight: 600,
           lineHeight: 1.2,
+          border: "1px solid var(--color-panel-border)",
+        },
+        sizeSmall: {
+          height: 22,
+          padding: "0 var(--spacing-xs)",
+          fontSize: "var(--font-size-2xs)",
         },
       },
     },
@@ -195,20 +245,23 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
         tooltip: {
           fontSize: "var(--font-size-xs)",
           lineHeight: 1.35,
+          border: "1px solid var(--color-panel-border)",
+          borderRadius: "var(--radius-sm)",
+          backgroundColor: isDark ? "#202124" : "#fdfcf9",
+          color: "var(--color-text)",
+          boxShadow: "var(--shadow-sm)",
         },
       },
     },
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 16,
-          backdropFilter: "blur(16px) saturate(180%)",
-          WebkitBackdropFilter: "blur(16px) saturate(180%)",
-          backgroundColor: isDark ? "rgba(22, 27, 34, 0.82)" : "rgba(255, 255, 255, 0.88)",
-          border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.08)",
-          boxShadow: isDark
-            ? "0 24px 48px rgba(0,0,0,0.5), 0 0 1px 1px rgba(255,255,255,0.1)"
-            : "0 24px 48px rgba(15,23,42,0.12), 0 0 1px 1px rgba(0,0,0,0.04)",
+          borderRadius: "var(--radius-md)",
+          backdropFilter: "none",
+          WebkitBackdropFilter: "none",
+          backgroundColor: isDark ? "#202124" : "#fdfcf9",
+          border: "2px solid var(--color-panel-border)",
+          boxShadow: "var(--shadow-lg)",
           backgroundImage: "none",
         },
       },
@@ -218,17 +271,31 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
         root: { fontWeight: 600, fontSize: "var(--font-size-lg)" },
       },
     },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          padding: "var(--spacing-md) var(--spacing-lg)",
+          gap: "var(--spacing-sm)",
+        },
+      },
+    },
     MuiListItemButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          transition: "all 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          borderRadius: "var(--radius-sm)",
+          transition: "all var(--transition-fast)",
+          "&.Mui-selected": {
+            backgroundColor: "var(--color-accent-subtle)",
+            "&:hover": {
+              backgroundColor: "var(--color-surface-hover)",
+            },
+          },
         },
       },
     },
     MuiDivider: {
       styleOverrides: {
-        root: { opacity: isDark ? 0.12 : 0.1 },
+        root: { borderColor: "var(--color-panel-border)", opacity: 0.5 },
       },
     },
   }
@@ -237,13 +304,12 @@ function makeComponentOverrides(mode: ThemeMode, palette: Theme["palette"]): The
 export function createAppTheme(mode: ThemeMode): Theme {
   const isDark = mode === "dark"
 
-  // Define palette first so we can use it in component overrides
-  const primaryMain = isDark ? "#6b82f5" : "#4f6bed"
-  const primaryLight = isDark ? "#9aa8fb" : "#7c8ff7"
-  const primaryDark = isDark ? "#5568df" : "#3d57d6"
+  const primaryMain = isDark ? "#db8e3b" : "#b85a3c"
+  const primaryLight = isDark ? "#e79e4d" : "#cf7d63"
+  const primaryDark = isDark ? "#b36f25" : "#973f24"
 
-  const backgroundDefault = isDark ? "#0d1117" : "#f7f8fb"
-  const backgroundPaper = isDark ? "#161b22" : "#ffffff"
+  const backgroundDefault = isDark ? "#161719" : "#f5f2eb"
+  const backgroundPaper = isDark ? "#202124" : "#fdfcf9"
 
   const base = createTheme({
     palette: {
@@ -252,37 +318,37 @@ export function createAppTheme(mode: ThemeMode): Theme {
         main: primaryMain,
         light: primaryLight,
         dark: primaryDark,
-        contrastText: "#ffffff",
+        contrastText: isDark ? "#161719" : "#ffffff",
       },
       secondary: {
-        main: isDark ? "#f59e0b" : "#f59e0b",
-        light: isDark ? "#fbbf24" : "#fbbf24",
-        dark: isDark ? "#d97706" : "#d97706",
-        contrastText: isDark ? "#0d1117" : "#ffffff",
+        main: isDark ? "#db8e3b" : "#cf9c34",
+        light: isDark ? "#e79e4d" : "#dfb050",
+        dark: isDark ? "#b36f25" : "#a17621",
+        contrastText: isDark ? "#161719" : "#ffffff",
       },
       error: {
-        main: isDark ? "#ef4444" : "#dc2626",
-        light: isDark ? "#f87171" : "#ef4444",
+        main: isDark ? "#ea5a4b" : "#c94a3b",
+        light: isDark ? "#f28175" : "#e06557",
       },
       warning: {
-        main: isDark ? "#f59e0b" : "#d97706",
+        main: isDark ? "#db8e3b" : "#cf9c34",
       },
       success: {
-        main: isDark ? "#10b981" : "#059669",
+        main: isDark ? "#a7c080" : "#5f8745",
       },
       background: {
         default: backgroundDefault,
         paper: backgroundPaper,
       },
       text: {
-        primary: isDark ? "#f1f5f9" : "#0f172a",
-        secondary: isDark ? "#94a3b8" : "#475569",
-        disabled: isDark ? "#475569" : "#94a3b8",
+        primary: isDark ? "#f2eeeb" : "#2b2621",
+        secondary: isDark ? "#bdae93" : "#5f544b",
+        disabled: isDark ? "#665c54" : "#8a7f74",
       },
-      divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(15, 23, 42, 0.08)",
+      divider: isDark ? "#a89984" : "#2b2621",
       action: {
-        hover: isDark ? "rgba(255,255,255,0.05)" : "rgba(15, 23, 42, 0.04)",
-        selected: isDark ? "rgba(107,130,245,0.16)" : "rgba(79,107,237,0.08)",
+        hover: isDark ? "rgba(255,255,255,0.06)" : "rgba(43, 38, 33, 0.05)",
+        selected: isDark ? "rgba(219, 142, 59, 0.15)" : "rgba(184, 90, 60, 0.08)",
         disabled: isDark ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.26)",
         disabledBackground: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
       },
