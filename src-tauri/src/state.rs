@@ -1,11 +1,46 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Context;
+use tokio::sync::RwLock;
 use wmux_core::state::AppState;
 
 pub struct IpcState {
     pub app_state: AppState,
     pub config_path: PathBuf,
+    pub terminal_sessions: TerminalSessions,
+}
+
+pub struct TerminalSessionHandle {
+    pub session: wmux_core::session::Session,
+    pub target_name: String,
+    pub session_name: String,
+}
+
+pub struct TerminalSessions {
+    pub handles: RwLock<HashMap<String, Arc<RwLock<Option<TerminalSessionHandle>>>>>,
+}
+
+impl TerminalSessions {
+    pub fn new() -> Self {
+        Self {
+            handles: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn make_key(target_name: &str, session: &str, pane: Option<&str>) -> String {
+        match pane {
+            Some(p) => format!("{}:{}:{}", target_name, session, p),
+            None => format!("{}:{}", target_name, session),
+        }
+    }
+}
+
+impl Default for TerminalSessions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IpcState {
@@ -36,7 +71,11 @@ impl IpcState {
             app_state.set_sync_handle(sync_holder);
         }
 
-        Ok(Self { app_state, config_path })
+        Ok(Self {
+            app_state,
+            config_path,
+            terminal_sessions: TerminalSessions::new(),
+        })
     }
 }
 

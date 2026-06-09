@@ -1,3 +1,7 @@
+// @deprecated Use TerminalIpc from ./terminalIpc.js instead. This WebSocket-based implementation
+// is kept for reference only and will be removed in a future version.
+// The IPC-based TerminalIpc provides better integration with Tauri and removes the need for
+// token-based authentication (authentication is handled automatically by Tauri's invoke system).
 import { getWebSocketUrl } from "./runtime.js"
 
 export type ClientMessage =

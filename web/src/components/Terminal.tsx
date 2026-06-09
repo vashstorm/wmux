@@ -5,8 +5,7 @@ import "@xterm/xterm/css/xterm.css"
 import type { Terminal as XTermType } from "@xterm/xterm"
 import type { FitAddon as FitAddonType } from "@xterm/addon-fit"
 import { getErrorMessage } from "../api/errors.js"
-import { getAuthToken } from "../api/runtime.js"
-import { TerminalWebSocket } from "../api/websocket.js"
+import { TerminalIpc } from "../api/terminalIpc.js"
 import { useAppState, type SelectedPane } from "../state/store.js"
 import { getTerminalFontPx } from "../ui/fontSize.js"
 import { getTerminalTheme } from "../ui/themes.js"
@@ -51,7 +50,7 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<XTermType | null>(null)
   const fitAddonRef = useRef<FitAddonType | null>(null)
-  const wsRef = useRef<TerminalWebSocket | null>(null)
+  const wsRef = useRef<TerminalIpc | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const resizeFrameRef = useRef<number | null>(null)
   const resizeTimeoutRefs = useRef<number[]>([])
@@ -139,21 +138,19 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
 
   const connectWebSocket = useCallback(
     (initialSize?: TerminalSize | null) => {
-      const token = getAuthToken() ?? ""
       const terminalSize = initialSize ?? fitAndSyncSize()
       lastSentSizeRef.current = terminalSize
 
       setDisconnected(false)
       setErrorMessage(null)
 
-      const ws = new TerminalWebSocket({
+      const ipc = new TerminalIpc({
         targetName,
         session,
         window: windowId,
         pane,
         rows: terminalSize?.rows,
         cols: terminalSize?.cols,
-        token,
         onMessage: (message) => {
           switch (message.type) {
             case "output": {
@@ -188,12 +185,12 @@ export const Terminal = memo(function Terminal({ selectedPane, windowTheme, sour
           setDisconnected(true)
         },
         onError: () => {
-          setErrorMessage("WebSocket connection failed")
+          setErrorMessage("IPC connection failed")
         },
       })
 
-      ws.connect()
-      wsRef.current = ws
+      void ipc.connect()
+      wsRef.current = ipc
     },
     [targetName, fitAndSyncSize, pane, session, setError, windowId],
   )

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import { Terminal as XTerm } from "@xterm/xterm"
 import { Unicode11Addon } from "@xterm/addon-unicode11"
 import { Terminal } from "./Terminal.js"
-import { TerminalWebSocket } from "../api/websocket.js"
+import { TerminalIpc } from "../api/terminalIpc.js"
 import type { SelectedPane } from "../state/store.js"
 
 const mockXTermWrite = vi.fn()
@@ -78,8 +78,8 @@ let capturedOnMessage:
     }) => void)
   | null = null
 
-vi.mock("../api/websocket.js", () => ({
-  TerminalWebSocket: vi.fn().mockImplementation((options) => {
+vi.mock("../api/terminalIpc.js", () => ({
+  TerminalIpc: vi.fn().mockImplementation((options) => {
     capturedOnMessage = options.onMessage
     return {
       connect: mockConnect,
@@ -88,6 +88,22 @@ vi.mock("../api/websocket.js", () => ({
       isConnected: vi.fn(() => false),
     }
   }),
+}))
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+  Channel: vi.fn().mockImplementation(() => ({
+    onmessage: null,
+    onerror: null,
+    onclose: null,
+    send: vi.fn(),
+    close: vi.fn(),
+  })),
+}))
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+  emit: vi.fn(),
 }))
 
 let mockUISettings = {
@@ -134,7 +150,7 @@ describe("Terminal", () => {
     mockSetError.mockClear()
     capturedOnResize = null
     capturedOnMessage = null
-    vi.mocked(TerminalWebSocket).mockClear()
+    vi.mocked(TerminalIpc).mockClear()
   })
 
   afterEach(() => {
@@ -146,37 +162,25 @@ describe("Terminal", () => {
     expect(screen.getByTestId("terminal")).toBeInTheDocument()
   })
 
-  test("creates WebSocket connection when auth token exists in sessionStorage", async () => {
-    sessionStorage.setItem("wmux-auth-token", "test-token")
+  test("creates IPC connection on mount", async () => {
     render(<Terminal selectedPane={mockSelectedPane} />)
 
     await waitFor(() => {
-      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+      expect(TerminalIpc).toHaveBeenCalledTimes(1)
     })
     expect(mockConnect).toHaveBeenCalledTimes(1)
-    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
-    expect(callArgs.token).toBe("test-token")
-  })
-
-  test("creates WebSocket connection even when auth token is missing from sessionStorage", async () => {
-    render(<Terminal selectedPane={mockSelectedPane} />)
-
-    await waitFor(() => {
-      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
-    })
-    expect(mockConnect).toHaveBeenCalledTimes(1)
-    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
-    expect(callArgs.token).toBe("")
-    expect(screen.queryByText("Authentication token not found")).not.toBeInTheDocument()
+    const callArgs = vi.mocked(TerminalIpc).mock.calls[0]![0]
+    expect(callArgs.targetName).toBe("conn-1")
+    expect(callArgs.session).toBe("dev")
   })
 
   test("passes correct pane parameters to WebSocket", async () => {
     render(<Terminal selectedPane={mockSelectedPane} />)
 
     await waitFor(() => {
-      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+      expect(vi.mocked(TerminalIpc).mock.calls.length).toBeGreaterThan(0)
     })
-    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    const callArgs = vi.mocked(TerminalIpc).mock.calls[0]![0]
     expect(callArgs.targetName).toBe("conn-1")
     expect(callArgs.session).toBe("dev")
     expect(callArgs.window).toBe("@1")
@@ -187,9 +191,9 @@ describe("Terminal", () => {
     render(<Terminal selectedPane={mockSelectedPane} />)
 
     await waitFor(() => {
-      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+      expect(vi.mocked(TerminalIpc).mock.calls.length).toBeGreaterThan(0)
     })
-    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    const callArgs = vi.mocked(TerminalIpc).mock.calls[0]![0]
     expect(mockProposeDimensions).toHaveBeenCalled()
     expect(mockFit).not.toHaveBeenCalled()
     expect(callArgs.cols).toBe(120)
@@ -200,9 +204,9 @@ describe("Terminal", () => {
     render(<Terminal selectedPane={mockSelectedPane} sourceSize={{ cols: 160, rows: 45 }} />)
 
     await waitFor(() => {
-      expect(vi.mocked(TerminalWebSocket).mock.calls.length).toBeGreaterThan(0)
+      expect(vi.mocked(TerminalIpc).mock.calls.length).toBeGreaterThan(0)
     })
-    const callArgs = vi.mocked(TerminalWebSocket).mock.calls[0]![0]
+    const callArgs = vi.mocked(TerminalIpc).mock.calls[0]![0]
     expect(mockXTermResize).toHaveBeenCalledWith(120, 40)
     expect(callArgs.cols).toBe(120)
     expect(callArgs.rows).toBe(40)
@@ -221,12 +225,12 @@ describe("Terminal", () => {
     const { rerender } = render(<Terminal selectedPane={mockSelectedPane} />)
 
     await waitFor(() => {
-      expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+      expect(TerminalIpc).toHaveBeenCalledTimes(1)
     })
 
     rerender(<Terminal selectedPane={{ ...mockSelectedPane }} />)
 
-    expect(TerminalWebSocket).toHaveBeenCalledTimes(1)
+    expect(TerminalIpc).toHaveBeenCalledTimes(1)
     expect(mockClose).not.toHaveBeenCalled()
   })
 

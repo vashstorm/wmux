@@ -37,6 +37,7 @@ export class AudioPipeline {
   private playbackSource: AudioBufferSourceNode | null = null
   private isCapturing = false
   private isPlaying = false
+  private volume = 1.0
 
   constructor(config: AudioPipelineConfig) {
     this.config = {
@@ -48,6 +49,9 @@ export class AudioPipeline {
     }
   }
 
+  setVolume(vol: number): void {
+    this.volume = Math.max(0, Math.min(1, vol))
+  }
   async startCapture(
     onFrame: (frameBase64: string, sampleRate: number) => void,
     levelObserver?: AudioLevelObserver,

@@ -164,6 +164,8 @@ export type OmniStatus =
 export interface OmniPendingConfirmation {
   confirmationId: string
   skill: string
+  params?: Record<string, unknown>
+  callId?: string
 }
 
 export interface OmniState {

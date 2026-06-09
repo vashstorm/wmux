@@ -21,6 +21,7 @@ const audioPipelineMocks = vi.hoisted(() => ({
   startCapture: vi.fn(),
   stopCapture: vi.fn(),
   stopPlayback: vi.fn(),
+  setVolume: vi.fn(),
 }))
 
 vi.mock("../api/client.js", () => ({
@@ -51,6 +52,23 @@ vi.mock("../api/voiceClient.js", () => ({
     ),
 }))
 
+vi.mock("../api/voiceIpc.js", () => ({
+  OmniIpc: vi
+    .fn()
+    .mockImplementation(
+      (options: { onMessage?: (event: unknown) => void; onOpen?: () => void }) => {
+        voiceClientMocks.onMessage = options.onMessage
+        voiceClientMocks.onOpen = options.onOpen
+        return {
+          connect: vi.fn().mockResolvedValue(undefined),
+          send: voiceClientMocks.send,
+          close: vi.fn().mockResolvedValue(undefined),
+          isConnected: () => true,
+        }
+      },
+    ),
+}))
+
 vi.mock("../api/audioPipeline.js", () => ({
   AudioPipeline: vi.fn().mockImplementation((config: unknown) => {
     audioPipelineMocks.constructor(config)
@@ -59,6 +77,7 @@ vi.mock("../api/audioPipeline.js", () => ({
       startCapture: audioPipelineMocks.startCapture,
       stopCapture: audioPipelineMocks.stopCapture,
       stopPlayback: audioPipelineMocks.stopPlayback,
+      setVolume: audioPipelineMocks.setVolume,
     }
   }),
 }))
@@ -76,6 +95,7 @@ beforeEach(() => {
   audioPipelineMocks.startCapture.mockClear()
   audioPipelineMocks.stopCapture.mockClear()
   audioPipelineMocks.stopPlayback.mockClear()
+  audioPipelineMocks.setVolume.mockClear()
   vi.mocked(client.clearOmniHistory).mockClear()
   vi.mocked(client.getConfig).mockResolvedValue({
     schemaVersion: 1,
@@ -254,7 +274,7 @@ describe("AiAssistant", () => {
     const controls = document.querySelector(".ai-assistant-controls")
     expect(controls?.querySelectorAll("button")).toHaveLength(3)
     expect(screen.getByRole("button", { name: "Send message" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Mute AI voice" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Adjust AI voice volume" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Start listening" })).toBeInTheDocument()
   })
 
@@ -834,6 +854,7 @@ describe("AiAssistant", () => {
       ctx.setOmniStatus("idle")
     })
 
+    fireEvent.click(screen.getByRole("button", { name: "Adjust AI voice volume" }))
     fireEvent.click(screen.getByRole("button", { name: "Mute AI voice" }))
 
     fireEvent.change(screen.getByRole("textbox", { name: "Message AI Assistant" }), {

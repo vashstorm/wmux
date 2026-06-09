@@ -32,6 +32,9 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             crate::commands::stream_poc::stream_burst,
+            crate::commands::voice::voice_open,
+            crate::commands::voice::voice_send,
+            crate::commands::voice::voice_close,
             crate::commands::connections::list_connections,
             crate::commands::connections::create_connection,
             crate::commands::connections::get_connection,
@@ -73,6 +76,10 @@ fn main() {
             crate::commands::ai::cleanup_stale_window_events,
             crate::commands::voice_history::list_voice_history,
             crate::commands::voice_history::clear_voice_history,
+            crate::commands::terminal::terminal_open,
+            crate::commands::terminal::terminal_input,
+            crate::commands::terminal::terminal_resize,
+            crate::commands::terminal::terminal_close,
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Wmux Tauri app");

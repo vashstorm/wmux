@@ -70,7 +70,7 @@ describe("runtime", () => {
       value: undefined,
     })
 
-    expect(getRuntimeFlags()).toEqual({ isTauri: false, omniAvailable: false })
+    expect(getRuntimeFlags()).toEqual({ isElectron: false, isTauri: false, omniAvailable: false })
 
     window.__WMUX_RUNTIME__ = {
       baseUrl: "http://127.0.0.1:7331",
@@ -81,7 +81,7 @@ describe("runtime", () => {
       value: { getUserMedia: vi.fn() } as unknown as MediaDevices,
     })
 
-    expect(getRuntimeFlags()).toEqual({ isTauri: true, omniAvailable: true })
+    expect(getRuntimeFlags()).toEqual({ isElectron: false, isTauri: true, omniAvailable: true })
   })
 
   test("derives secure WebSocket protocol from HTTPS base URL", () => {

@@ -135,6 +135,15 @@ export interface VoiceStopResponseMessage extends OmniClientMessageBase {
   type: "stop_response"
 }
 
+/** Result of a tool/skill execution */
+export interface VoiceToolResultMessage extends OmniClientMessageBase {
+  type: "tool_result"
+  skill: string
+  callId?: string
+  output?: unknown
+  error?: string
+}
+
 /** Union type for all client-to-server voice messages */
 export type OmniClientMessage =
   | VoiceAudioFrameMessage
@@ -145,6 +154,7 @@ export type OmniClientMessage =
   | VoiceStopListeningMessage
   | VoiceStartListeningMessage
   | VoiceStopResponseMessage
+  | VoiceToolResultMessage
 
 // ============================================================================
 // Server-to-Client WebSocket Events
@@ -179,6 +189,12 @@ export interface VoiceTranscriptDoneEvent extends OmniServerEventBase {
   text: string
 }
 
+/** Corrected transcript (after post-processing) */
+export interface VoiceTranscriptCorrectedEvent extends OmniServerEventBase {
+  type: "transcript_corrected"
+  text: string
+}
+
 /** Intent parsed from transcript with action parameters */
 export interface VoiceIntentReceivedEvent extends OmniServerEventBase {
   type: "intent_received"
@@ -186,6 +202,7 @@ export interface VoiceIntentReceivedEvent extends OmniServerEventBase {
   params: Record<string, unknown>
   confirmationRequired: boolean
   confirmationId?: string
+  callId?: string
 }
 
 /** Result of executed action */
@@ -240,6 +257,7 @@ export type OmniServerEvent =
   | VoiceAudioDeltaEvent
   | VoiceTranscriptDeltaEvent
   | VoiceTranscriptDoneEvent
+  | VoiceTranscriptCorrectedEvent
   | VoiceIntentReceivedEvent
   | VoiceActionResultEvent
   | VoiceAssistantMessageEvent
@@ -262,6 +280,7 @@ const CLIENT_MESSAGE_TYPES = [
   "stop_listening",
   "start_listening",
   "stop_response",
+  "tool_result",
 ] as const
 
 /** Server event type strings */
@@ -270,6 +289,7 @@ const SERVER_EVENT_TYPES = [
   "audio_delta",
   "transcript_delta",
   "transcript_done",
+  "transcript_corrected",
   "intent_received",
   "action_result",
   "assistant_message",
@@ -407,6 +427,15 @@ export function isVoiceTranscriptDoneEvent(
   event: OmniServerEvent,
 ): event is VoiceTranscriptDoneEvent {
   return event.type === "transcript_done"
+}
+
+/**
+ * Type guard for VoiceTranscriptCorrectedEvent.
+ */
+export function isVoiceTranscriptCorrectedEvent(
+  event: OmniServerEvent,
+): event is VoiceTranscriptCorrectedEvent {
+  return event.type === "transcript_corrected"
 }
 
 /**

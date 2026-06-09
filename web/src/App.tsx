@@ -248,6 +248,7 @@ function WorkspaceNavigationSync() {
 }
 
 function AiLauncher({ onOpen }: { onOpen: () => void }) {
+  const { omniStatus } = useAppState()
   const [pos, setPos] = useState<AssistantPos>(() => loadLauncherPos())
   const dragRef = useRef<{
     pointerId: number | "mouse"
@@ -354,6 +355,7 @@ function AiLauncher({ onOpen }: { onOpen: () => void }) {
       type="button"
       className="voice-launcher"
       aria-label="Show AI Assistant"
+      data-ai-assistant-state={omniStatus}
       style={{ "--launcher-x": `${pos.x}px`, "--launcher-y": `${pos.y}px` } as CSSProperties}
       onPointerDown={(e) => {
         if (e.button !== 0) return

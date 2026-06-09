@@ -5,6 +5,7 @@ interface WmuxRuntime {
 
 interface RuntimeFlags {
   isTauri: boolean
+  isElectron: boolean
   omniAvailable: boolean
 }
 
@@ -29,6 +30,7 @@ export function getRuntimeFlags(): RuntimeFlags {
 
   return {
     isTauri: Boolean(window.__WMUX_RUNTIME__?.baseUrl),
+    isElectron: false,
     omniAvailable: typeof mediaDevices?.getUserMedia === "function",
   }
 }

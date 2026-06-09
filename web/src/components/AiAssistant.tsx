@@ -19,13 +19,15 @@ import CloseIcon from "@mui/icons-material/Close"
 import AddIcon from "@mui/icons-material/Add"
 import SendIcon from "@mui/icons-material/Send"
 import { getAuthToken, getRuntimeFlags } from "../api/runtime.js"
-import { OmniWebSocket } from "../api/voiceClient.js"
+import { OmniWebSocket, type OmniClientError } from "../api/voiceClient.js"
+import { OmniIpc } from "../api/voiceIpc.js"
 import { AudioPipeline } from "../api/audioPipeline.js"
 import type { OmniServerEvent, VoiceSessionContextMessage } from "../api/voiceTypes.js"
 import {
   isVoiceAudioDeltaEvent,
   isVoiceTranscriptDeltaEvent,
   isVoiceTranscriptDoneEvent,
+  isVoiceTranscriptCorrectedEvent,
   isVoiceIntentReceivedEvent,
   isVoiceActionResultEvent,
   isVoiceErrorEvent,
@@ -39,11 +41,38 @@ import {
   getConfig,
   getOmniHistory,
   clearOmniHistory,
+  createSession,
   getProject,
+  killSession,
+  listConnections,
   listPanes,
   listProjects,
   listSessions,
   listWindows,
+  renameSession,
+  createWindow,
+  killWindow,
+  renameWindow,
+  splitPane,
+  killPane,
+  sendKeysToPane,
+  capturePane,
+  clearPane,
+  createProject,
+  updateProject,
+  deleteProject,
+  launchProject,
+  syncProjectFromTmux,
+  generateProjectAiHtml,
+  analyzeSession,
+  listAiStats,
+  cleanupAiStats,
+  listAiLogs,
+  clearAiLogs,
+  fetchHealth,
+  getConnectionHealth,
+  updateConfig,
+  type AppConfig,
   type OmniConversationMessage,
   type PaneInfo,
   type Project,
@@ -77,6 +106,8 @@ type TokenUsage = {
   inputTokens: number
   outputTokens: number
   totalTokens: number
+  skillTokens?: number
+  cacheReadTokens?: number
 }
 type TokenUsageStats = {
   last: TokenUsage | null
@@ -141,7 +172,7 @@ function formatRole(role: string): string {
 }
 
 function emptyTokenUsage(): TokenUsage {
-  return { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  return { inputTokens: 0, outputTokens: 0, totalTokens: 0, skillTokens: 0, cacheReadTokens: 0 }
 }
 
 function addTokenUsage(total: TokenUsage, next: TokenUsage): TokenUsage {
@@ -149,7 +180,17 @@ function addTokenUsage(total: TokenUsage, next: TokenUsage): TokenUsage {
     inputTokens: total.inputTokens + next.inputTokens,
     outputTokens: total.outputTokens + next.outputTokens,
     totalTokens: total.totalTokens + next.totalTokens,
+    skillTokens: (total.skillTokens ?? 0) + (next.skillTokens ?? 0),
+    cacheReadTokens: (total.cacheReadTokens ?? 0) + (next.cacheReadTokens ?? 0),
   }
+}
+
+function displayInputTokens(usage: TokenUsage): number {
+  return Math.max(0, usage.inputTokens - (usage.skillTokens ?? 0))
+}
+
+function percentOfTotal(value: number, total: number): number {
+  return total > 0 ? (value / total) * 100 : 0
 }
 
 function formatTokenCount(count: number): string {
@@ -178,6 +219,7 @@ function createAudioPipeline(): AudioPipeline {
 }
 
 type VoiceIntentParams = Record<string, unknown>
+type VoiceToolResultPayload = { output?: unknown; error?: string }
 
 function stringParam(params: VoiceIntentParams, fields: string[]): string | null {
   for (const field of fields) {
@@ -192,22 +234,98 @@ function stringParam(params: VoiceIntentParams, fields: string[]): string | null
   return null
 }
 
+function objectParam(params: VoiceIntentParams, field: string): VoiceIntentParams | null {
+  const value = params[field]
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as VoiceIntentParams)
+    : null
+}
+
 function matchesText(value: string, query: string): boolean {
   return value.toLowerCase() === query.toLowerCase()
 }
 
-function findWindow(windows: WindowInfo[], query: string | null): WindowInfo | undefined {
-  if (!query) return windows.find((windowInfo) => windowInfo.Active) ?? windows[0]
-  return (
-    windows.find(
-      (windowInfo) =>
-        windowInfo.ID === query ||
-        matchesText(windowInfo.Name, query) ||
-        String(windowInfo.Index) === query,
-    ) ??
-    windows.find((windowInfo) => windowInfo.Active) ??
-    windows[0]
+function parseChineseInteger(value: string): number | null {
+  const digits: Record<string, number> = {
+    一: 1,
+    二: 2,
+    两: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9,
+  }
+  if (value === "十") return 10
+  const teenMatch = value.match(/^十([一二两三四五六七八九])$/)
+  if (teenMatch?.[1]) return 10 + digits[teenMatch[1]]!
+  const tensMatch = value.match(/^([一二两三四五六七八九])十([一二两三四五六七八九])?$/)
+  if (tensMatch?.[1]) {
+    return digits[tensMatch[1]]! * 10 + (tensMatch[2] ? digits[tensMatch[2]]! : 0)
+  }
+  return digits[value] ?? null
+}
+
+function parseOrdinal(value: string | null): number | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  if (!normalized) return null
+
+  const numeric = normalized.match(/^第?\s*(\d+)\s*(?:个|号|#|st|nd|rd|th)?$/)
+  if (numeric?.[1]) {
+    const parsed = Number(numeric[1])
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  }
+
+  const chinese = normalized.match(/^第?\s*([一二两三四五六七八九十]+)\s*(?:个|号)?$/)
+  if (chinese?.[1]) {
+    const parsed = parseChineseInteger(chinese[1])
+    return parsed && parsed > 0 ? parsed : null
+  }
+
+  return null
+}
+
+function sortWindowsForVoiceSelection(windows: WindowInfo[]): WindowInfo[] {
+  return [...windows].sort((a, b) => a.Index - b.Index)
+}
+
+function findWindowByVoiceTarget(
+  windows: WindowInfo[],
+  query: string | null,
+  ordinal: number | null = null,
+  fallbackWhenQueryMisses = true,
+): WindowInfo | undefined {
+  const ordered = sortWindowsForVoiceSelection(windows)
+  if (ordinal !== null) {
+    return ordered[ordinal - 1]
+  }
+  if (!query) return windows.find((windowInfo) => windowInfo.Active) ?? ordered[0]
+
+  const trimmedQuery = query.trim()
+  const idOrNameMatch = windows.find(
+    (windowInfo) =>
+      windowInfo.ID === trimmedQuery ||
+      matchesText(windowInfo.Name, trimmedQuery),
   )
+  if (idOrNameMatch) return idOrNameMatch
+
+  const queryOrdinal = parseOrdinal(trimmedQuery)
+  if (queryOrdinal !== null) {
+    return ordered[queryOrdinal - 1]
+  }
+
+  const indexMatch = windows.find((windowInfo) => String(windowInfo.Index) === trimmedQuery)
+  if (indexMatch) return indexMatch
+
+  if (!fallbackWhenQueryMisses) return undefined
+  return windows.find((windowInfo) => windowInfo.Active) ?? ordered[0]
+}
+
+function findWindow(windows: WindowInfo[], query: string | null): WindowInfo | undefined {
+  return findWindowByVoiceTarget(windows, query)
 }
 
 function findPane(panes: PaneInfo[], query: string | null): PaneInfo | undefined {
@@ -244,6 +362,124 @@ function emitSidebarNavigation(route: string): void {
   window.dispatchEvent(new CustomEvent("wmux:navigate-sidebar", { detail: { route } }))
 }
 
+function compactSessionForTool(session: { name?: string; attached?: boolean; windowCount?: number }) {
+  return {
+    name: session.name ?? "",
+    attached: session.attached ?? false,
+    windowCount: session.windowCount ?? 0,
+  }
+}
+
+function compactOperationForTool(operation: unknown): unknown {
+  if (!operation || typeof operation !== "object" || Array.isArray(operation)) {
+    return operation
+  }
+  const record = operation as Record<string, unknown>
+  return {
+    targetName: record.targetName,
+    operation: record.operation,
+    mode: record.mode,
+    status: record.status,
+  }
+}
+
+function isDashScopeSettingsError(error: OmniClientError): boolean {
+  return (
+    error.code === "unauthorized" ||
+    /DashScope|API key|Authorization|endpoint region|connection failed/i.test(error.message)
+  )
+}
+
+function voiceErrorMessage(error: OmniClientError): string {
+  if (isDashScopeSettingsError(error)) {
+    return error.message
+  }
+  return error.message || "Connection failed"
+}
+
+function normalizeAgentPrompt(prompt: string): string {
+  return prompt.replace(/\s*\r?\n\s*/g, " ").trim()
+}
+
+function shellDoubleQuote(value: string): string {
+  return `"${value.replace(/(["\\$`])/g, "\\$1")}"`
+}
+
+function parseVoiceConfirmation(text: string): "confirm" | "cancel" | null {
+  const normalized = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+  const compact = normalized.replace(/\s/g, "")
+  if (!normalized && !compact) return null
+
+  const exactCancel = new Set([
+    "cancel",
+    "no",
+    "stop",
+    "abort",
+    "reject",
+    "never mind",
+    "nevermind",
+    "取消",
+    "不",
+    "不要",
+    "停止",
+    "算了",
+    "别",
+    "不行",
+    "否",
+    "拒绝",
+    "不确认",
+  ])
+  const exactConfirm = new Set([
+    "confirm",
+    "yes",
+    "ok",
+    "okay",
+    "sure",
+    "do it",
+    "proceed",
+    "approve",
+    "go ahead",
+    "确认",
+    "确定",
+    "可以",
+    "好",
+    "好的",
+    "是",
+    "是的",
+    "执行",
+    "同意",
+    "继续",
+  ])
+
+  if (exactCancel.has(normalized) || exactCancel.has(compact)) return "cancel"
+  if (exactConfirm.has(normalized) || exactConfirm.has(compact)) return "confirm"
+
+  const cancelPhrases = ["cancel", "abort", "reject", "停止", "取消", "算了", "不要", "不行", "拒绝", "不确认"]
+  if (cancelPhrases.some((phrase) => normalized.includes(phrase) || compact.includes(phrase))) {
+    return "cancel"
+  }
+
+  const confirmPhrases = ["confirm", "proceed", "approve", "go ahead", "do it", "确认", "确定", "可以", "执行", "同意", "继续"]
+  if (confirmPhrases.some((phrase) => normalized.includes(phrase) || compact.includes(phrase))) {
+    return "confirm"
+  }
+
+  return null
+}
+
+async function openMicrophonePermissions(): Promise<void> {
+  // No-op: wmux doesn't have Electron-specific microphone permissions
+}
+
+async function requestMicrophoneAccess(): Promise<boolean | null> {
+  // No-op: wmux doesn't have Electron-specific microphone permissions
+  return null
+}
+
 export function AiAssistant() {
   const {
     omniStatus,
@@ -273,13 +509,17 @@ export function AiAssistant() {
 
   const audioLevel = useRef(0)
   const [audioBars, setAudioBars] = useState<boolean[]>(new Array(LEVEL_SEGMENTS).fill(false))
-  const wsRef = useRef<OmniWebSocket | null>(null)
+  const wsRef = useRef<OmniWebSocket | OmniIpc | null>(null)
   const pipelineRef = useRef<AudioPipeline | null>(null)
   const wsConnectingRef = useRef(false)
   const omniStatusRef = useRef(omniStatus)
   const [wsConnecting, setWsConnecting] = useState(false)
   const [micCapturing, setMicCapturing] = useState(false)
   const [audioMuted, setAudioMuted] = useState(false)
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem("omni-volume")
+    return saved !== null ? Number(saved) : 1.0
+  })
   const [micDisabled, setMicDisabled] = useState(false)
   const [micAvailable, setMicAvailable] = useState(() => getRuntimeFlags().omniAvailable)
   const [history, setHistory] = useState<OmniConversationMessage[]>([])
@@ -299,6 +539,8 @@ export function AiAssistant() {
   const chatRef = useRef<HTMLDivElement | null>(null)
   const assistantDraftRef = useRef("")
   const audioMutedRef = useRef(false)
+  const omniPendingConfirmationRef = useRef(omniPendingConfirmation)
+  const lastSuccessfulConfirmationAtRef = useRef(0)
   const suppressAssistantOutputRef = useRef(false)
   const resizeStartRef = useRef<ResizeStart | null>(null)
   const dragStartRef = useRef<DragStart | null>(null)
@@ -306,8 +548,13 @@ export function AiAssistant() {
   const [showTokenPopover, setShowTokenPopover] = useState(false)
   const [pulseActive, setPulseActive] = useState(false)
   const tokenMeterContainerRef = useRef<HTMLDivElement | null>(null)
+  const [showVolumePopover, setShowVolumePopover] = useState(false)
+  const volumePopoverRef = useRef<HTMLDivElement | null>(null)
 
   const prevTotalRef = useRef(0)
+  const omniTranscriptRef = useRef(omniTranscript)
+  const pendingTranscriptCorrectionRef = useRef<string | null>(null)
+  const lastFinalTranscriptAtRef = useRef(0)
 
   useEffect(() => {
     const handleLauncherPosChange = (event: Event) => {
@@ -361,6 +608,33 @@ export function AiAssistant() {
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [showTokenPopover])
 
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as Element | null
+      if (
+        showVolumePopover &&
+        volumePopoverRef.current &&
+        !volumePopoverRef.current.contains(e.target as Node) &&
+        !target?.closest(".voice-btn--audio") &&
+        !target?.closest(".voice-btn--muted")
+      ) {
+        setShowVolumePopover(false)
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [showVolumePopover])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showVolumePopover) {
+        setShowVolumePopover(false)
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [showVolumePopover])
+
   const buildSessionContextMessage = useCallback((): VoiceSessionContextMessage | null => {
     const targetName = selectedPane?.targetName ?? selectedTargetName
     if (!targetName) return null
@@ -379,11 +653,12 @@ export function AiAssistant() {
   }, [connections, selectedPane, selectedTargetName])
 
   const sendSessionContext = useCallback(
-    (ws: OmniWebSocket) => {
+    (ws: OmniWebSocket | OmniIpc) => {
       const context = buildSessionContextMessage()
       if (context) {
         ws.send(context)
       }
+      return context
     },
     [buildSessionContextMessage],
   )
@@ -392,8 +667,14 @@ export function AiAssistant() {
     omniStatusRef.current = omniStatus
   }, [omniStatus])
   useEffect(() => {
+    omniTranscriptRef.current = omniTranscript
+  }, [omniTranscript])
+  useEffect(() => {
     audioMutedRef.current = audioMuted
   }, [audioMuted])
+  useEffect(() => {
+    omniPendingConfirmationRef.current = omniPendingConfirmation
+  }, [omniPendingConfirmation])
   useEffect(() => {
     let cancelled = false
     const loadMicState = async () => {
@@ -443,11 +724,24 @@ export function AiAssistant() {
     try {
       await clearOmniHistory()
     } catch {}
+    pipelineRef.current?.stopPlayback()
+    pipelineRef.current?.stopCapture()
+    wsRef.current?.close()
+    wsRef.current = null
+    wsConnectingRef.current = false
+    setWsConnecting(false)
+    setMicCapturing(false)
+    setAudioBars(new Array(LEVEL_SEGMENTS).fill(false))
     assistantDraftRef.current = ""
+    pendingTranscriptCorrectionRef.current = null
+    lastFinalTranscriptAtRef.current = 0
     setAssistantDraft("")
     setHistory([])
     setTokenUsage({ last: null, total: emptyTokenUsage() })
-  }, [])
+    if (omniStatusRef.current !== "disabled") {
+      setOmniStatus("idle")
+    }
+  }, [setOmniStatus])
 
   const appendAssistantDraft = useCallback((text: string) => {
     assistantDraftRef.current += text
@@ -541,7 +835,8 @@ export function AiAssistant() {
         stringParam(params, ["target_name", "targetName"]) ??
         selectedPane?.targetName ??
         selectedTargetName
-      const sessionName = stringParam(params, ["session", "session_name", "sessionName"])
+      const sessionName =
+        stringParam(params, ["session", "session_name", "sessionName"]) ?? selectedPane?.session
 
       if (!targetName || !sessionName) {
         setError({
@@ -551,7 +846,26 @@ export function AiAssistant() {
         return
       }
 
-      const windowQuery = stringParam(params, ["window", "window_name", "windowName"])
+      const windowQuery = stringParam(params, [
+        "window",
+        "window_name",
+        "windowName",
+        "window_id",
+        "windowId",
+        "window_index",
+        "windowIndex",
+        "index",
+        "position",
+        "ordinal",
+      ])
+      const windowOrdinal =
+        stringParam(params, ["window_index", "windowIndex", "index", "position", "ordinal"])
+          ? parseOrdinal(
+              stringParam(params, ["window_index", "windowIndex", "index", "position", "ordinal"]),
+            )
+          : windowQuery && /^第/.test(windowQuery.trim())
+            ? parseOrdinal(windowQuery)
+            : null
       const paneQuery = stringParam(params, ["pane", "pane_index", "paneIndex"])
 
       try {
@@ -564,10 +878,10 @@ export function AiAssistant() {
         const windows = windowsResponse.data ?? []
         setWindows(targetName, sessionName, windows)
 
-        const selectedWindow = findWindow(windows, windowQuery)
+        const selectedWindow = findWindowByVoiceTarget(windows, windowQuery, windowOrdinal)
         if (!selectedWindow) {
           setSelectedPane({ targetName, session: sessionName })
-          return
+          return { targetName, session: sessionName }
         }
 
         const panesResponse = await listPanes(targetName, sessionName, selectedWindow.ID)
@@ -575,17 +889,28 @@ export function AiAssistant() {
         setPanes(targetName, sessionName, selectedWindow.ID, panes)
 
         const selectedPaneInfo = findPane(panes, paneQuery)
-        setSelectedPane({
+        const nextSelection = {
           targetName,
           session: sessionName,
           window: selectedWindow.ID,
           pane: selectedPaneInfo?.ID,
+        }
+        setSelectedPane({
+          ...nextSelection,
         })
+        return {
+          targetName,
+          session: sessionName,
+          window: selectedWindow.ID,
+          pane: selectedPaneInfo?.ID,
+        }
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to open workspace item"
         setError({
           code: "voice_navigation_failed",
-          message: error instanceof Error ? error.message : "Failed to open workspace item",
+          message,
         })
+        throw new Error(message)
       }
     },
     [
@@ -610,6 +935,7 @@ export function AiAssistant() {
           : findProject(await listProjects(), params)
         if (project) {
           setSelectedProject(project)
+          return { projectId: project.id, name: project.name, path: project.path }
         } else if (
           stringParam(params, [
             "project_name",
@@ -620,38 +946,1128 @@ export function AiAssistant() {
             "sessionName",
           ]) !== null
         ) {
-          setError({
-            code: "voice_navigation_failed",
-            message: "Project not found",
-          })
+          throw new Error("Project not found")
         }
+        return { opened: false }
       } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to open project"
         setError({
           code: "voice_navigation_failed",
-          message: error instanceof Error ? error.message : "Failed to open project",
+          message,
         })
+        throw new Error(message)
       }
     },
     [setError, setSelectedProject],
   )
 
+  const executeListSessionsIntent = useCallback(
+    async (params: VoiceIntentParams, callId?: string) => {
+      const targetName =
+        stringParam(params, ["target_name", "targetName"]) ??
+        selectedPane?.targetName ??
+        selectedTargetName ??
+        connections[0]?.targetName ??
+        null
+
+      if (!targetName) {
+        const message = "Target is required to list sessions"
+        setError({ code: "voice_tool_failed", message })
+        wsRef.current?.send({
+          type: "tool_result",
+          skill: "list_sessions",
+          callId,
+          error: message,
+        })
+        return
+      }
+
+      try {
+        const response = await listSessions(targetName)
+        const data = response.data ?? []
+        setSessions(targetName, data)
+        wsRef.current?.send({
+          type: "tool_result",
+          skill: "list_sessions",
+          callId,
+          output: {
+            targetName,
+            count: data.length,
+            sessions: data.map(compactSessionForTool),
+          },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to list sessions"
+        setError({ code: "voice_tool_failed", message })
+        wsRef.current?.send({
+          type: "tool_result",
+          skill: "list_sessions",
+          callId,
+          error: message,
+        })
+      }
+    },
+    [connections, selectedPane, selectedTargetName, setError, setSessions],
+  )
+
+  const resolveIntentTargetName = useCallback(
+    (params: VoiceIntentParams): string | null =>
+      stringParam(params, ["target_name", "targetName"]) ??
+      selectedPane?.targetName ??
+      selectedTargetName ??
+      connections[0]?.targetName ??
+      null,
+    [connections, selectedPane, selectedTargetName],
+  )
+
+  const resolveIntentSessionName = useCallback(
+    (params: VoiceIntentParams): string | null =>
+      stringParam(params, ["session", "session_name", "sessionName"]) ??
+      selectedPane?.session ??
+      null,
+    [selectedPane],
+  )
+
+  const refreshSessionsForTool = useCallback(
+    async (targetName: string) => {
+      const response = await listSessions(targetName)
+      const data = response.data ?? []
+      setSessions(targetName, data)
+      return data
+    },
+    [setSessions],
+  )
+
+  const sendToolResult = useCallback(
+    (skill: string, callId: string | undefined, result: VoiceToolResultPayload) => {
+      wsRef.current?.send({
+        type: "tool_result",
+        skill,
+        callId,
+        ...result,
+      })
+    },
+    [],
+  )
+
+  const reportIntentPromise = useCallback(
+    (skill: string, callId: string | undefined, promise: Promise<unknown>) => {
+      void promise
+        .then((output) => {
+          sendToolResult(skill, callId, { output })
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+          sendToolResult(skill, callId, { error: message })
+        })
+    },
+    [sendToolResult],
+  )
+
+  const executeSessionMutationIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+      extraOutput?: Record<string, unknown>,
+    ) => {
+      const targetName = resolveIntentTargetName(params)
+      if (!targetName) {
+        const message = "Target is required for session operation"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+        return
+      }
+
+      try {
+        let operation: unknown
+        if (skill === "create_session") {
+          const sessionName = stringParam(params, ["session_name", "sessionName", "name", "session"])
+          if (!sessionName) {
+            throw new Error("Session name is required to create a session")
+          }
+          operation = await createSession(targetName, sessionName)
+        } else if (skill === "rename_session") {
+          const sessionName = stringParam(params, ["old_name", "oldName", "session_name", "sessionName", "session"])
+          const newName = stringParam(params, ["new_name", "newName", "name"])
+          if (!sessionName || !newName) {
+            throw new Error("Current session name and new name are required to rename a session")
+          }
+          operation = await renameSession(targetName, sessionName, newName)
+        } else if (skill === "delete_session") {
+          const sessionName = stringParam(params, ["session_name", "sessionName", "session", "name"])
+          if (!sessionName) {
+            throw new Error("Session name is required to delete a session")
+          }
+          operation = await killSession(targetName, sessionName)
+        } else {
+          return
+        }
+
+        const sessions = await refreshSessionsForTool(targetName)
+        sendToolResult(resultSkill, callId, {
+          output: {
+            ...extraOutput,
+            targetName,
+            operation: compactOperationForTool(operation),
+            count: sessions.length,
+            sessions: sessions.map(compactSessionForTool),
+          },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [refreshSessionsForTool, resolveIntentTargetName, sendToolResult, setError],
+  )
+
+  const executeBackendRouteIntent = useCallback(
+    (params: VoiceIntentParams, callId?: string) => {
+      const routeId = stringParam(params, ["route_id", "routeId"])
+      const routeParams = objectParam(params, "params") ?? params
+
+      // Delegate mutation intents to the existing handler
+      if (routeId === "sessions.create") {
+        void executeSessionMutationIntent("create_session", routeParams, callId, "invoke_backend_route", {
+          routeId,
+        })
+        return
+      }
+
+      if (routeId === "sessions.rename") {
+        void executeSessionMutationIntent("rename_session", routeParams, callId, "invoke_backend_route", {
+          routeId,
+        })
+        return
+      }
+
+      if (routeId === "sessions.delete") {
+        void executeSessionMutationIntent("delete_session", routeParams, callId, "invoke_backend_route", {
+          routeId,
+        })
+        return
+      }
+
+      // Helper to invoke async backend routes and send the result
+      const invokeRoute = async () => {
+        switch (routeId) {
+          case "connections.list": {
+            const data = await listConnections()
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "sessions.list": {
+            const targetName = resolveIntentTargetName(routeParams)
+            if (!targetName) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name is required for sessions.list" })
+              return
+            }
+            const data = await listSessions(targetName)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "sessions.analyze": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            if (!targetName || !sessionName) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for sessions.analyze" })
+              return
+            }
+            const data = await analyzeSession(targetName, sessionName)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "windows.list": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            if (!targetName || !sessionName) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for windows.list" })
+              return
+            }
+            const data = await listWindows(targetName, sessionName)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "windows.create": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            if (!targetName || !sessionName) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name and session_name are required for windows.create" })
+              return
+            }
+            const windowName = stringParam(routeParams, ["window_name", "windowName", "name"])
+            const data = await createWindow(targetName, sessionName, windowName ?? undefined)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "windows.delete": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            const windowId = stringParam(routeParams, ["window_id", "windowId"])
+            if (!targetName || !sessionName || !windowId) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, and window_id are required for windows.delete" })
+              return
+            }
+            const data = await killWindow(targetName, sessionName, windowId)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "panes.list": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            const windowId = stringParam(routeParams, ["window_id", "windowId"])
+            if (!targetName || !sessionName || !windowId) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, and window_id are required for panes.list" })
+              return
+            }
+            const data = await listPanes(targetName, sessionName, windowId)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "panes.split": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            const windowId = stringParam(routeParams, ["window_id", "windowId"])
+            const paneId = stringParam(routeParams, ["pane_id", "paneId", "pane"])
+            const horizontal = stringParam(routeParams, ["direction", "split_direction", "splitDirection"]) === "horizontal"
+            if (!targetName || !sessionName || !windowId || !paneId) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, window_id, and pane_id are required for panes.split" })
+              return
+            }
+            const data = await splitPane(targetName, sessionName, windowId, paneId, horizontal)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "panes.delete": {
+            const targetName = resolveIntentTargetName(routeParams)
+            const sessionName = resolveIntentSessionName(routeParams)
+            const windowId = stringParam(routeParams, ["window_id", "windowId"])
+            const paneId = stringParam(routeParams, ["pane_id", "paneId", "pane"])
+            if (!targetName || !sessionName || !windowId || !paneId) {
+              sendToolResult("invoke_backend_route", callId, { error: "target_name, session_name, window_id, and pane_id are required for panes.delete" })
+              return
+            }
+            const data = await killPane(targetName, sessionName, windowId, paneId)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.list": {
+            const data = await listProjects()
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.create": {
+            const name = stringParam(routeParams, ["name", "project_name", "projectName"])
+            if (!name) {
+              sendToolResult("invoke_backend_route", callId, { error: "name is required for projects.create" })
+              return
+            }
+            const data = await createProject({
+              name,
+              path: stringParam(routeParams, ["path"]) ?? undefined,
+              description: stringParam(routeParams, ["description"]) ?? undefined,
+            })
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.update": {
+            const id = stringParam(routeParams, ["id", "project_id", "projectId"])
+            if (!id) {
+              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.update" })
+              return
+            }
+            const data = await updateProject(id, {
+              name: stringParam(routeParams, ["name", "project_name", "projectName"]) ?? undefined,
+              path: stringParam(routeParams, ["path"]) ?? undefined,
+              description: stringParam(routeParams, ["description"]) ?? undefined,
+            })
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.delete": {
+            const id = stringParam(routeParams, ["id", "project_id", "projectId"])
+            if (!id) {
+              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.delete" })
+              return
+            }
+            const killSession = stringParam(routeParams, ["kill_session", "killSession"]) === "true"
+            await deleteProject(id, killSession)
+            sendToolResult("invoke_backend_route", callId, { output: { deleted: id } })
+            break
+          }
+
+          case "projects.launch": {
+            const id = stringParam(routeParams, ["id", "project_id", "projectId"])
+            if (!id) {
+              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.launch" })
+              return
+            }
+            const data = await launchProject(id)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.sync_from_tmux": {
+            const id = stringParam(routeParams, ["id", "project_id", "projectId"])
+            if (!id) {
+              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.sync_from_tmux" })
+              return
+            }
+            const data = await syncProjectFromTmux(id)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "projects.generate_ai_html": {
+            const id = stringParam(routeParams, ["id", "project_id", "projectId"])
+            if (!id) {
+              sendToolResult("invoke_backend_route", callId, { error: "id is required for projects.generate_ai_html" })
+              return
+            }
+            const data = await generateProjectAiHtml(id)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "tmux_analysis.list": {
+            const options: Record<string, unknown> = {}
+            const limit = stringParam(routeParams, ["limit"])
+            const projectId = stringParam(routeParams, ["project_id", "projectId"])
+            const status = stringParam(routeParams, ["status"])
+            if (limit) options.limit = Number(limit)
+            if (projectId) options.projectId = projectId
+            if (status) options.status = status
+            const data = await listAiStats(options)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "tmux_analysis.cleanup": {
+            const options: Record<string, unknown> = {}
+            const projectId = stringParam(routeParams, ["project_id", "projectId"])
+            if (projectId) options.projectId = projectId
+            const data = await cleanupAiStats(options)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "ai_logs.list": {
+            const options: Record<string, unknown> = {}
+            const limit = stringParam(routeParams, ["limit"])
+            const before = stringParam(routeParams, ["before"])
+            if (limit) options.limit = Number(limit)
+            if (before) options.before = before
+            const data = await listAiLogs(options)
+            sendToolResult("invoke_backend_route", callId, { output: data })
+            break
+          }
+
+          case "ai_logs.clear": {
+            await clearAiLogs()
+            sendToolResult("invoke_backend_route", callId, { output: { cleared: true } })
+            break
+          }
+
+          default: {
+            const message = routeId
+              ? `Voice backend route is not implemented in the frontend executor: ${routeId}`
+              : "Backend route ID is required"
+            setError({ code: "voice_tool_failed", message })
+            sendToolResult("invoke_backend_route", callId, { error: message })
+          }
+        }
+      }
+
+      void invokeRoute().catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : `Failed to execute backend route ${routeId}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult("invoke_backend_route", callId, { error: message })
+      })
+    },
+    [executeSessionMutationIntent, resolveIntentTargetName, resolveIntentSessionName, sendToolResult, setError],
+  )
+
+  const resolveIntentWindowQuery = useCallback(
+    (params: VoiceIntentParams): string | null =>
+      stringParam(params, [
+        "window",
+        "window_name",
+        "windowName",
+        "window_id",
+        "windowId",
+        "window_index",
+        "windowIndex",
+        "index",
+        "position",
+        "ordinal",
+      ]),
+    [],
+  )
+
+  const resolveIntentWindowOrdinal = useCallback(
+    (params: VoiceIntentParams): number | null => {
+      const ordinalParam = stringParam(params, [
+        "window_index",
+        "windowIndex",
+        "index",
+        "position",
+        "ordinal",
+      ])
+      if (ordinalParam) {
+        return parseOrdinal(ordinalParam)
+      }
+      const windowText = stringParam(params, ["window", "window_name", "windowName"])
+      return windowText && /^第/.test(windowText.trim()) ? parseOrdinal(windowText) : null
+    },
+    [],
+  )
+
+  const resolveIntentWindowTarget = useCallback(
+    async (
+      targetName: string,
+      sessionName: string,
+      params: VoiceIntentParams,
+    ): Promise<{ window: WindowInfo; windows: WindowInfo[] }> => {
+      const response = await listWindows(targetName, sessionName)
+      const windows = response.data ?? []
+      const query = resolveIntentWindowQuery(params)
+      const ordinal = resolveIntentWindowOrdinal(params)
+      const selectedWindow = findWindowByVoiceTarget(windows, query, ordinal, false)
+      if (!selectedWindow) {
+        throw new Error("Window not found")
+      }
+      return { window: selectedWindow, windows }
+    },
+    [resolveIntentWindowOrdinal, resolveIntentWindowQuery],
+  )
+
+  const resolveIntentPaneId = useCallback(
+    (params: VoiceIntentParams): string | null =>
+      stringParam(params, ["pane", "pane_index", "paneIndex", "pane_id", "paneId"]),
+    [],
+  )
+
+  const executeWindowMutationIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      const targetName = resolveIntentTargetName(params)
+      const sessionName = resolveIntentSessionName(params)
+      if (!targetName || !sessionName) {
+        const message = "Target and session are required for window operation"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+        return
+      }
+
+      try {
+        let operation: unknown
+        let selectedWindow: WindowInfo | null = null
+        let updatedWindows: WindowInfo[] = []
+        if (skill === "create_window") {
+          const newWindowName = stringParam(params, ["window_name", "windowName", "name"])
+          operation = await createWindow(targetName, sessionName, newWindowName ?? undefined)
+        } else if (skill === "rename_window") {
+          selectedWindow = (await resolveIntentWindowTarget(targetName, sessionName, params)).window
+          const newName = stringParam(params, ["new_name", "newName", "name"])
+          if (!newName) {
+            throw new Error("New window name is required")
+          }
+          operation = await renameWindow(targetName, sessionName, selectedWindow.ID, newName)
+        } else if (skill === "delete_window") {
+          selectedWindow = (await resolveIntentWindowTarget(targetName, sessionName, params)).window
+          operation = await killWindow(targetName, sessionName, selectedWindow.ID)
+        } else {
+          return
+        }
+
+        const windows = await listWindows(targetName, sessionName)
+        updatedWindows = windows.data ?? []
+        setWindows(targetName, sessionName, updatedWindows)
+        sendToolResult(resultSkill, callId, {
+          output: {
+            targetName,
+            session: sessionName,
+            window: selectedWindow
+              ? { id: selectedWindow.ID, name: selectedWindow.Name, index: selectedWindow.Index }
+              : undefined,
+            operation: compactOperationForTool(operation),
+            count: updatedWindows.length,
+            windows: updatedWindows.map((w) => ({ id: w.ID, name: w.Name, index: w.Index })),
+          },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      resolveIntentWindowTarget,
+      sendToolResult,
+      setError,
+      setWindows,
+    ],
+  )
+
+  const executePaneMutationIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      const targetName = resolveIntentTargetName(params)
+      const sessionName = resolveIntentSessionName(params)
+      const paneName = resolveIntentPaneId(params)
+      if (!targetName || !sessionName || !paneName) {
+        const message = "Target, session, window, and pane are required for pane operation"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+        return
+      }
+
+      try {
+        const { window: resolvedWindow } = await resolveIntentWindowTarget(
+          targetName,
+          sessionName,
+          params,
+        )
+        const windowName = resolvedWindow.ID
+        let output: Record<string, unknown> = {}
+        if (skill === "split_pane") {
+          const horizontal = params.horizontal === true || params.direction === "horizontal"
+          const result = await splitPane(targetName, sessionName, windowName, paneName, horizontal)
+          output = { targetName, session: sessionName, window: windowName, pane: paneName, operation: compactOperationForTool(result) }
+        } else if (skill === "kill_pane") {
+          await killPane(targetName, sessionName, windowName, paneName)
+          output = { targetName, session: sessionName, window: windowName, pane: paneName, status: "killed" }
+        } else if (skill === "read_pane_output") {
+          const lines = typeof params.lines === "number" ? params.lines : 50
+          const maxBytes = Math.min(lines * 200, 100000)
+          const result = await capturePane(targetName, sessionName, windowName, paneName, maxBytes)
+          output = { targetName, session: sessionName, window: windowName, pane: paneName, output: result.output }
+        } else if (skill === "clear_pane") {
+          await clearPane(targetName, sessionName, windowName, paneName)
+          output = { targetName, session: sessionName, window: windowName, pane: paneName, status: "cleared" }
+        } else if (skill === "send_to_pane") {
+          const text = stringParam(params, ["text"]) ?? ""
+          const execute = params.execute === true
+          const appendEnter = params.append_enter === true
+          const control = params.control === true
+          const controlSequence = stringParam(params, ["control_sequence"])
+          const keys: string[] = []
+          if (control && controlSequence) {
+            keys.push(controlSequence)
+          } else if (text) {
+            keys.push(text)
+            if (appendEnter) {
+              keys.push("Enter")
+            }
+          }
+          if (keys.length > 0) {
+            await sendKeysToPane(targetName, sessionName, windowName, paneName, keys)
+          }
+          output = { targetName, session: sessionName, window: windowName, pane: paneName, text, executed: execute || appendEnter }
+        } else {
+          return
+        }
+
+        sendToolResult(resultSkill, callId, { output })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      resolveIntentWindowTarget,
+      resolveIntentPaneId,
+      sendToolResult,
+      setError,
+    ],
+  )
+
+  const executeAgentPromptIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      const agent = skill === "run_claude_prompt" ? "claude" : "codex"
+      const prompt = normalizeAgentPrompt(stringParam(params, ["prompt", "text", "message"]) ?? "")
+      if (!prompt) {
+        const message = "Prompt is required"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+        return
+      }
+
+      const targetName = resolveIntentTargetName(params) ?? selectedPane?.targetName ?? selectedTargetName
+      const sessionName = resolveIntentSessionName(params) ?? selectedPane?.session
+      if (!targetName || !sessionName) {
+        const message = "Target and session are required for agent prompt execution"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+        return
+      }
+
+      try {
+        const explicitWindow = Boolean(resolveIntentWindowQuery(params))
+        const selectedMatches =
+          selectedPane?.targetName === targetName && selectedPane.session === sessionName
+        let windowName = selectedMatches && selectedPane?.window && !explicitWindow
+          ? selectedPane.window
+          : null
+        if (!windowName) {
+          windowName = (await resolveIntentWindowTarget(targetName, sessionName, params)).window.ID
+        }
+
+        const paneQuery = resolveIntentPaneId(params)
+        let paneName = paneQuery ?? (
+          selectedMatches && selectedPane?.window === windowName ? selectedPane.pane : undefined
+        )
+        if (!paneName) {
+          const panesResponse = await listPanes(targetName, sessionName, windowName)
+          paneName = findPane(panesResponse.data ?? [], null)?.ID
+        }
+        if (!paneName) {
+          throw new Error("Pane not found")
+        }
+
+        const promptArg = shellDoubleQuote(prompt)
+        const command = agent === "claude"
+          ? `claude -p ${promptArg}`
+          : `codex exec ${promptArg}`
+        await sendKeysToPane(targetName, sessionName, windowName, paneName, [command, "Enter"])
+        sendToolResult(resultSkill, callId, {
+          output: {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            agent,
+            command,
+          },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      resolveIntentWindowQuery,
+      resolveIntentWindowTarget,
+      resolveIntentPaneId,
+      selectedPane,
+      selectedTargetName,
+      sendToolResult,
+      setError,
+    ],
+  )
+
+  const executeProjectMutationIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      try {
+        let output: Record<string, unknown> = {}
+        if (skill === "list_projects") {
+          const projects = await listProjects()
+          output = { count: projects.length, projects: projects.map((p) => ({ id: p.id, name: p.name, path: p.path })) }
+        } else if (skill === "create_project") {
+          const name = stringParam(params, ["name"]) ?? ""
+          const projectPath = stringParam(params, ["path"]) ?? ""
+          const description = stringParam(params, ["description"]) ?? undefined
+          const sessionName = stringParam(params, ["session_name", "sessionName"]) ?? undefined
+          const workdir = stringParam(params, ["workdir"]) ?? undefined
+          const result = await createProject({ name, path: projectPath, description, sessionName, workdir })
+          output = { project: result }
+        } else if (skill === "update_project") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          if (!projectId) {
+            throw new Error("Project ID is required")
+          }
+          const result = await updateProject(projectId, {
+            name: stringParam(params, ["name"]) ?? undefined,
+            path: stringParam(params, ["path"]) ?? undefined,
+            description: stringParam(params, ["description"]) ?? undefined,
+            sessionName: stringParam(params, ["session_name", "sessionName"]) ?? undefined,
+            workdir: stringParam(params, ["workdir"]) ?? undefined,
+          })
+          output = { project: result }
+        } else if (skill === "delete_project") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          const killSessionFlag = params.kill_session === true
+          if (!projectId) {
+            throw new Error("Project ID is required")
+          }
+          await deleteProject(projectId, killSessionFlag)
+          output = { projectId, deleted: true }
+        } else if (skill === "launch_project") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          if (!projectId) {
+            throw new Error("Project ID is required")
+          }
+          const result = await launchProject(projectId)
+          output = { projectId, result }
+        } else if (skill === "sync_project_from_tmux") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          if (!projectId) {
+            throw new Error("Project ID is required")
+          }
+          const result = await syncProjectFromTmux(projectId)
+          output = { projectId, result }
+        } else if (skill === "generate_project_ai_html") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          if (!projectId) {
+            throw new Error("Project ID is required")
+          }
+          const result = await generateProjectAiHtml(projectId)
+          output = { projectId, result }
+        } else {
+          return
+        }
+
+        sendToolResult(resultSkill, callId, { output })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [sendToolResult, setError],
+  )
+
+  const executeConfigIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      try {
+        let output: Record<string, unknown> = {}
+        if (skill === "get_config") {
+          const config = await getConfig()
+          output = { config }
+        } else if (skill === "check_health") {
+          const targetName = stringParam(params, ["target_name", "targetName"])
+          if (targetName) {
+            const health = await getConnectionHealth(targetName)
+            output = { targetName, health }
+          } else {
+            const health = await fetchHealth()
+            output = { health }
+          }
+        } else if (skill === "toggle_omni") {
+          const enabled = params.enabled === true
+          const config = await getConfig()
+          await updateConfig({ ...config, omni: { ...config.omni, enabled } } as AppConfig)
+          output = { enabled }
+        } else if (skill === "set_voice") {
+          const voice = stringParam(params, ["voice"])
+          if (!voice) {
+            throw new Error("Voice is required")
+          }
+          const config = await getConfig()
+          await updateConfig({ ...config, omni: { ...config.omni, voice } } as AppConfig)
+          output = { voice }
+        } else if (skill === "toggle_continuous_listening") {
+          const enabled = params.enabled === true
+          const config = await getConfig()
+          await updateConfig({ ...config, omni: { ...config.omni, continuousListening: enabled } } as AppConfig)
+          output = { enabled }
+        } else if (skill === "toggle_vad") {
+          const enabled = params.enabled !== false
+          const threshold = typeof params.threshold === "number" ? params.threshold : undefined
+          const config = await getConfig()
+          await updateConfig({ ...config, omni: { ...config.omni, vadEnabled: enabled, ...(threshold !== undefined ? { vadThreshold: threshold } : {}) } } as AppConfig)
+          output = { enabled, threshold }
+        } else if (skill === "set_theme") {
+          const theme = stringParam(params, ["theme"])
+          if (!theme || (theme !== "light" && theme !== "dark")) {
+            throw new Error("Theme must be 'light' or 'dark'")
+          }
+          const config = await getConfig()
+          await updateConfig({ ...config, ui: { ...config.ui, theme } } as AppConfig)
+          output = { theme }
+        } else if (skill === "set_font_size") {
+          const size = typeof params.size === "number" ? params.size : undefined
+          if (!size) {
+            throw new Error("Font size is required")
+          }
+          const config = await getConfig()
+          await updateConfig({ ...config, ui: { ...config.ui, fontSize: size } } as AppConfig)
+          output = { size }
+        } else if (skill === "set_terminal_font") {
+          const fontSize = typeof params.fontSize === "number" ? params.fontSize : undefined
+          const fontWeight = stringParam(params, ["fontWeight"])
+          if (!fontSize) {
+            throw new Error("Terminal font size is required")
+          }
+          const config = await getConfig()
+          await updateConfig({ ...config, ui: { ...config.ui, terminalFontSize: fontSize, ...(fontWeight ? { terminalFontWeight: fontWeight } : {}) } } as AppConfig)
+          output = { fontSize, fontWeight }
+        } else {
+          return
+        }
+
+        sendToolResult(resultSkill, callId, { output })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [sendToolResult, setError],
+  )
+
+  const executeAnalysisIntent = useCallback(
+    async (
+      skill: string,
+      params: VoiceIntentParams,
+      callId?: string,
+      resultSkill: string = skill,
+    ) => {
+      try {
+        let output: Record<string, unknown> = {}
+        if (skill === "analyze_session") {
+          const targetName = resolveIntentTargetName(params)
+          const sessionName = resolveIntentSessionName(params)
+          if (!targetName || !sessionName) {
+            throw new Error("Target and session are required")
+          }
+          const result = await analyzeSession(targetName, sessionName)
+          output = { targetName, session: sessionName, result }
+        } else if (skill === "list_tmux_analysis") {
+          const limit = typeof params.limit === "number" ? params.limit : 50
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          const status = stringParam(params, ["status"])
+          const result = await listAiStats({ limit, projectId: projectId ?? undefined, status: status ?? undefined })
+          output = { result }
+        } else if (skill === "cleanup_tmux_analysis") {
+          const projectId = stringParam(params, ["project_id", "projectId"])
+          const result = await cleanupAiStats({ projectId: projectId ?? undefined })
+          output = { result }
+        } else if (skill === "list_ai_logs") {
+          const limit = typeof params.limit === "number" ? params.limit : 50
+          const before = stringParam(params, ["before"])
+          const result = await listAiLogs({ limit, before: before ?? undefined })
+          output = { result }
+        } else if (skill === "clear_ai_logs") {
+          await clearAiLogs()
+          output = { cleared: true }
+        } else {
+          return
+        }
+
+        sendToolResult(resultSkill, callId, { output })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `Failed to execute ${skill}`
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult(resultSkill, callId, { error: message })
+      }
+    },
+    [resolveIntentTargetName, resolveIntentSessionName, sendToolResult, setError],
+  )
+
+  const executeRunProjectIntent = useCallback(
+    async (params: VoiceIntentParams, callId?: string) => {
+      const targetName = resolveIntentTargetName(params)
+      const sessionName = resolveIntentSessionName(params)
+      const paneName = resolveIntentPaneId(params)
+      const projectPath = stringParam(params, ["project_path", "projectPath"])
+      const startCommand = stringParam(params, ["start_command", "startCommand"])
+
+      if (!targetName || !sessionName || !paneName || !projectPath || !startCommand) {
+        const message = "Target, session, pane, project path, and start command are required to run a project"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult("run_project", callId, { error: message })
+        return
+      }
+
+      try {
+        const { window: resolvedWindow } = await resolveIntentWindowTarget(
+          targetName,
+          sessionName,
+          params,
+        )
+        const windowName = resolvedWindow.ID
+        const cdCommand = `cd "${projectPath}"`
+        await sendKeysToPane(targetName, sessionName, windowName, paneName, [cdCommand, "Enter"])
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        await sendKeysToPane(targetName, sessionName, windowName, paneName, [startCommand, "Enter"])
+        sendToolResult("run_project", callId, {
+          output: {
+            targetName,
+            session: sessionName,
+            window: windowName,
+            pane: paneName,
+            projectPath,
+            commands: [cdCommand, startCommand],
+          },
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to run project"
+        setError({ code: "voice_tool_failed", message })
+        sendToolResult("run_project", callId, { error: message })
+      }
+    },
+    [
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      resolveIntentPaneId,
+      resolveIntentWindowTarget,
+      sendToolResult,
+      setError,
+    ],
+  )
+
   const handleFrontendIntent = useCallback(
-    (skill: string, params: VoiceIntentParams) => {
+    (skill: string, params: VoiceIntentParams, callId?: string, confirmationRequired = false) => {
       if (skill === "new_chat") {
         void handleNewChat()
         return
       }
 
+      if (skill === "list_sessions") {
+        emitSidebarNavigation("session")
+        void executeListSessionsIntent(params, callId)
+        return
+      }
+
+      if (
+        !confirmationRequired &&
+        (skill === "create_session" || skill === "rename_session" || skill === "delete_session")
+      ) {
+        emitSidebarNavigation("session")
+        void executeSessionMutationIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && skill === "invoke_backend_route") {
+        emitSidebarNavigation("session")
+        executeBackendRouteIntent(params, callId)
+        return
+      }
+
       if (skill === "get_current_focus") {
         if (wsRef.current?.isConnected()) {
-          sendSessionContext(wsRef.current)
+          const context = sendSessionContext(wsRef.current)
+          sendToolResult(skill, callId, { output: context })
         }
         return
       }
 
       if (skill === "focus_pane") {
         emitSidebarNavigation("session")
-        void openWorkspaceTarget(params)
+        reportIntentPromise(skill, callId, openWorkspaceTarget(params))
+        return
+      }
+
+      if (skill === "switch_window") {
+        emitSidebarNavigation("session")
+        reportIntentPromise(skill, callId, openWorkspaceTarget(params))
+        return
+      }
+
+      if (!confirmationRequired && (skill === "create_window" || skill === "rename_window" || skill === "delete_window")) {
+        emitSidebarNavigation("session")
+        void executeWindowMutationIntent(skill, params, callId)
+        return
+      }
+
+      if (
+        !confirmationRequired &&
+        (skill === "split_pane" || skill === "read_pane_output" || skill === "send_to_pane" ||
+         skill === "kill_pane" || skill === "clear_pane")
+      ) {
+        emitSidebarNavigation("session")
+        void executePaneMutationIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && (skill === "run_claude_prompt" || skill === "run_codex_prompt")) {
+        emitSidebarNavigation("session")
+        void executeAgentPromptIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && skill === "list_projects") {
+        emitSidebarNavigation("projects")
+        void executeProjectMutationIntent(skill, params, callId)
+        return
+      }
+
+      if (
+        !confirmationRequired &&
+        (skill === "create_project" || skill === "update_project" || skill === "launch_project" ||
+         skill === "sync_project_from_tmux" || skill === "generate_project_ai_html" ||
+         skill === "delete_project")
+      ) {
+        emitSidebarNavigation("projects")
+        void executeProjectMutationIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && skill === "run_project") {
+        emitSidebarNavigation("session")
+        void executeRunProjectIntent(params, callId)
+        return
+      }
+
+      if (!confirmationRequired && (skill === "get_config" || skill === "check_health")) {
+        void executeConfigIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && (skill === "toggle_omni" || skill === "set_voice" || skill === "toggle_continuous_listening" || skill === "toggle_vad" || skill === "set_theme" || skill === "set_font_size" || skill === "set_terminal_font")) {
+        void executeConfigIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && (skill === "analyze_session" || skill === "list_tmux_analysis")) {
+        void executeAnalysisIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && (skill === "cleanup_tmux_analysis" || skill === "clear_ai_logs")) {
+        void executeAnalysisIntent(skill, params, callId)
+        return
+      }
+
+      if (!confirmationRequired && skill === "list_ai_logs") {
+        void executeAnalysisIntent(skill, params, callId)
         return
       }
 
@@ -661,11 +2077,13 @@ export function AiAssistant() {
       if (route === "settings") {
         setShowSettingsPanel(true)
         window.history.pushState(null, "", `${window.location.pathname}?view=settings`)
+        sendToolResult(skill, callId, { output: { route } })
         return
       }
 
       if (route === "connections") {
         setShowNewConnectionForm(true)
+        sendToolResult(skill, callId, { output: { route } })
         return
       }
 
@@ -675,36 +2093,121 @@ export function AiAssistant() {
         setSelectedProject(null)
         setSelectedPane(null)
         window.history.replaceState(null, "", window.location.pathname)
+        sendToolResult(skill, callId, { output: { route } })
         return
       }
 
       if (route === "projects" || route === "project") {
         emitSidebarNavigation("projects")
-        void openProjectTarget(params)
+        reportIntentPromise(skill, callId, openProjectTarget(params))
         return
       }
 
       if (route === "session" || route === "window" || route === "pane") {
         emitSidebarNavigation("session")
-        if (stringParam(params, ["session", "session_name", "sessionName"])) {
-          void openWorkspaceTarget(params)
+        if (resolveIntentSessionName(params)) {
+          reportIntentPromise(skill, callId, openWorkspaceTarget(params))
+        } else {
+          sendToolResult(skill, callId, { output: { route } })
         }
         return
       }
 
       emitSidebarNavigation(route)
+      sendToolResult(skill, callId, { output: { route } })
     },
     [
       handleNewChat,
+      executeListSessionsIntent,
+      executeBackendRouteIntent,
+      executeSessionMutationIntent,
+      executeWindowMutationIntent,
+      executePaneMutationIntent,
+      executeAgentPromptIntent,
+      executeProjectMutationIntent,
+      executeConfigIntent,
+      executeAnalysisIntent,
+      executeRunProjectIntent,
+      resolveIntentTargetName,
+      resolveIntentSessionName,
+      resolveIntentWindowQuery,
+      resolveIntentPaneId,
       openProjectTarget,
       openWorkspaceTarget,
+      reportIntentPromise,
       sendSessionContext,
+      sendToolResult,
       setSelectedPane,
       setSelectedProject,
       setShowErrorLogsPanel,
       setShowNewConnectionForm,
       setShowSettingsPanel,
     ],
+  )
+
+  const sendPendingConfirmationResponse = useCallback(
+    (response: "confirm" | "cancel"): boolean => {
+      const pendingConfirmation = omniPendingConfirmationRef.current
+      if (!pendingConfirmation) {
+        return false
+      }
+
+      if (wsRef.current?.isConnected()) {
+        wsRef.current.send({
+          type: response === "confirm" ? "confirm_action" : "cancel_action",
+          confirmationId: pendingConfirmation.confirmationId,
+        })
+      }
+
+      if (response === "cancel") {
+        omniPendingConfirmationRef.current = null
+        setOmniConfirmation(null)
+        setOmniStatus("listening")
+      } else {
+        omniPendingConfirmationRef.current = null
+        setOmniConfirmation(null)
+        setOmniStatus("processing")
+        if (pendingConfirmation.params) {
+          handleFrontendIntent(
+            pendingConfirmation.skill,
+            pendingConfirmation.params,
+            pendingConfirmation.callId,
+            false,
+          )
+        }
+      }
+
+      return true
+    },
+    [handleFrontendIntent, setOmniConfirmation, setOmniStatus],
+  )
+
+  const applyTranscriptCorrection = useCallback(
+    (text: string) => {
+      const correctedText = text.trim()
+      if (!correctedText) return
+
+      pendingTranscriptCorrectionRef.current = correctedText
+      if (omniTranscriptRef.current) {
+        setOmniTranscript(correctedText)
+      }
+
+      const shouldTryReplaceHistory = Date.now() - lastFinalTranscriptAtRef.current < 10000
+      if (!shouldTryReplaceHistory) return
+
+      pendingTranscriptCorrectionRef.current = null
+      setHistory((prev) => {
+        const latestIndex = prev.length - 1
+        const next = [...prev]
+        const message = next[latestIndex]
+        if (!message || message.role !== "user" || message.kind !== "transcript") {
+          return prev
+        }
+        next[latestIndex] = { ...message, text: correctedText }
+        return next
+      })
+    },
+    [setOmniTranscript],
   )
 
   const handleServerMessage = useCallback(
@@ -722,10 +2225,18 @@ export function AiAssistant() {
         return
       }
 
+      if (isVoiceTranscriptCorrectedEvent(event)) {
+        applyTranscriptCorrection(event.text)
+        return
+      }
+
       if (isVoiceTranscriptDoneEvent(event)) {
+        const confirmationResponse = parseVoiceConfirmation(event.text)
+        const transcriptText = pendingTranscriptCorrectionRef.current ?? event.text
+        pendingTranscriptCorrectionRef.current = null
         setOmniTranscript("")
         clearAssistantDraft()
-        setOmniStatus("processing")
+        lastFinalTranscriptAtRef.current = Date.now()
         setHistory((prev) => [
           ...prev,
           {
@@ -733,30 +2244,40 @@ export function AiAssistant() {
             conversationId: "default",
             role: "user",
             kind: "transcript",
-            text: event.text,
+            text: transcriptText,
             createdAt: new Date().toISOString(),
           },
         ])
+        if (confirmationResponse && sendPendingConfirmationResponse(confirmationResponse)) {
+          return
+        }
+        setOmniStatus("processing")
         return
       }
 
       if (isVoiceIntentReceivedEvent(event)) {
-        handleFrontendIntent(event.skill, event.params)
         if (event.confirmationRequired && event.confirmationId) {
-          setOmniConfirmation({
+          const pendingConfirmation = {
             confirmationId: event.confirmationId,
             skill: event.skill,
-          })
+            params: event.params,
+            callId: event.callId,
+          }
+          omniPendingConfirmationRef.current = pendingConfirmation
+          setOmniConfirmation(pendingConfirmation)
           setOmniStatus("confirming")
         } else {
+          handleFrontendIntent(event.skill, event.params, event.callId, event.confirmationRequired)
           setOmniStatus("processing")
         }
         return
       }
 
       if (isVoiceActionResultEvent(event)) {
+        omniPendingConfirmationRef.current = null
         setOmniConfirmation(null)
         if (event.success) {
+          lastSuccessfulConfirmationAtRef.current = Date.now()
           setOmniStatus("listening")
           setHistory((prev) => [
             ...prev,
@@ -826,6 +2347,13 @@ export function AiAssistant() {
       }
 
       if (isVoiceErrorEvent(event)) {
+        const isRecentSuccessfulConfirmation = Date.now() - lastSuccessfulConfirmationAtRef.current < 3000
+        const isUnspecifiedError =
+          (event.code === "dashscope_error" || event.code === "unknown") &&
+          (event.message === "DashScope realtime error" || event.message === "Unknown error")
+        if (isRecentSuccessfulConfirmation && isUnspecifiedError) {
+          return
+        }
         setOmniError(event.message)
         setOmniStatus("error")
       }
@@ -839,6 +2367,8 @@ export function AiAssistant() {
       setOmniError,
       setOmniStatus,
       handleFrontendIntent,
+      sendPendingConfirmationResponse,
+      applyTranscriptCorrection,
     ],
   )
 
@@ -852,12 +2382,15 @@ export function AiAssistant() {
     omniStatusRef.current = "connecting"
     setOmniStatus("connecting")
     setOmniTranscript("")
+    pendingTranscriptCorrectionRef.current = null
+    lastFinalTranscriptAtRef.current = 0
     clearAssistantDraft()
     setOmniError(null)
     suppressAssistantOutputRef.current = false
 
-    const ws = new OmniWebSocket({
-      token,
+    // Use OmniIpc (IPC Channel-based) instead of OmniWebSocket
+    // This keeps the DashScope API key in the backend
+    const ws = new OmniIpc({
       onMessage: (event: OmniServerEvent) => {
         handleServerMessage(event)
       },
@@ -873,21 +2406,26 @@ export function AiAssistant() {
         wsConnectingRef.current = false
         setWsConnecting(false)
         setMicCapturing(false)
-        if (omniStatusRef.current !== "disabled") {
+        if (omniStatusRef.current !== "disabled" && omniStatusRef.current !== "error") {
           setOmniStatus("idle")
         }
         wsRef.current = null
       },
-      onError: () => {
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : "Voice connection failed"
         wsConnectingRef.current = false
         setWsConnecting(false)
-        setOmniError("Connection failed")
+        setMicCapturing(false)
+        pipelineRef.current?.stopCapture()
+        omniStatusRef.current = "error"
+        setOmniError(message)
         setOmniStatus("error")
+        void ws.close()
       },
     })
 
     sendSessionContext(ws)
-    ws.connect()
+    ws.connect().catch(() => {})
     wsRef.current = ws
   }, [
     clearAssistantDraft,
@@ -901,15 +2439,34 @@ export function AiAssistant() {
   const startListening = useCallback(async () => {
     if (micDisabled) return
     if (!micAvailable) {
-      setOmniError("Microphone is unavailable in this browser")
+      const granted = getRuntimeFlags().isElectron ? await requestMicrophoneAccess() : null
+      setOmniError(
+        getRuntimeFlags().isElectron
+          ? "Microphone is unavailable. Open macOS System Settings and allow Emux to use the microphone."
+          : "Microphone is unavailable in this browser",
+      )
       setOmniStatus("error")
+      if (getRuntimeFlags().isElectron && granted !== true) {
+        void openMicrophonePermissions()
+      }
       return
     }
 
-    connectVoice()
+    if (getRuntimeFlags().isElectron) {
+      const granted = await requestMicrophoneAccess()
+      if (granted === false) {
+        setOmniError(
+          "Microphone access denied. Open macOS System Settings and allow Emux to use the microphone.",
+        )
+        setOmniStatus("error")
+        void openMicrophonePermissions()
+        return
+      }
+    }
 
     if (!pipelineRef.current) {
       pipelineRef.current = createAudioPipeline()
+      pipelineRef.current.setVolume(volume)
     }
 
     try {
@@ -938,10 +2495,19 @@ export function AiAssistant() {
       setOmniTranscript("")
       clearAssistantDraft()
       setOmniError(null)
+      connectVoice()
     } catch {
       setMicCapturing(false)
-      setOmniError("Microphone access denied")
+      const granted = getRuntimeFlags().isElectron ? await requestMicrophoneAccess() : null
+      setOmniError(
+        getRuntimeFlags().isElectron
+          ? "Microphone access denied. Open macOS System Settings and allow Emux to use the microphone."
+          : "Microphone access denied",
+      )
       setOmniStatus("error")
+      if (getRuntimeFlags().isElectron && granted !== true) {
+        void openMicrophonePermissions()
+      }
     }
   }, [
     clearAssistantDraft,
@@ -971,9 +2537,36 @@ export function AiAssistant() {
       audioMutedRef.current = next
       if (next) {
         pipelineRef.current?.stopPlayback()
+      } else {
+        setVolume((v) => {
+          if (v === 0) {
+            localStorage.setItem("omni-volume", "0.5")
+            pipelineRef.current?.setVolume(0.5)
+            return 0.5
+          }
+          pipelineRef.current?.setVolume(v)
+          return v
+        })
       }
       return next
     })
+  }, [])
+
+  const handleVolumeChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(event.target.value)
+    setVolume(val)
+    localStorage.setItem("omni-volume", String(val))
+    if (pipelineRef.current) {
+      pipelineRef.current.setVolume(val)
+    }
+    if (val > 0 && audioMutedRef.current) {
+      setAudioMuted(false)
+      audioMutedRef.current = false
+    } else if (val === 0 && !audioMutedRef.current) {
+      setAudioMuted(true)
+      audioMutedRef.current = true
+      pipelineRef.current?.stopPlayback()
+    }
   }, [])
 
   const handleStopResponse = useCallback(() => {
@@ -1003,24 +2596,12 @@ export function AiAssistant() {
   ])
 
   const handleConfirm = useCallback(() => {
-    if (omniPendingConfirmation && wsRef.current?.isConnected()) {
-      wsRef.current.send({
-        type: "confirm_action",
-        confirmationId: omniPendingConfirmation.confirmationId,
-      })
-    }
-  }, [omniPendingConfirmation])
+    sendPendingConfirmationResponse("confirm")
+  }, [sendPendingConfirmationResponse])
 
   const handleCancel = useCallback(() => {
-    if (omniPendingConfirmation && wsRef.current?.isConnected()) {
-      wsRef.current.send({
-        type: "cancel_action",
-        confirmationId: omniPendingConfirmation.confirmationId,
-      })
-    }
-    setOmniConfirmation(null)
-    setOmniStatus("listening")
-  }, [omniPendingConfirmation, setOmniConfirmation, setOmniStatus])
+    sendPendingConfirmationResponse("cancel")
+  }, [sendPendingConfirmationResponse])
 
   const handleReconnect = useCallback(() => {
     stopListening()
@@ -1043,6 +2624,7 @@ export function AiAssistant() {
       }
       if (!pipelineRef.current) {
         pipelineRef.current = createAudioPipeline()
+        pipelineRef.current.setVolume(volume)
       }
 
       const now = new Date().toISOString()
@@ -1062,6 +2644,10 @@ export function AiAssistant() {
       clearAssistantDraft()
       setOmniError(null)
       suppressAssistantOutputRef.current = false
+      const confirmationResponse = parseVoiceConfirmation(text)
+      if (confirmationResponse && sendPendingConfirmationResponse(confirmationResponse)) {
+        return
+      }
       omniStatusRef.current = "processing"
       setOmniStatus("processing")
       if (existingWs) {
@@ -1074,6 +2660,7 @@ export function AiAssistant() {
       connectVoice,
       inputText,
       sendSessionContext,
+      sendPendingConfirmationResponse,
       setOmniError,
       setOmniStatus,
       setOmniTranscript,
@@ -1259,6 +2846,12 @@ export function AiAssistant() {
     : omniStatus === "error"
       ? handleReconnect
       : startListening
+  const totalVisibleInputTokens = displayInputTokens(tokenUsage.total)
+  const totalSkillTokens = tokenUsage.total.skillTokens ?? 0
+  const totalCacheReadTokens = tokenUsage.total.cacheReadTokens ?? 0
+  const lastVisibleInputTokens = tokenUsage.last ? displayInputTokens(tokenUsage.last) : 0
+  const lastSkillTokens = tokenUsage.last?.skillTokens ?? 0
+  const lastCacheReadTokens = tokenUsage.last?.cacheReadTokens ?? 0
 
   useLayoutEffect(() => {
     scrollChatToBottom()
@@ -1339,7 +2932,7 @@ export function AiAssistant() {
           <span className="voice-status-dot" />
         </div>
         <div className="voice-status-label">
-          <span>{omniStatus}</span>
+          <span key={omniStatus}>{omniStatus}</span>
         </div>
         <div className="voice-token-meter-container" ref={tokenMeterContainerRef}>
           <button
@@ -1378,38 +2971,40 @@ export function AiAssistant() {
 
               <div className="voice-token-visual-bar">
                 <div className="bar-label">
-                  <span>Input vs Output Allocation</span>
+                  <span>Input, Skills, Output Allocation</span>
                 </div>
                 <div className="progress-track">
                   <div
                     className="progress-segment input-segment"
                     style={{
-                      width: `${
-                        tokenUsage.total.totalTokens > 0
-                          ? (tokenUsage.total.inputTokens / tokenUsage.total.totalTokens) * 100
-                          : 50
-                      }%`,
+                      width: `${tokenUsage.total.totalTokens > 0 ? percentOfTotal(totalVisibleInputTokens, tokenUsage.total.totalTokens) : 50}%`,
                     }}
-                    title={`Input: ${formatTokenCount(tokenUsage.total.inputTokens)} tokens`}
+                    title={`Input: ${formatTokenCount(totalVisibleInputTokens)} tokens`}
+                  />
+                  <div
+                    className="progress-segment skills-segment"
+                    style={{
+                      width: `${percentOfTotal(totalSkillTokens, tokenUsage.total.totalTokens)}%`,
+                    }}
+                    title={`Skills: ${formatTokenCount(totalSkillTokens)} tokens`}
                   />
                   <div
                     className="progress-segment output-segment"
                     style={{
-                      width: `${
-                        tokenUsage.total.totalTokens > 0
-                          ? (tokenUsage.total.outputTokens / tokenUsage.total.totalTokens) * 100
-                          : 50
-                      }%`,
+                      width: `${tokenUsage.total.totalTokens > 0 ? percentOfTotal(tokenUsage.total.outputTokens, tokenUsage.total.totalTokens) : 50}%`,
                     }}
                     title={`Output: ${formatTokenCount(tokenUsage.total.outputTokens)} tokens`}
                   />
                 </div>
                 <div className="progress-legend">
                   <span className="legend-item input-legend">
-                    <span className="legend-dot" /> Input ({tokenUsage.total.totalTokens > 0 ? Math.round((tokenUsage.total.inputTokens / tokenUsage.total.totalTokens) * 100) : 0}%)
+                    <span className="legend-dot" /> Input ({Math.round(percentOfTotal(totalVisibleInputTokens, tokenUsage.total.totalTokens))}%)
+                  </span>
+                  <span className="legend-item skills-legend">
+                    <span className="legend-dot" /> Skills ({Math.round(percentOfTotal(totalSkillTokens, tokenUsage.total.totalTokens))}%)
                   </span>
                   <span className="legend-item output-legend">
-                    <span className="legend-dot" /> Output ({tokenUsage.total.totalTokens > 0 ? Math.round((tokenUsage.total.outputTokens / tokenUsage.total.totalTokens) * 100) : 0}%)
+                    <span className="legend-dot" /> Output ({Math.round(percentOfTotal(tokenUsage.total.outputTokens, tokenUsage.total.totalTokens))}%)
                   </span>
                 </div>
               </div>
@@ -1428,8 +3023,16 @@ export function AiAssistant() {
                       <span className="indicator-dot input-dot" />
                       Input
                     </td>
-                    <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.inputTokens) : "-"}</td>
-                    <td>{formatTokenCount(tokenUsage.total.inputTokens)}</td>
+                    <td>{tokenUsage.last ? formatTokenCount(lastVisibleInputTokens) : "-"}</td>
+                    <td>{formatTokenCount(totalVisibleInputTokens)}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span className="indicator-dot skills-dot" />
+                      Skills
+                    </td>
+                    <td>{tokenUsage.last ? formatTokenCount(lastSkillTokens) : "-"}</td>
+                    <td>{formatTokenCount(totalSkillTokens)}</td>
                   </tr>
                   <tr>
                     <td>
@@ -1438,6 +3041,14 @@ export function AiAssistant() {
                     </td>
                     <td>{tokenUsage.last ? formatTokenCount(tokenUsage.last.outputTokens) : "-"}</td>
                     <td>{formatTokenCount(tokenUsage.total.outputTokens)}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span className="indicator-dot cache-dot" />
+                      Cache Read
+                    </td>
+                    <td>{tokenUsage.last ? formatTokenCount(lastCacheReadTokens) : "-"}</td>
+                    <td>{formatTokenCount(totalCacheReadTokens)}</td>
                   </tr>
                   <tr className="table-row-total">
                     <td>Total</td>
@@ -1494,6 +3105,20 @@ export function AiAssistant() {
               <span>Live</span>
             </div>
             <div className="voice-message-bubble">{omniTranscript}</div>
+          </div>
+        )}
+
+        {omniStatus === "processing" && !assistantDraft && (
+          <div className="voice-message voice-message--assistant voice-message--live voice-message--thinking">
+            <div className="voice-message-meta">
+              <span>AI</span>
+              <span>Thinking</span>
+            </div>
+            <div className="voice-message-bubble voice-message-bubble--thinking" aria-label="AI is thinking">
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+              <span className="thinking-dot" />
+            </div>
           </div>
         )}
 
@@ -1557,12 +3182,34 @@ export function AiAssistant() {
               }
             }}
           />
-          {(micCapturing || omniStatus === "connecting") && (
+          {micCapturing && omniStatus !== "connecting" && (
             <div className="voice-level-bar" aria-hidden="true">
               {audioBars.map((active, i) => (
                 <span
                   key={i}
                   className={`voice-level-segment${active ? " voice-level-segment--active" : ""}`}
+                />
+              ))}
+            </div>
+          )}
+          {omniStatus === "connecting" && (
+            <div className="voice-level-bar voice-level-bar--connecting" aria-hidden="true">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="voice-level-segment voice-level-segment--connecting"
+                  style={{ animationDelay: `${i * 0.08}s` }}
+                />
+              ))}
+            </div>
+          )}
+          {omniStatus === "processing" && (
+            <div className="voice-level-bar voice-level-bar--processing" aria-hidden="true">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <span
+                  key={i}
+                  className="voice-level-segment voice-level-segment--processing"
+                  style={{ animationDelay: `${i * 0.08}s` }}
                 />
               ))}
             </div>
@@ -1577,16 +3224,53 @@ export function AiAssistant() {
           >
             <SendIcon fontSize="small" />
           </button>
-          <button
-            type="button"
-            className={`voice-btn ${audioMuted ? "voice-btn--muted" : "voice-btn--audio"}`}
-            aria-label={audioMuted ? "Unmute AI voice" : "Mute AI voice"}
-            aria-pressed={audioMuted}
-            onClick={handleMuteToggle}
-            disabled={isDisabled}
-          >
-            {audioMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
-          </button>
+          <div className="voice-volume-control-wrapper">
+            <button
+              type="button"
+              className={`voice-btn ${audioMuted ? "voice-btn--muted" : "voice-btn--audio"}`}
+              aria-label="Adjust AI voice volume"
+              aria-haspopup="true"
+              aria-expanded={showVolumePopover}
+              onClick={() => setShowVolumePopover(!showVolumePopover)}
+              disabled={isDisabled}
+            >
+              {audioMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
+            </button>
+            {showVolumePopover && (
+              <div className="voice-volume-popover" ref={volumePopoverRef} data-testid="voice-volume-popover">
+                <div className="voice-volume-header">
+                  <span className="voice-volume-pct">{audioMuted ? "—" : `${Math.round(volume * 100)}%`}</span>
+                  <button
+                    type="button"
+                    className={`voice-mute-icon-btn${audioMuted ? " voice-mute-icon-btn--muted" : ""}`}
+                    aria-label={audioMuted ? "Unmute AI voice" : "Mute AI voice"}
+                    aria-pressed={audioMuted}
+                    onClick={handleMuteToggle}
+                    disabled={isDisabled}
+                  >
+                    {audioMuted ? <VolumeOffIcon style={{ fontSize: 16 }} /> : <VolumeUpIcon style={{ fontSize: 16 }} />}
+                  </button>
+                </div>
+                <div className="voice-volume-track-wrap">
+                  <div
+                    className="voice-volume-track-bg"
+                    style={{ "--volume-fill": `${audioMuted ? 0 : volume * 100}%` } as React.CSSProperties}
+                  />
+                  <input
+                    type="range"
+                    className="voice-volume-slider-popover"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    disabled={isDisabled}
+                    aria-label="Volume level"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           {isRunning ? (
             <button
               type="button"

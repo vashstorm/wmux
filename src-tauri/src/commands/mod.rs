@@ -7,5 +7,7 @@ pub mod projects;
 pub mod logs;
 pub mod ai;
 pub mod voice_history;
+pub mod voice;
+pub mod terminal;
 
 pub use crate::state::IpcState;

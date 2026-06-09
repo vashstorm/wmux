@@ -1,5 +1,16 @@
+/**
+ * @deprecated Use OmniIpc from voiceIpc.ts instead.
+ * This module uses native WebSocket which exposes API traffic to frontend.
+ * OmniIpc uses Tauri IPC Channel to keep the DashScope API key in the backend.
+ */
+
 import { getWebSocketUrl } from "./runtime.js"
 import type { OmniClientMessage, OmniServerEvent } from "./voiceTypes.js"
+
+export interface OmniClientError {
+  code: string
+  message: string
+}
 
 export interface OmniWebSocketOptions {
   token: string
