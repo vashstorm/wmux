@@ -4,6 +4,7 @@ pub mod app;
 pub mod config;
 pub mod http;
 pub mod intelligence;
+pub mod intelligence_task;
 pub mod ipc_error;
 pub mod logging;
 pub mod project_ai;

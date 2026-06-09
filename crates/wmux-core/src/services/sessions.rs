@@ -5,6 +5,7 @@ use wmux_core::intelligence::{
     self, ActiveProvider, IntelligenceStore, SessionIntelligence, WindowCacheDecision,
 };
 use wmux_core::ipc_error::{IpcError, IpcResult};
+use wmux_core::storage::{AiUsageRepository, models::NewAiUsageEvent};
 use wmux_core::tmux::{Adapter, Pane, Session, TmuxError, Window};
 
 use crate::services::connections::{
@@ -693,6 +694,46 @@ async fn analyze_single_window(
                 &command_basename,
                 &pane_signature,
             );
+
+            if let Some(pool) = pool {
+                let provider_name = if provider.provider.trim().is_empty() {
+                    provider.name.clone()
+                } else {
+                    provider.provider.clone()
+                };
+                let response_json = serde_json::json!({
+                    "app": intelligence.app,
+                    "status": intelligence.status,
+                    "summary": intelligence.summary,
+                    "confidence": intelligence.confidence,
+                    "source": intelligence.source,
+                })
+                .to_string();
+                let error_message = match &result {
+                    Err(err) => Some(err.message.clone()),
+                    Ok(_) => None,
+                };
+                let event = NewAiUsageEvent {
+                    project_id: None,
+                    provider: provider_name,
+                    model: provider.model.clone(),
+                    target_name: target_name.to_string(),
+                    session_name: session_name.to_string(),
+                    status: if is_error { "error".to_string() } else { "success".to_string() },
+                    duration_ms: elapsed_ms,
+                    prompt_tokens: result.as_ref().ok().and_then(|r| r.prompt_tokens),
+                    completion_tokens: result.as_ref().ok().and_then(|r| r.completion_tokens),
+                    total_tokens: result.as_ref().ok().and_then(|r| r.total_tokens),
+                    estimated_cost: None,
+                    error_message,
+                    window_number: Some(window.index as i64),
+                    response_json: Some(response_json),
+                };
+                let repo = AiUsageRepository::new(pool.clone());
+                if let Err(err) = repo.insert(&event).await {
+                    tracing::error!(target_name = %target_name, session_name = %session_name, window_id = %window.id, raw_error = %err, "failed to record window analysis usage event");
+                }
+            }
 
             WindowAnalysisResult {
                 intelligence,

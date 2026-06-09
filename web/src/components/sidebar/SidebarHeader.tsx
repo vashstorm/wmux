@@ -26,7 +26,8 @@ export const SidebarHeader = memo(function SidebarHeader({ activeView, onViewCha
     <Box
       className="sidebar-header"
       sx={{
-        minHeight: 48,
+        height: "var(--app-shell-header-height)",
+        minHeight: "var(--app-shell-header-height)",
         display: "flex",
         alignItems: "center",
         px: "var(--spacing-lg)",

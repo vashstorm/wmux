@@ -180,3 +180,126 @@ impl AiUsageRepository {
         Ok(result.rows_affected())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::db;
+
+    async fn setup_test_db() -> SqlitePool {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("create pool");
+        db::run_migrations(&pool).await.expect("run migrations");
+        pool
+    }
+
+    fn new_window_event(
+        target_name: &str,
+        session_name: &str,
+        window_number: i64,
+        status: &str,
+        response_json: Option<&str>,
+    ) -> NewAiUsageEvent {
+        NewAiUsageEvent {
+            project_id: None,
+            provider: "openai".to_string(),
+            model: "gpt-4".to_string(),
+            target_name: target_name.to_string(),
+            session_name: session_name.to_string(),
+            status: status.to_string(),
+            duration_ms: 1234,
+            prompt_tokens: Some(100),
+            completion_tokens: Some(50),
+            total_tokens: Some(150),
+            estimated_cost: None,
+            error_message: None,
+            window_number: Some(window_number),
+            response_json: response_json.map(|s| s.to_string()),
+        }
+    }
+
+    #[tokio::test]
+    async fn ai_usage_repository_insert_window_event_persists_window_number() {
+        let pool = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        let event = new_window_event("local", "dev", 3, "success", Some("{\"app\":\"vim\"}"));
+        let inserted = repo.insert(&event).await.expect("insert");
+
+        assert_eq!(inserted.target_name, "local");
+        assert_eq!(inserted.session_name, "dev");
+        assert_eq!(inserted.window_number, Some(3));
+        assert_eq!(inserted.status, "success");
+        assert_eq!(inserted.response_json, Some("{\"app\":\"vim\"}".to_string()));
+    }
+
+    #[tokio::test]
+    async fn ai_usage_repository_list_filters_by_status() {
+        let pool = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        repo.insert(&new_window_event("local", "dev", 1, "success", None))
+            .await
+            .expect("insert success");
+        repo.insert(&new_window_event("local", "dev", 2, "error", None))
+            .await
+            .expect("insert error");
+        repo.insert(&new_window_event("local", "dev", 3, "success", None))
+            .await
+            .expect("insert success 2");
+
+        let all = repo.list(10, None, None).await.expect("list all");
+        assert_eq!(all.len(), 3);
+
+        let errors = repo.list(10, None, Some("error")).await.expect("list errors");
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].window_number, Some(2));
+
+        let successes = repo.list(10, None, Some("success")).await.expect("list successes");
+        assert_eq!(successes.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn ai_usage_repository_summary_counts_window_events() {
+        let pool = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        repo.insert(&new_window_event("local", "dev", 1, "success", None))
+            .await
+            .expect("insert success");
+        repo.insert(&new_window_event("local", "dev", 2, "error", None))
+            .await
+            .expect("insert error");
+
+        let summary = repo.summary(None).await.expect("summary");
+        assert_eq!(summary.total_events, 2);
+        assert_eq!(summary.total_success, 1);
+        assert_eq!(summary.total_error, 1);
+        assert_eq!(summary.total_duration_ms, 2468);
+        assert_eq!(summary.total_prompt_tokens, 200);
+        assert_eq!(summary.total_completion_tokens, 100);
+        assert_eq!(summary.total_tokens, 300);
+    }
+
+    #[tokio::test]
+    async fn ai_usage_repository_delete_stale_window_events_removes_old_records() {
+        let pool = setup_test_db().await;
+        let repo = AiUsageRepository::new(pool);
+
+        repo.insert(&new_window_event("local", "dev", 1, "success", None))
+            .await
+            .expect("insert");
+
+        let deleted = repo
+            .delete_stale_window_events(None)
+            .await
+            .expect("delete stale");
+        assert_eq!(deleted, 0);
+
+        let remaining = repo.list(10, None, None).await.expect("list after delete");
+        assert_eq!(remaining.len(), 1);
+    }
+}

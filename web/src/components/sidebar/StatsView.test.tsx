@@ -1,5 +1,5 @@
 import { describe, expect, test, vi, beforeEach } from "vitest"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { AppProvider } from "../../state/store.js"
 import type { AiStatsResponse } from "../../api/client.js"
 import { StatsView } from "./StatsView.js"
@@ -83,7 +83,9 @@ describe("StatsView", () => {
     expect(screen.getByText("Wmux")).toBeInTheDocument()
     expect(screen.getByText("Project HTML")).toBeInTheDocument()
     expect(screen.getByText("dev")).toBeInTheDocument()
-    expect(screen.queryByText("Window Analysis")).not.toBeInTheDocument()
+
+    const analysisEvent = screen.getByTestId("stats-event-analysis-1")
+    expect(within(analysisEvent).queryByText("Window Analysis")).not.toBeInTheDocument()
   })
 
   test("clicking Errors reloads stats with an error status filter", async () => {

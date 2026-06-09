@@ -78,6 +78,9 @@ impl IpcState {
             app_state.set_sync_handle(sync_holder);
         }
 
+        let analysis_holder = wmux_core::intelligence_task::spawn_analysis_task(app_state.clone());
+        app_state.set_analysis_handle(analysis_holder);
+
         Ok(Self {
             app_state,
             config_path,

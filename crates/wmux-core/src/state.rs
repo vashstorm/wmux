@@ -24,6 +24,7 @@ pub struct AppState {
     pub storage: Option<SqlitePool>,
     pub cleanup_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
     pub sync_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
+    pub analysis_handle: Option<Arc<Mutex<Option<JoinHandle<()>>>>>,
     pub skills: RuntimeSkills,
 }
 
@@ -43,6 +44,7 @@ impl AppState {
             storage: None,
             cleanup_handle: None,
             sync_handle: None,
+            analysis_handle: None,
             skills: RuntimeSkills::default(),
         }
     }
@@ -75,6 +77,7 @@ impl AppState {
             storage: Some(pool),
             cleanup_handle: None,
             sync_handle: None,
+            analysis_handle: None,
             skills: RuntimeSkills::default(),
         })
     }
@@ -85,6 +88,10 @@ impl AppState {
 
     pub fn set_sync_handle(&mut self, handle: Arc<Mutex<Option<JoinHandle<()>>>>) {
         self.sync_handle = Some(handle);
+    }
+
+    pub fn set_analysis_handle(&mut self, handle: Arc<Mutex<Option<JoinHandle<()>>>>) {
+        self.analysis_handle = Some(handle);
     }
 }
 

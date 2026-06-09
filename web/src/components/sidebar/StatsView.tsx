@@ -135,9 +135,9 @@ export function StatsView() {
 
   const handleCleanup = useCallback(() => {
     showConfirm({
-      title: "Clean Tmux Analysis Logs",
+      title: "Clean Window Analysis Logs",
       message:
-        "This will delete all Tmux analysis records older than 5 minutes. Records within the last 5 minutes will be kept.",
+        "This will delete all Window analysis records older than 5 minutes. Records within the last 5 minutes will be kept.",
       confirmText: "Clean",
       confirmVariant: "danger",
       onConfirm: () => {
@@ -156,7 +156,7 @@ export function StatsView() {
           variant="subtitle2"
           sx={{ fontSize: STATS_FONT_SIZE.title, fontWeight: "var(--font-weight-semibold)" }}
         >
-          Tmux Analysis
+          Window Analysis
         </Typography>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
           <IconButton
@@ -174,7 +174,7 @@ export function StatsView() {
                 size="small"
                 onClick={handleCleanup}
                 data-testid="stats-cleanup-button"
-                aria-label="Clean Tmux analysis logs"
+                aria-label="Clean Window analysis logs"
                 disabled={loading || cleaning || events.length === 0}
               >
                 <DeleteSweepIcon fontSize="small" />
@@ -289,8 +289,8 @@ export function StatsView() {
               aria-pressed={statusFilter === "error"}
               aria-label={
                 statusFilter === "error"
-                  ? "Show all Tmux analysis logs"
-                  : "Show error Tmux analysis logs"
+                  ? "Show all Window analysis logs"
+                  : "Show error Window analysis logs"
               }
               sx={{
                 p: 2,
@@ -361,7 +361,7 @@ export function StatsView() {
           data-testid="stats-empty"
           sx={{ textAlign: "center", py: 2 }}
         >
-          {statusFilter === "error" ? "No error logs found" : "No Tmux analysis events yet"}
+          {statusFilter === "error" ? "No error logs found" : "No Window analysis events yet"}
         </Typography>
       ) : (
         <List disablePadding dense>
