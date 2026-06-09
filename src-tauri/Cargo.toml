@@ -12,6 +12,7 @@ wmux-core = { path = "../crates/wmux-core" }
 serde = { version = "1", features = ["derive"] }
 tracing = "0.1"
 anyhow = "1"
+sqlx = { version = "0.8", features = ["sqlite"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
