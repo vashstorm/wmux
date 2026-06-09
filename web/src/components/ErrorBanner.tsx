@@ -1,6 +1,5 @@
+import { Alert, Button } from "@mui/material"
 import { useAppState } from "../state/store.js"
-import ErrorOutlinedIcon from "@mui/icons-material/ErrorOutlined"
-import CloseIcon from "@mui/icons-material/Close"
 
 export function ErrorBanner() {
   const { error, setError } = useAppState()
@@ -12,20 +11,31 @@ export function ErrorBanner() {
   if (!error) return null
 
   return (
-    <div className="error-banner" data-testid="error-banner">
-      <ErrorOutlinedIcon className="error-banner-icon" />
-      <div className="error-banner-content">
-        <span className="error-banner-code">Error: {error.code}</span>
-        <span className="error-banner-message">{error.message}</span>
-      </div>
-      <button
-        type="button"
-        className="error-banner-dismiss"
-        onClick={() => setError(null)}
-        aria-label="Dismiss error"
-      >
-        <CloseIcon className="error-banner-dismiss-icon" />
-      </button>
-    </div>
+    <Alert
+      severity="error"
+      variant="filled"
+      onClose={() => setError(null)}
+      action={
+        <Button
+          color="inherit"
+          size="small"
+          onClick={() => setError(null)}
+        >
+          Dismiss
+        </Button>
+      }
+      sx={{
+        position: "fixed",
+        bottom: "var(--spacing-xl)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9999,
+        maxWidth: 520,
+        width: "calc(100% - var(--spacing-xl) * 2)",
+      }}
+      data-testid="error-banner"
+    >
+      <strong>Error: {error.code}</strong> {error.message}
+    </Alert>
   )
 }

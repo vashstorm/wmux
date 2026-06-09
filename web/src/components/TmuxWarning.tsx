@@ -1,3 +1,4 @@
+import { Alert } from "@mui/material"
 import { useAppState } from "../state/store.js"
 
 export function TmuxWarning() {
@@ -15,9 +16,13 @@ export function TmuxWarning() {
   }
 
   return (
-    <div className="inline-warning-banner" data-testid="tmux-warning" role="alert">
-      <strong>Local tmux unavailable.</strong>
-      <span>Install tmux or update the tmux path in Settings before using local connections.</span>
-    </div>
+    <Alert
+      severity="warning"
+      sx={{ width: "100%", maxWidth: 720, mb: 2 }}
+      data-testid="tmux-warning"
+    >
+      <strong>Local tmux unavailable.</strong> Install tmux or update the tmux path in Settings before
+      using local connections.
+    </Alert>
   )
 }
