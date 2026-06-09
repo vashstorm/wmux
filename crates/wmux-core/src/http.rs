@@ -1,93 +1,61 @@
-use axum::Json;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use wmux_core::ipc_error::IpcError;
-use wmux_core::protocol::ErrorResponse;
+use serde::{Deserialize, Serialize};
 
-pub type ApiResult<T> = Result<Json<T>, ApiError>;
-
-pub fn api_error_from_ipc_error(error: IpcError) -> ApiError {
-    match error {
-        IpcError::NotFound(msg) => ApiError::not_found(msg),
-        IpcError::BadRequest(msg) => ApiError::bad_request(msg),
-        IpcError::Conflict(msg) => ApiError::conflict(msg),
-        IpcError::Internal(msg) => ApiError::internal(msg),
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorLogsResponse {
+    pub enabled: bool,
+    pub path: Option<String>,
+    pub lines: Vec<String>,
+    pub truncated: bool,
+    pub max_lines: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct ApiErrorLog {
-    pub code: &'static str,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiError {
+    pub code: String,
     pub message: String,
 }
 
-#[derive(Debug)]
-pub struct ApiError {
-    status: StatusCode,
-    code: &'static str,
-    message: String,
-}
-
 impl ApiError {
-    pub fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
+    pub fn bad_request(message: impl Into<String>) -> Self {
         Self {
-            status,
-            code,
+            code: "bad_request".to_string(),
             message: message.into(),
         }
     }
 
-    pub fn bad_request(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::BAD_REQUEST, "bad_request", message)
-    }
-
     pub fn not_found(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::NOT_FOUND, "not_found", message)
+        Self {
+            code: "not_found".to_string(),
+            message: message.into(),
+        }
     }
 
     pub fn conflict(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::CONFLICT, "conflict", message)
+        Self {
+            code: "conflict".to_string(),
+            message: message.into(),
+        }
     }
 
     pub fn internal(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", message)
+        Self {
+            code: "internal".to_string(),
+            message: message.into(),
+        }
     }
 
-    pub fn not_implemented(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::NOT_IMPLEMENTED, "not_implemented", message)
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self {
+            code: "unauthorized".to_string(),
+            message: message.into(),
+        }
     }
 
-    pub fn code(&self) -> &'static str {
-        self.code
+    pub fn code(&self) -> &str {
+        &self.code
     }
 
     pub fn message(&self) -> &str {
-        self.message.as_str()
+        &self.message
     }
-}
-
-impl std::fmt::Display for ApiError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.message.as_str())
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        let log = ApiErrorLog {
-            code: self.code,
-            message: self.message.clone(),
-        };
-        let mut response = (
-            self.status,
-            Json(ErrorResponse::new(self.code, self.message)),
-        )
-            .into_response();
-        response.extensions_mut().insert(log);
-        response
-    }
-}
-
-pub async fn api_not_found() -> ApiError {
-    ApiError::not_found("resource not found")
 }

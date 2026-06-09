@@ -2,16 +2,13 @@ extern crate self as wmux_core;
 
 pub mod app;
 pub mod config;
-pub mod handlers;
 pub mod http;
 pub mod intelligence;
 pub mod ipc_error;
 pub mod logging;
-pub mod middleware;
 pub mod project_ai;
 pub mod project_runtime;
 pub mod protocol;
-pub mod routes;
 pub mod services;
 pub mod session;
 pub mod skills;

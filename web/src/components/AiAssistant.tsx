@@ -18,8 +18,7 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp"
 import CloseIcon from "@mui/icons-material/Close"
 import AddIcon from "@mui/icons-material/Add"
 import SendIcon from "@mui/icons-material/Send"
-import { getAuthToken, getRuntimeFlags } from "../api/runtime.js"
-import { OmniWebSocket, type OmniClientError } from "../api/voiceClient.js"
+import { getRuntimeFlags } from "../api/runtime.js"
 import { OmniIpc } from "../api/voiceIpc.js"
 import { AudioPipeline } from "../api/audioPipeline.js"
 import type { OmniServerEvent, VoiceSessionContextMessage } from "../api/voiceTypes.js"
@@ -383,14 +382,17 @@ function compactOperationForTool(operation: unknown): unknown {
   }
 }
 
-function isDashScopeSettingsError(error: OmniClientError): boolean {
+function isDashScopeSettingsError(error: Error): boolean {
   return (
-    error.code === "unauthorized" ||
-    /DashScope|API key|Authorization|endpoint region|connection failed/i.test(error.message)
+    error.message.includes("DashScope") ||
+    error.message.includes("API key") ||
+    error.message.includes("Authorization") ||
+    error.message.includes("endpoint region") ||
+    error.message.includes("connection failed")
   )
 }
 
-function voiceErrorMessage(error: OmniClientError): string {
+function voiceErrorMessage(error: Error): string {
   if (isDashScopeSettingsError(error)) {
     return error.message
   }
@@ -509,7 +511,7 @@ export function AiAssistant() {
 
   const audioLevel = useRef(0)
   const [audioBars, setAudioBars] = useState<boolean[]>(new Array(LEVEL_SEGMENTS).fill(false))
-  const wsRef = useRef<OmniWebSocket | OmniIpc | null>(null)
+  const wsRef = useRef<OmniIpc | null>(null)
   const pipelineRef = useRef<AudioPipeline | null>(null)
   const wsConnectingRef = useRef(false)
   const omniStatusRef = useRef(omniStatus)
@@ -653,7 +655,7 @@ export function AiAssistant() {
   }, [connections, selectedPane, selectedTargetName])
 
   const sendSessionContext = useCallback(
-    (ws: OmniWebSocket | OmniIpc) => {
+    (ws: OmniIpc) => {
       const context = buildSessionContextMessage()
       if (context) {
         ws.send(context)
@@ -2374,8 +2376,6 @@ export function AiAssistant() {
 
   const connectVoice = useCallback(() => {
     if (wsConnectingRef.current || wsRef.current) return
-
-    const token = getAuthToken() ?? ""
 
     wsConnectingRef.current = true
     setWsConnecting(true)

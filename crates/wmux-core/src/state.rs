@@ -13,12 +13,6 @@ use wmux_core::skills::{
     OmniSkillDef, delete_skill_from_dir, load_skills_from_dir, save_skill_to_dir,
 };
 
-/// Cached config snapshot injected into request extensions by auth middleware.
-/// Wraps an `Arc<Config>` so handlers can cheaply clone and avoid
-/// re-acquiring the store lock.
-#[derive(Clone)]
-pub struct CachedConfig(pub Arc<Config>);
-
 #[derive(Clone)]
 pub struct AppState {
     pub store: Store,

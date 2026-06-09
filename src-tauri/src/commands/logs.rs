@@ -1,5 +1,5 @@
 use tauri::State;
-use wmux_core::handlers::logs::ErrorLogsResponse;
+use wmux_core::http::ErrorLogsResponse;
 use crate::state::IpcState;
 
 #[tauri::command]

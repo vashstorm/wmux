@@ -28,6 +28,7 @@ uuid = { version = "1", features = ["v4"] }
 ammonia = "4"
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 futures-util = "0.3"
+http-body = "0.4"
 
 [dev-dependencies]
 serde_json = "1"

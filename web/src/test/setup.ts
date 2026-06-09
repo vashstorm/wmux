@@ -9,11 +9,6 @@ vi.mock("@mui/material", async (importOriginal) => {
   }
 })
 
-const AUTH_TOKEN_KEY = "wmux-auth-token"
-const TEST_AUTH_TOKEN = "test-auth-token"
-
-sessionStorage.setItem(AUTH_TOKEN_KEY, TEST_AUTH_TOKEN)
-
 if (!window.matchMedia) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,

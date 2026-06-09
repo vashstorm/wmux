@@ -477,9 +477,6 @@ export function SettingsPanel() {
       setConfigConflict(null)
       setShowSettingsPanel(false)
 
-      if (formState?.tokenInput.trim()) {
-        sessionStorage.setItem("wmux-auth-token", formState.tokenInput.trim())
-      }
     } catch (err: unknown) {
       if (err instanceof ApiError && err.code === "conflict") {
         setConfigConflict({

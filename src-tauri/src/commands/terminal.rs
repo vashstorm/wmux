@@ -44,7 +44,7 @@ pub async fn terminal_open(
     let target = svc::build_terminal_target(&query).map_err(|e| e.to_string())?;
     let size = svc::parse_initial_size(&query).map_err(|e| e.to_string())?;
 
-    let tmux_path = wmux_core::handlers::connections::current_config(&state.app_state)
+    let tmux_path = wmux_core::services::connections::current_config(&state.app_state)
         .map(|c| c.tmux.path)
         .unwrap_or_else(|_| "tmux".to_string());
 

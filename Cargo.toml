@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/wmux-core",
-    # "crates/wmux-server",  # Task 11: remove entirely
     "src-tauri",
 ]
 resolver = "3"
