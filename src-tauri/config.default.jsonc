@@ -1,4 +1,6 @@
 {
+  // IPC-only config for Tauri runtime. No HTTP server.
+  // server.bind and auth.token are deprecated (ignored).
   "schemaVersion": 1,
   "path": ".",
   "server": {

@@ -2,17 +2,25 @@
   // Increment when the config schema changes.
   "schemaVersion": 1,
 
+  // Tauri-only IPC runtime. server.bind and auth.token are no longer used.
+  // They remain in config for backwards compatibility only.
+  //
+  // Runtime: Tauri desktop app with in-process IPC. No HTTP server.
+  // server.bind: DEPRECATED (ignored in Tauri mode)
+  // auth.token: DEPRECATED (ignored in Tauri mode)
+
   // Base runtime directory. Logs go to <path>/logs/, SQLite goes to <path>/data/.
   "path": ".",
 
   "server": {
-    // Localhost binds can omit auth.token. Non-localhost binds must set it.
+    // DEPRECATED: Only kept for backwards compatibility. Ignored in Tauri mode.
     "bind": "127.0.0.1:7331"
   },
 
   "auth": {
-    // Leave empty only for localhost development.
-    "token": "replace-with-a-random-token"
+    // DEPRECATED: Only kept for backwards compatibility. Ignored in Tauri mode.
+    // Leave empty - auth is handled by OS-level process isolation.
+    "token": ""
   },
 
   "tmux": {

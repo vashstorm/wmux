@@ -6276,25 +6276,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wmux-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "serde",
- "serde_json",
- "tempfile",
- "time",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "wmux-core",
-]
-
-[[package]]
 name = "wmux-tauri"
 version = "0.1.0"
 dependencies = [
