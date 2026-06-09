@@ -7,31 +7,23 @@ use serde::Serialize;
 use serde_json::json;
 use std::time::Instant;
 
-use crate::http::{ApiError, ApiResult};
+use crate::http::{api_error_from_ipc_error, ApiError, ApiResult};
 use crate::project_ai::{generate_sanitized_html, get_active_provider};
 use crate::project_runtime::{launch_or_sync_project, snapshot_from_tmux};
+use crate::services::projects as svc;
+use crate::services::projects::{ProjectActionResponse, ProjectListResponse};
 use crate::state::{AppState, CachedConfig};
 use crate::storage::models::{NewAiUsageEvent, NewProject, Project, ProjectLayout, UpdateProject};
 use crate::storage::{AiUsageRepository, ProjectRepository};
 use crate::tmux::Adapter;
 
-#[derive(Serialize)]
-pub struct ProjectListResponse {
-    pub data: Vec<Project>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectActionResponse {
-    pub project: Project,
-    pub operation: String,
-}
-
 pub async fn list(State(state): State<AppState>) -> ApiResult<ProjectListResponse> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let projects = repo.list().await.map_err(map_project_error)?;
-    Ok(Json(ProjectListResponse { data: projects }))
+    match repo.list().await {
+        Ok(projects) => Ok(Json(ProjectListResponse { data: projects })),
+        Err(e) => Err(map_project_error(e)),
+    }
 }
 
 pub async fn create(
@@ -59,7 +51,10 @@ pub async fn create(
     }
 
     let repo = ProjectRepository::new(pool.clone());
-    let mut project = repo.create(&payload).await.map_err(map_project_error)?;
+    let mut project = match repo.create(&payload).await {
+        Ok(p) => p,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     if let Ok(true) = adapter.has_session(session_to_check).await {
         let now_str = time::OffsetDateTime::now_utc()
@@ -74,15 +69,16 @@ pub async fn create(
     }
 
     tracing::info!(project_id = %project.id, name = %project.name, "project created");
-
     Ok((StatusCode::CREATED, Json(project)))
 }
 
 pub async fn get(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
-    Ok(Json(project))
+    match repo.get_by_id(&id).await {
+        Ok(project) => Ok(Json(project)),
+        Err(e) => Err(map_project_error(e)),
+    }
 }
 
 pub async fn update(
@@ -92,14 +88,13 @@ pub async fn update(
 ) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo
-        .update(&id, &payload)
-        .await
-        .map_err(map_project_error)?;
-
-    tracing::info!(project_id = %project.id, name = %project.name, "project updated");
-
-    Ok(Json(project))
+    match repo.update(&id, &payload).await {
+        Ok(project) => {
+            tracing::info!(project_id = %project.id, name = %project.name, "project updated");
+            Ok(Json(project))
+        }
+        Err(e) => Err(map_project_error(e)),
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -116,13 +111,18 @@ pub async fn delete(
 ) -> Result<Response, ApiError> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
+    let project = match repo.get_by_id(&id).await {
+        Ok(p) => p,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
-    repo.delete(&id).await.map_err(map_project_error)?;
+    match repo.delete(&id).await {
+        Ok(()) => {}
+        Err(e) => return Err(map_project_error(e)),
+    }
 
     if params.kill_session {
         let session_name = session_name_for(&project);
-
         let tmux_path = tmux_path_from_config(&cached);
         let adapter = Adapter::new(tmux_path);
 
@@ -132,10 +132,8 @@ pub async fn delete(
     }
 
     tracing::info!(project_id = %id, "project deleted");
-
     Ok(StatusCode::NO_CONTENT.into_response())
 }
-
 
 fn storage(state: &AppState) -> Result<sqlx::SqlitePool, ApiError> {
     state
@@ -144,7 +142,6 @@ fn storage(state: &AppState) -> Result<sqlx::SqlitePool, ApiError> {
         .ok_or_else(|| ApiError::internal("storage not initialized"))
 }
 
-/// Returns the tmux executable path from config, or "tmux" if not configured.
 fn tmux_path_from_config(cached: &CachedConfig) -> &str {
     if cached.0.tmux.path.is_empty() {
         "tmux"
@@ -153,7 +150,6 @@ fn tmux_path_from_config(cached: &CachedConfig) -> &str {
     }
 }
 
-/// Returns the session name for a project, falling back to project name if empty.
 fn session_name_for(project: &Project) -> &str {
     if project.session_name.is_empty() {
         &project.name
@@ -189,21 +185,27 @@ pub async fn launch(
 ) -> ApiResult<ProjectActionResponse> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
+    let project = match repo.get_by_id(&id).await {
+        Ok(p) => p,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     let tmux_path = tmux_path_from_config(&cached);
     let adapter = Adapter::new(tmux_path);
 
-    let layout: ProjectLayout = serde_json::from_str(&project.layout_json)
-        .map_err(|e| ApiError::bad_request(format!("invalid layout JSON: {}", e)))?;
+    let layout: ProjectLayout = match serde_json::from_str(&project.layout_json) {
+        Ok(l) => l,
+        Err(e) => return Err(ApiError::bad_request(format!("invalid layout JSON: {}", e))),
+    };
 
     let session_name = session_name_for(&project);
 
-    let snapshot = launch_or_sync_project(&adapter, session_name, &layout)
-        .await
-        .map_err(map_tmux_error)?;
+    let snapshot = match launch_or_sync_project(&adapter, session_name, &layout).await {
+        Ok(s) => s,
+        Err(e) => return Err(map_tmux_error(e)),
+    };
 
-    let updated = repo
+    let updated = match repo
         .update_snapshot(
             &id,
             &snapshot.layout_json,
@@ -214,7 +216,10 @@ pub async fn launch(
             &project,
         )
         .await
-        .map_err(map_project_error)?;
+    {
+        Ok(u) => u,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     tracing::info!(
         project_id = %updated.id,
@@ -237,17 +242,19 @@ pub async fn sync_from_tmux(
 ) -> ApiResult<ProjectActionResponse> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
+    let project = match repo.get_by_id(&id).await {
+        Ok(p) => p,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     let tmux_path = tmux_path_from_config(&cached);
     let adapter = Adapter::new(tmux_path);
-
     let session_name = session_name_for(&project);
 
-    let exists = adapter
-        .has_session(session_name)
-        .await
-        .map_err(map_tmux_error)?;
+    let exists = match adapter.has_session(session_name).await {
+        Ok(e) => e,
+        Err(e) => return Err(map_tmux_error(e)),
+    };
     if !exists {
         return Err(ApiError::not_found(format!(
             "tmux session '{}' not found",
@@ -255,11 +262,12 @@ pub async fn sync_from_tmux(
         )));
     }
 
-    let snapshot = snapshot_from_tmux(&adapter, session_name)
-        .await
-        .map_err(map_tmux_error)?;
+    let snapshot = match snapshot_from_tmux(&adapter, session_name).await {
+        Ok(s) => s,
+        Err(e) => return Err(map_tmux_error(e)),
+    };
 
-    let updated = repo
+    let updated = match repo
         .update_snapshot(
             &id,
             &snapshot.layout_json,
@@ -270,7 +278,10 @@ pub async fn sync_from_tmux(
             &project,
         )
         .await
-        .map_err(map_project_error)?;
+    {
+        Ok(u) => u,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     tracing::info!(
         project_id = %updated.id,
@@ -293,7 +304,10 @@ pub async fn generate_ai_html(
 ) -> ApiResult<Project> {
     let pool = storage(&state)?;
     let repo = ProjectRepository::new(pool.clone());
-    let project = repo.get_by_id(&id).await.map_err(map_project_error)?;
+    let project = match repo.get_by_id(&id).await {
+        Ok(p) => p,
+        Err(e) => return Err(map_project_error(e)),
+    };
 
     let config = &cached.0;
     let provider_for_log = get_active_provider(&config.intelligence).ok();
@@ -302,10 +316,13 @@ pub async fn generate_ai_html(
     match generate_sanitized_html(&config, &project).await {
         Ok(ai_html) => {
             let duration_ms = started_at.elapsed().as_millis() as i64;
-            let updated = repo
+            let updated = match repo
                 .update_ai_result(&id, &ai_html, "completed", "", &project)
                 .await
-                .map_err(map_project_error)?;
+            {
+                Ok(u) => u,
+                Err(e) => return Err(map_project_error(e)),
+            };
             record_project_ai_usage_event(
                 &pool,
                 &project,
@@ -317,19 +334,17 @@ pub async fn generate_ai_html(
                 None,
             )
             .await;
-
             tracing::info!(
                 project_id = %updated.id,
                 ai_html_len = ai_html.len(),
                 "project AI HTML generated"
             );
-
             Ok(Json(updated))
         }
         Err(err) => {
             let duration_ms = started_at.elapsed().as_millis() as i64;
-            let api_err: ApiError = err.into();
-            let error_msg = api_err.message().to_string();
+            let error_msg = err.to_string();
+            let api_err: ApiError = ApiError::from(err);
             let _ = repo.update_ai_result(&id, "", "error", &error_msg, &project).await;
             record_project_ai_usage_event(
                 &pool,
@@ -342,13 +357,11 @@ pub async fn generate_ai_html(
                 Some(error_msg.as_str()),
             )
             .await;
-
             tracing::error!(
                 project_id = %id,
                 error = %error_msg,
                 "project AI HTML generation failed"
             );
-
             Err(api_err)
         }
     }
@@ -413,7 +426,6 @@ async fn record_project_ai_usage_event(
         window_number: None,
         response_json: Some(response_json),
     };
-
     if let Err(err) = repo.insert(&event).await {
         tracing::error!(project_id = %project.id, raw_error = %err, "failed to record project AI usage event");
     }

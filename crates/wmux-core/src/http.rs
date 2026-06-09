@@ -1,9 +1,19 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use wmux_core::ipc_error::IpcError;
 use wmux_core::protocol::ErrorResponse;
 
 pub type ApiResult<T> = Result<Json<T>, ApiError>;
+
+pub fn api_error_from_ipc_error(error: IpcError) -> ApiError {
+    match error {
+        IpcError::NotFound(msg) => ApiError::not_found(msg),
+        IpcError::BadRequest(msg) => ApiError::bad_request(msg),
+        IpcError::Conflict(msg) => ApiError::conflict(msg),
+        IpcError::Internal(msg) => ApiError::internal(msg),
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ApiErrorLog {

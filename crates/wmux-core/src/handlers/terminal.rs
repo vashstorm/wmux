@@ -9,18 +9,11 @@ use wmux_core::session::{
 
 use crate::handlers::connections::{current_config, find_connection, require_local_connection};
 use crate::http::ApiError;
+use crate::services::terminal as svc;
+use crate::services::terminal::TerminalQuery;
 use crate::state::AppState;
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TerminalQuery {
-    target_name: Option<String>,
-    session: Option<String>,
-    window: Option<String>,
-    pane: Option<String>,
-    rows: Option<String>,
-    cols: Option<String>,
-}
+pub use svc::TerminalSessionTarget;
 
 pub async fn websocket(
     State(state): State<AppState>,
@@ -51,13 +44,13 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
         return;
     }
 
-    if let Err(error) = require_terminal_target(&state, target_name.as_str()) {
+    if let Err(error) = svc::require_terminal_target(&state, target_name.as_str()) {
         tracing::warn!(target_name = %target_name, error = %error, "terminal target lookup failed");
         send_error_and_close(&mut socket, error.code(), error.message().to_string()).await;
         return;
     }
 
-    let target = match build_terminal_target(&query) {
+    let target = match svc::build_terminal_target(&query) {
         Ok(target) => target,
         Err(message) => {
             tracing::warn!(target_name = %target_name, %message, "terminal bad request");
@@ -65,7 +58,8 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
             return;
         }
     };
-    let size = match parse_initial_size(&query) {
+
+    let size = match svc::parse_initial_size(&query) {
         Ok(size) => size,
         Err(message) => {
             tracing::warn!(target_name = %target_name, %message, "terminal bad request");
@@ -73,6 +67,7 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
             return;
         }
     };
+
     let tmux_path = match current_config(&state) {
         Ok(config) => config.tmux.path,
         Err(error) => {
@@ -82,15 +77,12 @@ async fn handle_socket(state: AppState, query: TerminalQuery, mut socket: WebSoc
         }
     };
 
-    let session = match state
-        .sessions
-        .attach_local(&target_name, tmux_path, target, size)
-        .await
-    {
+    let target_struct = TerminalSessionTarget { target };
+    let session = match svc::attach_terminal_session(&state, &target_name, tmux_path, target_struct, size).await {
         Ok(session) => session,
         Err(error) => {
             tracing::error!(target_name = %target_name, error = %error, "terminal attach failed");
-            send_error_and_close(&mut socket, session_error_code(&error), error.to_string()).await;
+            send_error_and_close(&mut socket, svc::session_error_code(&error), error.to_string()).await;
             return;
         }
     };
@@ -164,44 +156,6 @@ async fn bridge_terminal(mut socket: WebSocket, session: Session, target_name: S
     let _ = socket.send(Message::Close(None)).await;
 }
 
-fn build_terminal_target(query: &TerminalQuery) -> Result<String, String> {
-    let session = query.session.as_deref().unwrap_or_default().trim();
-    if session.is_empty() {
-        return Err("session target is required".to_string());
-    }
-
-    let mut parts = vec![format!("session={}", percent_encode_query_value(session))];
-    if let Some(window) = trimmed_non_empty(query.window.as_deref()) {
-        parts.push(format!("window={}", percent_encode_query_value(window)));
-    }
-    if let Some(pane) = trimmed_non_empty(query.pane.as_deref()) {
-        parts.push(format!("pane={}", percent_encode_query_value(pane)));
-    }
-    Ok(parts.join("&"))
-}
-
-fn parse_initial_size(query: &TerminalQuery) -> Result<WindowSize, String> {
-    let rows = parse_optional_positive_u16(query.rows.as_deref())
-        .map_err(|error| format!("invalid rows query parameter: {error}"))?
-        .unwrap_or(24);
-    let cols = parse_optional_positive_u16(query.cols.as_deref())
-        .map_err(|error| format!("invalid cols query parameter: {error}"))?
-        .unwrap_or(80);
-    WindowSize::new(cols, rows).map_err(|error| error.to_string())
-}
-
-fn parse_optional_positive_u16(raw: Option<&str>) -> Result<Option<u16>, String> {
-    let raw = raw.unwrap_or_default().trim();
-    if raw.is_empty() {
-        return Ok(None);
-    }
-    let value = raw.parse::<i32>().map_err(|error| error.to_string())?;
-    if value <= 0 || value > u16::MAX as i32 {
-        return Err("must be positive".to_string());
-    }
-    Ok(Some(value as u16))
-}
-
 async fn send_json(socket: &mut WebSocket, message: &ServerMessage) -> Result<(), axum::Error> {
     let data = serde_json::to_string(message).map_err(axum::Error::new)?;
     socket.send(Message::Text(data.into())).await
@@ -216,43 +170,4 @@ fn terminal_error(code: impl Into<String>, message: impl Into<String>) -> Server
     ServerMessage::Error {
         error: ErrorDetail::new(code, message),
     }
-}
-
-fn session_error_code(error: &SessionError) -> &'static str {
-    match error {
-        SessionError::MissingTargetName
-        | SessionError::MissingTarget
-        | SessionError::MissingTargetPart(_)
-        | SessionError::InvalidWindowSize
-        | SessionError::InvalidTarget(_) => "bad_request",
-        SessionError::TmuxCommandFailed(_) | SessionError::Pty(_) => "terminal_attach_failed",
-        SessionError::SessionClosed | SessionError::Join(_) => "terminal_closed",
-    }
-}
-
-fn require_terminal_target(state: &AppState, target_name: &str) -> Result<(), ApiError> {
-    if target_name == "local" {
-        return Ok(());
-    }
-    let connection = find_connection(state, target_name)?;
-    require_local_connection(&connection)
-}
-
-fn trimmed_non_empty(value: Option<&str>) -> Option<&str> {
-    let value = value?.trim();
-    if value.is_empty() { None } else { Some(value) }
-}
-
-fn percent_encode_query_value(value: &str) -> String {
-    let mut encoded = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(byte as char);
-            }
-            b' ' => encoded.push('+'),
-            _ => encoded.push_str(&format!("%{byte:02X}")),
-        }
-    }
-    encoded
 }

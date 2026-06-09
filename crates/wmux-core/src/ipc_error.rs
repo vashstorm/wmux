@@ -46,6 +46,15 @@ impl IpcError {
         Self::Internal(message.into())
     }
 
+    pub fn from_ai_error(err: &crate::project_ai::AiError) -> Self {
+        match err {
+            crate::project_ai::AiError::ProviderNotConfigured => Self::BadRequest(err.to_string()),
+            crate::project_ai::AiError::HttpError(msg) => Self::BadRequest(msg.clone()),
+            crate::project_ai::AiError::ParseError(msg) => Self::Internal(msg.clone()),
+            crate::project_ai::AiError::SizeExceeded => Self::Internal(err.to_string()),
+        }
+    }
+
     /// Returns the stable error code for this error.
     pub fn code(&self) -> &'static str {
         match self {

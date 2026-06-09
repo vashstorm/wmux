@@ -706,7 +706,8 @@ impl OmniSkillExecutor {
 
     fn tmux_adapter_for_target(&self, target_name: &str) -> Result<Adapter, OmniExecutorError> {
         if target_name != "local" {
-            let connection = find_connection(&self.state, target_name).map_err(api_error)?;
+            let runtime_conn = find_connection(&self.state, target_name).map_err(api_error)?;
+            let connection: wmux_core::config::ConnectionConfig = runtime_conn.into_config();
             require_local_connection(&connection).map_err(api_error)?;
         }
         let config = current_config(&self.state).map_err(api_error)?;

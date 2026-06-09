@@ -12,6 +12,7 @@ pub mod project_ai;
 pub mod project_runtime;
 pub mod protocol;
 pub mod routes;
+pub mod services;
 pub mod session;
 pub mod skills;
 pub mod state;

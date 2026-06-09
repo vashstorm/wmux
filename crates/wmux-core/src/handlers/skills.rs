@@ -5,44 +5,36 @@ use axum::response::IntoResponse;
 use serde::Serialize;
 use wmux_core::skills::OmniSkillDef;
 
-use crate::http::{ApiError, ApiResult};
+use crate::http::{api_error_from_ipc_error, ApiError, ApiResult};
+use crate::services::skills as svc;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillListResponse {
-    data: Vec<OmniSkillDef>,
+    pub data: Vec<OmniSkillDef>,
 }
 
 pub async fn list(State(state): State<AppState>) -> ApiResult<SkillListResponse> {
-    Ok(Json(SkillListResponse {
-        data: state.skills.list(),
-    }))
+    let data = svc::list_skills(&state);
+    Ok(Json(SkillListResponse { data }))
 }
 
 pub async fn get(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<OmniSkillDef> {
-    let skill = state
-        .skills
-        .get(&id)
-        .ok_or_else(|| ApiError::not_found(format!("skill not found: {id}")))?;
-    Ok(Json(skill))
+    match svc::get_skill(&state, &id) {
+        Ok(skill) => Ok(Json(skill)),
+        Err(e) => Err(api_error_from_ipc_error(e)),
+    }
 }
 
 pub async fn create(
     State(state): State<AppState>,
     Json(payload): Json<OmniSkillDef>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.skills.get(&payload.id).is_some() {
-        return Err(ApiError::conflict(format!(
-            "skill already exists: {}",
-            payload.id
-        )));
+    match svc::create_skill(&state, payload) {
+        Ok(saved) => Ok((StatusCode::CREATED, Json(saved))),
+        Err(e) => Err(api_error_from_ipc_error(e)),
     }
-    let saved = state
-        .skills
-        .upsert(&payload)
-        .map_err(|error| ApiError::bad_request(error.to_string()))?;
-    Ok((StatusCode::CREATED, Json(saved)))
 }
 
 pub async fn update(
@@ -51,26 +43,20 @@ pub async fn update(
     Json(mut payload): Json<OmniSkillDef>,
 ) -> ApiResult<OmniSkillDef> {
     if payload.id != id {
-        payload.id = id;
+        payload.id = id.clone();
     }
-    let saved = state
-        .skills
-        .upsert(&payload)
-        .map_err(|error| ApiError::bad_request(error.to_string()))?;
-    Ok(Json(saved))
+    match svc::update_skill(&state, id, payload) {
+        Ok(saved) => Ok(Json(saved)),
+        Err(e) => Err(api_error_from_ipc_error(e)),
+    }
 }
 
 pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let removed = state
-        .skills
-        .delete(&id)
-        .map_err(|error| ApiError::bad_request(error.to_string()))?;
-    if removed {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("skill not found: {id}")))
+    match svc::delete_skill(&state, &id) {
+        Ok(()) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(api_error_from_ipc_error(e)),
     }
 }

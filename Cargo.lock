@@ -6298,10 +6298,12 @@ dependencies = [
 name = "wmux-tauri"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
  "tokio",
  "tracing",
  "wmux-core",
