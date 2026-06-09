@@ -12,3 +12,7 @@ wmux-core = { path = "../crates/wmux-core" }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "test-util"] }
+serde_json = "1"

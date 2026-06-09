@@ -5,6 +5,7 @@ pub mod config;
 pub mod handlers;
 pub mod http;
 pub mod intelligence;
+pub mod ipc_error;
 pub mod logging;
 pub mod middleware;
 pub mod project_ai;
@@ -17,6 +18,8 @@ pub mod state;
 pub mod storage;
 pub mod tmux;
 pub mod voice;
+
+pub use ipc_error::{IpcError, IpcResult};
 
 pub fn version() -> &'static str {
     match option_env!("WMUX_VERSION") {
