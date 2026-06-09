@@ -46,7 +46,7 @@ struct ConfigIntelligenceProviderResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ConfigIntelligenceResponse {
+pub struct ConfigIntelligenceResponse {
     enabled: bool,
     #[serde(skip_serializing_if = "String::is_empty")]
     active_provider: String,
@@ -62,7 +62,7 @@ struct ConfigIntelligenceResponse {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ConfigOmniResponse {
+pub struct ConfigOmniResponse {
     enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     dashscope_api_key: Option<String>,

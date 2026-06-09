@@ -34,7 +34,7 @@ pub async fn terminal_open(
     svc::require_terminal_target(&state.app_state, target_name)
         .map_err(|e| e.message().to_string())?;
 
-    let mut query = svc::TerminalQuery {
+    let query = svc::TerminalQuery {
         target_name: Some(target_name.to_string()),
         session: Some(session_name.to_string()),
         window: window.clone(),

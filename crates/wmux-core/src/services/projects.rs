@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::Instant;
 use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::project_ai::{generate_sanitized_html, get_active_provider};
@@ -296,14 +296,6 @@ fn storage(state: &AppState) -> IpcResult<sqlx::SqlitePool> {
         .ok_or_else(|| IpcError::internal("storage not initialized"))
 }
 
-fn tmux_path_from_config(config: &wmux_core::config::Config) -> &str {
-    if config.tmux.path.is_empty() {
-        "tmux"
-    } else {
-        &config.tmux.path
-    }
-}
-
 fn session_name_for(project: &Project) -> &str {
     if project.session_name.is_empty() {
         &project.name
@@ -443,18 +435,5 @@ mod tests {
             updated_at: "".to_string(),
         };
         assert_eq!(session_name_for(&project), "tmux-session");
-    }
-
-    #[test]
-    fn tmux_path_from_config_returns_tmux_when_empty() {
-        let config = wmux_core::config::Config::default();
-        assert_eq!(tmux_path_from_config(&config), "tmux");
-    }
-
-    #[test]
-    fn tmux_path_from_config_returns_configured_path() {
-        let mut config = wmux_core::config::Config::default();
-        config.tmux.path = "/usr/local/bin/tmux".to_string();
-        assert_eq!(tmux_path_from_config(&config), "/usr/local/bin/tmux");
     }
 }

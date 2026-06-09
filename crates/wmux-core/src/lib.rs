@@ -28,4 +28,5 @@ pub fn version() -> &'static str {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod test_utils;

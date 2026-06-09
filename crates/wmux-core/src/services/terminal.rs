@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use wmux_core::ipc_error::{IpcError, IpcResult};
+use wmux_core::ipc_error::IpcResult;
 use wmux_core::session::{Session, SessionError, WindowSize};
 
 use crate::state::AppState;

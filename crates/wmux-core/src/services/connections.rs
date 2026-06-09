@@ -5,7 +5,7 @@ use wmux_core::config::{Config, ConnectionConfig};
 use wmux_core::ipc_error::{IpcError, IpcResult};
 use wmux_core::tmux::Adapter;
 
-use crate::state::{AppState, RuntimeConnections};
+use crate::state::AppState;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,7 +169,7 @@ pub fn create_connection(
     normalize_connection_payload(&mut connection);
     validate_local_connection(&connection)?;
 
-    let mut connection = runtime_connection(connection);
+    let connection = runtime_connection(connection);
     state.connections.create(connection.clone());
 
     persist_connections(state)?;

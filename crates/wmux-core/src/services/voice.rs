@@ -1,6 +1,5 @@
 use std::time::Duration;
 use wmux_core::ipc_error::{IpcError, IpcResult};
-use wmux_core::protocol::OmniTarget;
 use wmux_core::voice::{OmniSkillExecutor, is_dangerous};
 
 pub use wmux_core::voice::OmniSkillExecution;
@@ -79,7 +78,7 @@ pub fn has_string_alias(params: &serde_json::Value, fields: &[&str]) -> bool {
 
 pub fn apply_session_context_defaults(
     skill: &str,
-    mut params: serde_json::Value,
+    params: serde_json::Value,
     target_name: Option<&str>,
 ) -> serde_json::Value {
     let Some(target_name) = target_name.filter(|value| !value.trim().is_empty()) else {

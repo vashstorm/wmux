@@ -1,16 +1,11 @@
 use std::time::Instant;
 
-use axum::body::Body;
-use axum::http::{Method, Request, StatusCode, header};
-use http_body::Body as _;
+use axum::http::Method;
 use serde_json::{Value, json};
-use tower::ServiceExt;
 use uuid::Uuid;
 
-use crate::http::ApiError;
-use crate::ipc_error::IpcError;
 use crate::protocol::{OmniServerEvent, OmniSkill, VOICE_FRONTEND_ROUTES};
-use crate::services::connections::{current_config, find_connection, require_local_connection};
+use crate::services::connections::current_config;
 use crate::state::AppState;
 use crate::tmux::{Adapter, TmuxError};
 use crate::voice::audit::{
@@ -38,13 +33,6 @@ impl OmniExecutorError {
     fn not_found(message: impl Into<String>) -> Self {
         Self {
             code: "not_found".to_string(),
-            message: message.into(),
-        }
-    }
-
-    fn conflict(message: impl Into<String>) -> Self {
-        Self {
-            code: "conflict".to_string(),
             message: message.into(),
         }
     }
@@ -601,36 +589,6 @@ impl OmniSkillExecutor {
             "Backend route '{}' is not available in IPC mode",
             path
         )))
-    }
-
-    fn internal_request(
-        &self,
-        method: Method,
-        path: &str,
-        body: Option<Value>,
-    ) -> Result<Request<Body>, OmniExecutorError> {
-        let mut builder = Request::builder().method(method).uri(path);
-        let token = self
-            .state
-            .store
-            .snapshot()
-            .map_err(|_| OmniExecutorError::bad_request("failed to read configuration"))?
-            .auth
-            .token
-            .trim()
-            .to_string();
-        if !token.is_empty() {
-            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
-        }
-        if body.is_some() {
-            builder = builder.header(header::CONTENT_TYPE, "application/json");
-        }
-        builder
-            .body(match body {
-                Some(value) => Body::from(value.to_string()),
-                None => Body::empty(),
-            })
-            .map_err(|error| OmniExecutorError::bad_request(error.to_string()))
     }
 
     async fn audit(
@@ -2059,34 +2017,6 @@ fn path_segment(value: &str) -> String {
     encoded
 }
 
-fn error_from_response(status: StatusCode, body: Value) -> OmniExecutorError {
-    let code = body
-        .get("error")
-        .and_then(|error| error.get("code"))
-        .and_then(Value::as_str)
-        .unwrap_or_else(|| status_error_code(status));
-    let message = body
-        .get("error")
-        .and_then(|error| error.get("message"))
-        .and_then(Value::as_str)
-        .unwrap_or("request failed")
-        .to_string();
-
-    match code {
-        "not_found" => OmniExecutorError::not_found(message),
-        "conflict" => OmniExecutorError::conflict(message),
-        _ => OmniExecutorError::bad_request(message),
-    }
-}
-
-fn status_error_code(status: StatusCode) -> &'static str {
-    match status {
-        StatusCode::NOT_FOUND => "not_found",
-        StatusCode::CONFLICT => "conflict",
-        _ => "bad_request",
-    }
-}
-
 fn event_requires_confirmation(event: &OmniServerEvent) -> bool {
     matches!(
         event,
@@ -2103,15 +2033,6 @@ fn confirmation_error(error: ConfirmationError) -> OmniExecutorError {
         ConfirmationError::Expired | ConfirmationError::InvalidState => {
             OmniExecutorError::bad_request(error.to_string())
         }
-    }
-}
-
-fn api_error(error: impl Into<IpcError>) -> OmniExecutorError {
-    let error: IpcError = error.into();
-    match &error.code()[..] {
-        "not_found" => OmniExecutorError::not_found(error.to_string()),
-        "conflict" => OmniExecutorError::conflict(error.to_string()),
-        _ => OmniExecutorError::bad_request(error.to_string()),
     }
 }
 

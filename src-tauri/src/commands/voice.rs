@@ -3,9 +3,7 @@
 //! These commands provide a secure IPC channel for voice communication,
 //! keeping the DashScope API key strictly within Rust backend.
 
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State, ipc::Channel};
-use tokio::sync::{RwLock, mpsc};
+use tauri::{AppHandle, State, ipc::Channel};
 use wmux_core::protocol::{OmniClientMessage, OmniServerEvent};
 
 use crate::state::IpcState;
@@ -25,31 +23,11 @@ pub struct VoiceClientConfig {
     pub connection_type: Option<String>,
 }
 
-/// Active voice session managed by the backend.
-struct VoiceSession {
-    /// Conversation ID for this session
-    conversation_id: String,
-    /// Channel to send events to frontend
-    event_tx: mpsc::Sender<String>,
-}
-
-/// Global voice session state.
-struct VoiceGlobalState {
-    /// Currently active voice session (if any)
-    session: Option<VoiceSession>,
-}
-
-impl Default for VoiceGlobalState {
-    fn default() -> Self {
-        Self { session: None }
-    }
-}
-
 /// Open a voice session with DashScope WebSocket in the backend.
 /// Returns a Channel for receiving server events.
 #[tauri::command]
 pub async fn voice_open(
-    app: AppHandle,
+    _app: AppHandle,
     state: State<'_, IpcState>,
     config: VoiceClientConfig,
     on_event: Channel<OmniServerEvent>,
@@ -70,7 +48,7 @@ pub async fn voice_open(
     }
 
     // Check if API key exists (never exposed to frontend)
-    let api_key = match &omni_config.dashscope_api_key {
+    let _api_key = match &omni_config.dashscope_api_key {
         Some(key) if !key.trim().is_empty() => key.trim().to_string(),
         _ => {
             return Err("voice_api_key_required".to_string());
@@ -83,7 +61,6 @@ pub async fn voice_open(
     }
 
     // Spawn the voice session task
-    let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         // This would be where we connect to DashScope WebSocket
         // For now, we send a connected event to establish the channel

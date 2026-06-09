@@ -5,7 +5,7 @@ use anyhow::Result;
 use sqlx::SqlitePool;
 use tokio::task::JoinHandle;
 
-use wmux_core::config::{Config, ConnectionConfig, Store};
+use wmux_core::config::{ConnectionConfig, Store};
 use wmux_core::intelligence::IntelligenceStore;
 use wmux_core::logging::LoggingHandle;
 use wmux_core::session::SessionManager;
